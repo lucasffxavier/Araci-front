@@ -15,26 +15,69 @@ namespace Araci.Applications.Editar.Deletar
 
         public bool MantemBotaoAtivado => true;
 
-        public void Ativar() { }
+        public void Ativar()
+        {
+        }
 
-        public void Desativar() { }
+        public void Desativar()
+        {
+        }
+
+        // =========================
+        // MOUSE DOWN
+        // =========================
 
         public void OnMouseDown(
             ElementoViewModel? vm,
             Point position)
         {
+            // =========================
+            // CLICK DIRETO NO ELEMENTO
+            // =========================
+
+            if (vm != null)
+            {
+                ExecutarDelete(
+                    new[] { vm });
+
+                return;
+            }
+
+            // =========================
+            // DELETE DA SELEÇÃO
+            // =========================
+
             var selecionados =
-                AppServices.Editor
-                    .ElementosSelecionados
+                SelectionService
+                    .Selecionados
                     .ToList();
 
             if (selecionados.Count == 0)
                 return;
 
+            ExecutarDelete(
+                selecionados);
+        }
+
+        // =========================
+        // EXECUTAR DELETE
+        // =========================
+
+        private void ExecutarDelete(
+            System.Collections.Generic.IEnumerable<ElementoViewModel> elementos)
+        {
+            var lista =
+                elementos
+                    .Distinct()
+                    .ToList();
+
+            if (lista.Count == 0)
+                return;
+
             AppServices.Commands
                 .BeginTransaction();
 
-            foreach (var item in selecionados)
+            foreach (var item in lista)
             {
                 AppServices.Commands.Execute(
                     new DeleteElementCommand(item));

@@ -79,6 +79,9 @@ namespace Araci.Services
         public static void Deselecionar(
             ElementoViewModel vm)
         {
+            if (!Selecionados.Contains(vm))
+                return;
+
             vm.IsSelecionado = false;
 
             Selecionados.Remove(vm);
@@ -94,7 +97,7 @@ namespace Araci.Services
 
         public static void Limpar()
         {
-            foreach (var item in Selecionados)
+            foreach (var item in Selecionados.ToList())
             {
                 item.IsSelecionado = false;
             }

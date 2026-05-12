@@ -6,8 +6,16 @@ namespace Araci.Core.Commands
     public class DeleteElementCommand
         : IUndoableCommand
     {
+        // =========================
+        // ELEMENTO
+        // =========================
+
         private readonly ElementoViewModel
             _vm;
+
+        // =========================
+        // CONSTRUTOR
+        // =========================
 
         public DeleteElementCommand(
             ElementoViewModel vm)
@@ -15,13 +23,26 @@ namespace Araci.Core.Commands
             _vm = vm;
         }
 
+        // =========================
+        // EXECUTE
+        // =========================
+
         public void Execute()
         {
             AppServices.Document
                 .RemoverElemento(_vm);
 
-            SelectionService.Limpar();
+            // =========================
+            // REMOVE APENAS O ITEM
+            // =========================
+
+            SelectionService
+                .Deselecionar(_vm);
         }
+
+        // =========================
+        // UNDO
+        // =========================
 
         public void Undo()
         {
