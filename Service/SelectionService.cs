@@ -1,5 +1,5 @@
-﻿using System.Linq;
-using System.Windows.Input;
+﻿using System.Collections.ObjectModel;
+using System.Linq;
 
 using Araci.ViewModels;
 
@@ -8,67 +8,84 @@ namespace Araci.Services
     public static class SelectionService
     {
         // =========================
+        // SELECIONADOS
+        // =========================
+
+        public static ObservableCollection<
+            ElementoViewModel>
+            Selecionados
+        { get; }
+            = new();
+
+        // =========================
+        // PRINCIPAL
+        // =========================
+
+        public static ElementoViewModel?
+            Principal
+        {
+            get
+            {
+                return Selecionados
+                    .FirstOrDefault();
+            }
+        }
+
+        // =========================
         // SELECIONAR
         // =========================
 
         public static void Selecionar(
-            ElementoViewModel vm)
+            ElementoViewModel vm,
+            bool adicionar = false)
         {
-            bool ctrl =
-                Keyboard.Modifiers.HasFlag(
-                    ModifierKeys.Control);
-
-            if (!ctrl)
+            if (!adicionar)
             {
                 Limpar();
             }
 
-            Toggle(vm, ctrl);
+            if (Selecionados.Contains(vm))
+                return;
+
+            vm.IsSelecionado = true;
+
+            Selecionados.Add(vm);
+
+            AppServices.Editor
+                .ElementoSelecionado = vm;
         }
 
         // =========================
         // TOGGLE
         // =========================
 
-        private static void Toggle(
-            ElementoViewModel vm,
-            bool ctrl)
+        public static void Toggle(
+            ElementoViewModel vm)
         {
-            var selecionados =
-                AppServices
-                    .Editor
-                    .ElementosSelecionados;
-
-            // =========================
-            // CTRL + CLICK
-            // =========================
-
-            if (ctrl)
+            if (Selecionados.Contains(vm))
             {
-                if (selecionados.Contains(vm))
-                {
-                    vm.IsSelecionado = false;
-
-                    selecionados.Remove(vm);
-                }
-                else
-                {
-                    vm.IsSelecionado = true;
-
-                    selecionados.Add(vm);
-                }
+                Deselecionar(vm);
             }
             else
             {
-                vm.IsSelecionado = true;
-
-                if (!selecionados.Contains(vm))
-                {
-                    selecionados.Add(vm);
-                }
+                Selecionar(vm, true);
             }
+        }
 
-            AtualizarPrincipal();
+        // =========================
+        // DESELECIONAR
+        // =========================
+
+        public static void Deselecionar(
+            ElementoViewModel vm)
+        {
+            vm.IsSelecionado = false;
+
+            Selecionados.Remove(vm);
+
+            AppServices.Editor
+                .ElementoSelecionado =
+                    Principal;
         }
 
         // =========================
@@ -77,36 +94,15 @@ namespace Araci.Services
 
         public static void Limpar()
         {
-            foreach (var item in AppServices
-                         .Editor
-                         .ElementosSelecionados
-                         .ToList())
+            foreach (var item in Selecionados)
             {
                 item.IsSelecionado = false;
             }
 
-            AppServices
-                .Editor
-                .ElementosSelecionados
-                .Clear();
+            Selecionados.Clear();
 
-            AtualizarPrincipal();
-        }
-
-        // =========================
-        // PRINCIPAL
-        // =========================
-
-        private static void AtualizarPrincipal()
-        {
-            AppServices.Editor.ElementoSelecionado =
-                AppServices.Editor
-                    .ElementosSelecionados
-                    .LastOrDefault();
-
-            AppServices
-                .Editor
-                .NotifySelecaoAlterada();
+            AppServices.Editor
+                .ElementoSelecionado = null;
         }
     }
 }

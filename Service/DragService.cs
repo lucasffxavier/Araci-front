@@ -23,9 +23,12 @@ namespace Araci.Services
             _elemento.MouseLeftButtonUp += MouseUp;
         }
 
-        private FrameworkElement? Ref => AppServices.ViewportReference;
+        private FrameworkElement? Ref =>
+            AppServices.ViewportReference;
 
-        private void MouseDown(object sender, MouseButtonEventArgs e)
+        private void MouseDown(
+            object sender,
+            MouseButtonEventArgs e)
         {
             if (_elemento is not FrameworkElement fe)
                 return;
@@ -38,41 +41,57 @@ namespace Araci.Services
 
             _arrastando = true;
 
-            _ultimoPonto = e.GetPosition(Ref); // 🔥 FIX REAL
+            _ultimoPonto =
+                e.GetPosition(Ref);
 
-            AppServices.Tools.HandleMouseDown(vm, _ultimoPonto);
+            AppServices.Tools
+                .HandleMouseDown(
+                    vm,
+                    _ultimoPonto);
+
+            e.Handled = true;
 
             _elemento.CaptureMouse();
         }
 
-        private void MouseMove(object sender, MouseEventArgs e)
+        private void MouseMove(
+            object sender,
+            MouseEventArgs e)
         {
             if (Ref == null)
                 return;
 
-            Point pos = e.GetPosition(Ref); // 🔥 FIX REAL
+            Point pos =
+                e.GetPosition(Ref);
 
             if (_arrastando)
             {
-                Vector delta = pos - _ultimoPonto;
+                Vector delta =
+                    pos - _ultimoPonto;
+
                 _ultimoPonto = pos;
 
                 DragDelta?.Invoke(delta);
             }
 
-            AppServices.Tools.HandleMouseMove(pos);
+            AppServices.Tools
+                .HandleMouseMove(pos);
         }
 
-        private void MouseUp(object sender, MouseButtonEventArgs e)
+        private void MouseUp(
+            object sender,
+            MouseButtonEventArgs e)
         {
             if (Ref == null)
                 return;
 
-            Point pos = e.GetPosition(Ref); // 🔥 FIX REAL
+            Point pos =
+                e.GetPosition(Ref);
 
             _arrastando = false;
 
-            AppServices.Tools.HandleMouseUp(pos);
+            AppServices.Tools
+                .HandleMouseUp(pos);
 
             _elemento.ReleaseMouseCapture();
         }

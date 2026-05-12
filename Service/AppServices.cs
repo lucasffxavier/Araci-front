@@ -3,6 +3,7 @@
 using Araci.Core.Documents;
 using Araci.Services;
 using Araci.Core.Commands;
+using Araci.ViewModels;
 
 namespace Araci
 {
@@ -51,6 +52,15 @@ namespace Araci
         public static MoveHudService MoveHud
         { get; }
             = new MoveHudService();
+
+        // =========================
+        // SELECTION BOX
+        // =========================
+
+        public static SelectionBoxViewModel
+            SelectionBox
+        { get; }
+            = new SelectionBoxViewModel();
 
         // =========================
         // COMMANDS
