@@ -16,39 +16,22 @@ using Araci.ViewModels;
 
 namespace Araci.Controls
 {
-    public class CaboControl
-        : UserControl
+    public class CaboControl : UserControl
     {
-        // =========================
-        // VISUAL
-        // =========================
-
         private readonly Line _line;
-
         private readonly Canvas _canvas;
-
         private readonly DragService _drag;
-
-        // =========================
-        // COMPATIBILIDADE LEGADO
-        // =========================
 
         public Cabo? Cabo
         {
             get
             {
                 if (DataContext is CaboViewModel vm)
-                {
                     return (Cabo)vm.Modelo;
-                }
 
                 return null;
             }
         }
-
-        // =========================
-        // CONSTRUTOR
-        // =========================
 
         public CaboControl()
         {
@@ -57,176 +40,114 @@ namespace Araci.Controls
             _line = new Line
             {
                 Stroke = Brushes.Lime,
-
                 StrokeThickness = 4,
-
                 SnapsToDevicePixels = true
             };
 
             _canvas = new Canvas();
-
             _canvas.Children.Add(_line);
 
             Content = _canvas;
 
-            MouseLeftButtonDown +=
-                OnMouseLeftButtonDown;
-
-            DataContextChanged +=
-                OnDataContextChanged;
+            MouseLeftButtonDown += OnMouseLeftButtonDown;
+            DataContextChanged += OnDataContextChanged;
 
             _drag = new DragService(this);
+            _drag.DragDelta += OnDragDelta; // 🔥 CORREÇÃO
         }
 
-        // =========================
-        // MOUSE
-        // =========================
-
-        private void OnMouseLeftButtonDown(
-            object sender,
-            MouseButtonEventArgs e)
+        private void OnDragDelta(Vector delta)
         {
             if (DataContext is not CaboViewModel vm)
                 return;
 
-            // =========================
-            // SELECIONAR
-            // =========================
+            var ferramenta = AppServices.Tools.FerramentaAtual;
 
-            if (AppServices.Tools.FerramentaAtual
-                is SelecionarTool)
+            if (ferramenta is SelecionarTool)
             {
-                SelectionService
-                    .Selecionar(vm);
+                MoveService.MoverCabo(this, vm, delta);
+            }
+            else if (ferramenta is MoverTool)
+            {
+                MoveService.MoverCabo(this, vm, delta);
+            }
+        }
 
+        private void OnMouseLeftButtonDown(object sender, MouseButtonEventArgs e)
+        {
+            if (DataContext is not CaboViewModel vm)
+                return;
+
+            if (AppServices.Tools.FerramentaAtual is SelecionarTool)
+            {
+                SelectionService.Selecionar(vm);
                 return;
             }
 
-            // =========================
-            // MOVER
-            // =========================
-
-            if (AppServices.Tools.FerramentaAtual
-                is MoverTool)
+            if (AppServices.Tools.FerramentaAtual is MoverTool)
             {
-                SelectionService
-                    .Selecionar(vm);
-
+                SelectionService.Selecionar(vm);
                 return;
             }
 
-            // =========================
-            // DELETAR
-            // =========================
-
-            if (AppServices.Tools.FerramentaAtual
-                is DeletarTool)
+            if (AppServices.Tools.FerramentaAtual is DeletarTool)
             {
-                AppServices.Viewport
-                    ?.RemoverElemento(vm);
-
-                SelectionService
-                    .Limpar();
-
+                AppServices.Viewport?.RemoverElemento(vm);
+                SelectionService.Limpar();
                 return;
             }
         }
 
-        // =========================
-        // DATACONTEXT
-        // =========================
-
-        private void OnDataContextChanged(
-            object sender,
-            DependencyPropertyChangedEventArgs e)
+        private void OnDataContextChanged(object sender, DependencyPropertyChangedEventArgs e)
         {
             if (e.OldValue is CaboViewModel antigo)
-            {
-                antigo.PropertyChanged -=
-                    OnViewModelPropertyChanged;
-            }
+                antigo.PropertyChanged -= OnViewModelPropertyChanged;
 
             if (e.NewValue is CaboViewModel novo)
             {
-                novo.PropertyChanged +=
-                    OnViewModelPropertyChanged;
-
+                novo.PropertyChanged += OnViewModelPropertyChanged;
                 AtualizarGeometria(novo);
-
                 AtualizarVisual(novo);
             }
         }
 
-        // =========================
-        // VIEWMODEL
-        // =========================
-
-        private void OnViewModelPropertyChanged(
-            object? sender,
-            PropertyChangedEventArgs e)
+        private void OnViewModelPropertyChanged(object? sender, PropertyChangedEventArgs e)
         {
             if (sender is not CaboViewModel vm)
                 return;
 
             AtualizarGeometria(vm);
-
             AtualizarVisual(vm);
         }
 
-        // =========================
-        // VISUAL
-        // =========================
-
-        private void AtualizarVisual(
-            CaboViewModel vm)
+        private void AtualizarVisual(CaboViewModel vm)
         {
             if (vm.IsSelecionado)
             {
-                _line.Stroke =
-                    Brushes.DeepSkyBlue;
-
-                _line.StrokeThickness =
-                    6;
+                _line.Stroke = Brushes.DeepSkyBlue;
+                _line.StrokeThickness = 6;
             }
             else
             {
-                _line.Stroke =
-                    Brushes.Lime;
-
-                _line.StrokeThickness =
-                    4;
+                _line.Stroke = Brushes.Lime;
+                _line.StrokeThickness = 4;
             }
         }
 
-        // =========================
-        // GEOMETRIA
-        // =========================
-
-        private void AtualizarGeometria(
-            CaboViewModel vm)
+        private void AtualizarGeometria(CaboViewModel vm)
         {
-            double minX =
-                Math.Min(vm.X, vm.X2);
+            double minX = Math.Min(vm.X, vm.X2);
+            double minY = Math.Min(vm.Y, vm.Y2);
 
-            double minY =
-                Math.Min(vm.Y, vm.Y2);
-
-            double largura =
-                Math.Abs(vm.X2 - vm.X);
-
-            double altura =
-                Math.Abs(vm.Y2 - vm.Y);
+            double largura = Math.Abs(vm.X2 - vm.X);
+            double altura = Math.Abs(vm.Y2 - vm.Y);
 
             Width = largura + 10;
-
             Height = altura + 10;
 
             _line.X1 = vm.X - minX;
-
             _line.Y1 = vm.Y - minY;
-
             _line.X2 = vm.X2 - minX;
-
             _line.Y2 = vm.Y2 - minY;
         }
     }

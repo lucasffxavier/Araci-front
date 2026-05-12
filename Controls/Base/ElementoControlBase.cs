@@ -13,134 +13,81 @@ using Araci.ViewModels;
 
 namespace Araci.Controls.Base
 {
-    public abstract class ElementoControlBase
-        : UserControl
+    public abstract class ElementoControlBase : UserControl
     {
-        // =========================
-        // CONSTRUTOR
-        // =========================
+        private readonly DragService _drag;
 
         protected ElementoControlBase()
         {
             Loaded += OnLoaded;
-
-            MouseLeftButtonDown +=
-                OnMouseLeftButtonDown;
-
-            DataContextChanged +=
-                OnDataContextChanged;
+            MouseLeftButtonDown += OnMouseLeftButtonDown;
+            DataContextChanged += OnDataContextChanged;
 
             Cursor = Cursors.Hand;
+
+            _drag = new DragService(this);
+            _drag.DragDelta += OnDragDelta;
         }
 
-        // =========================
-        // LOADED
-        // =========================
-
-        private void OnLoaded(
-            object sender,
-            RoutedEventArgs e)
+        private void OnLoaded(object sender, RoutedEventArgs e)
         {
             AtualizarPosicao();
-
             AtualizarVisual();
         }
 
-        // =========================
-        // MOUSE
-        // =========================
-
-        private void OnMouseLeftButtonDown(
-            object sender,
-            MouseButtonEventArgs e)
+        private void OnMouseLeftButtonDown(object sender, MouseButtonEventArgs e)
         {
             if (DataContext is not ElementoViewModel vm)
                 return;
 
-            // =========================
-            // SELECIONAR
-            // =========================
-
-            if (AppServices.Tools.FerramentaAtual
-                is SelecionarTool)
+            if (AppServices.Tools.FerramentaAtual is SelecionarTool ||
+                AppServices.Tools.FerramentaAtual is MoverTool)
             {
-                SelectionService
-                    .Selecionar(vm);
-
+                SelectionService.Selecionar(vm);
                 return;
             }
 
-            // =========================
-            // MOVER
-            // =========================
-
-            if (AppServices.Tools.FerramentaAtual
-                is MoverTool)
+            if (AppServices.Tools.FerramentaAtual is DeletarTool)
             {
-                SelectionService
-                    .Selecionar(vm);
-
-                return;
-            }
-
-            // =========================
-            // DELETAR
-            // =========================
-
-            if (AppServices.Tools.FerramentaAtual
-                is DeletarTool)
-            {
-                AppServices.Viewport
-                    ?.RemoverElemento(vm);
-
-                SelectionService
-                    .Limpar();
-
-                return;
+                AppServices.Viewport?.RemoverElemento(vm);
+                SelectionService.Limpar();
             }
         }
 
-        // =========================
-        // DATACONTEXT
-        // =========================
+        private void OnDragDelta(Vector delta)
+        {
+            if (DataContext is not ElementoViewModel vm)
+                return;
 
-        private void OnDataContextChanged(
-            object sender,
-            DependencyPropertyChangedEventArgs e)
+            var ferramenta = AppServices.Tools.FerramentaAtual;
+
+            if (ferramenta is SelecionarTool)
+            {
+                MoveService.Mover(this, vm, delta);
+            }
+            else if (ferramenta is MoverTool)
+            {
+                MoveService.Mover(this, vm, delta);
+            }
+        }
+
+        private void OnDataContextChanged(object sender, DependencyPropertyChangedEventArgs e)
         {
             if (e.OldValue is ElementoViewModel antigo)
-            {
-                antigo.PropertyChanged -=
-                    OnViewModelPropertyChanged;
-            }
+                antigo.PropertyChanged -= OnViewModelPropertyChanged;
 
             if (e.NewValue is ElementoViewModel novo)
             {
-                novo.PropertyChanged +=
-                    OnViewModelPropertyChanged;
-
+                novo.PropertyChanged += OnViewModelPropertyChanged;
                 AtualizarVisual();
             }
         }
 
-        // =========================
-        // PROPERTY CHANGED
-        // =========================
-
-        private void OnViewModelPropertyChanged(
-            object? sender,
-            PropertyChangedEventArgs e)
+        private void OnViewModelPropertyChanged(object? sender, PropertyChangedEventArgs e)
         {
-            if (e.PropertyName ==
-                nameof(ElementoViewModel.IsSelecionado))
-            {
+            if (e.PropertyName == nameof(ElementoViewModel.IsSelecionado))
                 AtualizarVisual();
-            }
         }
-
-        // =========================
-        // VISUAL
-        // =========================
 
         private void AtualizarVisual()
         {
@@ -148,28 +95,13 @@ namespace Araci.Controls.Base
                 return;
 
             if (vm.IsSelecionado)
-            {
                 AtualizarVisualSelecionado();
-            }
             else
-            {
                 AtualizarVisualNormal();
-            }
         }
 
-        // =========================
-        // VIRTUAL
-        // =========================
-
-        protected abstract void
-            AtualizarVisualSelecionado();
-
-        protected abstract void
-            AtualizarVisualNormal();
-
-        // =========================
-        // POSIÇÃO
-        // =========================
+        protected abstract void AtualizarVisualSelecionado();
+        protected abstract void AtualizarVisualNormal();
 
         protected void AtualizarPosicao()
         {
@@ -177,21 +109,13 @@ namespace Araci.Controls.Base
                 return;
 
             Canvas.SetLeft(this, vm.X);
-
             Canvas.SetTop(this, vm.Y);
         }
 
-        // =========================
-        // BRUSH
-        // =========================
-
-        protected SolidColorBrush CriarBrush(
-            string hexadecimal)
+        protected SolidColorBrush CriarBrush(string hex)
         {
             return new SolidColorBrush(
-                (Color)ColorConverter
-                .ConvertFromString(
-                    hexadecimal));
+                (Color)ColorConverter.ConvertFromString(hex));
         }
     }
 }
