@@ -2,6 +2,7 @@
 
 using Araci.Core.Documents;
 using Araci.Services;
+using Araci.Core.Commands;
 
 namespace Araci
 {
@@ -50,5 +51,14 @@ namespace Araci
         public static MoveHudService MoveHud
         { get; }
             = new MoveHudService();
+
+        // =========================
+        // COMMANDS
+        // =========================
+
+        public static CommandManager
+            Commands
+        { get; }
+            = new CommandManager();
     }
 }

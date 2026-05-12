@@ -2,6 +2,7 @@
 using System.Windows.Input;
 
 using Araci.Applications.Editar.Base;
+using Araci.Core.Commands;
 using Araci.Services;
 using Araci.ViewModels;
 
@@ -17,13 +18,19 @@ namespace Araci.Applications.Editar.Deletar
 
         public void Desativar() { }
 
-        public void OnMouseDown(ElementoViewModel? vm, Point position)
+        public void OnMouseDown(
+            ElementoViewModel? vm,
+            Point position)
         {
             if (vm == null)
                 return;
 
-            AppServices.Viewport?.RemoverElemento(vm);
-            SelectionService.Limpar();
+            var command =
+                new DeleteElementCommand(vm);
+
+            AppServices
+                .Commands
+                .Execute(command);
         }
 
         public void OnMouseMove(Point position)

@@ -74,6 +74,28 @@ namespace Araci.Services
 
         public void HandleKeyDown(Key key)
         {
+            // =========================
+            // UNDO
+            // =========================
+
+            if (Keyboard.Modifiers == ModifierKeys.Control
+                && key == Key.Z)
+            {
+                AppServices.Commands.Undo();
+                return;
+            }
+
+            // =========================
+            // REDO
+            // =========================
+
+            if (Keyboard.Modifiers == ModifierKeys.Control
+                && key == Key.Y)
+            {
+                AppServices.Commands.Redo();
+                return;
+            }
+
             _ferramentaAtual.OnKeyDown(key);
         }
     }
