@@ -1,6 +1,7 @@
-﻿using System.Collections.ObjectModel;
-using System.ComponentModel;
+﻿using System.ComponentModel;
 using System.Runtime.CompilerServices;
+
+using Araci.Core.Documents;
 
 namespace Araci.ViewModels
 {
@@ -8,22 +9,21 @@ namespace Araci.ViewModels
         : INotifyPropertyChanged
     {
         // =========================
-        // ELEMENTOS
+        // DOCUMENTO
         // =========================
 
-        public ObservableCollection<ElementoViewModel>
-            Elementos
+        public AraciDocument
+            Document
         { get; }
 
         // =========================
         // CONSTRUTOR
         // =========================
 
-        public ViewportViewModel()
+        public ViewportViewModel(
+            AraciDocument document)
         {
-            Elementos =
-                new ObservableCollection<
-                    ElementoViewModel>();
+            Document = document;
         }
 
         // =========================

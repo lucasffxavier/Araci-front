@@ -25,18 +25,18 @@ namespace Araci.Services
         // 🔥 RESTAURADO
         public void AdicionarElemento(ElementoViewModel vm)
         {
-            _vm.Elementos.Add(vm);
+            _vm.Document.Elementos.Add(vm);
         }
 
         // 🔥 RESTAURADO
         public void AdicionarCabo(CaboViewModel vm)
         {
-            _vm.Elementos.Add(vm);
+            _vm.Document.Elementos.Add(vm);
         }
 
         public void RemoverElemento(ElementoViewModel vm)
         {
-            _vm.Elementos.Remove(vm);
+            _vm.Document.Elementos.Remove(vm);
         }
     }
 }
