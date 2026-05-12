@@ -63,11 +63,12 @@ namespace Araci.Controls.Base
 
             if (ferramenta is SelecionarTool)
             {
-                MoveService.Mover(this, vm, delta);
+                vm.X += delta.X;
+                vm.Y += delta.Y;
             }
             else if (ferramenta is MoverTool)
             {
-                MoveService.Mover(this, vm, delta);
+                MoveService.Mover(vm, delta); // ✅ CORRETO (2 parâmetros)
             }
         }
 

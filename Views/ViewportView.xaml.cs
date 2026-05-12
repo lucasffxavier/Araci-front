@@ -1,5 +1,4 @@
 ﻿using Araci.Applications.Editar.Selecionar;
-
 using Araci.Services;
 using Araci.ViewModels;
 
@@ -12,59 +11,33 @@ using Araci.Controls;
 
 namespace Araci.Views
 {
-    public partial class ViewportView
-        : UserControl
+    public partial class ViewportView : UserControl
     {
-        // =========================
-        // VIEWMODEL
-        // =========================
-
-        private readonly ViewportViewModel
-            _viewportViewModel;
-
-        // =========================
-        // CONSTRUTOR
-        // =========================
+        private readonly ViewportViewModel _viewportViewModel;
 
         public ViewportView()
         {
             InitializeComponent();
 
-            _viewportViewModel =
-                new ViewportViewModel();
+            _viewportViewModel = new ViewportViewModel();
 
-            DataContext =
-                _viewportViewModel;
+            DataContext = _viewportViewModel;
 
             AppServices.Viewport =
-                new ViewportService(
-                    _viewportViewModel);
+                new ViewportService(_viewportViewModel);
 
         }
 
-        // =========================
-        // LOADED
-        // =========================
-
-        private void OnLoaded(
-            object sender,
-            RoutedEventArgs e)
+        private void OnLoaded(object sender, RoutedEventArgs e)
         {
             Focus();
         }
 
-        // =========================
-        // MOUSE
-        // =========================
-
-        private void OnPreviewMouseLeftButtonDown(
-            object sender,
-            MouseButtonEventArgs e)
+        private void OnPreviewMouseLeftButtonDown(object sender, MouseButtonEventArgs e)
         {
             Focus();
 
-            DependencyObject? origem =
-                e.OriginalSource as DependencyObject;
+            DependencyObject? origem = e.OriginalSource as DependencyObject;
 
             while (origem != null)
             {
@@ -75,34 +48,21 @@ namespace Araci.Views
                     return;
                 }
 
-                origem =
-                    VisualTreeHelper.GetParent(origem);
+                origem = VisualTreeHelper.GetParent(origem);
             }
 
-            if (AppServices.Tools.FerramentaAtual
-                is SelecionarTool)
+            if (AppServices.Tools.FerramentaAtual is SelecionarTool)
             {
                 SelectionService.Limpar();
             }
         }
 
-        // =========================
-        // TECLADO
-        // =========================
-
-        private void OnPreviewKeyDown(
-            object sender,
-            KeyEventArgs e)
+        private void OnPreviewKeyDown(object sender, KeyEventArgs e)
         {
             if (e.Key == Key.Escape)
             {
-                AppServices
-                    .Tools
-                    .VoltarParaSelecao();
-
-                SelectionService
-                    .Limpar();
-
+                AppServices.Tools.VoltarParaSelecao();
+                SelectionService.Limpar();
                 e.Handled = true;
             }
         }

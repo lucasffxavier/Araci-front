@@ -1,37 +1,17 @@
-﻿using Araci.Services;
-
-namespace Araci.Services
+﻿namespace Araci.Services
 {
     public static class AppServices
     {
-        // =========================
-        // VIEWPORT
-        // =========================
+        public static ViewportService? Viewport { get; set; }
 
-        public static ViewportService? Viewport
-        {
-            get;
-            set;
-        }
+        public static EditorState Editor { get; }
+            = new EditorState();
 
-        // =========================
-        // ESTADO GLOBAL
-        // =========================
+        public static ToolService Tools { get; }
+            = new ToolService();
 
-        public static EditorState Editor
-        {
-            get;
-        }
-        = new EditorState();
-
-        // =========================
-        // FERRAMENTAS
-        // =========================
-
-        public static ToolService Tools
-        {
-            get;
-        }
-        = new ToolService();
+        // 🔥 NOVO
+        public static MoveHudState MoveHud { get; }
+            = new MoveHudState();
     }
 }

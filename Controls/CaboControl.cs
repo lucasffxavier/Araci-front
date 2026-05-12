@@ -65,11 +65,14 @@ namespace Araci.Controls
 
             if (ferramenta is SelecionarTool)
             {
-                MoveService.MoverCabo(this, vm, delta);
+                vm.X += delta.X;
+                vm.Y += delta.Y;
+                vm.X2 += delta.X;
+                vm.Y2 += delta.Y;
             }
             else if (ferramenta is MoverTool)
             {
-                MoveService.MoverCabo(this, vm, delta);
+                MoveService.MoverCabo(vm, delta); // ✅ CORRETO
             }
         }
 

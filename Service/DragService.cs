@@ -1,4 +1,6 @@
-﻿using Araci.ViewModels;
+﻿using Araci.Applications.Editar.Mover;
+using Araci.Applications.Editar.Selecionar;
+using Araci.ViewModels;
 using System;
 using System.Windows;
 using System.Windows.Controls;
@@ -27,7 +29,11 @@ namespace Araci.Services
 
         private void MouseDown(object sender, MouseButtonEventArgs e)
         {
-            if (!AppServices.Tools.FerramentaAtual.PermiteArrastar)
+            var ferramenta = AppServices.Tools.FerramentaAtual;
+
+            // ✅ AGORA PERMITE SELECIONAR E MOVER
+            if (ferramenta is not SelecionarTool &&
+                ferramenta is not MoverTool)
                 return;
 
             if (_elemento is not FrameworkElement fe)
@@ -48,6 +54,14 @@ namespace Araci.Services
             _arrastando = true;
             _ultimoPonto = e.GetPosition(canvas);
 
+            // 🔥 HUD SOMENTE NO MOVER
+            if (ferramenta is MoverTool)
+            {
+                var hud = AppServices.MoveHud;
+                hud.Reset();
+                hud.Visivel = true;
+            }
+
             _elemento.CaptureMouse();
         }
 
@@ -59,25 +73,55 @@ namespace Araci.Services
             if (_elemento is not FrameworkElement fe)
                 return;
 
+            if (fe.DataContext is not ElementoViewModel vm)
+                return;
+
             if (VisualTreeHelper.GetParent(fe) is not ContentPresenter presenter)
                 return;
 
             if (VisualTreeHelper.GetParent(presenter) is not Canvas canvas)
                 return;
 
-            Point atual = e.GetPosition(canvas);
+            var ferramenta = AppServices.Tools.FerramentaAtual;
 
+            Point atual = e.GetPosition(canvas);
             Vector delta = atual - _ultimoPonto;
+
+            // 🔥 LIMITAÇÃO DA VIEWPORT
+            double novoX = vm.X + delta.X;
+            double novoY = vm.Y + delta.Y;
+
+            double maxX = canvas.ActualWidth - fe.ActualWidth;
+            double maxY = canvas.ActualHeight - fe.ActualHeight;
+
+            novoX = Math.Max(0, Math.Min(maxX, novoX));
+            novoY = Math.Max(0, Math.Min(maxY, novoY));
+
+            delta = new Vector(novoX - vm.X, novoY - vm.Y);
 
             DragDelta?.Invoke(delta);
 
             _ultimoPonto = atual;
+
+            // 🔥 HUD SÓ NO MOVER
+            if (ferramenta is MoverTool)
+            {
+                var hud = AppServices.MoveHud;
+                hud.X = novoX + 20;
+                hud.Y = novoY - 10;
+            }
         }
 
         private void MouseUp(object sender, MouseButtonEventArgs e)
         {
+            if (!_arrastando)
+                return;
+
             _arrastando = false;
             _elemento.ReleaseMouseCapture();
+
+            // 🔥 HUD OFF (seguro chamar sempre)
+            AppServices.MoveHud.Visivel = false;
         }
     }
 }
