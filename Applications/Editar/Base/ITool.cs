@@ -1,4 +1,6 @@
-﻿using Araci.Applications.Commands;
+﻿using System.Windows;
+using System.Windows.Input;
+using Araci.ViewModels;
 
 namespace Araci.Applications.Editar.Base
 {
@@ -6,16 +8,15 @@ namespace Araci.Applications.Editar.Base
     {
         string Nome { get; }
 
-        bool PermiteArrastar { get; }
-
         bool MantemBotaoAtivado { get; }
 
-        ICommandHandler GetClickCommand();
+        void OnMouseDown(ElementoViewModel? vm, Point position);
+        void OnMouseMove(Point position);
+        void OnMouseUp(Point position);
 
-        ICommandHandler? GetDragCommand();
+        void OnKeyDown(Key key);
 
         void Ativar();
-
         void Desativar();
     }
 }

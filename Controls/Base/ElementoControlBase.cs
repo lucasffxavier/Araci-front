@@ -4,10 +4,6 @@ using System.Windows.Controls;
 using System.Windows.Input;
 using System.Windows.Media;
 
-using Araci.Applications.Editar.Deletar;
-using Araci.Applications.Editar.Mover;
-using Araci.Applications.Editar.Selecionar;
-
 using Araci.Services;
 using Araci.ViewModels;
 
@@ -40,23 +36,14 @@ namespace Araci.Controls.Base
             if (DataContext is not ElementoViewModel vm)
                 return;
 
-            var tool = AppServices.Tools.FerramentaAtual;
+            var pos = e.GetPosition(null);
 
-            var command = tool.GetClickCommand();
-
-            command.Execute(vm);
+            AppServices.Tools.HandleMouseDown(vm, pos);
         }
 
         private void OnDragDelta(Vector delta)
         {
-            if (DataContext is not ElementoViewModel vm)
-                return;
-
-            var tool = AppServices.Tools.FerramentaAtual;
-
-            var command = tool.GetDragCommand();
-
-            command?.Execute(vm, delta);
+            // movimento tratado no Tool
         }
 
         private void OnDataContextChanged(object sender, DependencyPropertyChangedEventArgs e)
@@ -75,6 +62,10 @@ namespace Araci.Controls.Base
         {
             if (e.PropertyName == nameof(ElementoViewModel.IsSelecionado))
                 AtualizarVisual();
+
+            if (e.PropertyName == nameof(ElementoViewModel.X) ||
+                e.PropertyName == nameof(ElementoViewModel.Y))
+                AtualizarPosicao();
         }
 
         private void AtualizarVisual()
@@ -96,10 +87,11 @@ namespace Araci.Controls.Base
             if (DataContext is not ElementoViewModel vm)
                 return;
 
-            Canvas.SetLeft(this, vm.X);
-            Canvas.SetTop(this, vm.Y);
+            //Canvas.SetLeft(this, vm.X);
+            //Canvas.SetTop(this, vm.Y);
         }
 
+        // 🔥 RESTAURADO (era o que estava faltando)
         protected SolidColorBrush CriarBrush(string hex)
         {
             return new SolidColorBrush(

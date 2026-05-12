@@ -10,11 +10,14 @@
 
             private readonly Gerador _gerador;
 
-            // =========================
-            // CONSTRUTOR
-            // =========================
+            public override double Largura => 80;
+            public override double Altura => 80;
 
-            public GeradorViewModel(Gerador gerador)
+        // =========================
+        // CONSTRUTOR
+        // =========================
+
+        public GeradorViewModel(Gerador gerador)
                 : base(gerador)
             {
                 _gerador = gerador;

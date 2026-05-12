@@ -1,59 +1,42 @@
-﻿using Araci.ViewModels;
+﻿using System.Windows;
+using Araci.ViewModels;
 
 namespace Araci.Services
 {
     public class ViewportService
     {
-        // =========================
-        // VIEWMODEL
-        // =========================
+        private readonly ViewportViewModel _vm;
 
-        private readonly ViewportViewModel
-            _viewportViewModel;
-
-        // =========================
-        // CONSTRUTOR
-        // =========================
-
-        public ViewportService(
-            ViewportViewModel viewportViewModel)
+        public ViewportService(ViewportViewModel vm)
         {
-            _viewportViewModel =
-                viewportViewModel;
+            _vm = vm;
         }
 
-        // =========================
-        // ADICIONAR
-        // =========================
+        public double Largura { get; set; } = 1000;
+        public double Altura { get; set; } = 800;
 
-        public void AdicionarElemento(
-            ElementoViewModel vm)
+        public void AtualizarTamanho(Size size)
         {
-            _viewportViewModel
-                .Elementos
-                .Add(vm);
+            // 🔥 remove borda visual (1px * 2)
+            Largura = size.Width;
+            Altura = size.Height;
         }
 
-        // =========================
-        // REMOVER
-        // =========================
-
-        public void RemoverElemento(
-            ElementoViewModel vm)
+        // 🔥 RESTAURADO
+        public void AdicionarElemento(ElementoViewModel vm)
         {
-            _viewportViewModel
-                .Elementos
-                .Remove(vm);
+            _vm.Elementos.Add(vm);
         }
 
-        // =========================
-        // CABO
-        // =========================
-
-        public void AdicionarCabo(
-            CaboViewModel vm)
+        // 🔥 RESTAURADO
+        public void AdicionarCabo(CaboViewModel vm)
         {
-            AdicionarElemento(vm);
+            _vm.Elementos.Add(vm);
+        }
+
+        public void RemoverElemento(ElementoViewModel vm)
+        {
+            _vm.Elementos.Remove(vm);
         }
     }
 }

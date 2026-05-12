@@ -1,48 +1,27 @@
 ﻿using System;
-
+using System.Windows;
+using System.Windows.Input;
 using Araci.Applications.Editar.Base;
 using Araci.Applications.Editar.Selecionar;
+using Araci.ViewModels;
 
 namespace Araci.Services
 {
     public class ToolService
     {
-        // =========================
-        // EVENTOS
-        // =========================
-
         public event Action<ITool>? FerramentaAlterada;
-
-        // =========================
-        // CAMPOS
-        // =========================
 
         private ITool _ferramentaAtual;
 
-        // =========================
-        // CONSTRUTOR
-        // =========================
-
         public ToolService()
         {
-            _ferramentaAtual =
-                new SelecionarTool();
-
-            _ferramentaAtual
-                .Ativar();
+            _ferramentaAtual = new SelecionarTool();
+            _ferramentaAtual.Ativar();
         }
-
-        // =========================
-        // FERRAMENTA ATUAL
-        // =========================
 
         public ITool FerramentaAtual
         {
-            get
-            {
-                return _ferramentaAtual;
-            }
-
+            get => _ferramentaAtual;
             set
             {
                 if (_ferramentaAtual == value)
@@ -50,51 +29,52 @@ namespace Araci.Services
 
                 _ferramentaAtual.Desativar();
 
-                _ferramentaAtual =
-                    value;
+                _ferramentaAtual = value;
 
                 _ferramentaAtual.Ativar();
 
-                FerramentaAlterada
-                    ?.Invoke(_ferramentaAtual);
+                FerramentaAlterada?.Invoke(_ferramentaAtual);
             }
         }
 
-        // =========================
-        // ATIVAR
-        // =========================
-
-        public void AtivarFerramenta(
-            ITool ferramenta)
+        public void AtivarFerramenta(ITool ferramenta)
         {
-            FerramentaAtual =
-                ferramenta;
+            FerramentaAtual = ferramenta;
         }
-
-        // =========================
-        // SELEÇÃO
-        // =========================
 
         public void VoltarParaSelecao()
         {
-            if (_ferramentaAtual
-                is SelecionarTool)
-            {
+            if (_ferramentaAtual is SelecionarTool)
                 return;
-            }
 
-            FerramentaAtual =
-                new SelecionarTool();
+            FerramentaAtual = new SelecionarTool();
         }
-
-        // =========================
-        // VISUAL
-        // =========================
 
         public bool FerramentaAtivaMantida()
         {
-            return FerramentaAtual
-                .MantemBotaoAtivado;
+            return FerramentaAtual.MantemBotaoAtivado;
+        }
+
+        // 🔥 NOVO — DISPATCH
+
+        public void HandleMouseDown(ElementoViewModel? vm, Point pos)
+        {
+            _ferramentaAtual.OnMouseDown(vm, pos);
+        }
+
+        public void HandleMouseMove(Point pos)
+        {
+            _ferramentaAtual.OnMouseMove(pos);
+        }
+
+        public void HandleMouseUp(Point pos)
+        {
+            _ferramentaAtual.OnMouseUp(pos);
+        }
+
+        public void HandleKeyDown(Key key)
+        {
+            _ferramentaAtual.OnKeyDown(key);
         }
     }
 }

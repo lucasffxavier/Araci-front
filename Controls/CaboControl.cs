@@ -6,11 +6,6 @@ using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Shapes;
 
-using Araci.Applications.Editar.Deletar;
-using Araci.Applications.Editar.Mover;
-using Araci.Applications.Editar.Selecionar;
-
-using Araci.Models;
 using Araci.Services;
 using Araci.ViewModels;
 
@@ -22,20 +17,13 @@ namespace Araci.Controls
         private readonly Canvas _canvas;
         private readonly DragService _drag;
 
-        public Cabo? Cabo
-        {
-            get
-            {
-                if (DataContext is CaboViewModel vm)
-                    return (Cabo)vm.Modelo;
-
-                return null;
-            }
-        }
-
         public CaboControl()
         {
             Cursor = Cursors.Hand;
+
+            ClipToBounds = true;
+            SnapsToDevicePixels = true;
+            UseLayoutRounding = true;
 
             _line = new Line
             {
@@ -44,93 +32,70 @@ namespace Araci.Controls
                 SnapsToDevicePixels = true
             };
 
-            _canvas = new Canvas();
+            _canvas = new Canvas
+            {
+                ClipToBounds = true,
+                SnapsToDevicePixels = true
+            };
+
             _canvas.Children.Add(_line);
 
             Content = _canvas;
 
-            MouseLeftButtonDown += OnMouseLeftButtonDown;
             DataContextChanged += OnDataContextChanged;
 
             _drag = new DragService(this);
-            _drag.DragDelta += OnDragDelta; // 🔥 CORREÇÃO
         }
 
-        private void OnDragDelta(Vector delta)
-        {
-            if (DataContext is not CaboViewModel vm)
-                return;
-
-            var tool = AppServices.Tools.FerramentaAtual;
-
-            var command = tool.GetDragCommand();
-
-            command?.Execute(vm, delta);
-        }
-
-        private void OnMouseLeftButtonDown(object sender, MouseButtonEventArgs e)
-        {
-            if (DataContext is not CaboViewModel vm)
-                return;
-
-            var tool = AppServices.Tools.FerramentaAtual;
-
-            var command = tool.GetClickCommand();
-
-            command.Execute(vm);
-        }
-
-        private void OnDataContextChanged(object sender, DependencyPropertyChangedEventArgs e)
+        private void OnDataContextChanged(
+            object sender,
+            DependencyPropertyChangedEventArgs e)
         {
             if (e.OldValue is CaboViewModel antigo)
-                antigo.PropertyChanged -= OnViewModelPropertyChanged;
+                antigo.PropertyChanged -= OnVmChanged;
 
             if (e.NewValue is CaboViewModel novo)
             {
-                novo.PropertyChanged += OnViewModelPropertyChanged;
-                AtualizarGeometria(novo);
-                AtualizarVisual(novo);
+                novo.PropertyChanged += OnVmChanged;
+                Atualizar(novo);
             }
         }
 
-        private void OnViewModelPropertyChanged(object? sender, PropertyChangedEventArgs e)
+        private void OnVmChanged(
+            object? sender,
+            PropertyChangedEventArgs e)
         {
-            if (sender is not CaboViewModel vm)
-                return;
-
-            AtualizarGeometria(vm);
-            AtualizarVisual(vm);
+            if (sender is CaboViewModel vm)
+                Atualizar(vm);
         }
 
-        private void AtualizarVisual(CaboViewModel vm)
+        private void Atualizar(CaboViewModel vm)
         {
-            if (vm.IsSelecionado)
-            {
-                _line.Stroke = Brushes.DeepSkyBlue;
-                _line.StrokeThickness = 6;
-            }
-            else
-            {
-                _line.Stroke = Brushes.Lime;
-                _line.StrokeThickness = 4;
-            }
-        }
+            double x1 = vm.X;
+            double y1 = vm.Y;
+            double x2 = vm.X2;
+            double y2 = vm.Y2;
 
-        private void AtualizarGeometria(CaboViewModel vm)
-        {
-            double minX = Math.Min(vm.X, vm.X2);
-            double minY = Math.Min(vm.Y, vm.Y2);
+            double minX = Math.Min(x1, x2);
+            double minY = Math.Min(y1, y2);
 
-            double largura = Math.Abs(vm.X2 - vm.X);
-            double altura = Math.Abs(vm.Y2 - vm.Y);
+            double largura = Math.Abs(x2 - x1);
+            double altura = Math.Abs(y2 - y1);
 
-            Width = largura + 10;
-            Height = altura + 10;
+            // margem para o stroke
+            largura = Math.Max(4, largura + 4);
+            altura = Math.Max(4, altura + 4);
 
-            _line.X1 = vm.X - minX;
-            _line.Y1 = vm.Y - minY;
-            _line.X2 = vm.X2 - minX;
-            _line.Y2 = vm.Y2 - minY;
+            Width = largura;
+            Height = altura;
+
+            _canvas.Width = largura;
+            _canvas.Height = altura;
+
+            _line.X1 = x1 - minX + 2;
+            _line.Y1 = y1 - minY + 2;
+            _line.X2 = x2 - minX + 2;
+            _line.Y2 = y2 - minY + 2;
         }
     }
 }

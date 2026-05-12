@@ -1,27 +1,64 @@
-﻿using Araci.Applications.Commands;
+﻿using System.Windows;
+using System.Windows.Input;
+
 using Araci.Applications.Editar.Base;
+using Araci.Services;
+using Araci.ViewModels;
 
 namespace Araci.Applications.Editar.Selecionar
 {
     public class SelecionarTool : ITool
     {
-        private readonly SelectCommand _select = new();
-        private readonly MoveCommand _move = new();
+        private ElementoViewModel? _selecionado;
+        private Point _ultimoPonto;
+        private bool _arrastando;
 
         public string Nome => "Selecionar";
 
-        public bool PermiteArrastar => true;
-
         public bool MantemBotaoAtivado => true;
-
-        public ICommandHandler GetClickCommand()
-            => _select;
-
-        public ICommandHandler? GetDragCommand()
-            => _move;
 
         public void Ativar() { }
 
-        public void Desativar() { }
+        public void Desativar()
+        {
+            _arrastando = false;
+        }
+
+        public void OnMouseDown(ElementoViewModel? vm, Point position)
+        {
+            if (vm == null)
+            {
+                SelectionService.Limpar();
+                return;
+            }
+
+            SelectionService.Selecionar(vm);
+
+            _selecionado = vm;
+            _ultimoPonto = position;
+            _arrastando = true;
+        }
+
+        public void OnMouseMove(Point position)
+        {
+            if (!_arrastando || _selecionado == null)
+                return;
+
+            Vector delta = position - _ultimoPonto;
+
+            MoveService.Mover(_selecionado, delta);
+
+            _ultimoPonto = position;
+        }
+
+        public void OnMouseUp(Point position)
+        {
+            _arrastando = false;
+            _selecionado = null;
+        }
+
+        public void OnKeyDown(Key key)
+        {
+        }
     }
 }

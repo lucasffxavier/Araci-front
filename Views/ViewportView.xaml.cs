@@ -1,13 +1,10 @@
-﻿using Araci.Applications.Editar.Selecionar;
-using Araci.Services;
+﻿using Araci.Services;
 using Araci.ViewModels;
 
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
 using System.Windows.Media;
-
-using Araci.Controls;
 
 namespace Araci.Views
 {
@@ -19,50 +16,130 @@ namespace Araci.Views
         {
             InitializeComponent();
 
-            _viewportViewModel = new ViewportViewModel();
+            _viewportViewModel =
+                new ViewportViewModel();
 
-            DataContext = _viewportViewModel;
+            DataContext =
+                _viewportViewModel;
 
             AppServices.Viewport =
                 new ViewportService(_viewportViewModel);
 
+            AppServices.ViewportReference = this;
         }
 
-        private void OnLoaded(object sender, RoutedEventArgs e)
+        private void OnLoaded(
+            object sender,
+            RoutedEventArgs e)
         {
             Focus();
+
+            AtualizarViewport();
+
+            SizeChanged += (_, __) =>
+            {
+                AtualizarViewport();
+            };
         }
 
-        private void OnPreviewMouseLeftButtonDown(object sender, MouseButtonEventArgs e)
+        private void AtualizarViewport()
+        {
+            if (AppServices.Viewport == null)
+                return;
+
+            double larguraReal =
+                ActualWidth;
+
+            double alturaReal =
+                ActualHeight;
+
+            if (RootBorder != null)
+            {
+                larguraReal -=
+                    RootBorder.BorderThickness.Left +
+                    RootBorder.BorderThickness.Right;
+
+                alturaReal -=
+                    RootBorder.BorderThickness.Top +
+                    RootBorder.BorderThickness.Bottom;
+            }
+
+            larguraReal =
+                Math.Max(0, larguraReal);
+
+            alturaReal =
+                Math.Max(0, alturaReal);
+
+            AppServices.Viewport.AtualizarTamanho(
+                new Size(
+                    larguraReal,
+                    alturaReal));
+        }
+
+        private Point GetPos(MouseEventArgs e)
+        {
+            return e.GetPosition(this);
+        }
+
+        private void OnPreviewMouseLeftButtonDown(
+            object sender,
+            MouseButtonEventArgs e)
         {
             Focus();
 
-            DependencyObject? origem = e.OriginalSource as DependencyObject;
+            ElementoViewModel? vm = null;
+
+            DependencyObject? origem =
+                e.OriginalSource as DependencyObject;
 
             while (origem != null)
             {
-                if (origem is CaboControl
-                    || origem is CargaControl
-                    || origem is GeradorControl)
+                if (origem is FrameworkElement fe &&
+                    fe.DataContext is ElementoViewModel elemento)
                 {
-                    return;
+                    vm = elemento;
+                    break;
                 }
 
-                origem = VisualTreeHelper.GetParent(origem);
+                origem =
+                    VisualTreeHelper.GetParent(origem);
             }
 
-            if (AppServices.Tools.FerramentaAtual is SelecionarTool)
-            {
-                SelectionService.Limpar();
-            }
+            var pos = GetPos(e);
+
+            AppServices.Tools.HandleMouseDown(vm, pos);
         }
 
-        private void OnPreviewKeyDown(object sender, KeyEventArgs e)
+        private void OnPreviewMouseMove(
+            object sender,
+            MouseEventArgs e)
         {
+            var pos = GetPos(e);
+
+            AppServices.Tools.HandleMouseMove(pos);
+        }
+
+        private void OnPreviewMouseLeftButtonUp(
+            object sender,
+            MouseButtonEventArgs e)
+        {
+            var pos = GetPos(e);
+
+            AppServices.Tools.HandleMouseUp(pos);
+        }
+
+        private void OnPreviewKeyDown(
+            object sender,
+            KeyEventArgs e)
+        {
+            AppServices.Tools.HandleKeyDown(e.Key);
+
             if (e.Key == Key.Escape)
             {
                 AppServices.Tools.VoltarParaSelecao();
+
                 SelectionService.Limpar();
+
                 e.Handled = true;
             }
         }

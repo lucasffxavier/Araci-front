@@ -1,9 +1,6 @@
 ﻿using System;
 using System.Windows;
-using System.Windows.Controls;
 using System.Windows.Input;
-using System.Windows.Media;
-
 using Araci.ViewModels;
 
 namespace Araci.Services
@@ -26,99 +23,58 @@ namespace Araci.Services
             _elemento.MouseLeftButtonUp += MouseUp;
         }
 
+        private FrameworkElement? Ref => AppServices.ViewportReference;
+
         private void MouseDown(object sender, MouseButtonEventArgs e)
         {
-            // ✅ VOLTA PARA O CONTRATO CORRETO
-            if (!AppServices.Tools.FerramentaAtual.PermiteArrastar)
-                return;
-
             if (_elemento is not FrameworkElement fe)
                 return;
 
             if (fe.DataContext is not ElementoViewModel vm)
                 return;
 
-            if (!vm.IsSelecionado)
-                return;
-
-            if (VisualTreeHelper.GetParent(fe) is not ContentPresenter presenter)
-                return;
-
-            if (VisualTreeHelper.GetParent(presenter) is not Canvas canvas)
+            if (Ref == null)
                 return;
 
             _arrastando = true;
-            _ultimoPonto = e.GetPosition(canvas);
 
-            // 🔥 HUD apenas no Mover
-            if (AppServices.Tools.FerramentaAtual is Applications.Editar.Mover.MoverTool)
-            {
-                var hud = AppServices.MoveHud;
-                hud.Reset();
-                hud.Visivel = true;
-            }
+            _ultimoPonto = e.GetPosition(Ref); // 🔥 FIX REAL
+
+            AppServices.Tools.HandleMouseDown(vm, _ultimoPonto);
 
             _elemento.CaptureMouse();
         }
 
         private void MouseMove(object sender, MouseEventArgs e)
         {
-            if (!_arrastando)
+            if (Ref == null)
                 return;
 
-            if (_elemento is not FrameworkElement fe)
-                return;
+            Point pos = e.GetPosition(Ref); // 🔥 FIX REAL
 
-            if (fe.DataContext is not ElementoViewModel vm)
-                return;
-
-            if (VisualTreeHelper.GetParent(fe) is not ContentPresenter presenter)
-                return;
-
-            if (VisualTreeHelper.GetParent(presenter) is not Canvas canvas)
-                return;
-
-            Point atual = e.GetPosition(canvas);
-            Vector delta = atual - _ultimoPonto;
-
-            // 🔥 LIMITAÇÃO DA VIEWPORT
-            double novoX = vm.X + delta.X;
-            double novoY = vm.Y + delta.Y;
-
-            double maxX = canvas.ActualWidth - fe.ActualWidth;
-            double maxY = canvas.ActualHeight - fe.ActualHeight;
-
-            novoX = Math.Max(0, Math.Min(maxX, novoX));
-            novoY = Math.Max(0, Math.Min(maxY, novoY));
-
-            delta = new Vector(novoX - vm.X, novoY - vm.Y);
-
-            DragDelta?.Invoke(delta);
-
-            _ultimoPonto = atual;
-
-            // 🔥 HUD só no Mover
-            if (AppServices.Tools.FerramentaAtual is Applications.Editar.Mover.MoverTool)
+            if (_arrastando)
             {
-                var hud = AppServices.MoveHud;
-                hud.X = novoX + 20;
-                hud.Y = novoY - 10;
+                Vector delta = pos - _ultimoPonto;
+                _ultimoPonto = pos;
+
+                DragDelta?.Invoke(delta);
             }
+
+            AppServices.Tools.HandleMouseMove(pos);
         }
 
         private void MouseUp(object sender, MouseButtonEventArgs e)
         {
-            if (!_arrastando)
+            if (Ref == null)
                 return;
 
-            _arrastando = false;
-            _elemento.ReleaseMouseCapture();
+            Point pos = e.GetPosition(Ref); // 🔥 FIX REAL
 
-            // 🔥 HUD OFF somente se estava ativo
-            if (AppServices.Tools.FerramentaAtual is Applications.Editar.Mover.MoverTool)
-            {
-                AppServices.MoveHud.Visivel = false;
-            }
+            _arrastando = false;
+
+            AppServices.Tools.HandleMouseUp(pos);
+
+            _elemento.ReleaseMouseCapture();
         }
     }
 }

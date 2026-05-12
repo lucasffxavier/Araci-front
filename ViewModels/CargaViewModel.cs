@@ -9,7 +9,8 @@ namespace Araci.ViewModels
         // =========================
 
         private readonly Carga _carga;
-
+        public override double Largura => 70;
+        public override double Altura => 70;
         // =========================
         // CONSTRUTOR
         // =========================

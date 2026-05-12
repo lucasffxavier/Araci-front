@@ -10,6 +10,9 @@ namespace Araci.ViewModels
 
         private readonly Cabo _cabo;
 
+        public override double Largura => Math.Abs(X2 - X) ;
+        public override double Altura => Math.Abs(Y2 - Y) ;
+
         // =========================
         // CONSTRUTOR
         // =========================
