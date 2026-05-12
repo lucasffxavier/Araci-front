@@ -1,4 +1,6 @@
-﻿using System.Windows;
+﻿using System.Collections.Generic;
+using System.Linq;
+using System.Windows;
 using System.Windows.Input;
 
 using Araci.Applications.Editar.Base;
@@ -9,9 +11,6 @@ namespace Araci.Applications.Editar.Selecionar
 {
     public class SelecionarTool : ITool
     {
-        private ElementoViewModel?
-            _selecionado;
-
         private Point _ultimoPonto;
 
         private bool _arrastando;
@@ -43,15 +42,9 @@ namespace Araci.Applications.Editar.Selecionar
 
             SelectionService.Selecionar(vm);
 
-            _selecionado = vm;
-
             _ultimoPonto = position;
 
             _arrastando = true;
-
-            // =========================
-            // BEGIN TRANSACTION
-            // =========================
 
             AppServices
                 .Commands
@@ -61,16 +54,22 @@ namespace Araci.Applications.Editar.Selecionar
         public void OnMouseMove(
             Point position)
         {
-            if (!_arrastando
-                || _selecionado == null)
+            if (!_arrastando)
                 return;
 
             Vector delta =
                 position - _ultimoPonto;
 
-            MoveService.Mover(
-                _selecionado,
-                delta);
+            var selecionados =
+                AppServices
+                    .Editor
+                    .ElementosSelecionados
+                    .ToList();
+
+            foreach (var vm in selecionados)
+            {
+                MoveService.Mover(vm, delta);
+            }
 
             _ultimoPonto = position;
         }
@@ -86,8 +85,6 @@ namespace Araci.Applications.Editar.Selecionar
             }
 
             _arrastando = false;
-
-            _selecionado = null;
         }
 
         public void OnKeyDown(Key key)

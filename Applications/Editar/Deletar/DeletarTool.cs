@@ -1,4 +1,5 @@
-﻿using System.Windows;
+﻿using System.Linq;
+using System.Windows;
 using System.Windows.Input;
 
 using Araci.Applications.Editar.Base;
@@ -22,15 +23,25 @@ namespace Araci.Applications.Editar.Deletar
             ElementoViewModel? vm,
             Point position)
         {
-            if (vm == null)
+            var selecionados =
+                AppServices.Editor
+                    .ElementosSelecionados
+                    .ToList();
+
+            if (selecionados.Count == 0)
                 return;
 
-            var command =
-                new DeleteElementCommand(vm);
+            AppServices.Commands
+                .BeginTransaction();
 
-            AppServices
-                .Commands
-                .Execute(command);
+            foreach (var item in selecionados)
+            {
+                AppServices.Commands.Execute(
+                    new DeleteElementCommand(item));
+            }
+
+            AppServices.Commands
+                .CommitTransaction();
         }
 
         public void OnMouseMove(Point position)

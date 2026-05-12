@@ -1,16 +1,12 @@
-﻿using Araci.ViewModels;
+﻿using System.Linq;
+using System.Windows.Input;
+
+using Araci.ViewModels;
 
 namespace Araci.Services
 {
     public static class SelectionService
     {
-        // =========================
-        // ELEMENTO ATUAL
-        // =========================
-
-        private static ElementoViewModel?
-            _selecionado;
-
         // =========================
         // SELECIONAR
         // =========================
@@ -18,32 +14,61 @@ namespace Araci.Services
         public static void Selecionar(
             ElementoViewModel vm)
         {
-            // =========================
-            // REMOVE ANTERIOR
-            // =========================
+            bool ctrl =
+                Keyboard.Modifiers.HasFlag(
+                    ModifierKeys.Control);
 
-            if (_selecionado != null)
+            if (!ctrl)
             {
-                _selecionado.IsSelecionado =
-                    false;
+                Limpar();
             }
 
+            Toggle(vm, ctrl);
+        }
+
+        // =========================
+        // TOGGLE
+        // =========================
+
+        private static void Toggle(
+            ElementoViewModel vm,
+            bool ctrl)
+        {
+            var selecionados =
+                AppServices
+                    .Editor
+                    .ElementosSelecionados;
+
             // =========================
-            // NOVO
+            // CTRL + CLICK
             // =========================
 
-            _selecionado = vm;
+            if (ctrl)
+            {
+                if (selecionados.Contains(vm))
+                {
+                    vm.IsSelecionado = false;
 
-            _selecionado.IsSelecionado =
-                true;
+                    selecionados.Remove(vm);
+                }
+                else
+                {
+                    vm.IsSelecionado = true;
 
-            // =========================
-            // EDITOR
-            // =========================
+                    selecionados.Add(vm);
+                }
+            }
+            else
+            {
+                vm.IsSelecionado = true;
 
-            AppServices
-                .Editor
-                .ElementoSelecionado = vm;
+                if (!selecionados.Contains(vm))
+                {
+                    selecionados.Add(vm);
+                }
+            }
+
+            AtualizarPrincipal();
         }
 
         // =========================
@@ -52,17 +77,36 @@ namespace Araci.Services
 
         public static void Limpar()
         {
-            if (_selecionado != null)
+            foreach (var item in AppServices
+                         .Editor
+                         .ElementosSelecionados
+                         .ToList())
             {
-                _selecionado.IsSelecionado =
-                    false;
+                item.IsSelecionado = false;
             }
-
-            _selecionado = null;
 
             AppServices
                 .Editor
-                .ElementoSelecionado = null;
+                .ElementosSelecionados
+                .Clear();
+
+            AtualizarPrincipal();
+        }
+
+        // =========================
+        // PRINCIPAL
+        // =========================
+
+        private static void AtualizarPrincipal()
+        {
+            AppServices.Editor.ElementoSelecionado =
+                AppServices.Editor
+                    .ElementosSelecionados
+                    .LastOrDefault();
+
+            AppServices
+                .Editor
+                .NotifySelecaoAlterada();
         }
     }
 }
