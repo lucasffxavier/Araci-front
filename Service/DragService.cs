@@ -1,11 +1,10 @@
-﻿using Araci.Applications.Editar.Mover;
-using Araci.Applications.Editar.Selecionar;
-using Araci.ViewModels;
-using System;
+﻿using System;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
 using System.Windows.Media;
+
+using Araci.ViewModels;
 
 namespace Araci.Services
 {
@@ -29,11 +28,8 @@ namespace Araci.Services
 
         private void MouseDown(object sender, MouseButtonEventArgs e)
         {
-            var ferramenta = AppServices.Tools.FerramentaAtual;
-
-            // ✅ AGORA PERMITE SELECIONAR E MOVER
-            if (ferramenta is not SelecionarTool &&
-                ferramenta is not MoverTool)
+            // ✅ VOLTA PARA O CONTRATO CORRETO
+            if (!AppServices.Tools.FerramentaAtual.PermiteArrastar)
                 return;
 
             if (_elemento is not FrameworkElement fe)
@@ -54,8 +50,8 @@ namespace Araci.Services
             _arrastando = true;
             _ultimoPonto = e.GetPosition(canvas);
 
-            // 🔥 HUD SOMENTE NO MOVER
-            if (ferramenta is MoverTool)
+            // 🔥 HUD apenas no Mover
+            if (AppServices.Tools.FerramentaAtual is Applications.Editar.Mover.MoverTool)
             {
                 var hud = AppServices.MoveHud;
                 hud.Reset();
@@ -82,8 +78,6 @@ namespace Araci.Services
             if (VisualTreeHelper.GetParent(presenter) is not Canvas canvas)
                 return;
 
-            var ferramenta = AppServices.Tools.FerramentaAtual;
-
             Point atual = e.GetPosition(canvas);
             Vector delta = atual - _ultimoPonto;
 
@@ -103,8 +97,8 @@ namespace Araci.Services
 
             _ultimoPonto = atual;
 
-            // 🔥 HUD SÓ NO MOVER
-            if (ferramenta is MoverTool)
+            // 🔥 HUD só no Mover
+            if (AppServices.Tools.FerramentaAtual is Applications.Editar.Mover.MoverTool)
             {
                 var hud = AppServices.MoveHud;
                 hud.X = novoX + 20;
@@ -120,8 +114,11 @@ namespace Araci.Services
             _arrastando = false;
             _elemento.ReleaseMouseCapture();
 
-            // 🔥 HUD OFF (seguro chamar sempre)
-            AppServices.MoveHud.Visivel = false;
+            // 🔥 HUD OFF somente se estava ativo
+            if (AppServices.Tools.FerramentaAtual is Applications.Editar.Mover.MoverTool)
+            {
+                AppServices.MoveHud.Visivel = false;
+            }
         }
     }
 }

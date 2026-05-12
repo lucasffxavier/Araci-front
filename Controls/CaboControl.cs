@@ -63,6 +63,7 @@ namespace Araci.Controls
 
             var ferramenta = AppServices.Tools.FerramentaAtual;
 
+            // 🔥 Selecionar também move, mas SEM HUD
             if (ferramenta is SelecionarTool)
             {
                 vm.X += delta.X;
@@ -72,7 +73,7 @@ namespace Araci.Controls
             }
             else if (ferramenta is MoverTool)
             {
-                MoveService.MoverCabo(vm, delta); // ✅ CORRETO
+                MoveService.MoverCabo(vm, delta);
             }
         }
 
