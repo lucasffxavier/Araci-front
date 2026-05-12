@@ -1,33 +1,18 @@
-﻿namespace Araci.Applications.Editar.Base
+﻿using Araci.Applications.Commands;
+
+namespace Araci.Applications.Editar.Base
 {
     public interface ITool
     {
-        // =========================
-        // IDENTIFICAÇÃO
-        // =========================
+        string Nome { get; }
 
-        string Nome
-        {
-            get;
-        }
+        bool PermiteArrastar { get; }
 
-        // =========================
-        // COMPORTAMENTO
-        // =========================
+        bool MantemBotaoAtivado { get; }
 
-        bool PermiteArrastar
-        {
-            get;
-        }
+        ICommandHandler GetClickCommand();
 
-        bool MantemBotaoAtivado
-        {
-            get;
-        }
-
-        // =========================
-        // CICLO
-        // =========================
+        ICommandHandler? GetDragCommand();
 
         void Ativar();
 

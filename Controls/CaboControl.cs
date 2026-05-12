@@ -61,20 +61,11 @@ namespace Araci.Controls
             if (DataContext is not CaboViewModel vm)
                 return;
 
-            var ferramenta = AppServices.Tools.FerramentaAtual;
+            var tool = AppServices.Tools.FerramentaAtual;
 
-            // 🔥 Selecionar também move, mas SEM HUD
-            if (ferramenta is SelecionarTool)
-            {
-                vm.X += delta.X;
-                vm.Y += delta.Y;
-                vm.X2 += delta.X;
-                vm.Y2 += delta.Y;
-            }
-            else if (ferramenta is MoverTool)
-            {
-                MoveService.MoverCabo(vm, delta);
-            }
+            var command = tool.GetDragCommand();
+
+            command?.Execute(vm, delta);
         }
 
         private void OnMouseLeftButtonDown(object sender, MouseButtonEventArgs e)
@@ -82,24 +73,11 @@ namespace Araci.Controls
             if (DataContext is not CaboViewModel vm)
                 return;
 
-            if (AppServices.Tools.FerramentaAtual is SelecionarTool)
-            {
-                SelectionService.Selecionar(vm);
-                return;
-            }
+            var tool = AppServices.Tools.FerramentaAtual;
 
-            if (AppServices.Tools.FerramentaAtual is MoverTool)
-            {
-                SelectionService.Selecionar(vm);
-                return;
-            }
+            var command = tool.GetClickCommand();
 
-            if (AppServices.Tools.FerramentaAtual is DeletarTool)
-            {
-                AppServices.Viewport?.RemoverElemento(vm);
-                SelectionService.Limpar();
-                return;
-            }
+            command.Execute(vm);
         }
 
         private void OnDataContextChanged(object sender, DependencyPropertyChangedEventArgs e)

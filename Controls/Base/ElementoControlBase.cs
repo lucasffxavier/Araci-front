@@ -40,18 +40,11 @@ namespace Araci.Controls.Base
             if (DataContext is not ElementoViewModel vm)
                 return;
 
-            if (AppServices.Tools.FerramentaAtual is SelecionarTool ||
-                AppServices.Tools.FerramentaAtual is MoverTool)
-            {
-                SelectionService.Selecionar(vm);
-                return;
-            }
+            var tool = AppServices.Tools.FerramentaAtual;
 
-            if (AppServices.Tools.FerramentaAtual is DeletarTool)
-            {
-                AppServices.Viewport?.RemoverElemento(vm);
-                SelectionService.Limpar();
-            }
+            var command = tool.GetClickCommand();
+
+            command.Execute(vm);
         }
 
         private void OnDragDelta(Vector delta)
@@ -59,17 +52,11 @@ namespace Araci.Controls.Base
             if (DataContext is not ElementoViewModel vm)
                 return;
 
-            var ferramenta = AppServices.Tools.FerramentaAtual;
+            var tool = AppServices.Tools.FerramentaAtual;
 
-            if (ferramenta is SelecionarTool)
-            {
-                vm.X += delta.X;
-                vm.Y += delta.Y;
-            }
-            else if (ferramenta is MoverTool)
-            {
-                MoveService.Mover(vm, delta); // ✅ CORRETO (2 parâmetros)
-            }
+            var command = tool.GetDragCommand();
+
+            command?.Execute(vm, delta);
         }
 
         private void OnDataContextChanged(object sender, DependencyPropertyChangedEventArgs e)

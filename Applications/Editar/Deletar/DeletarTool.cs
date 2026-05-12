@@ -1,48 +1,26 @@
-﻿using Araci.Applications.Editar.Base;
+﻿using Araci.Applications.Commands;
+using Araci.Applications.Editar.Base;
 
 namespace Araci.Applications.Editar.Deletar
 {
-    public class DeletarTool
-        : ITool
+    public class DeletarTool : ITool
     {
-        // =========================
-        // IDENTIFICAÇÃO
-        // =========================
+        private readonly DeleteCommand _delete = new();
 
-        public string Nome
-        {
-            get;
-        }
-        = "Deletar";
+        public string Nome => "Deletar";
 
-        // =========================
-        // COMPORTAMENTO
-        // =========================
+        public bool PermiteArrastar => false;
 
-        public bool PermiteArrastar
-        {
-            get;
-        }
-        = false;
+        public bool MantemBotaoAtivado => true;
 
-        public bool MantemBotaoAtivado
-        {
-            get;
-        }
-        = true;
+        public ICommandHandler GetClickCommand()
+            => _delete;
 
-        // =========================
-        // CICLO
-        // =========================
+        public ICommandHandler? GetDragCommand()
+            => null;
 
-        public void Ativar()
-        {
+        public void Ativar() { }
 
-        }
-
-        public void Desativar()
-        {
-
-        }
+        public void Desativar() { }
     }
 }

@@ -1,52 +1,27 @@
-﻿using Araci.Applications.Editar.Base;
+﻿using Araci.Applications.Commands;
+using Araci.Applications.Editar.Base;
 
 namespace Araci.Applications.Editar.Mover
 {
-    public class MoverTool
-        : ITool
+    public class MoverTool : ITool
     {
-        // =========================
-        // IDENTIFICAÇÃO
-        // =========================
+        private readonly MoveCommand _move = new();
+        private readonly SelectCommand _select = new();
 
-        public string Nome
-        {
-            get;
-        }
-        = "Mover";
+        public string Nome => "Mover";
 
-        // =========================
-        // COMPORTAMENTO
-        // =========================
+        public bool PermiteArrastar => true;
 
-        // =========================
-        // MOVE COM MODO ESPECIAL
-        // =========================
+        public bool MantemBotaoAtivado => true;
 
-        public bool PermiteArrastar
-        {
-            get;
-        }
-        = true;
+        public ICommandHandler GetClickCommand()
+            => _select;
 
-        public bool MantemBotaoAtivado
-        {
-            get;
-        }
-        = true;
+        public ICommandHandler? GetDragCommand()
+            => _move;
 
-        // =========================
-        // CICLO
-        // =========================
+        public void Ativar() { }
 
-        public void Ativar()
-        {
-
-        }
-
-        public void Desativar()
-        {
-
-        }
+        public void Desativar() { }
     }
 }

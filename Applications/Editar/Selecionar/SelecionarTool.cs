@@ -1,52 +1,27 @@
-﻿using Araci.Applications.Editar.Base;
+﻿using Araci.Applications.Commands;
+using Araci.Applications.Editar.Base;
 
 namespace Araci.Applications.Editar.Selecionar
 {
-    public class SelecionarTool
-        : ITool
+    public class SelecionarTool : ITool
     {
-        // =========================
-        // IDENTIFICAÇÃO
-        // =========================
+        private readonly SelectCommand _select = new();
+        private readonly MoveCommand _move = new();
 
-        public string Nome
-        {
-            get;
-        }
-        = "Selecionar";
+        public string Nome => "Selecionar";
 
-        // =========================
-        // COMPORTAMENTO
-        // =========================
+        public bool PermiteArrastar => true;
 
-        // =========================
-        // MOVE NORMALMENTE
-        // =========================
+        public bool MantemBotaoAtivado => true;
 
-        public bool PermiteArrastar
-        {
-            get;
-        }
-        = true;
+        public ICommandHandler GetClickCommand()
+            => _select;
 
-        public bool MantemBotaoAtivado
-        {
-            get;
-        }
-        = true;
+        public ICommandHandler? GetDragCommand()
+            => _move;
 
-        // =========================
-        // CICLO
-        // =========================
+        public void Ativar() { }
 
-        public void Ativar()
-        {
-
-        }
-
-        public void Desativar()
-        {
-
-        }
+        public void Desativar() { }
     }
 }
