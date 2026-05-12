@@ -23,27 +23,24 @@ namespace Araci.Services
                 AppServices.Viewport?.Altura
                     ?? 800;
 
-            double largura =
-                vm.Largura;
-
-            double altura =
-                vm.Altura;
+            Rect bounds =
+                vm.Bounds;
 
             double novoX =
-                vm.X + delta.X;
+                bounds.X + delta.X;
 
             double novoY =
-                vm.Y + delta.Y;
+                bounds.Y + delta.Y;
 
             double limiteDireito =
                 Math.Max(
                     0,
-                    maxX - largura - MARGEM_VISUAL);
+                    maxX - bounds.Width - MARGEM_VISUAL);
 
             double limiteInferior =
                 Math.Max(
                     0,
-                    maxY - altura - MARGEM_VISUAL);
+                    maxY - bounds.Height - MARGEM_VISUAL);
 
             novoX =
                 Math.Max(
@@ -61,8 +58,8 @@ namespace Araci.Services
 
             Vector deltaFinal =
                 new(
-                    novoX - vm.X,
-                    novoY - vm.Y);
+                    novoX - bounds.X,
+                    novoY - bounds.Y);
 
             if (deltaFinal.Length == 0)
                 return;

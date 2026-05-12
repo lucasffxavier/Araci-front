@@ -1,8 +1,12 @@
-﻿using Araci.Models;
+﻿using System;
+using System.Windows;
+
+using Araci.Models;
 
 namespace Araci.ViewModels
 {
-    public class CaboViewModel : ElementoViewModel
+    public class CaboViewModel
+        : ElementoViewModel
     {
         // =========================
         // MODELO
@@ -10,17 +14,53 @@ namespace Araci.ViewModels
 
         private readonly Cabo _cabo;
 
-        public override double Largura => Math.Abs(X2 - X) ;
-        public override double Altura => Math.Abs(Y2 - Y) ;
-
         // =========================
         // CONSTRUTOR
         // =========================
 
-        public CaboViewModel(Cabo cabo)
+        public CaboViewModel(
+            Cabo cabo)
             : base(cabo)
         {
             _cabo = cabo;
+        }
+
+        // =========================
+        // DIMENSÕES
+        // =========================
+
+        public override double Largura =>
+            Math.Abs(X2 - X);
+
+        public override double Altura =>
+            Math.Abs(Y2 - Y);
+
+        // =========================
+        // BOUNDS
+        // =========================
+
+        public override Rect Bounds
+        {
+            get
+            {
+                double minX =
+                    Math.Min(X, X2);
+
+                double minY =
+                    Math.Min(Y, Y2);
+
+                double largura =
+                    Math.Abs(X2 - X);
+
+                double altura =
+                    Math.Abs(Y2 - Y);
+
+                return new Rect(
+                    minX,
+                    minY,
+                    largura,
+                    altura);
+            }
         }
 
         // =========================
@@ -30,179 +70,12 @@ namespace Araci.ViewModels
         public string Nome
         {
             get => _cabo.Nome;
+
             set
             {
                 if (_cabo.Nome != value)
                 {
                     _cabo.Nome = value;
-
-                    OnPropertyChanged();
-                }
-            }
-        }
-
-        // =========================
-        // BARRAS
-        // =========================
-
-        public string Barra1
-        {
-            get => _cabo.Barra1;
-            set
-            {
-                if (_cabo.Barra1 != value)
-                {
-                    _cabo.Barra1 = value;
-
-                    OnPropertyChanged();
-                }
-            }
-        }
-
-        public string Barra2
-        {
-            get => _cabo.Barra2;
-            set
-            {
-                if (_cabo.Barra2 != value)
-                {
-                    _cabo.Barra2 = value;
-
-                    OnPropertyChanged();
-                }
-            }
-        }
-
-        // =========================
-        // COMPRIMENTO
-        // =========================
-
-        public double Comprimento
-        {
-            get => _cabo.Comprimento;
-            set
-            {
-                if (_cabo.Comprimento != value)
-                {
-                    _cabo.Comprimento = value;
-
-                    OnPropertyChanged();
-                }
-            }
-        }
-
-        // =========================
-        // LINECODE
-        // =========================
-
-        public string LineCode
-        {
-            get => _cabo.LineCode;
-            set
-            {
-                if (_cabo.LineCode != value)
-                {
-                    _cabo.LineCode = value;
-
-                    OnPropertyChanged();
-                }
-            }
-        }
-
-        // =========================
-        // IMPEDÂNCIA
-        // =========================
-
-        public double Resistencia
-        {
-            get => _cabo.Resistencia;
-            set
-            {
-                if (_cabo.Resistencia != value)
-                {
-                    _cabo.Resistencia = value;
-
-                    OnPropertyChanged();
-                }
-            }
-        }
-
-        public double Reatancia
-        {
-            get => _cabo.Reatancia;
-            set
-            {
-                if (_cabo.Reatancia != value)
-                {
-                    _cabo.Reatancia = value;
-
-                    OnPropertyChanged();
-                }
-            }
-        }
-
-        public double Capacitancia
-        {
-            get => _cabo.Capacitancia;
-            set
-            {
-                if (_cabo.Capacitancia != value)
-                {
-                    _cabo.Capacitancia = value;
-
-                    OnPropertyChanged();
-                }
-            }
-        }
-
-        // =========================
-        // AMPACIDADE
-        // =========================
-
-        public double Ampacidade
-        {
-            get => _cabo.Ampacidade;
-            set
-            {
-                if (_cabo.Ampacidade != value)
-                {
-                    _cabo.Ampacidade = value;
-
-                    OnPropertyChanged();
-                }
-            }
-        }
-
-        // =========================
-        // FASES
-        // =========================
-
-        public int Fases
-        {
-            get => _cabo.Fases;
-            set
-            {
-                if (_cabo.Fases != value)
-                {
-                    _cabo.Fases = value;
-
-                    OnPropertyChanged();
-                }
-            }
-        }
-
-        // =========================
-        // NEUTRO
-        // =========================
-
-        public bool Neutro
-        {
-            get => _cabo.Neutro;
-            set
-            {
-                if (_cabo.Neutro != value)
-                {
-                    _cabo.Neutro = value;
 
                     OnPropertyChanged();
                 }
@@ -216,6 +89,7 @@ namespace Araci.ViewModels
         public double X2
         {
             get => _cabo.PosicaoX2;
+
             set
             {
                 if (_cabo.PosicaoX2 != value)
@@ -223,6 +97,7 @@ namespace Araci.ViewModels
                     _cabo.PosicaoX2 = value;
 
                     OnPropertyChanged();
+                    OnPropertyChanged(nameof(Bounds));
                 }
             }
         }
@@ -230,6 +105,7 @@ namespace Araci.ViewModels
         public double Y2
         {
             get => _cabo.PosicaoY2;
+
             set
             {
                 if (_cabo.PosicaoY2 != value)
@@ -237,7 +113,53 @@ namespace Araci.ViewModels
                     _cabo.PosicaoY2 = value;
 
                     OnPropertyChanged();
+                    OnPropertyChanged(nameof(Bounds));
                 }
+            }
+        }
+
+        // =========================
+        // MOVER
+        // =========================
+
+        public override void Mover(
+            Vector delta)
+        {
+            X += delta.X;
+            Y += delta.Y;
+
+            X2 += delta.X;
+            Y2 += delta.Y;
+        }
+
+        // =========================
+        // ESTADO
+        // =========================
+
+        public override ElementoEstado
+            CapturarEstado()
+        {
+            return new ElementoEstado(
+                X,
+                Y,
+                X2,
+                Y2);
+        }
+
+        public override void AplicarEstado(
+            ElementoEstado estado)
+        {
+            X = estado.X;
+            Y = estado.Y;
+
+            if (estado.X2.HasValue)
+            {
+                X2 = estado.X2.Value;
+            }
+
+            if (estado.Y2.HasValue)
+            {
+                Y2 = estado.Y2.Value;
             }
         }
     }
