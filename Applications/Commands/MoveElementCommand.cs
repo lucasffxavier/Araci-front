@@ -1,6 +1,4 @@
-﻿using System.Windows;
-
-using Araci.ViewModels;
+﻿using Araci.ViewModels;
 
 namespace Araci.Core.Commands
 {
@@ -30,20 +28,16 @@ namespace Araci.Core.Commands
 
         public MoveElementCommand(
             ElementoViewModel vm,
-            Vector delta)
+            ElementoEstado estadoInicial,
+            ElementoEstado estadoFinal)
         {
             _vm = vm;
 
             _estadoInicial =
-                vm.CapturarEstado();
-
-            vm.Mover(delta);
+                estadoInicial;
 
             _estadoFinal =
-                vm.CapturarEstado();
-
-            vm.AplicarEstado(
-                _estadoInicial);
+                estadoFinal;
         }
 
         // =========================

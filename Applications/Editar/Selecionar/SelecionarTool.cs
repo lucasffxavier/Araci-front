@@ -1,8 +1,10 @@
-﻿using System.Linq;
+﻿using System.Collections.Generic;
+using System.Linq;
 using System.Windows;
 using System.Windows.Input;
 
 using Araci.Applications.Editar.Base;
+using Araci.Core.Commands;
 using Araci.Services;
 using Araci.ViewModels;
 
@@ -17,6 +19,16 @@ namespace Araci.Applications.Editar.Selecionar
         private bool _selecionandoJanela;
 
         private Point _inicioJanela;
+
+        // =========================
+        // ESTADOS INICIAIS
+        // =========================
+
+        private readonly Dictionary<
+            ElementoViewModel,
+            ElementoEstado>
+            _estadosIniciais
+                = new();
 
         public string Nome =>
             "Selecionar";
@@ -70,8 +82,18 @@ namespace Araci.Applications.Editar.Selecionar
 
                 _arrastandoElementos = true;
 
-                AppServices.Commands
-                    .BeginTransaction();
+                // =========================
+                // CAPTURA ESTADOS
+                // =========================
+
+                _estadosIniciais.Clear();
+
+                foreach (var item in SelectionService
+                    .Selecionados)
+                {
+                    _estadosIniciais[item] =
+                        item.CapturarEstado();
+                }
 
                 return;
             }
@@ -112,7 +134,10 @@ namespace Araci.Applications.Editar.Selecionar
                     .Selecionados
                     .ToList())
                 {
-                    MoveService.Mover(item, delta);
+                    MoveService
+                        .MoverVisual(
+                            item,
+                            delta);
                 }
 
                 _ultimoPonto = position;
@@ -142,8 +167,44 @@ namespace Araci.Applications.Editar.Selecionar
 
             if (_arrastandoElementos)
             {
-                AppServices.Commands
-                    .CommitTransaction();
+                var composite =
+                    new CompositeCommand();
+
+                foreach (var item in SelectionService
+                    .Selecionados)
+                {
+                    if (!_estadosIniciais
+                        .ContainsKey(item))
+                    {
+                        continue;
+                    }
+
+                    var estadoInicial =
+                        _estadosIniciais[item];
+
+                    var estadoFinal =
+                        item.CapturarEstado();
+
+                    bool mudou =
+                        estadoInicial.X != estadoFinal.X
+                        ||
+                        estadoInicial.Y != estadoFinal.Y;
+
+                    if (!mudou)
+                        continue;
+
+                    composite.Add(
+                        new MoveElementCommand(
+                            item,
+                            estadoInicial,
+                            estadoFinal));
+                }
+
+                if (!composite.IsEmpty)
+                {
+                    AppServices.Commands
+                        .Execute(composite);
+                }
             }
 
             // =========================
@@ -171,6 +232,8 @@ namespace Araci.Applications.Editar.Selecionar
 
             _arrastandoElementos = false;
             _selecionandoJanela = false;
+
+            _estadosIniciais.Clear();
 
             AppServices.SelectionBox
                 .Visivel = false;

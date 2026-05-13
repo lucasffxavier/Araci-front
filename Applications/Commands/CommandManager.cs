@@ -17,88 +17,17 @@ namespace Araci.Core.Commands
                 = new();
 
         // =========================
-        // TRANSACTION
-        // =========================
-
-        private CompositeCommand?
-            _transactionAtual;
-
-        // =========================
         // EXECUTE
         // =========================
 
         public void Execute(
             IUndoableCommand command)
         {
-            // =========================
-            // TRANSACTION ATIVA
-            // =========================
-
-            if (_transactionAtual != null)
-            {
-                _transactionAtual.Add(command);
-
-                command.Execute();
-
-                return;
-            }
-
-            // =========================
-            // NORMAL
-            // =========================
-
             command.Execute();
 
             _undoStack.Push(command);
 
             _redoStack.Clear();
-        }
-
-        // =========================
-        // BEGIN TRANSACTION
-        // =========================
-
-        public void BeginTransaction()
-        {
-            if (_transactionAtual != null)
-                return;
-
-            _transactionAtual =
-                new CompositeCommand();
-        }
-
-        // =========================
-        // COMMIT
-        // =========================
-
-        public void CommitTransaction()
-        {
-            if (_transactionAtual == null)
-                return;
-
-            if (!_transactionAtual.IsEmpty)
-            {
-                _undoStack.Push(
-                    _transactionAtual);
-
-                _redoStack.Clear();
-            }
-
-            _transactionAtual = null;
-        }
-
-        // =========================
-        // ROLLBACK
-        // =========================
-
-        public void RollbackTransaction()
-        {
-            if (_transactionAtual == null)
-                return;
-
-            _transactionAtual.Undo();
-
-            _transactionAtual = null;
         }
 
         // =========================
@@ -134,5 +63,15 @@ namespace Araci.Core.Commands
 
             _undoStack.Push(command);
         }
+
+        // =========================
+        // FLAGS
+        // =========================
+
+        public bool CanUndo =>
+            _undoStack.Count > 0;
+
+        public bool CanRedo =>
+            _redoStack.Count > 0;
     }
 }

@@ -1,7 +1,10 @@
-﻿using System.Windows;
+﻿using System.Collections.Generic;
+using System.Linq;
+using System.Windows;
 using System.Windows.Input;
 
 using Araci.Applications.Editar.Base;
+using Araci.Core.Commands;
 using Araci.Services;
 using Araci.ViewModels;
 
@@ -9,12 +12,19 @@ namespace Araci.Applications.Editar.Mover
 {
     public class MoverTool : ITool
     {
-        private ElementoViewModel?
-            _selecionado;
+        private bool _movendo;
 
         private Point _ultimoPonto;
 
-        private bool _arrastando;
+        // =========================
+        // ESTADOS INICIAIS
+        // =========================
+
+        private readonly Dictionary<
+            ElementoViewModel,
+            ElementoEstado>
+            _estadosIniciais
+                = new();
 
         public string Nome =>
             "Mover";
@@ -28,11 +38,9 @@ namespace Araci.Applications.Editar.Mover
 
         public void Desativar()
         {
-            _arrastando = false;
+            _movendo = false;
 
-            AppServices
-                .MoveHud
-                .Visivel = false;
+            _estadosIniciais.Clear();
         }
 
         public void OnMouseDown(
@@ -42,83 +50,102 @@ namespace Araci.Applications.Editar.Mover
             if (vm == null)
                 return;
 
-            SelectionService.Selecionar(vm);
+            if (!SelectionService
+                .Selecionados
+                .Contains(vm))
+            {
+                SelectionService
+                    .Selecionar(vm);
+            }
 
-            _selecionado = vm;
+            _movendo = true;
 
             _ultimoPonto = position;
 
-            _arrastando = true;
-
             // =========================
-            // BEGIN TRANSACTION
+            // CAPTURA ESTADOS
             // =========================
 
-            AppServices
-                .Commands
-                .BeginTransaction();
+            _estadosIniciais.Clear();
 
-            // =========================
-            // HUD
-            // =========================
-
-            var hud =
-                AppServices.MoveHud;
-
-            hud.Reset();
-
-            hud.Visivel = true;
+            foreach (var item in SelectionService
+                .Selecionados)
+            {
+                _estadosIniciais[item] =
+                    item.CapturarEstado();
+            }
         }
 
         public void OnMouseMove(
             Point position)
         {
-            if (!_arrastando
-                || _selecionado == null)
+            if (!_movendo)
                 return;
 
             Vector delta =
                 position - _ultimoPonto;
 
-            MoveService.Mover(
-                _selecionado,
-                delta);
+            foreach (var item in SelectionService
+                .Selecionados
+                .ToList())
+            {
+                MoveService
+                    .MoverVisual(
+                        item,
+                        delta);
+            }
 
             _ultimoPonto = position;
-
-            var hud =
-                AppServices.MoveHud;
-
-            hud.X =
-                position.X + 20;
-
-            hud.Y =
-                position.Y - 10;
-
-            hud.DeltaX +=
-                delta.X;
-
-            hud.DeltaY +=
-                delta.Y;
         }
 
         public void OnMouseUp(
             Point position)
         {
-            if (_arrastando)
+            if (!_movendo)
+                return;
+
+            var composite =
+                new CompositeCommand();
+
+            foreach (var item in SelectionService
+                .Selecionados)
             {
-                AppServices
-                    .Commands
-                    .CommitTransaction();
+                if (!_estadosIniciais
+                    .ContainsKey(item))
+                {
+                    continue;
+                }
+
+                var estadoInicial =
+                    _estadosIniciais[item];
+
+                var estadoFinal =
+                    item.CapturarEstado();
+
+                bool mudou =
+                    estadoInicial.X != estadoFinal.X
+                    ||
+                    estadoInicial.Y != estadoFinal.Y;
+
+                if (!mudou)
+                    continue;
+
+                composite.Add(
+                    new MoveElementCommand(
+                        item,
+                        estadoInicial,
+                        estadoFinal));
             }
 
-            _arrastando = false;
+            if (!composite.IsEmpty)
+            {
+                AppServices.Commands
+                    .Execute(composite);
+            }
 
-            _selecionado = null;
+            _movendo = false;
 
-            AppServices
-                .MoveHud
-                .Visivel = false;
+            _estadosIniciais.Clear();
         }
 
         public void OnKeyDown(Key key)

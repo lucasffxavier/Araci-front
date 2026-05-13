@@ -11,9 +11,11 @@ namespace Araci.Applications.Editar.Deletar
 {
     public class DeletarTool : ITool
     {
-        public string Nome => "Deletar";
+        public string Nome =>
+            "Deletar";
 
-        public bool MantemBotaoAtivado => true;
+        public bool MantemBotaoAtivado =>
+            true;
 
         public void Ativar()
         {
@@ -23,30 +25,10 @@ namespace Araci.Applications.Editar.Deletar
         {
         }
 
-        // =========================
-        // MOUSE DOWN
-        // =========================
-
         public void OnMouseDown(
             ElementoViewModel? vm,
             Point position)
         {
-            // =========================
-            // CLICK DIRETO NO ELEMENTO
-            // =========================
-
-            if (vm != null)
-            {
-                ExecutarDelete(
-                    new[] { vm });
-
-                return;
-            }
-
-            // =========================
-            // DELETE DA SELEÇÃO
-            // =========================
-
             var selecionados =
                 SelectionService
                     .Selecionados
@@ -55,47 +37,32 @@ namespace Araci.Applications.Editar.Deletar
             if (selecionados.Count == 0)
                 return;
 
-            ExecutarDelete(
-                selecionados);
-        }
+            var composite =
+                new CompositeCommand();
 
-        // =========================
-        // EXECUTAR DELETE
-        // =========================
-
-        private void ExecutarDelete(
-            System.Collections.Generic.IEnumerable<ElementoViewModel> elementos)
-        {
-            var lista =
-                elementos
-                    .Distinct()
-                    .ToList();
-
-            if (lista.Count == 0)
-                return;
-
-            AppServices.Commands
-                .BeginTransaction();
-
-            foreach (var item in lista)
+            foreach (var item in selecionados)
             {
-                AppServices.Commands.Execute(
-                    new DeleteElementCommand(item));
+                composite.Add(
+                    new DeleteElementCommand(
+                        item));
             }
 
             AppServices.Commands
-                .CommitTransaction();
+                .Execute(composite);
         }
 
-        public void OnMouseMove(Point position)
+        public void OnMouseMove(
+            Point position)
         {
         }
 
-        public void OnMouseUp(Point position)
+        public void OnMouseUp(
+            Point position)
         {
         }
 
-        public void OnKeyDown(Key key)
+        public void OnKeyDown(
+            Key key)
         {
         }
     }

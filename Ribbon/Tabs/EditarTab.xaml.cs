@@ -147,5 +147,29 @@ namespace Araci.Ribbon.Tabs
                 .AtivarFerramenta(
                     new DeletarTool());
         }
+
+        // =========================
+        // UNDO
+        // =========================
+
+        private void DesfazerButton_Click(
+            object sender,
+            RoutedEventArgs e)
+        {
+            AppServices.Commands
+                .Undo();
+        }
+
+        // =========================
+        // REDO
+        // =========================
+
+        private void RefazerButton_Click(
+            object sender,
+            RoutedEventArgs e)
+        {
+            AppServices.Commands
+                .Redo();
+        }
     }
 }

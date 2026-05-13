@@ -1,7 +1,6 @@
 ﻿using System;
 using System.Windows;
 
-using Araci.Core.Commands;
 using Araci.ViewModels;
 
 namespace Araci.Services
@@ -11,7 +10,7 @@ namespace Araci.Services
         private const double
             MARGEM_VISUAL = 2;
 
-        public static void Mover(
+        public static void MoverVisual(
             ElementoViewModel vm,
             Vector delta)
         {
@@ -56,22 +55,8 @@ namespace Araci.Services
                         novoY,
                         limiteInferior));
 
-            Vector deltaFinal =
-                new(
-                    novoX - bounds.X,
-                    novoY - bounds.Y);
-
-            if (deltaFinal.Length == 0)
-                return;
-
-            var command =
-                new MoveElementCommand(
-                    vm,
-                    deltaFinal);
-
-            AppServices
-                .Commands
-                .Execute(command);
+            vm.X = novoX;
+            vm.Y = novoY;
         }
     }
 }
