@@ -3,6 +3,7 @@
 using Araci.Core.Documents;
 using Araci.Services;
 using Araci.Core.Commands;
+using Araci.Core.Transactions;
 using Araci.ViewModels;
 
 namespace Araci
@@ -70,5 +71,15 @@ namespace Araci
             Commands
         { get; }
             = new CommandManager();
+
+        // =========================
+        // TRANSACTIONS
+        // =========================
+
+        public static TransactionScope
+            BeginTransaction()
+        {
+            return new TransactionScope(Commands);
+        }
     }
 }

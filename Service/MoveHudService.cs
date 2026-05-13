@@ -1,9 +1,12 @@
 ﻿using System.ComponentModel;
+using System.Windows;
 
 namespace Araci.Services
 {
     public class MoveHudService : INotifyPropertyChanged
     {
+        private const double MARGEM = 10;
+
         private bool _visivel;
         private double _x;
         private double _y;
@@ -28,7 +31,7 @@ namespace Araci.Services
         public double X
         {
             get => _x;
-            set
+            private set
             {
                 if (_x != value)
                 {
@@ -41,7 +44,7 @@ namespace Araci.Services
         public double Y
         {
             get => _y;
-            set
+            private set
             {
                 if (_y != value)
                 {
@@ -77,6 +80,32 @@ namespace Araci.Services
             }
         }
 
+        // =========================
+        // POSICIONAMENTO INTELIGENTE
+        // =========================
+
+        public void AtualizarPosicao(Rect bounds)
+        {
+            double viewportX =
+                AppServices.Viewport?.Largura ?? 1000;
+
+            double viewportY =
+                AppServices.Viewport?.Altura ?? 800;
+
+            double novoX =
+                bounds.X + bounds.Width / 2;
+
+            double novoY =
+                bounds.Y - 20; // acima do elemento
+
+            // CLAMP VIEWPORT
+            novoX = Math.Max(MARGEM, Math.Min(novoX, viewportX - MARGEM));
+            novoY = Math.Max(MARGEM, Math.Min(novoY, viewportY - MARGEM));
+
+            X = novoX;
+            Y = novoY;
+        }
+
         public void Reset()
         {
             DeltaX = 0;
@@ -85,7 +114,8 @@ namespace Araci.Services
 
         private void OnChanged(string nome)
         {
-            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nome));
+            PropertyChanged?.Invoke(this,
+                new PropertyChangedEventArgs(nome));
         }
     }
 }

@@ -11,19 +11,13 @@ namespace Araci.Applications.Editar.Deletar
 {
     public class DeletarTool : ITool
     {
-        public string Nome =>
-            "Deletar";
+        public string Nome => "Deletar";
 
-        public bool MantemBotaoAtivado =>
-            true;
+        public bool MantemBotaoAtivado => true;
 
-        public void Ativar()
-        {
-        }
+        public void Ativar() { }
 
-        public void Desativar()
-        {
-        }
+        public void Desativar() { }
 
         public void OnMouseDown(
             ElementoViewModel? vm,
@@ -37,33 +31,22 @@ namespace Araci.Applications.Editar.Deletar
             if (selecionados.Count == 0)
                 return;
 
-            var composite =
-                new CompositeCommand();
+            using var tx =
+                AppServices.BeginTransaction();
 
             foreach (var item in selecionados)
             {
-                composite.Add(
-                    new DeleteElementCommand(
-                        item));
+                tx.Add(
+                    new DeleteElementCommand(item));
             }
 
-            AppServices.Commands
-                .Execute(composite);
+            tx.Commit();
         }
 
-        public void OnMouseMove(
-            Point position)
-        {
-        }
+        public void OnMouseMove(Point position) { }
 
-        public void OnMouseUp(
-            Point position)
-        {
-        }
+        public void OnMouseUp(Point position) { }
 
-        public void OnKeyDown(
-            Key key)
-        {
-        }
+        public void OnKeyDown(Key key) { }
     }
 }

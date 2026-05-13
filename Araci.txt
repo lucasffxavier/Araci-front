@@ -176,88 +176,17 @@ namespace Araci.Core.Commands
                 = new();
 
         // =========================
-        // TRANSACTION
-        // =========================
-
-        private CompositeCommand?
-            _transactionAtual;
-
-        // =========================
         // EXECUTE
         // =========================
 
         public void Execute(
             IUndoableCommand command)
         {
-            // =========================
-            // TRANSACTION ATIVA
-            // =========================
-
-            if (_transactionAtual != null)
-            {
-                _transactionAtual.Add(command);
-
-                command.Execute();
-
-                return;
-            }
-
-            // =========================
-            // NORMAL
-            // =========================
-
             command.Execute();
 
             _undoStack.Push(command);
 
             _redoStack.Clear();
-        }
-
-        // =========================
-        // BEGIN TRANSACTION
-        // =========================
-
-        public void BeginTransaction()
-        {
-            if (_transactionAtual != null)
-                return;
-
-            _transactionAtual =
-                new CompositeCommand();
-        }
-
-        // =========================
-        // COMMIT
-        // =========================
-
-        public void CommitTransaction()
-        {
-            if (_transactionAtual == null)
-                return;
-
-            if (!_transactionAtual.IsEmpty)
-            {
-                _undoStack.Push(
-                    _transactionAtual);
-
-                _redoStack.Clear();
-            }
-
-            _transactionAtual = null;
-        }
-
-        // =========================
-        // ROLLBACK
-        // =========================
-
-        public void RollbackTransaction()
-        {
-            if (_transactionAtual == null)
-                return;
-
-            _transactionAtual.Undo();
-
-            _transactionAtual = null;
         }
 
         // =========================
@@ -293,6 +222,16 @@ namespace Araci.Core.Commands
 
             _undoStack.Push(command);
         }
+
+        // =========================
+        // FLAGS
+        // =========================
+
+        public bool CanUndo =>
+            _undoStack.Count > 0;
+
+        public bool CanRedo =>
+            _redoStack.Count > 0;
     }
 }
 
@@ -395,8 +334,16 @@ namespace Araci.Core.Commands
     public class DeleteElementCommand
         : IUndoableCommand
     {
+        // =========================
+        // ELEMENTO
+        // =========================
+
         private readonly ElementoViewModel
             _vm;
+
+        // =========================
+        // CONSTRUTOR
+        // =========================
 
         public DeleteElementCommand(
             ElementoViewModel vm)
@@ -404,13 +351,26 @@ namespace Araci.Core.Commands
             _vm = vm;
         }
 
+        // =========================
+        // EXECUTE
+        // =========================
+
         public void Execute()
         {
             AppServices.Document
                 .RemoverElemento(_vm);
 
-            SelectionService.Limpar();
+            // =========================
+            // REMOVE APENAS O ITEM
+            // =========================
+
+            SelectionService
+                .Deselecionar(_vm);
         }
+
+        // =========================
+        // UNDO
+        // =========================
 
         public void Undo()
         {
@@ -485,9 +445,7 @@ namespace Araci.Applications.Commands
 ARQUIVO: C:\Araci-Engine-Front\Araci Engine\Applications\Commands\MoveElementCommand.cs
 ====================================================================================================
 
-﻿using System.Windows;
-
-using Araci.ViewModels;
+﻿using Araci.ViewModels;
 
 namespace Araci.Core.Commands
 {
@@ -502,24 +460,14 @@ namespace Araci.Core.Commands
             _vm;
 
         // =========================
-        // ESTADO
+        // ESTADOS
         // =========================
 
-        private readonly double _xInicial;
-        private readonly double _yInicial;
+        private readonly ElementoEstado
+            _estadoInicial;
 
-        private readonly double _xFinal;
-        private readonly double _yFinal;
-
-        // =========================
-        // CABO
-        // =========================
-
-        private readonly double? _x2Inicial;
-        private readonly double? _y2Inicial;
-
-        private readonly double? _x2Final;
-        private readonly double? _y2Final;
+        private readonly ElementoEstado
+            _estadoFinal;
 
         // =========================
         // CONSTRUTOR
@@ -527,30 +475,16 @@ namespace Araci.Core.Commands
 
         public MoveElementCommand(
             ElementoViewModel vm,
-            Vector delta)
+            ElementoEstado estadoInicial,
+            ElementoEstado estadoFinal)
         {
             _vm = vm;
 
-            _xInicial = vm.X;
-            _yInicial = vm.Y;
+            _estadoInicial =
+                estadoInicial;
 
-            _xFinal =
-                vm.X + delta.X;
-
-            _yFinal =
-                vm.Y + delta.Y;
-
-            if (vm is CaboViewModel cabo)
-            {
-                _x2Inicial = cabo.X2;
-                _y2Inicial = cabo.Y2;
-
-                _x2Final =
-                    cabo.X2 + delta.X;
-
-                _y2Final =
-                    cabo.Y2 + delta.Y;
-            }
+            _estadoFinal =
+                estadoFinal;
         }
 
         // =========================
@@ -559,7 +493,8 @@ namespace Araci.Core.Commands
 
         public void Execute()
         {
-            AplicarEstadoFinal();
+            _vm.AplicarEstado(
+                _estadoFinal);
         }
 
         // =========================
@@ -568,45 +503,8 @@ namespace Araci.Core.Commands
 
         public void Undo()
         {
-            AplicarEstadoInicial();
-        }
-
-        // =========================
-        // ESTADO INICIAL
-        // =========================
-
-        private void AplicarEstadoInicial()
-        {
-            _vm.X = _xInicial;
-            _vm.Y = _yInicial;
-
-            if (_vm is CaboViewModel cabo)
-            {
-                cabo.X2 =
-                    _x2Inicial ?? cabo.X2;
-
-                cabo.Y2 =
-                    _y2Inicial ?? cabo.Y2;
-            }
-        }
-
-        // =========================
-        // ESTADO FINAL
-        // =========================
-
-        private void AplicarEstadoFinal()
-        {
-            _vm.X = _xFinal;
-            _vm.Y = _yFinal;
-
-            if (_vm is CaboViewModel cabo)
-            {
-                cabo.X2 =
-                    _x2Final ?? cabo.X2;
-
-                cabo.Y2 =
-                    _y2Final ?? cabo.Y2;
-            }
+            _vm.AplicarEstado(
+                _estadoInicial);
         }
     }
 }
@@ -809,7 +707,8 @@ namespace Araci.Applications.Editar.Base
 ARQUIVO: C:\Araci-Engine-Front\Araci Engine\Applications\Editar\Deletar\DeletarTool.cs
 ====================================================================================================
 
-﻿using System.Windows;
+﻿using System.Linq;
+using System.Windows;
 using System.Windows.Input;
 
 using Araci.Applications.Editar.Base;
@@ -821,38 +720,58 @@ namespace Araci.Applications.Editar.Deletar
 {
     public class DeletarTool : ITool
     {
-        public string Nome => "Deletar";
+        public string Nome =>
+            "Deletar";
 
-        public bool MantemBotaoAtivado => true;
+        public bool MantemBotaoAtivado =>
+            true;
 
-        public void Ativar() { }
+        public void Ativar()
+        {
+        }
 
-        public void Desativar() { }
+        public void Desativar()
+        {
+        }
 
         public void OnMouseDown(
             ElementoViewModel? vm,
             Point position)
         {
-            if (vm == null)
+            var selecionados =
+                SelectionService
+                    .Selecionados
+                    .ToList();
+
+            if (selecionados.Count == 0)
                 return;
 
-            var command =
-                new DeleteElementCommand(vm);
+            var composite =
+                new CompositeCommand();
 
-            AppServices
-                .Commands
-                .Execute(command);
+            foreach (var item in selecionados)
+            {
+                composite.Add(
+                    new DeleteElementCommand(
+                        item));
+            }
+
+            AppServices.Commands
+                .Execute(composite);
         }
 
-        public void OnMouseMove(Point position)
+        public void OnMouseMove(
+            Point position)
         {
         }
 
-        public void OnMouseUp(Point position)
+        public void OnMouseUp(
+            Point position)
         {
         }
 
-        public void OnKeyDown(Key key)
+        public void OnKeyDown(
+            Key key)
         {
         }
     }
@@ -863,10 +782,13 @@ namespace Araci.Applications.Editar.Deletar
 ARQUIVO: C:\Araci-Engine-Front\Araci Engine\Applications\Editar\Mover\MoverTool.cs
 ====================================================================================================
 
-﻿using System.Windows;
+﻿using System.Collections.Generic;
+using System.Linq;
+using System.Windows;
 using System.Windows.Input;
 
 using Araci.Applications.Editar.Base;
+using Araci.Core.Commands;
 using Araci.Services;
 using Araci.ViewModels;
 
@@ -874,12 +796,19 @@ namespace Araci.Applications.Editar.Mover
 {
     public class MoverTool : ITool
     {
-        private ElementoViewModel?
-            _selecionado;
+        private bool _movendo;
 
         private Point _ultimoPonto;
 
-        private bool _arrastando;
+        // =========================
+        // ESTADOS INICIAIS
+        // =========================
+
+        private readonly Dictionary<
+            ElementoViewModel,
+            ElementoEstado>
+            _estadosIniciais
+                = new();
 
         public string Nome =>
             "Mover";
@@ -893,11 +822,9 @@ namespace Araci.Applications.Editar.Mover
 
         public void Desativar()
         {
-            _arrastando = false;
+            _movendo = false;
 
-            AppServices
-                .MoveHud
-                .Visivel = false;
+            _estadosIniciais.Clear();
         }
 
         public void OnMouseDown(
@@ -907,83 +834,102 @@ namespace Araci.Applications.Editar.Mover
             if (vm == null)
                 return;
 
-            SelectionService.Selecionar(vm);
+            if (!SelectionService
+                .Selecionados
+                .Contains(vm))
+            {
+                SelectionService
+                    .Selecionar(vm);
+            }
 
-            _selecionado = vm;
+            _movendo = true;
 
             _ultimoPonto = position;
 
-            _arrastando = true;
-
             // =========================
-            // BEGIN TRANSACTION
+            // CAPTURA ESTADOS
             // =========================
 
-            AppServices
-                .Commands
-                .BeginTransaction();
+            _estadosIniciais.Clear();
 
-            // =========================
-            // HUD
-            // =========================
-
-            var hud =
-                AppServices.MoveHud;
-
-            hud.Reset();
-
-            hud.Visivel = true;
+            foreach (var item in SelectionService
+                .Selecionados)
+            {
+                _estadosIniciais[item] =
+                    item.CapturarEstado();
+            }
         }
 
         public void OnMouseMove(
             Point position)
         {
-            if (!_arrastando
-                || _selecionado == null)
+            if (!_movendo)
                 return;
 
             Vector delta =
                 position - _ultimoPonto;
 
-            MoveService.Mover(
-                _selecionado,
-                delta);
+            foreach (var item in SelectionService
+                .Selecionados
+                .ToList())
+            {
+                MoveService
+                    .MoverVisual(
+                        item,
+                        delta);
+            }
 
             _ultimoPonto = position;
-
-            var hud =
-                AppServices.MoveHud;
-
-            hud.X =
-                position.X + 20;
-
-            hud.Y =
-                position.Y - 10;
-
-            hud.DeltaX +=
-                delta.X;
-
-            hud.DeltaY +=
-                delta.Y;
         }
 
         public void OnMouseUp(
             Point position)
         {
-            if (_arrastando)
+            if (!_movendo)
+                return;
+
+            var composite =
+                new CompositeCommand();
+
+            foreach (var item in SelectionService
+                .Selecionados)
             {
-                AppServices
-                    .Commands
-                    .CommitTransaction();
+                if (!_estadosIniciais
+                    .ContainsKey(item))
+                {
+                    continue;
+                }
+
+                var estadoInicial =
+                    _estadosIniciais[item];
+
+                var estadoFinal =
+                    item.CapturarEstado();
+
+                bool mudou =
+                    estadoInicial.X != estadoFinal.X
+                    ||
+                    estadoInicial.Y != estadoFinal.Y;
+
+                if (!mudou)
+                    continue;
+
+                composite.Add(
+                    new MoveElementCommand(
+                        item,
+                        estadoInicial,
+                        estadoFinal));
             }
 
-            _arrastando = false;
+            if (!composite.IsEmpty)
+            {
+                AppServices.Commands
+                    .Execute(composite);
+            }
 
-            _selecionado = null;
+            _movendo = false;
 
-            AppServices
-                .MoveHud
-                .Visivel = false;
+            _estadosIniciais.Clear();
         }
 
         public void OnKeyDown(Key key)
@@ -997,10 +943,13 @@ namespace Araci.Applications.Editar.Mover
 ARQUIVO: C:\Araci-Engine-Front\Araci Engine\Applications\Editar\Selecionar\SelecionarTool.cs
 ====================================================================================================
 
-﻿using System.Windows;
+﻿using System.Collections.Generic;
+using System.Linq;
+using System.Windows;
 using System.Windows.Input;
 
 using Araci.Applications.Editar.Base;
+using Araci.Core.Commands;
 using Araci.Services;
 using Araci.ViewModels;
 
@@ -1008,12 +957,23 @@ namespace Araci.Applications.Editar.Selecionar
 {
     public class SelecionarTool : ITool
     {
-        private ElementoViewModel?
-            _selecionado;
-
         private Point _ultimoPonto;
 
-        private bool _arrastando;
+        private bool _arrastandoElementos;
+
+        private bool _selecionandoJanela;
+
+        private Point _inicioJanela;
+
+        // =========================
+        // ESTADOS INICIAIS
+        // =========================
+
+        private readonly Dictionary<
+            ElementoViewModel,
+            ElementoEstado>
+            _estadosIniciais
+                = new();
 
         public string Nome =>
             "Selecionar";
@@ -1027,66 +987,201 @@ namespace Araci.Applications.Editar.Selecionar
 
         public void Desativar()
         {
-            _arrastando = false;
+            _arrastandoElementos = false;
+            _selecionandoJanela = false;
+
+            AppServices.SelectionBox
+                .Visivel = false;
         }
 
         public void OnMouseDown(
             ElementoViewModel? vm,
             Point position)
         {
-            if (vm == null)
+            bool ctrl =
+                Keyboard.Modifiers
+                    .HasFlag(ModifierKeys.Control);
+
+            // =========================
+            // CLICK EM ELEMENTO
+            // =========================
+
+            if (vm != null)
             {
-                SelectionService.Limpar();
+                if (ctrl)
+                {
+                    SelectionService.Toggle(vm);
+                }
+                else
+                {
+                    if (!SelectionService
+                        .Selecionados
+                        .Contains(vm))
+                    {
+                        SelectionService
+                            .Selecionar(vm);
+                    }
+                }
+
+                _ultimoPonto = position;
+
+                _arrastandoElementos = true;
+
+                // =========================
+                // CAPTURA ESTADOS
+                // =========================
+
+                _estadosIniciais.Clear();
+
+                foreach (var item in SelectionService
+                    .Selecionados)
+                {
+                    _estadosIniciais[item] =
+                        item.CapturarEstado();
+                }
+
                 return;
             }
 
-            SelectionService.Selecionar(vm);
-
-            _selecionado = vm;
-
-            _ultimoPonto = position;
-
-            _arrastando = true;
-
             // =========================
-            // BEGIN TRANSACTION
+            // CLICK VAZIO
             // =========================
 
-            AppServices
-                .Commands
-                .BeginTransaction();
+            if (!ctrl)
+            {
+                SelectionService.Limpar();
+            }
+
+            _inicioJanela = position;
+
+            _selecionandoJanela = true;
+
+            AppServices.SelectionBox
+                .Visivel = true;
+
+            AppServices.SelectionBox
+                .Atualizar(position, position);
         }
 
         public void OnMouseMove(
             Point position)
         {
-            if (!_arrastando
-                || _selecionado == null)
+            // =========================
+            // MOVE ELEMENTOS
+            // =========================
+
+            if (_arrastandoElementos)
+            {
+                Vector delta =
+                    position - _ultimoPonto;
+
+                foreach (var item in SelectionService
+                    .Selecionados
+                    .ToList())
+                {
+                    MoveService
+                        .MoverVisual(
+                            item,
+                            delta);
+                }
+
+                _ultimoPonto = position;
+
                 return;
+            }
 
-            Vector delta =
-                position - _ultimoPonto;
+            // =========================
+            // SELECTION BOX
+            // =========================
 
-            MoveService.Mover(
-                _selecionado,
-                delta);
-
-            _ultimoPonto = position;
+            if (_selecionandoJanela)
+            {
+                AppServices.SelectionBox
+                    .Atualizar(
+                        _inicioJanela,
+                        position);
+            }
         }
 
         public void OnMouseUp(
             Point position)
         {
-            if (_arrastando)
+            // =========================
+            // FINALIZAR MOVE
+            // =========================
+
+            if (_arrastandoElementos)
             {
-                AppServices
-                    .Commands
-                    .CommitTransaction();
+                var composite =
+                    new CompositeCommand();
+
+                foreach (var item in SelectionService
+                    .Selecionados)
+                {
+                    if (!_estadosIniciais
+                        .ContainsKey(item))
+                    {
+                        continue;
+                    }
+
+                    var estadoInicial =
+                        _estadosIniciais[item];
+
+                    var estadoFinal =
+                        item.CapturarEstado();
+
+                    bool mudou =
+                        estadoInicial.X != estadoFinal.X
+                        ||
+                        estadoInicial.Y != estadoFinal.Y;
+
+                    if (!mudou)
+                        continue;
+
+                    composite.Add(
+                        new MoveElementCommand(
+                            item,
+                            estadoInicial,
+                            estadoFinal));
+                }
+
+                if (!composite.IsEmpty)
+                {
+                    AppServices.Commands
+                        .Execute(composite);
+                }
             }
 
-            _arrastando = false;
+            // =========================
+            // FINALIZAR JANELA
+            // =========================
 
-            _selecionado = null;
+            if (_selecionandoJanela)
+            {
+                var rect =
+                    AppServices.SelectionBox
+                        .Bounds;
+
+                foreach (var item in AppServices
+                    .Document
+                    .Elementos)
+                {
+                    if (rect.IntersectsWith(
+                        item.Bounds))
+                    {
+                        SelectionService
+                            .Selecionar(item, true);
+                    }
+                }
+            }
+
+            _arrastandoElementos = false;
+            _selecionandoJanela = false;
+
+            _estadosIniciais.Clear();
+
+            AppServices.SelectionBox
+                .Visivel = false;
         }
 
         public void OnKeyDown(Key key)
@@ -1102,56 +1197,42 @@ ARQUIVO: C:\Araci-Engine-Front\Araci Engine\Controls\CaboControl.cs
 
 ﻿using System;
 using System.ComponentModel;
-using System.Windows;
 using System.Windows.Controls;
-using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Shapes;
 
-using Araci.Services;
+using Araci.Controls.Base;
 using Araci.ViewModels;
 
 namespace Araci.Controls
 {
-    public class CaboControl : UserControl
+    public class CaboControl : ElementoControlBase
     {
         private readonly Line _line;
         private readonly Canvas _canvas;
-        private readonly DragService _drag;
 
         public CaboControl()
         {
-            Cursor = Cursors.Hand;
-
             ClipToBounds = true;
-            SnapsToDevicePixels = true;
-            UseLayoutRounding = true;
 
             _line = new Line
             {
                 Stroke = Brushes.Lime,
-                StrokeThickness = 4,
-                SnapsToDevicePixels = true
+                StrokeThickness = 4
             };
 
-            _canvas = new Canvas
-            {
-                ClipToBounds = true,
-                SnapsToDevicePixels = true
-            };
+            _canvas = new Canvas();
 
             _canvas.Children.Add(_line);
 
             Content = _canvas;
 
             DataContextChanged += OnDataContextChanged;
-
-            _drag = new DragService(this);
         }
 
         private void OnDataContextChanged(
             object sender,
-            DependencyPropertyChangedEventArgs e)
+            System.Windows.DependencyPropertyChangedEventArgs e)
         {
             if (e.OldValue is CaboViewModel antigo)
                 antigo.PropertyChanged -= OnVmChanged;
@@ -1168,25 +1249,27 @@ namespace Araci.Controls
             PropertyChangedEventArgs e)
         {
             if (sender is CaboViewModel vm)
+            {
                 Atualizar(vm);
+            }
         }
 
         private void Atualizar(CaboViewModel vm)
         {
             double x1 = vm.X;
             double y1 = vm.Y;
+
             double x2 = vm.X2;
             double y2 = vm.Y2;
 
             double minX = Math.Min(x1, x2);
             double minY = Math.Min(y1, y2);
 
-            double largura = Math.Abs(x2 - x1);
-            double altura = Math.Abs(y2 - y1);
+            double largura =
+                Math.Abs(x2 - x1) + 4;
 
-            // margem para o stroke
-            largura = Math.Max(4, largura + 4);
-            altura = Math.Max(4, altura + 4);
+            double altura =
+                Math.Abs(y2 - y1) + 4;
 
             Width = largura;
             Height = altura;
@@ -1196,8 +1279,21 @@ namespace Araci.Controls
 
             _line.X1 = x1 - minX + 2;
             _line.Y1 = y1 - minY + 2;
+
             _line.X2 = x2 - minX + 2;
             _line.Y2 = y2 - minY + 2;
+        }
+
+        protected override void AtualizarVisualSelecionado()
+        {
+            _line.Stroke = Brushes.DeepSkyBlue;
+            _line.StrokeThickness = 6;
+        }
+
+        protected override void AtualizarVisualNormal()
+        {
+            _line.Stroke = Brushes.Lime;
+            _line.StrokeThickness = 4;
         }
     }
 }
@@ -3381,8 +3477,57 @@ ARQUIVO: C:\Araci-Engine-Front\Araci Engine\Ribbon\Tabs\EditarTab.xaml
                             </StackPanel>
 
                         </Button>
-                        
-                        
+
+
+                        <Button x:Name="DesfazerButton"
+                                Width="80"
+                                Height="70"
+                                Background="Transparent"
+                                BorderThickness="0"
+                                Click="DesfazerButton_Click">
+
+                            <StackPanel HorizontalAlignment="Center">
+
+                                <Image Source="pack://application:,,,/Resources/Icons/desfazer.png"
+                                       Width="50"
+                                       Height="50"
+                                       Margin="0,0,0,0"/>
+
+                                <TextBlock Text="Desfazer"
+                                           Width="80"
+                                           TextAlignment="Center"
+                                           FontSize="11"
+                                           Foreground="Black"/>
+
+                            </StackPanel>
+
+                        </Button>
+
+
+                        <Button x:Name="RefazerButton"
+                                Width="80"
+                                Height="70"
+                                Background="Transparent"
+                                BorderThickness="0"
+                                Click="RefazerButton_Click">
+
+                            <StackPanel HorizontalAlignment="Center">
+
+                                <Image Source="pack://application:,,,/Resources/Icons/refazer.png"
+                                       Width="50"
+                                       Height="50"
+                                       Margin="0,0,0,0"/>
+
+                                <TextBlock Text="Refazer"
+                                           Width="80"
+                                           TextAlignment="Center"
+                                           FontSize="11"
+                                           Foreground="Black"/>
+
+                            </StackPanel>
+
+                        </Button>
+
 
                     </WrapPanel>
 
@@ -3550,6 +3695,30 @@ namespace Araci.Ribbon.Tabs
                 .AtivarFerramenta(
                     new DeletarTool());
         }
+
+        // =========================
+        // UNDO
+        // =========================
+
+        private void DesfazerButton_Click(
+            object sender,
+            RoutedEventArgs e)
+        {
+            AppServices.Commands
+                .Undo();
+        }
+
+        // =========================
+        // REDO
+        // =========================
+
+        private void RefazerButton_Click(
+            object sender,
+            RoutedEventArgs e)
+        {
+            AppServices.Commands
+                .Redo();
+        }
     }
 }
 
@@ -3638,6 +3807,7 @@ ARQUIVO: C:\Araci-Engine-Front\Araci Engine\Service\AppServices.cs
 using Araci.Core.Documents;
 using Araci.Services;
 using Araci.Core.Commands;
+using Araci.ViewModels;
 
 namespace Araci
 {
@@ -3688,6 +3858,15 @@ namespace Araci
             = new MoveHudService();
 
         // =========================
+        // SELECTION BOX
+        // =========================
+
+        public static SelectionBoxViewModel
+            SelectionBox
+        { get; }
+            = new SelectionBoxViewModel();
+
+        // =========================
         // COMMANDS
         // =========================
 
@@ -3728,9 +3907,12 @@ namespace Araci.Services
             _elemento.MouseLeftButtonUp += MouseUp;
         }
 
-        private FrameworkElement? Ref => AppServices.ViewportReference;
+        private FrameworkElement? Ref =>
+            AppServices.ViewportReference;
 
-        private void MouseDown(object sender, MouseButtonEventArgs e)
+        private void MouseDown(
+            object sender,
+            MouseButtonEventArgs e)
         {
             if (_elemento is not FrameworkElement fe)
                 return;
@@ -3743,41 +3925,57 @@ namespace Araci.Services
 
             _arrastando = true;
 
-            _ultimoPonto = e.GetPosition(Ref); // 🔥 FIX REAL
+            _ultimoPonto =
+                e.GetPosition(Ref);
 
-            AppServices.Tools.HandleMouseDown(vm, _ultimoPonto);
+            AppServices.Tools
+                .HandleMouseDown(
+                    vm,
+                    _ultimoPonto);
+
+            e.Handled = true;
 
             _elemento.CaptureMouse();
         }
 
-        private void MouseMove(object sender, MouseEventArgs e)
+        private void MouseMove(
+            object sender,
+            MouseEventArgs e)
         {
             if (Ref == null)
                 return;
 
-            Point pos = e.GetPosition(Ref); // 🔥 FIX REAL
+            Point pos =
+                e.GetPosition(Ref);
 
             if (_arrastando)
             {
-                Vector delta = pos - _ultimoPonto;
+                Vector delta =
+                    pos - _ultimoPonto;
+
                 _ultimoPonto = pos;
 
                 DragDelta?.Invoke(delta);
             }
 
-            AppServices.Tools.HandleMouseMove(pos);
+            AppServices.Tools
+                .HandleMouseMove(pos);
         }
 
-        private void MouseUp(object sender, MouseButtonEventArgs e)
+        private void MouseUp(
+            object sender,
+            MouseButtonEventArgs e)
         {
             if (Ref == null)
                 return;
 
-            Point pos = e.GetPosition(Ref); // 🔥 FIX REAL
+            Point pos =
+                e.GetPosition(Ref);
 
             _arrastando = false;
 
-            AppServices.Tools.HandleMouseUp(pos);
+            AppServices.Tools
+                .HandleMouseUp(pos);
 
             _elemento.ReleaseMouseCapture();
         }
@@ -3789,7 +3987,9 @@ namespace Araci.Services
 ARQUIVO: C:\Araci-Engine-Front\Araci Engine\Service\EditorState.cs
 ====================================================================================================
 
-﻿using System.ComponentModel;
+﻿using System.Collections.ObjectModel;
+using System.ComponentModel;
+using System.Linq;
 using System.Runtime.CompilerServices;
 
 using Araci.ViewModels;
@@ -3800,7 +4000,16 @@ namespace Araci.Services
         : INotifyPropertyChanged
     {
         // =========================
-        // ELEMENTO SELECIONADO
+        // SELEÇÃO
+        // =========================
+
+        public ObservableCollection<ElementoViewModel>
+            ElementosSelecionados
+        { get; }
+            = new();
+
+        // =========================
+        // ELEMENTO PRINCIPAL
         // =========================
 
         private ElementoViewModel?
@@ -3813,14 +4022,28 @@ namespace Araci.Services
 
             set
             {
-                if (_elementoSelecionado != value)
-                {
-                    _elementoSelecionado = value;
+                if (_elementoSelecionado == value)
+                    return;
 
-                    OnPropertyChanged();
-                }
+                _elementoSelecionado = value;
+
+                OnPropertyChanged();
             }
         }
+
+        // =========================
+        // CONTAGEM
+        // =========================
+
+        public int QuantidadeSelecionados =>
+            ElementosSelecionados.Count;
+
+        // =========================
+        // HELPERS
+        // =========================
+
+        public bool PossuiSelecao =>
+            ElementosSelecionados.Any();
 
         // =========================
         // PROPERTY CHANGED
@@ -3828,6 +4051,12 @@ namespace Araci.Services
 
         public event PropertyChangedEventHandler?
             PropertyChanged;
+
+        public void NotifySelecaoAlterada()
+        {
+            OnPropertyChanged(nameof(QuantidadeSelecionados));
+            OnPropertyChanged(nameof(PossuiSelecao));
+        }
 
         private void OnPropertyChanged(
             [CallerMemberName]
@@ -4053,7 +4282,6 @@ ARQUIVO: C:\Araci-Engine-Front\Araci Engine\Service\MoveService.cs
 ﻿using System;
 using System.Windows;
 
-using Araci.Core.Commands;
 using Araci.ViewModels;
 
 namespace Araci.Services
@@ -4063,7 +4291,7 @@ namespace Araci.Services
         private const double
             MARGEM_VISUAL = 2;
 
-        public static void Mover(
+        public static void MoverVisual(
             ElementoViewModel vm,
             Vector delta)
         {
@@ -4075,27 +4303,24 @@ namespace Araci.Services
                 AppServices.Viewport?.Altura
                     ?? 800;
 
-            double largura =
-                vm.Largura;
-
-            double altura =
-                vm.Altura;
+            Rect bounds =
+                vm.Bounds;
 
             double novoX =
-                vm.X + delta.X;
+                bounds.X + delta.X;
 
             double novoY =
-                vm.Y + delta.Y;
+                bounds.Y + delta.Y;
 
             double limiteDireito =
                 Math.Max(
                     0,
-                    maxX - largura - MARGEM_VISUAL);
+                    maxX - bounds.Width - MARGEM_VISUAL);
 
             double limiteInferior =
                 Math.Max(
                     0,
-                    maxY - altura - MARGEM_VISUAL);
+                    maxY - bounds.Height - MARGEM_VISUAL);
 
             novoX =
                 Math.Max(
@@ -4111,22 +4336,8 @@ namespace Araci.Services
                         novoY,
                         limiteInferior));
 
-            Vector deltaFinal =
-                new(
-                    novoX - vm.X,
-                    novoY - vm.Y);
-
-            if (deltaFinal.Length == 0)
-                return;
-
-            var command =
-                new MoveElementCommand(
-                    vm,
-                    deltaFinal);
-
-            AppServices
-                .Commands
-                .Execute(command);
+            vm.X = novoX;
+            vm.Y = novoY;
         }
     }
 }
@@ -4136,52 +4347,97 @@ namespace Araci.Services
 ARQUIVO: C:\Araci-Engine-Front\Araci Engine\Service\SelectionService.cs
 ====================================================================================================
 
-﻿using Araci.ViewModels;
+﻿using System.Collections.ObjectModel;
+using System.Linq;
+
+using Araci.ViewModels;
 
 namespace Araci.Services
 {
     public static class SelectionService
     {
         // =========================
-        // ELEMENTO ATUAL
+        // SELECIONADOS
         // =========================
 
-        private static ElementoViewModel?
-            _selecionado;
+        public static ObservableCollection<
+            ElementoViewModel>
+            Selecionados
+        { get; }
+            = new();
+
+        // =========================
+        // PRINCIPAL
+        // =========================
+
+        public static ElementoViewModel?
+            Principal
+        {
+            get
+            {
+                return Selecionados
+                    .FirstOrDefault();
+            }
+        }
 
         // =========================
         // SELECIONAR
         // =========================
 
         public static void Selecionar(
-            ElementoViewModel vm)
+            ElementoViewModel vm,
+            bool adicionar = false)
         {
-            // =========================
-            // REMOVE ANTERIOR
-            // =========================
-
-            if (_selecionado != null)
+            if (!adicionar)
             {
-                _selecionado.IsSelecionado =
-                    false;
+                Limpar();
             }
 
-            // =========================
-            // NOVO
-            // =========================
+            if (Selecionados.Contains(vm))
+                return;
 
-            _selecionado = vm;
+            vm.IsSelecionado = true;
 
-            _selecionado.IsSelecionado =
-                true;
+            Selecionados.Add(vm);
 
-            // =========================
-            // EDITOR
-            // =========================
-
-            AppServices
-                .Editor
+            AppServices.Editor
                 .ElementoSelecionado = vm;
+        }
+
+        // =========================
+        // TOGGLE
+        // =========================
+
+        public static void Toggle(
+            ElementoViewModel vm)
+        {
+            if (Selecionados.Contains(vm))
+            {
+                Deselecionar(vm);
+            }
+            else
+            {
+                Selecionar(vm, true);
+            }
+        }
+
+        // =========================
+        // DESELECIONAR
+        // =========================
+
+        public static void Deselecionar(
+            ElementoViewModel vm)
+        {
+            if (!Selecionados.Contains(vm))
+                return;
+
+            vm.IsSelecionado = false;
+
+            Selecionados.Remove(vm);
+
+            AppServices.Editor
+                .ElementoSelecionado =
+                    Principal;
         }
 
         // =========================
@@ -4190,16 +4446,14 @@ namespace Araci.Services
 
         public static void Limpar()
         {
-            if (_selecionado != null)
+            foreach (var item in Selecionados.ToList())
             {
-                _selecionado.IsSelecionado =
-                    false;
+                item.IsSelecionado = false;
             }
 
-            _selecionado = null;
+            Selecionados.Clear();
 
-            AppServices
-                .Editor
+            AppServices.Editor
                 .ElementoSelecionado = null;
         }
     }
@@ -4366,11 +4620,15 @@ namespace Araci.Services
 ARQUIVO: C:\Araci-Engine-Front\Araci Engine\ViewModels\CaboViewModel.cs
 ====================================================================================================
 
-﻿using Araci.Models;
+﻿using System;
+using System.Windows;
+
+using Araci.Models;
 
 namespace Araci.ViewModels
 {
-    public class CaboViewModel : ElementoViewModel
+    public class CaboViewModel
+        : ElementoViewModel
     {
         // =========================
         // MODELO
@@ -4378,17 +4636,53 @@ namespace Araci.ViewModels
 
         private readonly Cabo _cabo;
 
-        public override double Largura => Math.Abs(X2 - X) ;
-        public override double Altura => Math.Abs(Y2 - Y) ;
-
         // =========================
         // CONSTRUTOR
         // =========================
 
-        public CaboViewModel(Cabo cabo)
+        public CaboViewModel(
+            Cabo cabo)
             : base(cabo)
         {
             _cabo = cabo;
+        }
+
+        // =========================
+        // DIMENSÕES
+        // =========================
+
+        public override double Largura =>
+            Math.Abs(X2 - X);
+
+        public override double Altura =>
+            Math.Abs(Y2 - Y);
+
+        // =========================
+        // BOUNDS
+        // =========================
+
+        public override Rect Bounds
+        {
+            get
+            {
+                double minX =
+                    Math.Min(X, X2);
+
+                double minY =
+                    Math.Min(Y, Y2);
+
+                double largura =
+                    Math.Abs(X2 - X);
+
+                double altura =
+                    Math.Abs(Y2 - Y);
+
+                return new Rect(
+                    minX,
+                    minY,
+                    largura,
+                    altura);
+            }
         }
 
         // =========================
@@ -4398,179 +4692,12 @@ namespace Araci.ViewModels
         public string Nome
         {
             get => _cabo.Nome;
+
             set
             {
                 if (_cabo.Nome != value)
                 {
                     _cabo.Nome = value;
-
-                    OnPropertyChanged();
-                }
-            }
-        }
-
-        // =========================
-        // BARRAS
-        // =========================
-
-        public string Barra1
-        {
-            get => _cabo.Barra1;
-            set
-            {
-                if (_cabo.Barra1 != value)
-                {
-                    _cabo.Barra1 = value;
-
-                    OnPropertyChanged();
-                }
-            }
-        }
-
-        public string Barra2
-        {
-            get => _cabo.Barra2;
-            set
-            {
-                if (_cabo.Barra2 != value)
-                {
-                    _cabo.Barra2 = value;
-
-                    OnPropertyChanged();
-                }
-            }
-        }
-
-        // =========================
-        // COMPRIMENTO
-        // =========================
-
-        public double Comprimento
-        {
-            get => _cabo.Comprimento;
-            set
-            {
-                if (_cabo.Comprimento != value)
-                {
-                    _cabo.Comprimento = value;
-
-                    OnPropertyChanged();
-                }
-            }
-        }
-
-        // =========================
-        // LINECODE
-        // =========================
-
-        public string LineCode
-        {
-            get => _cabo.LineCode;
-            set
-            {
-                if (_cabo.LineCode != value)
-                {
-                    _cabo.LineCode = value;
-
-                    OnPropertyChanged();
-                }
-            }
-        }
-
-        // =========================
-        // IMPEDÂNCIA
-        // =========================
-
-        public double Resistencia
-        {
-            get => _cabo.Resistencia;
-            set
-            {
-                if (_cabo.Resistencia != value)
-                {
-                    _cabo.Resistencia = value;
-
-                    OnPropertyChanged();
-                }
-            }
-        }
-
-        public double Reatancia
-        {
-            get => _cabo.Reatancia;
-            set
-            {
-                if (_cabo.Reatancia != value)
-                {
-                    _cabo.Reatancia = value;
-
-                    OnPropertyChanged();
-                }
-            }
-        }
-
-        public double Capacitancia
-        {
-            get => _cabo.Capacitancia;
-            set
-            {
-                if (_cabo.Capacitancia != value)
-                {
-                    _cabo.Capacitancia = value;
-
-                    OnPropertyChanged();
-                }
-            }
-        }
-
-        // =========================
-        // AMPACIDADE
-        // =========================
-
-        public double Ampacidade
-        {
-            get => _cabo.Ampacidade;
-            set
-            {
-                if (_cabo.Ampacidade != value)
-                {
-                    _cabo.Ampacidade = value;
-
-                    OnPropertyChanged();
-                }
-            }
-        }
-
-        // =========================
-        // FASES
-        // =========================
-
-        public int Fases
-        {
-            get => _cabo.Fases;
-            set
-            {
-                if (_cabo.Fases != value)
-                {
-                    _cabo.Fases = value;
-
-                    OnPropertyChanged();
-                }
-            }
-        }
-
-        // =========================
-        // NEUTRO
-        // =========================
-
-        public bool Neutro
-        {
-            get => _cabo.Neutro;
-            set
-            {
-                if (_cabo.Neutro != value)
-                {
-                    _cabo.Neutro = value;
 
                     OnPropertyChanged();
                 }
@@ -4584,6 +4711,7 @@ namespace Araci.ViewModels
         public double X2
         {
             get => _cabo.PosicaoX2;
+
             set
             {
                 if (_cabo.PosicaoX2 != value)
@@ -4591,6 +4719,7 @@ namespace Araci.ViewModels
                     _cabo.PosicaoX2 = value;
 
                     OnPropertyChanged();
+                    OnPropertyChanged(nameof(Bounds));
                 }
             }
         }
@@ -4598,6 +4727,7 @@ namespace Araci.ViewModels
         public double Y2
         {
             get => _cabo.PosicaoY2;
+
             set
             {
                 if (_cabo.PosicaoY2 != value)
@@ -4605,7 +4735,53 @@ namespace Araci.ViewModels
                     _cabo.PosicaoY2 = value;
 
                     OnPropertyChanged();
+                    OnPropertyChanged(nameof(Bounds));
                 }
+            }
+        }
+
+        // =========================
+        // MOVER
+        // =========================
+
+        public override void Mover(
+            Vector delta)
+        {
+            X += delta.X;
+            Y += delta.Y;
+
+            X2 += delta.X;
+            Y2 += delta.Y;
+        }
+
+        // =========================
+        // ESTADO
+        // =========================
+
+        public override ElementoEstado
+            CapturarEstado()
+        {
+            return new ElementoEstado(
+                X,
+                Y,
+                X2,
+                Y2);
+        }
+
+        public override void AplicarEstado(
+            ElementoEstado estado)
+        {
+            X = estado.X;
+            Y = estado.Y;
+
+            if (estado.X2.HasValue)
+            {
+                X2 = estado.X2.Value;
+            }
+
+            if (estado.Y2.HasValue)
+            {
+                Y2 = estado.Y2.Value;
             }
         }
     }
@@ -4716,69 +4892,202 @@ namespace Araci.ViewModels
 
 
 ====================================================================================================
+ARQUIVO: C:\Araci-Engine-Front\Araci Engine\ViewModels\ElementoEstado.cs
+====================================================================================================
+
+﻿namespace Araci.ViewModels
+{
+    public class ElementoEstado
+    {
+        // =========================
+        // POSIÇÃO
+        // =========================
+
+        public double X { get; }
+
+        public double Y { get; }
+
+        // =========================
+        // CABO
+        // =========================
+
+        public double? X2 { get; }
+
+        public double? Y2 { get; }
+
+        // =========================
+        // CONSTRUTOR
+        // =========================
+
+        public ElementoEstado(
+            double x,
+            double y,
+            double? x2 = null,
+            double? y2 = null)
+        {
+            X = x;
+            Y = y;
+
+            X2 = x2;
+            Y2 = y2;
+        }
+    }
+}
+
+
+====================================================================================================
 ARQUIVO: C:\Araci-Engine-Front\Araci Engine\ViewModels\ElementoViewModel.cs
 ====================================================================================================
 
-﻿using Araci.Models;
+﻿using System.Windows;
+
+using Araci.Models;
 using Araci.ViewModels.Base;
 
 namespace Araci.ViewModels
 {
-    public abstract class ElementoViewModel : ViewModelBase
+    public abstract class ElementoViewModel
+        : ViewModelBase
     {
-        protected readonly Elemento _modelo;
+        // =========================
+        // MODELO
+        // =========================
+
+        protected readonly Elemento
+            _modelo;
+
+        // =========================
+        // SELEÇÃO
+        // =========================
 
         private bool _isSelecionado;
 
         public bool IsSelecionado
         {
             get => _isSelecionado;
+
             set
             {
-                if (_isSelecionado != value)
-                {
-                    _isSelecionado = value;
-                    OnPropertyChanged();
-                }
+                Set(
+                    ref _isSelecionado,
+                    value);
             }
         }
 
-        protected ElementoViewModel(Elemento modelo)
+        // =========================
+        // CONSTRUTOR
+        // =========================
+
+        protected ElementoViewModel(
+            Elemento modelo)
         {
             _modelo = modelo;
         }
 
-        public Elemento Modelo => _modelo;
+        // =========================
+        // MODELO
+        // =========================
 
-        public double X
+        public Elemento Modelo =>
+            _modelo;
+
+        // =========================
+        // POSIÇÃO
+        // =========================
+
+        public virtual double X
         {
             get => _modelo.PosicaoX;
+
             set
             {
                 if (_modelo.PosicaoX != value)
                 {
                     _modelo.PosicaoX = value;
+
                     OnPropertyChanged();
+                    OnPropertyChanged(nameof(Bounds));
+                    OnPropertyChanged(nameof(Centro));
                 }
             }
         }
 
-        public double Y
+        public virtual double Y
         {
             get => _modelo.PosicaoY;
+
             set
             {
                 if (_modelo.PosicaoY != value)
                 {
                     _modelo.PosicaoY = value;
+
                     OnPropertyChanged();
+                    OnPropertyChanged(nameof(Bounds));
+                    OnPropertyChanged(nameof(Centro));
                 }
             }
         }
 
-        // 🔥 ESSENCIAL
-        public virtual double Largura => 70;
-        public virtual double Altura => 70;
+        // =========================
+        // DIMENSÕES
+        // =========================
+
+        public virtual double Largura =>
+            70;
+
+        public virtual double Altura =>
+            70;
+
+        // =========================
+        // CENTRO
+        // =========================
+
+        public virtual Point Centro =>
+            new(
+                X + (Largura / 2.0),
+                Y + (Altura / 2.0));
+
+        // =========================
+        // BOUNDS
+        // =========================
+
+        public virtual Rect Bounds =>
+            new(
+                X,
+                Y,
+                Largura,
+                Altura);
+
+        // =========================
+        // MOVER
+        // =========================
+
+        public virtual void Mover(
+            Vector delta)
+        {
+            X += delta.X;
+            Y += delta.Y;
+        }
+
+        // =========================
+        // ESTADO
+        // =========================
+
+        public virtual ElementoEstado
+            CapturarEstado()
+        {
+            return new ElementoEstado(
+                X,
+                Y);
+        }
+
+        public virtual void AplicarEstado(
+            ElementoEstado estado)
+        {
+            X = estado.X;
+            Y = estado.Y;
+        }
     }
 }
 
@@ -4930,6 +5239,80 @@ namespace Araci.ViewModels
 
 
 ====================================================================================================
+ARQUIVO: C:\Araci-Engine-Front\Araci Engine\ViewModels\SelectionBoxViewModel.cs
+====================================================================================================
+
+﻿using System.Windows;
+
+using Araci.ViewModels.Base;
+
+namespace Araci.ViewModels
+{
+    public class SelectionBoxViewModel
+        : ViewModelBase
+    {
+        private bool _visivel;
+        private double _x;
+        private double _y;
+        private double _largura;
+        private double _altura;
+
+        public bool Visivel
+        {
+            get => _visivel;
+            set => Set(ref _visivel, value);
+        }
+
+        public double X
+        {
+            get => _x;
+            set => Set(ref _x, value);
+        }
+
+        public double Y
+        {
+            get => _y;
+            set => Set(ref _y, value);
+        }
+
+        public double Largura
+        {
+            get => _largura;
+            set => Set(ref _largura, value);
+        }
+
+        public double Altura
+        {
+            get => _altura;
+            set => Set(ref _altura, value);
+        }
+
+        public Rect Bounds =>
+            new(X, Y, Largura, Altura);
+
+        public void Atualizar(
+            Point inicio,
+            Point fim)
+        {
+            X = inicio.X < fim.X
+                ? inicio.X
+                : fim.X;
+
+            Y = inicio.Y < fim.Y
+                ? inicio.Y
+                : fim.Y;
+
+            Largura =
+                System.Math.Abs(fim.X - inicio.X);
+
+            Altura =
+                System.Math.Abs(fim.Y - inicio.Y);
+        }
+    }
+}
+
+
+====================================================================================================
 ARQUIVO: C:\Araci-Engine-Front\Araci Engine\ViewModels\ViewportViewModel.cs
 ====================================================================================================
 
@@ -5034,7 +5417,8 @@ ARQUIVO: C:\Araci-Engine-Front\Araci Engine\Views\ViewportView.xaml
              Loaded="OnLoaded">
 
     <UserControl.Resources>
-        <BooleanToVisibilityConverter x:Key="BooleanToVisibilityConverter"/>
+        <BooleanToVisibilityConverter
+            x:Key="BooleanToVisibilityConverter"/>
     </UserControl.Resources>
 
     <Border x:Name="RootBorder"
@@ -5048,7 +5432,7 @@ ARQUIVO: C:\Araci-Engine-Front\Araci Engine\Views\ViewportView.xaml
         <Grid ClipToBounds="True">
 
             <!-- ========================= -->
-            <!-- VIEWPORT -->
+            <!-- ELEMENTOS -->
             <!-- ========================= -->
 
             <ItemsControl ItemsSource="{Binding Document.Elementos}"
@@ -5078,15 +5462,6 @@ ARQUIVO: C:\Araci-Engine-Front\Araci Engine\Views\ViewportView.xaml
                         <Setter Property="Canvas.Top"
                                 Value="{Binding Y}"/>
 
-                        <Setter Property="HorizontalAlignment"
-                                Value="Left"/>
-
-                        <Setter Property="VerticalAlignment"
-                                Value="Top"/>
-
-                        <Setter Property="SnapsToDevicePixels"
-                                Value="True"/>
-
                     </Style>
                 </ItemsControl.ItemContainerStyle>
 
@@ -5107,6 +5482,30 @@ ARQUIVO: C:\Araci-Engine-Front\Araci Engine\Views\ViewportView.xaml
                 </ItemsControl.Resources>
 
             </ItemsControl>
+
+            <!-- ========================= -->
+            <!-- JANELA DE SELEÇÃO -->
+            <!-- ========================= -->
+
+            <Canvas IsHitTestVisible="False">
+
+                <Rectangle
+                    Stroke="#007ACC"
+                    StrokeThickness="1.5"
+                    Fill="#22007ACC"
+                    StrokeDashArray="3 2"
+
+                    Canvas.Left="{Binding Source={x:Static app:AppServices.SelectionBox}, Path=X}"
+                    Canvas.Top="{Binding Source={x:Static app:AppServices.SelectionBox}, Path=Y}"
+
+                    Width="{Binding Source={x:Static app:AppServices.SelectionBox}, Path=Largura}"
+                    Height="{Binding Source={x:Static app:AppServices.SelectionBox}, Path=Altura}"
+
+                    Visibility="{Binding Source={x:Static app:AppServices.SelectionBox},
+                                         Path=Visivel,
+                                         Converter={StaticResource BooleanToVisibilityConverter}}"/>
+
+            </Canvas>
 
             <!-- ========================= -->
             <!-- HUD -->

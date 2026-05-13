@@ -55,8 +55,14 @@ namespace Araci.Services
                         novoY,
                         limiteInferior));
 
-            vm.X = novoX;
-            vm.Y = novoY;
+            // 🔥 CORREÇÃO CRÍTICA
+            Vector deltaCorrigido =
+                new(
+                    novoX - bounds.X,
+                    novoY - bounds.Y);
+
+            // 🔥 AGORA respeita override (Cabo, etc.)
+            vm.Mover(deltaCorrigido);
         }
     }
 }
