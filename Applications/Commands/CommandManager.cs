@@ -4,21 +4,11 @@ namespace Araci.Core.Commands
 {
     public class CommandManager
     {
-        // =========================
-        // HISTÓRICO
-        // =========================
+        private readonly Stack<IUndoableCommand>
+            _undoStack = new();
 
         private readonly Stack<IUndoableCommand>
-            _undoStack
-                = new();
-
-        private readonly Stack<IUndoableCommand>
-            _redoStack
-                = new();
-
-        // =========================
-        // EXECUTE
-        // =========================
+            _redoStack = new();
 
         public void Execute(
             IUndoableCommand command)
@@ -29,10 +19,6 @@ namespace Araci.Core.Commands
 
             _redoStack.Clear();
         }
-
-        // =========================
-        // UNDO
-        // =========================
 
         public void Undo()
         {
@@ -47,10 +33,6 @@ namespace Araci.Core.Commands
             _redoStack.Push(command);
         }
 
-        // =========================
-        // REDO
-        // =========================
-
         public void Redo()
         {
             if (_redoStack.Count == 0)
@@ -59,14 +41,10 @@ namespace Araci.Core.Commands
             var command =
                 _redoStack.Pop();
 
-            command.Execute();
+            command.Redo();
 
             _undoStack.Push(command);
         }
-
-        // =========================
-        // FLAGS
-        // =========================
 
         public bool CanUndo =>
             _undoStack.Count > 0;

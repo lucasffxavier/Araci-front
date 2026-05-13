@@ -32,10 +32,6 @@ namespace Araci.Core.Commands
             AppServices.Document
                 .RemoverElemento(_vm);
 
-            // =========================
-            // REMOVE APENAS O ITEM
-            // =========================
-
             SelectionService
                 .Deselecionar(_vm);
         }
@@ -48,6 +44,15 @@ namespace Araci.Core.Commands
         {
             AppServices.Document
                 .AdicionarElemento(_vm);
+        }
+
+        // =========================
+        // REDO
+        // =========================
+
+        public void Redo()
+        {
+            Execute();
         }
     }
 }

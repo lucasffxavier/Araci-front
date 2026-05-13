@@ -59,5 +59,15 @@ namespace Araci.Core.Commands
             _vm.AplicarEstado(
                 _estadoInicial);
         }
+
+        // =========================
+        // REDO
+        // =========================
+
+        public void Redo()
+        {
+            _vm.AplicarEstado(
+                _estadoFinal);
+        }
     }
 }

@@ -10,11 +10,10 @@ namespace Araci.Core.Commands
         // =========================
 
         private readonly List<IUndoableCommand>
-            _commands
-                = new();
+            _commands = new();
 
         // =========================
-        // ADICIONAR
+        // ADD
         // =========================
 
         public void Add(
@@ -50,7 +49,19 @@ namespace Araci.Core.Commands
         }
 
         // =========================
-        // VAZIO
+        // REDO
+        // =========================
+
+        public void Redo()
+        {
+            foreach (var command in _commands)
+            {
+                command.Redo();
+            }
+        }
+
+        // =========================
+        // EMPTY
         // =========================
 
         public bool IsEmpty =>

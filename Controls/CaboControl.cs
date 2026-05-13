@@ -1,5 +1,4 @@
 ﻿using System;
-using System.ComponentModel;
 using System.Windows.Controls;
 using System.Windows.Media;
 using System.Windows.Shapes;
@@ -9,14 +8,16 @@ using Araci.ViewModels;
 
 namespace Araci.Controls
 {
-    public class CaboControl : ElementoControlBase
+    public class CaboControl
+        : ElementoControlBase
     {
         private readonly Line _line;
+
         private readonly Canvas _canvas;
 
         public CaboControl()
         {
-            ClipToBounds = true;
+            ClipToBounds = false;
 
             _line = new Line
             {
@@ -30,49 +31,47 @@ namespace Araci.Controls
 
             Content = _canvas;
 
-            DataContextChanged += OnDataContextChanged;
-        }
-
-        private void OnDataContextChanged(
-            object sender,
-            System.Windows.DependencyPropertyChangedEventArgs e)
-        {
-            if (e.OldValue is CaboViewModel antigo)
-                antigo.PropertyChanged -= OnVmChanged;
-
-            if (e.NewValue is CaboViewModel novo)
+            Loaded += (_, __) =>
             {
-                novo.PropertyChanged += OnVmChanged;
-                Atualizar(novo);
-            }
-        }
+                Atualizar();
+            };
 
-        private void OnVmChanged(
-            object? sender,
-            PropertyChangedEventArgs e)
-        {
-            if (sender is CaboViewModel vm)
+            DataContextChanged += (_, __) =>
             {
-                Atualizar(vm);
-            }
+                Atualizar();
+            };
         }
 
-        private void Atualizar(CaboViewModel vm)
+        protected override void OnRenderSizeChanged(
+            System.Windows.SizeChangedInfo sizeInfo)
         {
+            base.OnRenderSizeChanged(sizeInfo);
+
+            Atualizar();
+        }
+
+        private void Atualizar()
+        {
+            if (DataContext is not CaboViewModel vm)
+                return;
+
             double x1 = vm.X;
             double y1 = vm.Y;
 
             double x2 = vm.X2;
             double y2 = vm.Y2;
 
-            double minX = Math.Min(x1, x2);
-            double minY = Math.Min(y1, y2);
+            double minX =
+                Math.Min(x1, x2);
+
+            double minY =
+                Math.Min(y1, y2);
 
             double largura =
-                Math.Abs(x2 - x1) + 4;
+                Math.Abs(x2 - x1) + 8;
 
             double altura =
-                Math.Abs(y2 - y1) + 4;
+                Math.Abs(y2 - y1) + 8;
 
             Width = largura;
             Height = altura;
@@ -80,23 +79,31 @@ namespace Araci.Controls
             _canvas.Width = largura;
             _canvas.Height = altura;
 
-            _line.X1 = x1 - minX + 2;
-            _line.Y1 = y1 - minY + 2;
+            _line.X1 = x1 - minX + 4;
+            _line.Y1 = y1 - minY + 4;
 
-            _line.X2 = x2 - minX + 2;
-            _line.Y2 = y2 - minY + 2;
+            _line.X2 = x2 - minX + 4;
+            _line.Y2 = y2 - minY + 4;
         }
 
         protected override void AtualizarVisualSelecionado()
         {
-            _line.Stroke = Brushes.DeepSkyBlue;
+            _line.Stroke =
+                Brushes.DeepSkyBlue;
+
             _line.StrokeThickness = 6;
+
+            Atualizar();
         }
 
         protected override void AtualizarVisualNormal()
         {
-            _line.Stroke = Brushes.Lime;
+            _line.Stroke =
+                Brushes.Lime;
+
             _line.StrokeThickness = 4;
+
+            Atualizar();
         }
     }
 }
