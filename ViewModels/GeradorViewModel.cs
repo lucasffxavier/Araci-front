@@ -1,107 +1,98 @@
-﻿    using Araci.Models;
+﻿using Araci.Models;
 using System.Windows.Media;
 
-    namespace Araci.ViewModels
+namespace Araci.ViewModels
+{
+    public class GeradorViewModel
+        : ElementoViewModel
     {
-        public class GeradorViewModel : ElementoViewModel
+        private readonly Gerador _gerador;
+
+        protected override double LarguraBase => 80;
+
+        protected override double AlturaBase => 80;
+
+        public GeradorViewModel(
+            Gerador gerador)
+            : base(gerador)
         {
-            // =========================
-            // MODELO
-            // =========================
-
-            private readonly Gerador _gerador;
-
-            public override double Largura => 80;
-            public override double Altura => 80;
-
-        // =========================
-        // CONSTRUTOR
-        // =========================
-
-        public GeradorViewModel(Gerador gerador)
-                : base(gerador)
-            {
-                _gerador = gerador;
+            _gerador = gerador;
 
             VisualState.DefinirVisualBase(
                 Brushes.DimGray,
                 2);
 
+            AtualizarGeometria();
         }
 
-            // =========================
-            // IDENTIFICAÇÃO
-            // =========================
+        public string Nome
+        {
+            get => _gerador.Nome;
 
-            public string Nome
+            set
             {
-                get => _gerador.Nome;
-                set
+                if (_gerador.Nome != value)
                 {
-                    if (_gerador.Nome != value)
-                    {
-                        _gerador.Nome = value;
-                        OnPropertyChanged();
-                    }
+                    _gerador.Nome = value;
+                    OnPropertyChanged();
                 }
             }
+        }
 
-            // =========================
-            // ELÉTRICO
-            // =========================
+        public string Barra
+        {
+            get => _gerador.Barra;
 
-            public string Barra
+            set
             {
-                get => _gerador.Barra;
-                set
+                if (_gerador.Barra != value)
                 {
-                    if (_gerador.Barra != value)
-                    {
-                        _gerador.Barra = value;
-                        OnPropertyChanged();
-                    }
+                    _gerador.Barra = value;
+                    OnPropertyChanged();
                 }
             }
+        }
 
-            public double PotenciaAtivaKW
+        public double PotenciaAtivaKW
+        {
+            get => _gerador.PotenciaAtivaKW;
+
+            set
             {
-                get => _gerador.PotenciaAtivaKW;
-                set
+                if (_gerador.PotenciaAtivaKW != value)
                 {
-                    if (_gerador.PotenciaAtivaKW != value)
-                    {
-                        _gerador.PotenciaAtivaKW = value;
-                        OnPropertyChanged();
-                    }
+                    _gerador.PotenciaAtivaKW = value;
+                    OnPropertyChanged();
                 }
             }
+        }
 
-            public double TensaoKV
+        public double TensaoKV
+        {
+            get => _gerador.TensaoKV;
+
+            set
             {
-                get => _gerador.TensaoKV;
-                set
+                if (_gerador.TensaoKV != value)
                 {
-                    if (_gerador.TensaoKV != value)
-                    {
-                        _gerador.TensaoKV = value;
-                        OnPropertyChanged();
-                    }
+                    _gerador.TensaoKV = value;
+                    OnPropertyChanged();
                 }
             }
+        }
 
-            public string Fabricante
+        public string Fabricante
+        {
+            get => _gerador.Fabricante;
+
+            set
             {
-                get => _gerador.Fabricante;
-
-                set
+                if (_gerador.Fabricante != value)
                 {
-                    if (_gerador.Fabricante != value)
-                    {
-                        _gerador.Fabricante = value;
-                        OnPropertyChanged();
-                    }
+                    _gerador.Fabricante = value;
+                    OnPropertyChanged();
                 }
             }
-
+        }
     }
-    }
+}

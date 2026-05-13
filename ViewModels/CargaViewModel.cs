@@ -3,20 +3,17 @@ using System.Windows.Media;
 
 namespace Araci.ViewModels
 {
-    public class CargaViewModel : ElementoViewModel
+    public class CargaViewModel
+        : ElementoViewModel
     {
-        // =========================
-        // MODELO
-        // =========================
-
         private readonly Carga _carga;
-        public override double Largura => 70;
-        public override double Altura => 70;
-        // =========================
-        // CONSTRUTOR
-        // =========================
 
-        public CargaViewModel(Carga carga)
+        protected override double LarguraBase => 70;
+
+        protected override double AlturaBase => 70;
+
+        public CargaViewModel(
+            Carga carga)
             : base(carga)
         {
             _carga = carga;
@@ -24,15 +21,14 @@ namespace Araci.ViewModels
             VisualState.DefinirVisualBase(
                 Brushes.DimGray,
                 2);
-        }
 
-        // =========================
-        // IDENTIFICAÇÃO
-        // =========================
+            AtualizarGeometria();
+        }
 
         public string Nome
         {
             get => _carga.Nome;
+
             set
             {
                 if (_carga.Nome != value)
@@ -43,13 +39,10 @@ namespace Araci.ViewModels
             }
         }
 
-        // =========================
-        // PARÂMETROS
-        // =========================
-
         public string Barra
         {
             get => _carga.Barra;
+
             set
             {
                 if (_carga.Barra != value)
@@ -63,6 +56,7 @@ namespace Araci.ViewModels
         public double PotenciaAtivaKW
         {
             get => _carga.PotenciaAtivaKW;
+
             set
             {
                 if (_carga.PotenciaAtivaKW != value)
@@ -76,6 +70,7 @@ namespace Araci.ViewModels
         public double TensaoKV
         {
             get => _carga.TensaoKV;
+
             set
             {
                 if (_carga.TensaoKV != value)
@@ -89,6 +84,7 @@ namespace Araci.ViewModels
         public string Conexao
         {
             get => _carga.Conexao;
+
             set
             {
                 if (_carga.Conexao != value)

@@ -35,6 +35,13 @@ namespace Araci.ViewModels
 
             Geometry =
                 new ElementoGeometryState();
+
+            // IMPORTANTE:
+            // NÃO chamar AtualizarGeometria()
+            // aqui.
+            //
+            // Classes derivadas ainda
+            // não foram inicializadas.
         }
 
         public Elemento Modelo => _modelo;

@@ -61,7 +61,6 @@ namespace Araci.ViewModels
             }
         }
 
-
         public string BarraDestino
         {
             get => _cabo.BarraDestino;
@@ -74,7 +73,6 @@ namespace Araci.ViewModels
                 }
             }
         }
-
 
         public string TipoCabo
         {
@@ -101,7 +99,6 @@ namespace Araci.ViewModels
                 }
             }
         }
-
 
         public double X2
         {
@@ -134,10 +131,10 @@ namespace Araci.ViewModels
         }
 
         protected override double LarguraBase =>
-            Math.Abs(X2 - X);
+            Math.Max(8, Math.Abs(X2 - X));
 
         protected override double AlturaBase =>
-            Math.Abs(Y2 - Y);
+            Math.Max(8, Math.Abs(Y2 - Y));
 
         protected override void AtualizarGeometria()
         {
@@ -147,12 +144,10 @@ namespace Araci.ViewModels
                 Math.Max(8, Math.Abs(X2 - X)),
                 Math.Max(8, Math.Abs(Y2 - Y)));
 
-            OnPropertyChanged(nameof(X));
-            OnPropertyChanged(nameof(Y));
+            NotificarGeometria();
+
             OnPropertyChanged(nameof(X2));
             OnPropertyChanged(nameof(Y2));
-
-            NotificarGeometria();
         }
 
         public override void Mover(
