@@ -57,8 +57,18 @@ namespace Araci.Applications.Editar.Mover
 
             var hud = AppServices.MoveHud;
 
-            hud.Visivel = true;
             hud.Reset();
+
+            // =========================
+            // ATUALIZA HUD IMEDIATAMENTE
+            // =========================
+
+            var bounds =
+                CalcularBoundsSelecionados();
+
+            hud.AtualizarPosicao(bounds);
+
+            hud.Visivel = true;
         }
 
         public void OnMouseMove(Point position)
