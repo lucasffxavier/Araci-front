@@ -1,4 +1,5 @@
 ﻿    using Araci.Models;
+using System.Windows.Media;
 
     namespace Araci.ViewModels
     {
@@ -21,7 +22,12 @@
                 : base(gerador)
             {
                 _gerador = gerador;
-            }
+
+            VisualState.DefinirVisualBase(
+                Brushes.DimGray,
+                2);
+
+        }
 
             // =========================
             // IDENTIFICAÇÃO

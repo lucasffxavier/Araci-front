@@ -3,7 +3,6 @@ using System.Windows.Media;
 using System.Windows.Shapes;
 
 using Araci.Controls.Base;
-using Araci.Models;
 using Araci.ViewModels;
 
 namespace Araci.Controls
@@ -12,47 +11,31 @@ namespace Araci.Controls
     {
         private readonly Ellipse _ellipse;
 
-        public Gerador? Gerador
-        {
-            get
-            {
-                if (DataContext is GeradorViewModel vm)
-                {
-                    return (Gerador)vm.Modelo;
-                }
-
-                return null;
-            }
-        }
-
         public GeradorControl()
         {
             Width = 80;
             Height = 80;
+
             Cursor = Cursors.Hand;
 
             _ellipse = new Ellipse
             {
                 Width = 80,
                 Height = 80,
-                Fill = CriarBrush("#007ACC"),
-                Stroke = Brushes.White,
-                StrokeThickness = 2
+                Fill =
+                    new SolidColorBrush(
+                        (Color)ColorConverter
+                            .ConvertFromString("#007ACC"))
             };
 
             Content = _ellipse;
         }
 
-        protected override void AtualizarVisualSelecionado()
+        protected override void AplicarEstadoVisual(
+            ElementoViewModel vm)
         {
-            _ellipse.Stroke = Brushes.DeepSkyBlue;
-            _ellipse.StrokeThickness = 4;
-        }
-
-        protected override void AtualizarVisualNormal()
-        {
-            _ellipse.Stroke = Brushes.White;
-            _ellipse.StrokeThickness = 2;
+            _ellipse.Stroke = vm.Stroke;
+            _ellipse.StrokeThickness = vm.StrokeThickness;
         }
     }
 }

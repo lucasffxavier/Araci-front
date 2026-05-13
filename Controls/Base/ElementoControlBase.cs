@@ -1,7 +1,6 @@
 ﻿using System.ComponentModel;
 using System.Windows.Controls;
 using System.Windows.Input;
-using System.Windows.Media;
 
 using Araci.ViewModels;
 
@@ -50,38 +49,18 @@ namespace Araci.Controls.Base
             object? sender,
             PropertyChangedEventArgs e)
         {
-            if (e.PropertyName ==
-                nameof(ElementoViewModel.IsSelecionado))
-            {
-                AtualizarVisual();
-            }
+            AtualizarVisual();
         }
 
-        private void AtualizarVisual()
+        protected virtual void AtualizarVisual()
         {
             if (DataContext is not ElementoViewModel vm)
                 return;
 
-            if (vm.IsSelecionado)
-            {
-                AtualizarVisualSelecionado();
-            }
-            else
-            {
-                AtualizarVisualNormal();
-            }
+            AplicarEstadoVisual(vm);
         }
 
-        protected abstract void AtualizarVisualSelecionado();
-
-        protected abstract void AtualizarVisualNormal();
-
-        protected SolidColorBrush CriarBrush(
-            string hex)
-        {
-            return new SolidColorBrush(
-                (Color)ColorConverter
-                    .ConvertFromString(hex));
-        }
+        protected abstract void AplicarEstadoVisual(
+            ElementoViewModel vm);
     }
 }

@@ -1,9 +1,10 @@
-﻿using System;
-using System.Windows;
-
-using Araci.Models;
+﻿using Araci.Models;
 using Araci.ViewModels.Base;
 using Araci.ViewModels.VisualStates;
+
+using System;
+using System.Windows;
+using System.Windows.Media;
 
 namespace Araci.ViewModels
 {
@@ -24,9 +25,10 @@ namespace Araci.ViewModels
             _modelo = modelo
                 ?? throw new ArgumentNullException(nameof(modelo));
 
-            Transform = new ElementoTransform(
-                modelo.PosicaoX,
-                modelo.PosicaoY);
+            Transform =
+                new ElementoTransform(
+                    modelo.PosicaoX,
+                    modelo.PosicaoY);
 
             VisualState =
                 new ElementoVisualState();
@@ -38,7 +40,7 @@ namespace Araci.ViewModels
         public Elemento Modelo => _modelo;
 
         // =========================
-        // VISUAL STATE CENTRALIZADO
+        // VISUAL
         // =========================
 
         public bool IsSelecionado
@@ -50,11 +52,19 @@ namespace Araci.ViewModels
                 if (VisualState.IsSelecionado == value)
                     return;
 
-                VisualState.IsSelecionado = value;
+                VisualState.AtualizarSelecao(value);
 
                 OnPropertyChanged();
+                OnPropertyChanged(nameof(Stroke));
+                OnPropertyChanged(nameof(StrokeThickness));
             }
         }
+
+        public Brush Stroke =>
+            VisualState.Stroke;
+
+        public double StrokeThickness =>
+            VisualState.StrokeThickness;
 
         // =========================
         // POSIÇÃO
@@ -104,30 +114,39 @@ namespace Araci.ViewModels
         // GEOMETRIA
         // =========================
 
-        public virtual double Largura => 70;
+        protected virtual double LarguraBase => 70;
 
-        public virtual double Altura => 70;
+        protected virtual double AlturaBase => 70;
+
+        public virtual double Largura =>
+            Geometry.Largura;
+
+        public virtual double Altura =>
+            Geometry.Altura;
 
         public virtual Rect Bounds =>
-            new Rect(
-                X,
-                Y,
-                Largura,
-                Altura);
+            Geometry.Bounds;
 
         public virtual Point Centro =>
-            new Point(
-                X + (Largura / 2.0),
-                Y + (Altura / 2.0));
+            Geometry.Centro;
 
         protected virtual void AtualizarGeometria()
         {
+            Geometry.Atualizar(
+                X,
+                Y,
+                LarguraBase,
+                AlturaBase);
+
+            NotificarGeometria();
+        }
+
+        protected void NotificarGeometria()
+        {
             OnPropertyChanged(nameof(X));
             OnPropertyChanged(nameof(Y));
-
             OnPropertyChanged(nameof(Largura));
             OnPropertyChanged(nameof(Altura));
-
             OnPropertyChanged(nameof(Bounds));
             OnPropertyChanged(nameof(Centro));
         }
@@ -144,7 +163,7 @@ namespace Araci.ViewModels
         }
 
         // =========================
-        // LIMITES VIEWPORT
+        // LIMITES
         // =========================
 
         private double LimitarX(
@@ -193,8 +212,13 @@ namespace Araci.ViewModels
         public virtual void AplicarEstado(
             ElementoEstado estado)
         {
-            X = estado.X;
-            Y = estado.Y;
+            Transform.X = estado.X;
+            Transform.Y = estado.Y;
+
+            _modelo.PosicaoX = estado.X;
+            _modelo.PosicaoY = estado.Y;
+
+            AtualizarGeometria();
         }
     }
 }

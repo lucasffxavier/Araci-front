@@ -5,7 +5,17 @@ namespace Araci.ViewModels.VisualStates
     public class ElementoGeometryState
     {
         // =========================
-        // DIMENSÕES
+        // POSIÇÃO
+        // =========================
+
+        public double X
+        { get; set; }
+
+        public double Y
+        { get; set; }
+
+        // =========================
+        // TAMANHO
         // =========================
 
         public double Largura
@@ -18,28 +28,37 @@ namespace Araci.ViewModels.VisualStates
         // BOUNDS
         // =========================
 
-        public Rect ObterBounds(
-            double x,
-            double y)
-        {
-            return new Rect(
-                x,
-                y,
+        public Rect Bounds =>
+            new Rect(
+                X,
+                Y,
                 Largura,
                 Altura);
-        }
 
         // =========================
         // CENTRO
         // =========================
 
-        public Point ObterCentro(
+        public Point Centro =>
+            new Point(
+                X + (Largura / 2.0),
+                Y + (Altura / 2.0));
+
+        // =========================
+        // ATUALIZAR
+        // =========================
+
+        public void Atualizar(
             double x,
-            double y)
+            double y,
+            double largura,
+            double altura)
         {
-            return new Point(
-                x + (Largura / 2.0),
-                y + (Altura / 2.0));
+            X = x;
+            Y = y;
+
+            Largura = largura;
+            Altura = altura;
         }
     }
 }

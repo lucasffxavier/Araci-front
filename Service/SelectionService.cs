@@ -35,13 +35,32 @@ namespace Araci.Services
             if (vm == null)
                 return;
 
+            // =========================
+            // LIMPA SE NÃO FOR MULTISELECT
+            // =========================
+
             if (!adicionar)
             {
                 Limpar();
             }
 
+            // =========================
+            // EVITA DUPLICIDADE
+            // =========================
+
             if (Selecionados.Contains(vm))
+            {
+                vm.IsSelecionado = true;
+
+                AppServices.Editor
+                    .ElementoSelecionado = vm;
+
                 return;
+            }
+
+            // =========================
+            // MARCA VISUALMENTE
+            // =========================
 
             vm.IsSelecionado = true;
 
@@ -62,7 +81,10 @@ namespace Araci.Services
                 return;
 
             if (!Selecionados.Contains(vm))
+            {
+                vm.IsSelecionado = false;
                 return;
+            }
 
             vm.IsSelecionado = false;
 
@@ -80,6 +102,9 @@ namespace Araci.Services
         public static void Toggle(
             ElementoViewModel vm)
         {
+            if (vm == null)
+                return;
+
             if (Selecionados.Contains(vm))
             {
                 Deselecionar(vm);
@@ -106,6 +131,22 @@ namespace Araci.Services
 
             AppServices.Editor
                 .ElementoSelecionado = null;
+        }
+
+        // =========================
+        // SINCRONIZAÇÃO
+        // =========================
+
+        public static void GarantirConsistencia()
+        {
+            foreach (var item in
+                     Selecionados.ToList())
+            {
+                if (item == null)
+                    continue;
+
+                item.IsSelecionado = true;
+            }
         }
     }
 }

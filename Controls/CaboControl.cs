@@ -21,8 +21,9 @@ namespace Araci.Controls
 
             _line = new Line
             {
-                Stroke = Brushes.Lime,
-                StrokeThickness = 4
+                Stroke = Brushes.Black,
+                StrokeThickness = 4,
+                SnapsToDevicePixels = true
             };
 
             _canvas = new Canvas();
@@ -30,80 +31,50 @@ namespace Araci.Controls
             _canvas.Children.Add(_line);
 
             Content = _canvas;
-
-            Loaded += (_, __) =>
-            {
-                Atualizar();
-            };
-
-            DataContextChanged += (_, __) =>
-            {
-                Atualizar();
-            };
         }
 
-        protected override void OnRenderSizeChanged(
-            System.Windows.SizeChangedInfo sizeInfo)
+        private void Atualizar(
+            CaboViewModel vm)
         {
-            base.OnRenderSizeChanged(sizeInfo);
-
-            Atualizar();
-        }
-
-        private void Atualizar()
-        {
-            if (DataContext is not CaboViewModel vm)
-                return;
-
-            double x1 = vm.X;
-            double y1 = vm.Y;
-
-            double x2 = vm.X2;
-            double y2 = vm.Y2;
-
             double minX =
-                Math.Min(x1, x2);
+                Math.Min(vm.X, vm.X2);
 
             double minY =
-                Math.Min(y1, y2);
+                Math.Min(vm.Y, vm.Y2);
 
-            double largura =
-                Math.Abs(x2 - x1) + 8;
+            Width =
+                Math.Max(8,
+                    Math.Abs(vm.X2 - vm.X)) + 8;
 
-            double altura =
-                Math.Abs(y2 - y1) + 8;
+            Height =
+                Math.Max(8,
+                    Math.Abs(vm.Y2 - vm.Y)) + 8;
 
-            Width = largura;
-            Height = altura;
+            _canvas.Width = Width;
+            _canvas.Height = Height;
 
-            _canvas.Width = largura;
-            _canvas.Height = altura;
+            Canvas.SetLeft(this, minX);
+            Canvas.SetTop(this, minY);
 
-            _line.X1 = x1 - minX + 4;
-            _line.Y1 = y1 - minY + 4;
+            _line.X1 = vm.X - minX + 4;
+            _line.Y1 = vm.Y - minY + 4;
 
-            _line.X2 = x2 - minX + 4;
-            _line.Y2 = y2 - minY + 4;
+            _line.X2 = vm.X2 - minX + 4;
+            _line.Y2 = vm.Y2 - minY + 4;
         }
 
-        protected override void AtualizarVisualSelecionado()
+        protected override void AplicarEstadoVisual(
+            ElementoViewModel vm)
         {
-            _line.Stroke =
-                Brushes.DeepSkyBlue;
+            if (vm is not CaboViewModel cabo)
+                return;
 
-            _line.StrokeThickness = 6;
+            _line.Stroke = vm.Stroke;
 
-            Atualizar();
-        }
+            _line.StrokeThickness =
+                vm.StrokeThickness;
 
-        protected override void AtualizarVisualNormal()
-        {
-            _line.Stroke =
-                Brushes.Lime;
-
-            _line.StrokeThickness = 4;
-
-            Atualizar();
+            Atualizar(cabo);
         }
     }
 }

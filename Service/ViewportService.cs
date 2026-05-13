@@ -1,4 +1,5 @@
-﻿using System.Windows;
+﻿using System;
+using System.Windows;
 
 using Araci.ViewModels;
 
@@ -6,13 +7,26 @@ namespace Araci.Services
 {
     public class ViewportService
     {
+        // =========================
+        // VIEWMODEL
+        // =========================
+
         private readonly ViewportViewModel _vm;
+
+        // =========================
+        // CONSTRUTOR
+        // =========================
 
         public ViewportService(
             ViewportViewModel vm)
         {
-            _vm = vm;
+            _vm = vm
+                ?? throw new ArgumentNullException(nameof(vm));
         }
+
+        // =========================
+        // TAMANHO
+        // =========================
 
         public double Largura
         { get; private set; }
@@ -29,15 +43,27 @@ namespace Araci.Services
                 Largura,
                 Altura);
 
+        // =========================
+        // VIEWPORT
+        // =========================
+
         public void AtualizarTamanho(
             Size size)
         {
             Largura =
-                Math.Max(0, size.Width);
+                Math.Max(
+                    0,
+                    size.Width);
 
             Altura =
-                Math.Max(0, size.Height);
+                Math.Max(
+                    0,
+                    size.Height);
         }
+
+        // =========================
+        // ELEMENTOS
+        // =========================
 
         public void AdicionarElemento(
             ElementoViewModel vm)
@@ -45,16 +71,14 @@ namespace Araci.Services
             if (vm == null)
                 return;
 
-            if (!_vm.Document.Elementos.Contains(vm))
+            if (!_vm.Document
+                    .Elementos
+                    .Contains(vm))
             {
-                _vm.Document.Elementos.Add(vm);
+                _vm.Document
+                    .Elementos
+                    .Add(vm);
             }
-        }
-
-        public void AdicionarCabo(
-            CaboViewModel vm)
-        {
-            AdicionarElemento(vm);
         }
 
         public void RemoverElemento(
@@ -63,9 +87,13 @@ namespace Araci.Services
             if (vm == null)
                 return;
 
-            if (_vm.Document.Elementos.Contains(vm))
+            if (_vm.Document
+                    .Elementos
+                    .Contains(vm))
             {
-                _vm.Document.Elementos.Remove(vm);
+                _vm.Document
+                    .Elementos
+                    .Remove(vm);
             }
         }
     }

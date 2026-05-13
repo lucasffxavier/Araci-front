@@ -1,4 +1,5 @@
 ﻿using Araci.Models;
+using System.Windows.Media;
 
 namespace Araci.ViewModels
 {
@@ -19,6 +20,10 @@ namespace Araci.ViewModels
             : base(carga)
         {
             _carga = carga;
+
+            VisualState.DefinirVisualBase(
+                Brushes.DimGray,
+                2);
         }
 
         // =========================
