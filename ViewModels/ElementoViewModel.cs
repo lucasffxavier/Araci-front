@@ -1,126 +1,119 @@
-﻿using System.Windows;
+﻿using System;
+using System.Windows;
 
 using Araci.Models;
 using Araci.ViewModels.Base;
+using Araci.ViewModels.VisualStates;
 
 namespace Araci.ViewModels
 {
     public abstract class ElementoViewModel
         : ViewModelBase
     {
-        // =========================
-        // MODELO
-        // =========================
+        protected readonly Elemento _modelo;
 
-        protected readonly Elemento
-            _modelo;
+        public ElementoTransform Transform { get; }
 
-        // =========================
-        // SELEÇÃO
-        // =========================
+        public ElementoVisualState VisualState { get; }
 
-        private bool _isSelecionado;
-
-        public bool IsSelecionado
-        {
-            get => _isSelecionado;
-
-            set
-            {
-                Set(
-                    ref _isSelecionado,
-                    value);
-            }
-        }
-
-        // =========================
-        // CONSTRUTOR
-        // =========================
+        public ElementoGeometryState Geometry { get; }
 
         protected ElementoViewModel(
             Elemento modelo)
         {
-            _modelo = modelo;
+            _modelo = modelo
+                ?? throw new ArgumentNullException(nameof(modelo));
+
+            Transform = new ElementoTransform(
+                modelo.PosicaoX,
+                modelo.PosicaoY);
+
+            VisualState = new ElementoVisualState();
+
+            Geometry = new ElementoGeometryState();
         }
 
-        // =========================
-        // MODELO
-        // =========================
+        public Elemento Modelo => _modelo;
 
-        public Elemento Modelo =>
-            _modelo;
-
-        // =========================
-        // POSIÇÃO
-        // =========================
-
-        public virtual double X
+        public bool IsSelecionado
         {
-            get => _modelo.PosicaoX;
+            get => VisualState.IsSelecionado;
 
             set
             {
-                if (_modelo.PosicaoX != value)
-                {
-                    _modelo.PosicaoX = value;
+                if (VisualState.IsSelecionado == value)
+                    return;
 
-                    OnPropertyChanged();
-                    OnPropertyChanged(nameof(Bounds));
-                    OnPropertyChanged(nameof(Centro));
-                }
+                VisualState.IsSelecionado = value;
+                _modelo.Selecionado = value;
+
+                OnPropertyChanged();
+            }
+        }
+
+        public virtual double X
+        {
+            get => Transform.X;
+
+            set
+            {
+                double valorLimitado =
+                    LimitarX(value);
+
+                if (Transform.X == valorLimitado)
+                    return;
+
+                Transform.X = valorLimitado;
+                _modelo.PosicaoX = valorLimitado;
+
+                AtualizarGeometria();
             }
         }
 
         public virtual double Y
         {
-            get => _modelo.PosicaoY;
+            get => Transform.Y;
 
             set
             {
-                if (_modelo.PosicaoY != value)
-                {
-                    _modelo.PosicaoY = value;
+                double valorLimitado =
+                    LimitarY(value);
 
-                    OnPropertyChanged();
-                    OnPropertyChanged(nameof(Bounds));
-                    OnPropertyChanged(nameof(Centro));
-                }
+                if (Transform.Y == valorLimitado)
+                    return;
+
+                Transform.Y = valorLimitado;
+                _modelo.PosicaoY = valorLimitado;
+
+                AtualizarGeometria();
             }
         }
 
-        // =========================
-        // DIMENSÕES
-        // =========================
+        public virtual double Largura => 70;
 
-        public virtual double Largura =>
-            70;
-
-        public virtual double Altura =>
-            70;
-
-        // =========================
-        // CENTRO
-        // =========================
-
-        public virtual Point Centro =>
-            new(
-                X + (Largura / 2.0),
-                Y + (Altura / 2.0));
-
-        // =========================
-        // BOUNDS
-        // =========================
+        public virtual double Altura => 70;
 
         public virtual Rect Bounds =>
-            new(
+            new Rect(
                 X,
                 Y,
                 Largura,
                 Altura);
 
-        // =========================
-        // MOVER
-        // =========================
+        public virtual Point Centro =>
+            new Point(
+                X + (Largura / 2.0),
+                Y + (Altura / 2.0));
+
+        protected virtual void AtualizarGeometria()
+        {
+            OnPropertyChanged(nameof(X));
+            OnPropertyChanged(nameof(Y));
+            OnPropertyChanged(nameof(Largura));
+            OnPropertyChanged(nameof(Altura));
+            OnPropertyChanged(nameof(Bounds));
+            OnPropertyChanged(nameof(Centro));
+        }
 
         public virtual void Mover(
             Vector delta)
@@ -129,12 +122,39 @@ namespace Araci.ViewModels
             Y += delta.Y;
         }
 
-        // =========================
-        // ESTADO
-        // =========================
+        private double LimitarX(
+            double valor)
+        {
+            if (AppServices.Viewport == null)
+                return valor;
 
-        public virtual ElementoEstado
-            CapturarEstado()
+            double max =
+                Math.Max(
+                    0,
+                    AppServices.Viewport.Largura - Largura);
+
+            return Math.Max(
+                0,
+                Math.Min(valor, max));
+        }
+
+        private double LimitarY(
+            double valor)
+        {
+            if (AppServices.Viewport == null)
+                return valor;
+
+            double max =
+                Math.Max(
+                    0,
+                    AppServices.Viewport.Altura - Altura);
+
+            return Math.Max(
+                0,
+                Math.Min(valor, max));
+        }
+
+        public virtual ElementoEstado CapturarEstado()
         {
             return new ElementoEstado(
                 X,

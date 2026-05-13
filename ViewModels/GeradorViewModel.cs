@@ -82,5 +82,20 @@
                     }
                 }
             }
-        }
+
+            public string Fabricante
+            {
+                get => _gerador.Fabricante;
+
+                set
+                {
+                    if (_gerador.Fabricante != value)
+                    {
+                        _gerador.Fabricante = value;
+                        OnPropertyChanged();
+                    }
+                }
+            }
+
+    }
     }

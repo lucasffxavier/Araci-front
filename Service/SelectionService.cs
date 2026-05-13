@@ -7,38 +7,21 @@ namespace Araci.Services
 {
     public static class SelectionService
     {
-        // =========================
-        // SELECIONADOS
-        // =========================
-
-        public static ObservableCollection<
-            ElementoViewModel>
+        public static ObservableCollection<ElementoViewModel>
             Selecionados
         { get; }
             = new();
 
-        // =========================
-        // PRINCIPAL
-        // =========================
-
-        public static ElementoViewModel?
-            Principal
-        {
-            get
-            {
-                return Selecionados
-                    .FirstOrDefault();
-            }
-        }
-
-        // =========================
-        // SELECIONAR
-        // =========================
+        public static ElementoViewModel? Principal =>
+            Selecionados.FirstOrDefault();
 
         public static void Selecionar(
             ElementoViewModel vm,
             bool adicionar = false)
         {
+            if (vm == null)
+                return;
+
             if (!adicionar)
             {
                 Limpar();
@@ -48,16 +31,30 @@ namespace Araci.Services
                 return;
 
             vm.IsSelecionado = true;
+            vm.Modelo.Selecionado = true;
 
             Selecionados.Add(vm);
 
-            AppServices.Editor
-                .ElementoSelecionado = vm;
+            AppServices.Editor.ElementoSelecionado = vm;
         }
 
-        // =========================
-        // TOGGLE
-        // =========================
+        public static void Deselecionar(
+            ElementoViewModel vm)
+        {
+            if (vm == null)
+                return;
+
+            if (!Selecionados.Contains(vm))
+                return;
+
+            vm.IsSelecionado = false;
+            vm.Modelo.Selecionado = false;
+
+            Selecionados.Remove(vm);
+
+            AppServices.Editor.ElementoSelecionado =
+                Principal;
+        }
 
         public static void Toggle(
             ElementoViewModel vm)
@@ -72,40 +69,17 @@ namespace Araci.Services
             }
         }
 
-        // =========================
-        // DESELECIONAR
-        // =========================
-
-        public static void Deselecionar(
-            ElementoViewModel vm)
-        {
-            if (!Selecionados.Contains(vm))
-                return;
-
-            vm.IsSelecionado = false;
-
-            Selecionados.Remove(vm);
-
-            AppServices.Editor
-                .ElementoSelecionado =
-                    Principal;
-        }
-
-        // =========================
-        // LIMPAR
-        // =========================
-
         public static void Limpar()
         {
             foreach (var item in Selecionados.ToList())
             {
                 item.IsSelecionado = false;
+                item.Modelo.Selecionado = false;
             }
 
             Selecionados.Clear();
 
-            AppServices.Editor
-                .ElementoSelecionado = null;
+            AppServices.Editor.ElementoSelecionado = null;
         }
     }
 }

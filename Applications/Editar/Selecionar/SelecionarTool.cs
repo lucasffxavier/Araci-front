@@ -1,6 +1,4 @@
-﻿using System.Collections.Generic;
-using System.Linq;
-using System.Windows;
+﻿using System.Windows;
 using System.Windows.Input;
 
 using Araci.Applications.Editar.Base;
@@ -11,24 +9,19 @@ namespace Araci.Applications.Editar.Selecionar
 {
     public class SelecionarTool : ITool
     {
-        private Point _ultimoPonto;
-
         private bool _arrastandoElementos;
+
         private bool _selecionandoJanela;
 
         private Point _inicioJanela;
-
-        private readonly Dictionary<
-            ElementoViewModel,
-            ElementoEstado>
-            _estadosIniciais
-                = new();
 
         public string Nome => "Selecionar";
 
         public bool MantemBotaoAtivado => true;
 
-        public void Ativar() { }
+        public void Ativar()
+        {
+        }
 
         public void Desativar()
         {
@@ -43,59 +36,54 @@ namespace Araci.Applications.Editar.Selecionar
             Point position)
         {
             bool ctrl =
-                Keyboard.Modifiers.HasFlag(ModifierKeys.Control);
+                Keyboard.Modifiers
+                    .HasFlag(ModifierKeys.Control);
 
             if (vm != null)
             {
                 if (ctrl)
+                {
                     SelectionService.Toggle(vm);
-                else if (!SelectionService.Selecionados.Contains(vm))
+                }
+                else if (!SelectionService
+                             .Selecionados
+                             .Contains(vm))
+                {
                     SelectionService.Selecionar(vm);
+                }
 
-                _ultimoPonto = position;
                 _arrastandoElementos = true;
 
-                _estadosIniciais.Clear();
-
-                foreach (var item in SelectionService.Selecionados)
-                {
-                    _estadosIniciais[item] =
-                        item.CapturarEstado();
-                }
+                MoveService.BeginMove(
+                    SelectionService.Selecionados);
 
                 return;
             }
 
             if (!ctrl)
+            {
                 SelectionService.Limpar();
+            }
 
             _inicioJanela = position;
+
             _selecionandoJanela = true;
 
             AppServices.SelectionBox.Visivel = true;
-            AppServices.SelectionBox.Atualizar(position, position);
+
+            AppServices.SelectionBox.Atualizar(
+                position,
+                position);
         }
 
         public void OnMouseMove(Point position)
         {
-            if (_arrastandoElementos)
-            {
-                Vector delta =
-                    position - _ultimoPonto;
-
-                foreach (var item in SelectionService.Selecionados.ToList())
-                {
-                    MoveService.MoverVisual(item, delta);
-                }
-
-                _ultimoPonto = position;
-                return;
-            }
-
             if (_selecionandoJanela)
             {
                 AppServices.SelectionBox
-                    .Atualizar(_inicioJanela, position);
+                    .Atualizar(
+                        _inicioJanela,
+                        position);
             }
         }
 
@@ -103,19 +91,27 @@ namespace Araci.Applications.Editar.Selecionar
         {
             if (_arrastandoElementos)
             {
-                // 🔥 Sem HUD e sem transaction (movimento leve)
+                MoveService.EndMove(
+                    SelectionService.Selecionados);
             }
 
             if (_selecionandoJanela)
             {
                 var rect =
-                    AppServices.SelectionBox.Bounds;
+                    AppServices
+                        .SelectionBox
+                        .Bounds;
 
-                foreach (var item in AppServices.Document.Elementos)
+                foreach (var item in
+                    AppServices.Document.Elementos)
                 {
-                    if (rect.IntersectsWith(item.Bounds))
+                    if (rect.IntersectsWith(
+                            item.Bounds))
                     {
-                        SelectionService.Selecionar(item, true);
+                        SelectionService
+                            .Selecionar(
+                                item,
+                                true);
                     }
                 }
             }
@@ -123,11 +119,11 @@ namespace Araci.Applications.Editar.Selecionar
             _arrastandoElementos = false;
             _selecionandoJanela = false;
 
-            _estadosIniciais.Clear();
-
             AppServices.SelectionBox.Visivel = false;
         }
 
-        public void OnKeyDown(Key key) { }
+        public void OnKeyDown(Key key)
+        {
+        }
     }
 }

@@ -1,68 +1,101 @@
-﻿using System;
+﻿using System.Collections.Generic;
 using System.Windows;
 
+using Araci.Core.Commands;
 using Araci.ViewModels;
 
 namespace Araci.Services
 {
     public static class MoveService
     {
-        private const double
-            MARGEM_VISUAL = 2;
+        // =========================
+        // ESTADO DRAG
+        // =========================
+
+        private static bool _movendo;
+
+        private static readonly Dictionary<
+            ElementoViewModel,
+            ElementoEstado>
+            _estadoInicial = new();
+
+        // =========================
+        // BEGIN
+        // =========================
+
+        public static void BeginMove(
+            IEnumerable<ElementoViewModel> elementos)
+        {
+            _estadoInicial.Clear();
+
+            foreach (var vm in elementos)
+            {
+                _estadoInicial[vm] =
+                    vm.CapturarEstado();
+            }
+
+            _movendo = true;
+        }
+
+        // =========================
+        // MOVE VISUAL
+        // =========================
 
         public static void MoverVisual(
             ElementoViewModel vm,
             Vector delta)
         {
-            double maxX =
-                AppServices.Viewport?.Largura
-                    ?? 1000;
+            if (!_movendo)
+                return;
 
-            double maxY =
-                AppServices.Viewport?.Altura
-                    ?? 800;
+            vm.Mover(delta);
+        }
 
-            Rect bounds =
-                vm.Bounds;
+        // =========================
+        // END MOVE
+        // =========================
 
-            double novoX =
-                bounds.X + delta.X;
+        public static void EndMove(
+            IEnumerable<ElementoViewModel> elementos)
+        {
+            if (!_movendo)
+                return;
 
-            double novoY =
-                bounds.Y + delta.Y;
+            using var transaction =
+                AppServices.BeginTransaction();
 
-            double limiteDireito =
-                Math.Max(
-                    0,
-                    maxX - bounds.Width - MARGEM_VISUAL);
+            foreach (var vm in elementos)
+            {
+                if (!_estadoInicial.ContainsKey(vm))
+                    continue;
 
-            double limiteInferior =
-                Math.Max(
-                    0,
-                    maxY - bounds.Height - MARGEM_VISUAL);
+                ElementoEstado antes =
+                    _estadoInicial[vm];
 
-            novoX =
-                Math.Max(
-                    0,
-                    Math.Min(
-                        novoX,
-                        limiteDireito));
+                ElementoEstado depois =
+                    vm.CapturarEstado();
 
-            novoY =
-                Math.Max(
-                    0,
-                    Math.Min(
-                        novoY,
-                        limiteInferior));
+                bool mudou =
+                    antes.X != depois.X ||
+                    antes.Y != depois.Y ||
+                    antes.X2 != depois.X2 ||
+                    antes.Y2 != depois.Y2;
 
-            // 🔥 CORREÇÃO CRÍTICA
-            Vector deltaCorrigido =
-                new(
-                    novoX - bounds.X,
-                    novoY - bounds.Y);
+                if (!mudou)
+                    continue;
 
-            // 🔥 AGORA respeita override (Cabo, etc.)
-            vm.Mover(deltaCorrigido);
+                transaction.Add(
+                    new MoveElementoCommand(
+                        vm,
+                        antes,
+                        depois));
+            }
+
+            transaction.Commit();
+
+            _estadoInicial.Clear();
+
+            _movendo = false;
         }
     }
 }

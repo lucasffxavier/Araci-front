@@ -5,16 +5,8 @@ namespace Araci.Applications.Diagrama.InserirCabo
 {
     public class InserirCaboApplication
     {
-        // =========================
-        // SERVIÇO
-        // =========================
-
         private readonly ViewportService
             _viewportService;
-
-        // =========================
-        // CONSTRUTOR
-        // =========================
 
         public InserirCaboApplication(
             ViewportService viewportService)
@@ -23,18 +15,14 @@ namespace Araci.Applications.Diagrama.InserirCabo
                 viewportService;
         }
 
-        // =========================
-        // EXECUTAR
-        // =========================
-
         public void Executar()
         {
             CaboViewModel vm =
                 ElementoFactory
-                .CriarCaboVM();
+                    .CriarCaboVM();
 
             _viewportService
-                .AdicionarCabo(vm);
+                .AdicionarElemento(vm);
         }
     }
 }

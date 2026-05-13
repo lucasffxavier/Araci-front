@@ -1,6 +1,8 @@
 ﻿using System;
+using System.Linq;
 using System.Windows;
 using System.Windows.Input;
+
 using Araci.Applications.Editar.Base;
 using Araci.Applications.Editar.Selecionar;
 using Araci.ViewModels;
@@ -9,19 +11,50 @@ namespace Araci.Services
 {
     public class ToolService
     {
-        public event Action<ITool>? FerramentaAlterada;
+        // =========================
+        // EVENTOS
+        // =========================
 
-        private ITool _ferramentaAtual;
+        public event Action<ITool>?
+            FerramentaAlterada;
+
+        // =========================
+        // ESTADO
+        // =========================
+
+        private ITool
+            _ferramentaAtual;
+
+        // =========================
+        // DRAG GLOBAL
+        // =========================
+
+        private bool
+            _movendoElementos;
+
+        private Point
+            _ultimaPosicaoMouse;
+
+        // =========================
+        // CONSTRUTOR
+        // =========================
 
         public ToolService()
         {
-            _ferramentaAtual = new SelecionarTool();
+            _ferramentaAtual =
+                new SelecionarTool();
+
             _ferramentaAtual.Ativar();
         }
+
+        // =========================
+        // TOOL ATUAL
+        // =========================
 
         public ITool FerramentaAtual
         {
             get => _ferramentaAtual;
+
             set
             {
                 if (_ferramentaAtual == value)
@@ -33,55 +66,176 @@ namespace Araci.Services
 
                 _ferramentaAtual.Ativar();
 
-                FerramentaAlterada?.Invoke(_ferramentaAtual);
+                FerramentaAlterada?.Invoke(
+                    _ferramentaAtual);
             }
         }
 
-        public void AtivarFerramenta(ITool ferramenta)
+        // =========================
+        // ATIVAR
+        // =========================
+
+        public void AtivarFerramenta(
+            ITool ferramenta)
         {
-            FerramentaAtual = ferramenta;
+            FerramentaAtual =
+                ferramenta;
         }
+
+        // =========================
+        // VOLTAR SELEÇÃO
+        // =========================
 
         public void VoltarParaSelecao()
         {
-            if (_ferramentaAtual is SelecionarTool)
+            if (_ferramentaAtual
+                is SelecionarTool)
+            {
                 return;
+            }
 
-            FerramentaAtual = new SelecionarTool();
+            FerramentaAtual =
+                new SelecionarTool();
         }
+
+        // =========================
+        // TOOLBAR
+        // =========================
 
         public bool FerramentaAtivaMantida()
         {
-            return FerramentaAtual.MantemBotaoAtivado;
+            return FerramentaAtual
+                .MantemBotaoAtivado;
         }
 
-        // 🔥 NOVO — DISPATCH
+        // =========================
+        // MOUSE DOWN
+        // =========================
 
-        public void HandleMouseDown(ElementoViewModel? vm, Point pos)
+        public void HandleMouseDown(
+            ElementoViewModel? vm,
+            Point pos)
         {
-            _ferramentaAtual.OnMouseDown(vm, pos);
+            _ultimaPosicaoMouse = pos;
+
+            // =========================
+            // DRAG GLOBAL APENAS
+            // PARA FERRAMENTA SELECIONAR
+            // =========================
+
+            if (_ferramentaAtual is SelecionarTool)
+            {
+                bool clicouElementoSelecionado =
+                    vm != null &&
+                    SelectionService
+                        .Selecionados
+                        .Contains(vm);
+
+                if (clicouElementoSelecionado)
+                {
+                    _movendoElementos = true;
+                }
+            }
+
+            // =========================
+            // DISPATCH TOOL
+            // =========================
+
+            _ferramentaAtual
+                .OnMouseDown(vm, pos);
         }
 
-        public void HandleMouseMove(Point pos)
+        // =========================
+        // MOUSE MOVE
+        // =========================
+
+        public void HandleMouseMove(
+            Point pos)
         {
-            _ferramentaAtual.OnMouseMove(pos);
+            // =========================
+            // MOVIMENTO GLOBAL
+            // SOMENTE SELEÇÃO
+            // =========================
+
+            if (_movendoElementos &&
+                _ferramentaAtual is SelecionarTool)
+            {
+                Vector delta =
+                    pos - _ultimaPosicaoMouse;
+
+                if (delta.X != 0 ||
+                    delta.Y != 0)
+                {
+                    foreach (var item in
+                        SelectionService
+                            .Selecionados
+                            .ToList())
+                    {
+                        MoveService.MoverVisual(
+                            item,
+                            delta);
+                    }
+                }
+
+                _ultimaPosicaoMouse = pos;
+            }
+
+            // =========================
+            // DISPATCH TOOL
+            // =========================
+
+            _ferramentaAtual
+                .OnMouseMove(pos);
         }
 
-        public void HandleMouseUp(Point pos)
+        // =========================
+        // MOUSE UP
+        // =========================
+
+        public void HandleMouseUp(
+            Point pos)
         {
-            _ferramentaAtual.OnMouseUp(pos);
+            // =========================
+            // FINALIZA DRAG GLOBAL
+            // =========================
+
+            if (_movendoElementos &&
+                _ferramentaAtual is SelecionarTool)
+            {
+                MoveService.EndMove(
+                    SelectionService
+                        .Selecionados
+                        .ToList());
+            }
+
+            _movendoElementos = false;
+
+            // =========================
+            // DISPATCH TOOL
+            // =========================
+
+            _ferramentaAtual
+                .OnMouseUp(pos);
         }
 
-        public void HandleKeyDown(Key key)
+        // =========================
+        // KEYBOARD
+        // =========================
+
+        public void HandleKeyDown(
+            Key key)
         {
             // =========================
             // UNDO
             // =========================
 
-            if (Keyboard.Modifiers == ModifierKeys.Control
-                && key == Key.Z)
+            if (Keyboard.Modifiers ==
+                    ModifierKeys.Control &&
+                key == Key.Z)
             {
-                AppServices.Commands.Undo();
+                AppServices.Commands
+                    .Undo();
+
                 return;
             }
 
@@ -89,14 +243,22 @@ namespace Araci.Services
             // REDO
             // =========================
 
-            if (Keyboard.Modifiers == ModifierKeys.Control
-                && key == Key.Y)
+            if (Keyboard.Modifiers ==
+                    ModifierKeys.Control &&
+                key == Key.Y)
             {
-                AppServices.Commands.Redo();
+                AppServices.Commands
+                    .Redo();
+
                 return;
             }
 
-            _ferramentaAtual.OnKeyDown(key);
+            // =========================
+            // DISPATCH TOOL
+            // =========================
+
+            _ferramentaAtual
+                .OnKeyDown(key);
         }
     }
 }

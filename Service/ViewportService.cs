@@ -1,4 +1,5 @@
 ﻿using System.Windows;
+
 using Araci.ViewModels;
 
 namespace Araci.Services
@@ -7,36 +8,65 @@ namespace Araci.Services
     {
         private readonly ViewportViewModel _vm;
 
-        public ViewportService(ViewportViewModel vm)
+        public ViewportService(
+            ViewportViewModel vm)
         {
             _vm = vm;
         }
 
-        public double Largura { get; set; } = 1000;
-        public double Altura { get; set; } = 800;
+        public double Largura
+        { get; private set; }
+            = 1000;
 
-        public void AtualizarTamanho(Size size)
+        public double Altura
+        { get; private set; }
+            = 800;
+
+        public Rect Bounds =>
+            new Rect(
+                0,
+                0,
+                Largura,
+                Altura);
+
+        public void AtualizarTamanho(
+            Size size)
         {
-            // 🔥 remove borda visual (1px * 2)
-            Largura = size.Width;
-            Altura = size.Height;
+            Largura =
+                Math.Max(0, size.Width);
+
+            Altura =
+                Math.Max(0, size.Height);
         }
 
-        // 🔥 RESTAURADO
-        public void AdicionarElemento(ElementoViewModel vm)
+        public void AdicionarElemento(
+            ElementoViewModel vm)
         {
-            _vm.Document.Elementos.Add(vm);
+            if (vm == null)
+                return;
+
+            if (!_vm.Document.Elementos.Contains(vm))
+            {
+                _vm.Document.Elementos.Add(vm);
+            }
         }
 
-        // 🔥 RESTAURADO
-        public void AdicionarCabo(CaboViewModel vm)
+        public void AdicionarCabo(
+            CaboViewModel vm)
         {
-            _vm.Document.Elementos.Add(vm);
+            AdicionarElemento(vm);
         }
 
-        public void RemoverElemento(ElementoViewModel vm)
+        public void RemoverElemento(
+            ElementoViewModel vm)
         {
-            _vm.Document.Elementos.Remove(vm);
+            if (vm == null)
+                return;
+
+            if (_vm.Document.Elementos.Contains(vm))
+            {
+                _vm.Document.Elementos.Remove(vm);
+            }
         }
     }
 }

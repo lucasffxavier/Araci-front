@@ -6,14 +6,14 @@
         // INSTÂNCIA
         // =========================
 
-        public string Barra1 { get; set; }
+        public string BarraOrigem { get; set; }
 
-        public string Barra2 { get; set; }
+        public string BarraDestino { get; set; }
 
         public double Comprimento { get; set; }
 
         // =========================
-        // PONTO FINAL
+        // GEOMETRIA
         // =========================
 
         public double PosicaoX2 { get; set; }
@@ -24,7 +24,7 @@
         // TIPO
         // =========================
 
-        public string LineCode { get; set; }
+        public string TipoCabo { get; set; }
 
         public double Resistencia { get; set; }
 
@@ -46,25 +46,33 @@
         {
             Nome = "CB-01";
 
-            Barra1 = "BUS-01";
+            BarraOrigem = "BUS-01";
 
-            Barra2 = "BUS-02";
+            BarraDestino = "BUS-02";
 
             Comprimento = 120;
 
+            // =========================
             // PONTO INICIAL
+            // =========================
 
             PosicaoX = 100;
 
             PosicaoY = 100;
 
+            // =========================
             // PONTO FINAL
+            // =========================
 
             PosicaoX2 = 400;
 
             PosicaoY2 = 100;
 
-            LineCode = "LC-500MCM";
+            // =========================
+            // TIPO
+            // =========================
+
+            TipoCabo = "LC-500MCM";
 
             Resistencia = 0.12;
 

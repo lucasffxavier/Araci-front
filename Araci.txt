@@ -534,7 +534,86 @@ namespace Araci.Applications.Commands
 ARQUIVO: C:\Araci-Engine-Front\Araci Engine\Applications\Commands\TransactionScope.cs
 ====================================================================================================
 
-﻿
+﻿using System;
+using Araci.Core.Commands;
+
+namespace Araci.Core.Transactions
+{
+    public class TransactionScope : IDisposable
+    {
+        // =========================
+        // ESTADO
+        // =========================
+
+        private readonly CompositeCommand _composite;
+
+        private bool _finalizado;
+
+        private readonly CommandManager _commandManager;
+
+        // =========================
+        // CONSTRUTOR
+        // =========================
+
+        public TransactionScope(
+            CommandManager commandManager)
+        {
+            _commandManager = commandManager;
+            _composite = new CompositeCommand();
+        }
+
+        // =========================
+        // ADICIONAR
+        // =========================
+
+        public void Add(IUndoableCommand command)
+        {
+            if (_finalizado)
+                throw new InvalidOperationException(
+                    "Transaction já finalizada.");
+
+            _composite.Add(command);
+        }
+
+        // =========================
+        // COMMIT
+        // =========================
+
+        public void Commit()
+        {
+            if (_finalizado)
+                return;
+
+            if (!_composite.IsEmpty)
+            {
+                _commandManager.Execute(_composite);
+            }
+
+            _finalizado = true;
+        }
+
+        // =========================
+        // ROLLBACK (PREPARADO)
+        // =========================
+
+        public void Rollback()
+        {
+            _finalizado = true;
+        }
+
+        // =========================
+        // DISPOSE
+        // =========================
+
+        public void Dispose()
+        {
+            if (!_finalizado)
+            {
+                Commit();
+            }
+        }
+    }
+}
 
 
 ====================================================================================================
@@ -720,19 +799,13 @@ namespace Araci.Applications.Editar.Deletar
 {
     public class DeletarTool : ITool
     {
-        public string Nome =>
-            "Deletar";
+        public string Nome => "Deletar";
 
-        public bool MantemBotaoAtivado =>
-            true;
+        public bool MantemBotaoAtivado => true;
 
-        public void Ativar()
-        {
-        }
+        public void Ativar() { }
 
-        public void Desativar()
-        {
-        }
+        public void Desativar() { }
 
         public void OnMouseDown(
             ElementoViewModel? vm,
@@ -746,34 +819,23 @@ namespace Araci.Applications.Editar.Deletar
             if (selecionados.Count == 0)
                 return;
 
-            var composite =
-                new CompositeCommand();
+            using var tx =
+                AppServices.BeginTransaction();
 
             foreach (var item in selecionados)
             {
-                composite.Add(
-                    new DeleteElementCommand(
-                        item));
+                tx.Add(
+                    new DeleteElementCommand(item));
             }
 
-            AppServices.Commands
-                .Execute(composite);
+            tx.Commit();
         }
 
-        public void OnMouseMove(
-            Point position)
-        {
-        }
+        public void OnMouseMove(Point position) { }
 
-        public void OnMouseUp(
-            Point position)
-        {
-        }
+        public void OnMouseUp(Point position) { }
 
-        public void OnKeyDown(
-            Key key)
-        {
-        }
+        public void OnKeyDown(Key key) { }
     }
 }
 
@@ -799,10 +861,7 @@ namespace Araci.Applications.Editar.Mover
         private bool _movendo;
 
         private Point _ultimoPonto;
-
-        // =========================
-        // ESTADOS INICIAIS
-        // =========================
+        private Point _pontoInicial;
 
         private readonly Dictionary<
             ElementoViewModel,
@@ -810,21 +869,20 @@ namespace Araci.Applications.Editar.Mover
             _estadosIniciais
                 = new();
 
-        public string Nome =>
-            "Mover";
+        public string Nome => "Mover";
 
-        public bool MantemBotaoAtivado =>
-            true;
+        public bool MantemBotaoAtivado => true;
 
-        public void Ativar()
-        {
-        }
+        public void Ativar() { }
 
         public void Desativar()
         {
             _movendo = false;
-
             _estadosIniciais.Clear();
+
+            var hud = AppServices.MoveHud;
+            hud.Visivel = false;
+            hud.Reset();
         }
 
         public void OnMouseDown(
@@ -834,34 +892,28 @@ namespace Araci.Applications.Editar.Mover
             if (vm == null)
                 return;
 
-            if (!SelectionService
-                .Selecionados
-                .Contains(vm))
-            {
-                SelectionService
-                    .Selecionar(vm);
-            }
+            if (!SelectionService.Selecionados.Contains(vm))
+                SelectionService.Selecionar(vm);
 
             _movendo = true;
 
             _ultimoPonto = position;
+            _pontoInicial = position;
 
-            // =========================
-            // CAPTURA ESTADOS
-            // =========================
+            var hud = AppServices.MoveHud;
+            hud.Visivel = true;
+            hud.Reset();
 
             _estadosIniciais.Clear();
 
-            foreach (var item in SelectionService
-                .Selecionados)
+            foreach (var item in SelectionService.Selecionados)
             {
                 _estadosIniciais[item] =
                     item.CapturarEstado();
             }
         }
 
-        public void OnMouseMove(
-            Point position)
+        public void OnMouseMove(Point position)
         {
             if (!_movendo)
                 return;
@@ -869,72 +921,79 @@ namespace Araci.Applications.Editar.Mover
             Vector delta =
                 position - _ultimoPonto;
 
-            foreach (var item in SelectionService
-                .Selecionados
-                .ToList())
+            foreach (var item in SelectionService.Selecionados.ToList())
             {
-                MoveService
-                    .MoverVisual(
-                        item,
-                        delta);
+                MoveService.MoverVisual(item, delta);
             }
+
+            var deltaTotal =
+                position - _pontoInicial;
+
+            var hud = AppServices.MoveHud;
+            hud.DeltaX = deltaTotal.X;
+            hud.DeltaY = deltaTotal.Y;
+
+            // 🔥 CENTRO DO GRUPO
+            var bounds =
+                CalcularBoundsSelecionados();
+
+            hud.AtualizarPosicao(bounds);
 
             _ultimoPonto = position;
         }
 
-        public void OnMouseUp(
-            Point position)
+        public void OnMouseUp(Point position)
         {
             if (!_movendo)
                 return;
 
-            var composite =
-                new CompositeCommand();
+            using var tx =
+                AppServices.BeginTransaction();
 
-            foreach (var item in SelectionService
-                .Selecionados)
+            foreach (var item in SelectionService.Selecionados)
             {
-                if (!_estadosIniciais
-                    .ContainsKey(item))
-                {
-                    continue;
-                }
-
-                var estadoInicial =
-                    _estadosIniciais[item];
-
-                var estadoFinal =
-                    item.CapturarEstado();
-
-                bool mudou =
-                    estadoInicial.X != estadoFinal.X
-                    ||
-                    estadoInicial.Y != estadoFinal.Y;
-
-                if (!mudou)
+                if (!_estadosIniciais.ContainsKey(item))
                     continue;
 
-                composite.Add(
-                    new MoveElementCommand(
-                        item,
-                        estadoInicial,
-                        estadoFinal));
+                var inicial = _estadosIniciais[item];
+                var final = item.CapturarEstado();
+
+                if (inicial.X == final.X &&
+                    inicial.Y == final.Y)
+                    continue;
+
+                tx.Add(new MoveElementCommand(
+                    item,
+                    inicial,
+                    final));
             }
 
-            if (!composite.IsEmpty)
-            {
-                AppServices.Commands
-                    .Execute(composite);
-            }
+            tx.Commit();
+
+            var hud = AppServices.MoveHud;
+            hud.Visivel = false;
+            hud.Reset();
 
             _movendo = false;
-
             _estadosIniciais.Clear();
         }
 
-        public void OnKeyDown(Key key)
+        private Rect CalcularBoundsSelecionados()
         {
+            var items = SelectionService.Selecionados;
+
+            if (items.Count == 0)
+                return new Rect();
+
+            double minX = items.Min(i => i.Bounds.X);
+            double minY = items.Min(i => i.Bounds.Y);
+            double maxX = items.Max(i => i.Bounds.Right);
+            double maxY = items.Max(i => i.Bounds.Bottom);
+
+            return new Rect(minX, minY, maxX - minX, maxY - minY);
         }
+
+        public void OnKeyDown(Key key) { }
     }
 }
 
@@ -949,7 +1008,6 @@ using System.Windows;
 using System.Windows.Input;
 
 using Araci.Applications.Editar.Base;
-using Araci.Core.Commands;
 using Araci.Services;
 using Araci.ViewModels;
 
@@ -960,14 +1018,9 @@ namespace Araci.Applications.Editar.Selecionar
         private Point _ultimoPonto;
 
         private bool _arrastandoElementos;
-
         private bool _selecionandoJanela;
 
         private Point _inicioJanela;
-
-        // =========================
-        // ESTADOS INICIAIS
-        // =========================
 
         private readonly Dictionary<
             ElementoViewModel,
@@ -975,23 +1028,18 @@ namespace Araci.Applications.Editar.Selecionar
             _estadosIniciais
                 = new();
 
-        public string Nome =>
-            "Selecionar";
+        public string Nome => "Selecionar";
 
-        public bool MantemBotaoAtivado =>
-            true;
+        public bool MantemBotaoAtivado => true;
 
-        public void Ativar()
-        {
-        }
+        public void Ativar() { }
 
         public void Desativar()
         {
             _arrastandoElementos = false;
             _selecionandoJanela = false;
 
-            AppServices.SelectionBox
-                .Visivel = false;
+            AppServices.SelectionBox.Visivel = false;
         }
 
         public void OnMouseDown(
@@ -999,42 +1047,21 @@ namespace Araci.Applications.Editar.Selecionar
             Point position)
         {
             bool ctrl =
-                Keyboard.Modifiers
-                    .HasFlag(ModifierKeys.Control);
-
-            // =========================
-            // CLICK EM ELEMENTO
-            // =========================
+                Keyboard.Modifiers.HasFlag(ModifierKeys.Control);
 
             if (vm != null)
             {
                 if (ctrl)
-                {
                     SelectionService.Toggle(vm);
-                }
-                else
-                {
-                    if (!SelectionService
-                        .Selecionados
-                        .Contains(vm))
-                    {
-                        SelectionService
-                            .Selecionar(vm);
-                    }
-                }
+                else if (!SelectionService.Selecionados.Contains(vm))
+                    SelectionService.Selecionar(vm);
 
                 _ultimoPonto = position;
-
                 _arrastandoElementos = true;
-
-                // =========================
-                // CAPTURA ESTADOS
-                // =========================
 
                 _estadosIniciais.Clear();
 
-                foreach (var item in SelectionService
-                    .Selecionados)
+                foreach (var item in SelectionService.Selecionados)
                 {
                     _estadosIniciais[item] =
                         item.CapturarEstado();
@@ -1043,134 +1070,56 @@ namespace Araci.Applications.Editar.Selecionar
                 return;
             }
 
-            // =========================
-            // CLICK VAZIO
-            // =========================
-
             if (!ctrl)
-            {
                 SelectionService.Limpar();
-            }
 
             _inicioJanela = position;
-
             _selecionandoJanela = true;
 
-            AppServices.SelectionBox
-                .Visivel = true;
-
-            AppServices.SelectionBox
-                .Atualizar(position, position);
+            AppServices.SelectionBox.Visivel = true;
+            AppServices.SelectionBox.Atualizar(position, position);
         }
 
-        public void OnMouseMove(
-            Point position)
+        public void OnMouseMove(Point position)
         {
-            // =========================
-            // MOVE ELEMENTOS
-            // =========================
-
             if (_arrastandoElementos)
             {
                 Vector delta =
                     position - _ultimoPonto;
 
-                foreach (var item in SelectionService
-                    .Selecionados
-                    .ToList())
+                foreach (var item in SelectionService.Selecionados.ToList())
                 {
-                    MoveService
-                        .MoverVisual(
-                            item,
-                            delta);
+                    MoveService.MoverVisual(item, delta);
                 }
 
                 _ultimoPonto = position;
-
                 return;
             }
-
-            // =========================
-            // SELECTION BOX
-            // =========================
 
             if (_selecionandoJanela)
             {
                 AppServices.SelectionBox
-                    .Atualizar(
-                        _inicioJanela,
-                        position);
+                    .Atualizar(_inicioJanela, position);
             }
         }
 
-        public void OnMouseUp(
-            Point position)
+        public void OnMouseUp(Point position)
         {
-            // =========================
-            // FINALIZAR MOVE
-            // =========================
-
             if (_arrastandoElementos)
             {
-                var composite =
-                    new CompositeCommand();
-
-                foreach (var item in SelectionService
-                    .Selecionados)
-                {
-                    if (!_estadosIniciais
-                        .ContainsKey(item))
-                    {
-                        continue;
-                    }
-
-                    var estadoInicial =
-                        _estadosIniciais[item];
-
-                    var estadoFinal =
-                        item.CapturarEstado();
-
-                    bool mudou =
-                        estadoInicial.X != estadoFinal.X
-                        ||
-                        estadoInicial.Y != estadoFinal.Y;
-
-                    if (!mudou)
-                        continue;
-
-                    composite.Add(
-                        new MoveElementCommand(
-                            item,
-                            estadoInicial,
-                            estadoFinal));
-                }
-
-                if (!composite.IsEmpty)
-                {
-                    AppServices.Commands
-                        .Execute(composite);
-                }
+                // 🔥 Sem HUD e sem transaction (movimento leve)
             }
-
-            // =========================
-            // FINALIZAR JANELA
-            // =========================
 
             if (_selecionandoJanela)
             {
                 var rect =
-                    AppServices.SelectionBox
-                        .Bounds;
+                    AppServices.SelectionBox.Bounds;
 
-                foreach (var item in AppServices
-                    .Document
-                    .Elementos)
+                foreach (var item in AppServices.Document.Elementos)
                 {
-                    if (rect.IntersectsWith(
-                        item.Bounds))
+                    if (rect.IntersectsWith(item.Bounds))
                     {
-                        SelectionService
-                            .Selecionar(item, true);
+                        SelectionService.Selecionar(item, true);
                     }
                 }
             }
@@ -1180,13 +1129,10 @@ namespace Araci.Applications.Editar.Selecionar
 
             _estadosIniciais.Clear();
 
-            AppServices.SelectionBox
-                .Visivel = false;
+            AppServices.SelectionBox.Visivel = false;
         }
 
-        public void OnKeyDown(Key key)
-        {
-        }
+        public void OnKeyDown(Key key) { }
     }
 }
 
@@ -3807,6 +3753,7 @@ ARQUIVO: C:\Araci-Engine-Front\Araci Engine\Service\AppServices.cs
 using Araci.Core.Documents;
 using Araci.Services;
 using Araci.Core.Commands;
+using Araci.Core.Transactions;
 using Araci.ViewModels;
 
 namespace Araci
@@ -3874,6 +3821,16 @@ namespace Araci
             Commands
         { get; }
             = new CommandManager();
+
+        // =========================
+        // TRANSACTIONS
+        // =========================
+
+        public static TransactionScope
+            BeginTransaction()
+        {
+            return new TransactionScope(Commands);
+        }
     }
 }
 
@@ -4119,11 +4076,14 @@ ARQUIVO: C:\Araci-Engine-Front\Araci Engine\Service\MoveHudService.cs
 ====================================================================================================
 
 ﻿using System.ComponentModel;
+using System.Windows;
 
 namespace Araci.Services
 {
     public class MoveHudService : INotifyPropertyChanged
     {
+        private const double MARGEM = 10;
+
         private bool _visivel;
         private double _x;
         private double _y;
@@ -4148,7 +4108,7 @@ namespace Araci.Services
         public double X
         {
             get => _x;
-            set
+            private set
             {
                 if (_x != value)
                 {
@@ -4161,7 +4121,7 @@ namespace Araci.Services
         public double Y
         {
             get => _y;
-            set
+            private set
             {
                 if (_y != value)
                 {
@@ -4197,6 +4157,32 @@ namespace Araci.Services
             }
         }
 
+        // =========================
+        // POSICIONAMENTO INTELIGENTE
+        // =========================
+
+        public void AtualizarPosicao(Rect bounds)
+        {
+            double viewportX =
+                AppServices.Viewport?.Largura ?? 1000;
+
+            double viewportY =
+                AppServices.Viewport?.Altura ?? 800;
+
+            double novoX =
+                bounds.X + bounds.Width / 2;
+
+            double novoY =
+                bounds.Y - 20; // acima do elemento
+
+            // CLAMP VIEWPORT
+            novoX = Math.Max(MARGEM, Math.Min(novoX, viewportX - MARGEM));
+            novoY = Math.Max(MARGEM, Math.Min(novoY, viewportY - MARGEM));
+
+            X = novoX;
+            Y = novoY;
+        }
+
         public void Reset()
         {
             DeltaX = 0;
@@ -4205,7 +4191,8 @@ namespace Araci.Services
 
         private void OnChanged(string nome)
         {
-            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nome));
+            PropertyChanged?.Invoke(this,
+                new PropertyChangedEventArgs(nome));
         }
     }
 }
@@ -4336,8 +4323,14 @@ namespace Araci.Services
                         novoY,
                         limiteInferior));
 
-            vm.X = novoX;
-            vm.Y = novoY;
+            // 🔥 CORREÇÃO CRÍTICA
+            Vector deltaCorrigido =
+                new(
+                    novoX - bounds.X,
+                    novoY - bounds.Y);
+
+            // 🔥 AGORA respeita override (Cabo, etc.)
+            vm.Mover(deltaCorrigido);
         }
     }
 }
