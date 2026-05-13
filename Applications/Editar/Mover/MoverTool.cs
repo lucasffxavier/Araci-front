@@ -10,33 +10,65 @@ namespace Araci.Applications.Editar.Mover
 {
     public class MoverTool : ITool
     {
+        // =========================
+        // ESTADO
+        // =========================
+
         private bool _movendo;
 
         private Point _ultimoPonto;
+
         private Point _pontoInicial;
+
+        // =========================
+        // INFO TOOL
+        // =========================
 
         public string Nome => "Mover";
 
         public bool MantemBotaoAtivado => true;
 
+        // =========================
+        // ATIVAR
+        // =========================
+
         public void Ativar()
         {
         }
 
+        // =========================
+        // DESATIVAR
+        // =========================
+
         public void Desativar()
         {
-            _movendo = false;
-
-            AppServices.MoveHud.Visivel = false;
-            AppServices.MoveHud.Reset();
+            CancelarMovimento();
         }
+
+        // =========================
+        // MOUSE DOWN
+        // =========================
 
         public void OnMouseDown(
             ElementoViewModel? vm,
             Point position)
         {
+            // =========================
+            // CLIQUE NO VAZIO
+            // =========================
+
             if (vm == null)
+            {
+                CancelarMovimento();
+
+                SelectionService.Limpar();
+
                 return;
+            }
+
+            // =========================
+            // GARANTE SELEÇÃO
+            // =========================
 
             if (!SelectionService
                     .Selecionados
@@ -45,9 +77,14 @@ namespace Araci.Applications.Editar.Mover
                 SelectionService.Selecionar(vm);
             }
 
+            // =========================
+            // INICIA MOVIMENTO
+            // =========================
+
             _movendo = true;
 
             _ultimoPonto = position;
+
             _pontoInicial = position;
 
             MoveService.BeginMove(
@@ -55,13 +92,14 @@ namespace Araci.Applications.Editar.Mover
                     .Selecionados
                     .ToList());
 
-            var hud = AppServices.MoveHud;
+            // =========================
+            // HUD
+            // =========================
+
+            var hud =
+                AppServices.MoveHud;
 
             hud.Reset();
-
-            // =========================
-            // ATUALIZA HUD IMEDIATAMENTE
-            // =========================
 
             var bounds =
                 CalcularBoundsSelecionados();
@@ -71,13 +109,22 @@ namespace Araci.Applications.Editar.Mover
             hud.Visivel = true;
         }
 
-        public void OnMouseMove(Point position)
+        // =========================
+        // MOUSE MOVE
+        // =========================
+
+        public void OnMouseMove(
+            Point position)
         {
             if (!_movendo)
                 return;
 
             Vector delta =
                 position - _ultimoPonto;
+
+            // =========================
+            // MOVE ELEMENTOS
+            // =========================
 
             foreach (var item in
                 SelectionService.Selecionados)
@@ -87,13 +134,25 @@ namespace Araci.Applications.Editar.Mover
                     delta);
             }
 
+            // =========================
+            // DELTA TOTAL
+            // =========================
+
             var deltaTotal =
                 position - _pontoInicial;
 
-            var hud = AppServices.MoveHud;
+            // =========================
+            // HUD
+            // =========================
 
-            hud.DeltaX = deltaTotal.X;
-            hud.DeltaY = deltaTotal.Y;
+            var hud =
+                AppServices.MoveHud;
+
+            hud.DeltaX =
+                deltaTotal.X;
+
+            hud.DeltaY =
+                deltaTotal.Y;
 
             var bounds =
                 CalcularBoundsSelecionados();
@@ -103,7 +162,12 @@ namespace Araci.Applications.Editar.Mover
             _ultimoPonto = position;
         }
 
-        public void OnMouseUp(Point position)
+        // =========================
+        // MOUSE UP
+        // =========================
+
+        public void OnMouseUp(
+            Point position)
         {
             if (!_movendo)
                 return;
@@ -113,16 +177,48 @@ namespace Araci.Applications.Editar.Mover
                     .Selecionados
                     .ToList());
 
-            AppServices.MoveHud.Visivel = false;
-            AppServices.MoveHud.Reset();
+            AppServices.MoveHud
+                .Visivel = false;
+
+            AppServices.MoveHud
+                .Reset();
 
             _movendo = false;
         }
 
+        // =========================
+        // KEYBOARD
+        // =========================
+
+        public void OnKeyDown(
+            Key key)
+        {
+        }
+
+        // =========================
+        // CANCELAR
+        // =========================
+
+        private void CancelarMovimento()
+        {
+            _movendo = false;
+
+            AppServices.MoveHud
+                .Visivel = false;
+
+            AppServices.MoveHud
+                .Reset();
+        }
+
+        // =========================
+        // BOUNDS
+        // =========================
+
         private Rect CalcularBoundsSelecionados()
         {
             var items =
-                SelectionService.Selecionados;
+                SelectionService
+                    .Selecionados;
 
             if (items.Count == 0)
                 return Rect.Empty;
@@ -144,10 +240,6 @@ namespace Araci.Applications.Editar.Mover
                 minY,
                 maxX - minX,
                 maxY - minY);
-        }
-
-        public void OnKeyDown(Key key)
-        {
         }
     }
 }
