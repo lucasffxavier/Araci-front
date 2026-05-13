@@ -28,12 +28,18 @@ namespace Araci.ViewModels
                 modelo.PosicaoX,
                 modelo.PosicaoY);
 
-            VisualState = new ElementoVisualState();
+            VisualState =
+                new ElementoVisualState();
 
-            Geometry = new ElementoGeometryState();
+            Geometry =
+                new ElementoGeometryState();
         }
 
         public Elemento Modelo => _modelo;
+
+        // =========================
+        // VISUAL STATE CENTRALIZADO
+        // =========================
 
         public bool IsSelecionado
         {
@@ -45,11 +51,14 @@ namespace Araci.ViewModels
                     return;
 
                 VisualState.IsSelecionado = value;
-                _modelo.Selecionado = value;
 
                 OnPropertyChanged();
             }
         }
+
+        // =========================
+        // POSIÇÃO
+        // =========================
 
         public virtual double X
         {
@@ -64,6 +73,7 @@ namespace Araci.ViewModels
                     return;
 
                 Transform.X = valorLimitado;
+
                 _modelo.PosicaoX = valorLimitado;
 
                 AtualizarGeometria();
@@ -83,11 +93,16 @@ namespace Araci.ViewModels
                     return;
 
                 Transform.Y = valorLimitado;
+
                 _modelo.PosicaoY = valorLimitado;
 
                 AtualizarGeometria();
             }
         }
+
+        // =========================
+        // GEOMETRIA
+        // =========================
 
         public virtual double Largura => 70;
 
@@ -109,11 +124,17 @@ namespace Araci.ViewModels
         {
             OnPropertyChanged(nameof(X));
             OnPropertyChanged(nameof(Y));
+
             OnPropertyChanged(nameof(Largura));
             OnPropertyChanged(nameof(Altura));
+
             OnPropertyChanged(nameof(Bounds));
             OnPropertyChanged(nameof(Centro));
         }
+
+        // =========================
+        // MOVIMENTO
+        // =========================
 
         public virtual void Mover(
             Vector delta)
@@ -121,6 +142,10 @@ namespace Araci.ViewModels
             X += delta.X;
             Y += delta.Y;
         }
+
+        // =========================
+        // LIMITES VIEWPORT
+        // =========================
 
         private double LimitarX(
             double valor)
@@ -153,6 +178,10 @@ namespace Araci.ViewModels
                 0,
                 Math.Min(valor, max));
         }
+
+        // =========================
+        // SNAPSHOT
+        // =========================
 
         public virtual ElementoEstado CapturarEstado()
         {

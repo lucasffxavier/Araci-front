@@ -1,6 +1,4 @@
-﻿using System.Collections.ObjectModel;
-using System.ComponentModel;
-using System.Linq;
+﻿using System.ComponentModel;
 using System.Runtime.CompilerServices;
 
 using Araci.ViewModels;
@@ -10,19 +8,6 @@ namespace Araci.Services
     public class EditorState
         : INotifyPropertyChanged
     {
-        // =========================
-        // SELEÇÃO
-        // =========================
-
-        public ObservableCollection<ElementoViewModel>
-            ElementosSelecionados
-        { get; }
-            = new();
-
-        // =========================
-        // ELEMENTO PRINCIPAL
-        // =========================
-
         private ElementoViewModel?
             _elementoSelecionado;
 
@@ -42,32 +27,8 @@ namespace Araci.Services
             }
         }
 
-        // =========================
-        // CONTAGEM
-        // =========================
-
-        public int QuantidadeSelecionados =>
-            ElementosSelecionados.Count;
-
-        // =========================
-        // HELPERS
-        // =========================
-
-        public bool PossuiSelecao =>
-            ElementosSelecionados.Any();
-
-        // =========================
-        // PROPERTY CHANGED
-        // =========================
-
         public event PropertyChangedEventHandler?
             PropertyChanged;
-
-        public void NotifySelecaoAlterada()
-        {
-            OnPropertyChanged(nameof(QuantidadeSelecionados));
-            OnPropertyChanged(nameof(PossuiSelecao));
-        }
 
         private void OnPropertyChanged(
             [CallerMemberName]

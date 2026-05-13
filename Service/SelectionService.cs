@@ -7,13 +7,26 @@ namespace Araci.Services
 {
     public static class SelectionService
     {
+        // =========================
+        // SELECIONADOS
+        // =========================
+
         public static ObservableCollection<ElementoViewModel>
             Selecionados
         { get; }
             = new();
 
-        public static ElementoViewModel? Principal =>
-            Selecionados.FirstOrDefault();
+        // =========================
+        // PRINCIPAL
+        // =========================
+
+        public static ElementoViewModel?
+            Principal =>
+                Selecionados.FirstOrDefault();
+
+        // =========================
+        // SELECIONAR
+        // =========================
 
         public static void Selecionar(
             ElementoViewModel vm,
@@ -31,12 +44,16 @@ namespace Araci.Services
                 return;
 
             vm.IsSelecionado = true;
-            vm.Modelo.Selecionado = true;
 
             Selecionados.Add(vm);
 
-            AppServices.Editor.ElementoSelecionado = vm;
+            AppServices.Editor
+                .ElementoSelecionado = vm;
         }
+
+        // =========================
+        // DESELECIONAR
+        // =========================
 
         public static void Deselecionar(
             ElementoViewModel vm)
@@ -48,13 +65,17 @@ namespace Araci.Services
                 return;
 
             vm.IsSelecionado = false;
-            vm.Modelo.Selecionado = false;
 
             Selecionados.Remove(vm);
 
-            AppServices.Editor.ElementoSelecionado =
-                Principal;
+            AppServices.Editor
+                .ElementoSelecionado =
+                    Principal;
         }
+
+        // =========================
+        // TOGGLE
+        // =========================
 
         public static void Toggle(
             ElementoViewModel vm)
@@ -69,17 +90,22 @@ namespace Araci.Services
             }
         }
 
+        // =========================
+        // LIMPAR
+        // =========================
+
         public static void Limpar()
         {
-            foreach (var item in Selecionados.ToList())
+            foreach (var item in
+                     Selecionados.ToList())
             {
                 item.IsSelecionado = false;
-                item.Modelo.Selecionado = false;
             }
 
             Selecionados.Clear();
 
-            AppServices.Editor.ElementoSelecionado = null;
+            AppServices.Editor
+                .ElementoSelecionado = null;
         }
     }
 }

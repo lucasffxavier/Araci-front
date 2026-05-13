@@ -1,4 +1,6 @@
-﻿namespace Araci.Models
+﻿using System;
+
+namespace Araci.Models
 {
     public abstract class Elemento
     {
@@ -14,26 +16,29 @@
         // IDENTIFICAÇÃO
         // =========================
 
-        public string Nome { get; set; } = string.Empty;
+        public string Nome { get; set; }
+            = string.Empty;
 
-        public Guid Id { get; set; } = Guid.NewGuid();
+        public Guid Id { get; set; }
+            = Guid.NewGuid();
 
         // =========================
-        // VISUAL
+        // TRANSFORMAÇÃO PERSISTENTE
         // =========================
 
-        public bool Selecionado { get; set; }
+        public double Rotacao { get; set; }
 
-        public double Rotacao { get; set; } = 0;
-
-        public double Escala { get; set; } = 1;
+        public double Escala { get; set; }
+            = 1;
 
         // =========================
         // BIM
         // =========================
 
-        public string Familia { get; set; } = string.Empty;
+        public string Familia { get; set; }
+            = string.Empty;
 
-        public string Categoria { get; set; } = string.Empty;
+        public string Categoria { get; set; }
+            = string.Empty;
     }
 }
