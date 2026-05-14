@@ -15,16 +15,19 @@ namespace Araci.ViewModels.Base
                 new PropertyChangedEventArgs(propertyName));
         }
 
-        protected void Set<T>(
+        protected bool Set<T>(
             ref T field,
             T value,
             [CallerMemberName] string? propertyName = null)
         {
-            if (!Equals(field, value))
-            {
-                field = value;
-                OnPropertyChanged(propertyName);
-            }
+            if (Equals(field, value))
+                return false;
+
+            field = value;
+
+            OnPropertyChanged(propertyName);
+
+            return true;
         }
     }
 }

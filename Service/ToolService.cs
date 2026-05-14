@@ -1,5 +1,4 @@
 ﻿using System;
-using System.Linq;
 using System.Windows;
 using System.Windows.Input;
 
@@ -9,6 +8,7 @@ using Araci.ViewModels;
 
 namespace Araci.Services
 {
+
     public class ToolService
     {
         // =========================
@@ -24,16 +24,6 @@ namespace Araci.Services
 
         private ITool
             _ferramentaAtual;
-
-        // =========================
-        // DRAG GLOBAL
-        // =========================
-
-        private bool
-            _movendoElementos;
-
-        private Point
-            _ultimaPosicaoMouse;
 
         // =========================
         // CONSTRUTOR
@@ -116,31 +106,6 @@ namespace Araci.Services
             ElementoViewModel? vm,
             Point pos)
         {
-            _ultimaPosicaoMouse = pos;
-
-            // =========================
-            // DRAG GLOBAL APENAS
-            // PARA FERRAMENTA SELECIONAR
-            // =========================
-
-            if (_ferramentaAtual is SelecionarTool)
-            {
-                bool clicouElementoSelecionado =
-                    vm != null &&
-                    SelectionService
-                        .Selecionados
-                        .Contains(vm);
-
-                if (clicouElementoSelecionado)
-                {
-                    _movendoElementos = true;
-                }
-            }
-
-            // =========================
-            // DISPATCH TOOL
-            // =========================
-
             _ferramentaAtual
                 .OnMouseDown(vm, pos);
         }
@@ -152,38 +117,6 @@ namespace Araci.Services
         public void HandleMouseMove(
             Point pos)
         {
-            // =========================
-            // MOVIMENTO GLOBAL
-            // SOMENTE SELEÇÃO
-            // =========================
-
-            if (_movendoElementos &&
-                _ferramentaAtual is SelecionarTool)
-            {
-                Vector delta =
-                    pos - _ultimaPosicaoMouse;
-
-                if (delta.X != 0 ||
-                    delta.Y != 0)
-                {
-                    foreach (var item in
-                        SelectionService
-                            .Selecionados
-                            .ToList())
-                    {
-                        MoveService.MoverVisual(
-                            item,
-                            delta);
-                    }
-                }
-
-                _ultimaPosicaoMouse = pos;
-            }
-
-            // =========================
-            // DISPATCH TOOL
-            // =========================
-
             _ferramentaAtual
                 .OnMouseMove(pos);
         }
@@ -195,25 +128,6 @@ namespace Araci.Services
         public void HandleMouseUp(
             Point pos)
         {
-            // =========================
-            // FINALIZA DRAG GLOBAL
-            // =========================
-
-            if (_movendoElementos &&
-                _ferramentaAtual is SelecionarTool)
-            {
-                MoveService.EndMove(
-                    SelectionService
-                        .Selecionados
-                        .ToList());
-            }
-
-            _movendoElementos = false;
-
-            // =========================
-            // DISPATCH TOOL
-            // =========================
-
             _ferramentaAtual
                 .OnMouseUp(pos);
         }

@@ -22,25 +22,49 @@ namespace Araci.ViewModels
         public double X
         {
             get => _x;
-            set => Set(ref _x, value);
+            set
+            {
+                if (Set(ref _x, value))
+                {
+                    OnPropertyChanged(nameof(Bounds));
+                }
+            }
         }
 
         public double Y
         {
             get => _y;
-            set => Set(ref _y, value);
+            set
+            {
+                if (Set(ref _y, value))
+                {
+                    OnPropertyChanged(nameof(Bounds));
+                }
+            }
         }
 
         public double Largura
         {
             get => _largura;
-            set => Set(ref _largura, value);
+            set
+            {
+                if (Set(ref _largura, value))
+                {
+                    OnPropertyChanged(nameof(Bounds));
+                }
+            }
         }
 
         public double Altura
         {
             get => _altura;
-            set => Set(ref _altura, value);
+            set
+            {
+                if (Set(ref _altura, value))
+                {
+                    OnPropertyChanged(nameof(Bounds));
+                }
+            }
         }
 
         public Rect Bounds =>

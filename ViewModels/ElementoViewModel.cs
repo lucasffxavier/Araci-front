@@ -13,11 +13,14 @@ namespace Araci.ViewModels
     {
         protected readonly Elemento _modelo;
 
-        public ElementoTransform Transform { get; }
+        public ElementoTransform Transform
+        { get; }
 
-        public ElementoVisualState VisualState { get; }
+        public ElementoVisualState VisualState
+        { get; }
 
-        public ElementoGeometryState Geometry { get; }
+        public ElementoGeometryState Geometry
+        { get; }
 
         protected ElementoViewModel(
             Elemento modelo)
@@ -35,16 +38,10 @@ namespace Araci.ViewModels
 
             Geometry =
                 new ElementoGeometryState();
-
-            // IMPORTANTE:
-            // NÃO chamar AtualizarGeometria()
-            // aqui.
-            //
-            // Classes derivadas ainda
-            // não foram inicializadas.
         }
 
-        public Elemento Modelo => _modelo;
+        public Elemento Modelo =>
+            _modelo;
 
         // =========================
         // VISUAL
@@ -62,7 +59,9 @@ namespace Araci.ViewModels
                 VisualState.AtualizarSelecao(value);
 
                 OnPropertyChanged();
+
                 OnPropertyChanged(nameof(Stroke));
+
                 OnPropertyChanged(nameof(StrokeThickness));
             }
         }
@@ -89,9 +88,11 @@ namespace Araci.ViewModels
                 if (Transform.X == valorLimitado)
                     return;
 
-                Transform.X = valorLimitado;
+                Transform.X =
+                    valorLimitado;
 
-                _modelo.PosicaoX = valorLimitado;
+                _modelo.PosicaoX =
+                    valorLimitado;
 
                 AtualizarGeometria();
             }
@@ -109,9 +110,11 @@ namespace Araci.ViewModels
                 if (Transform.Y == valorLimitado)
                     return;
 
-                Transform.Y = valorLimitado;
+                Transform.Y =
+                    valorLimitado;
 
-                _modelo.PosicaoY = valorLimitado;
+                _modelo.PosicaoY =
+                    valorLimitado;
 
                 AtualizarGeometria();
             }
@@ -121,9 +124,11 @@ namespace Araci.ViewModels
         // GEOMETRIA
         // =========================
 
-        protected virtual double LarguraBase => 70;
+        protected virtual double LarguraBase =>
+            70;
 
-        protected virtual double AlturaBase => 70;
+        protected virtual double AlturaBase =>
+            70;
 
         public virtual double Largura =>
             Geometry.Largura;
@@ -139,7 +144,7 @@ namespace Araci.ViewModels
 
         protected virtual void AtualizarGeometria()
         {
-            Geometry.Atualizar(
+            Geometry.AtualizarRetangulo(
                 X,
                 Y,
                 LarguraBase,
@@ -151,10 +156,15 @@ namespace Araci.ViewModels
         protected void NotificarGeometria()
         {
             OnPropertyChanged(nameof(X));
+
             OnPropertyChanged(nameof(Y));
+
             OnPropertyChanged(nameof(Largura));
+
             OnPropertyChanged(nameof(Altura));
+
             OnPropertyChanged(nameof(Bounds));
+
             OnPropertyChanged(nameof(Centro));
         }
 
@@ -166,11 +176,12 @@ namespace Araci.ViewModels
             Vector delta)
         {
             X += delta.X;
+
             Y += delta.Y;
         }
 
         // =========================
-        // LIMITES
+        // LIMITES VIEWPORT
         // =========================
 
         private double LimitarX(
@@ -209,7 +220,8 @@ namespace Araci.ViewModels
         // SNAPSHOT
         // =========================
 
-        public virtual ElementoEstado CapturarEstado()
+        public virtual ElementoEstado
+            CapturarEstado()
         {
             return new ElementoEstado(
                 X,
@@ -219,11 +231,17 @@ namespace Araci.ViewModels
         public virtual void AplicarEstado(
             ElementoEstado estado)
         {
-            Transform.X = estado.X;
-            Transform.Y = estado.Y;
+            Transform.X =
+                estado.X;
 
-            _modelo.PosicaoX = estado.X;
-            _modelo.PosicaoY = estado.Y;
+            Transform.Y =
+                estado.Y;
+
+            _modelo.PosicaoX =
+                estado.X;
+
+            _modelo.PosicaoY =
+                estado.Y;
 
             AtualizarGeometria();
         }

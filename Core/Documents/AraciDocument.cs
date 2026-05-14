@@ -4,14 +4,7 @@ using Araci.ViewModels;
 
 namespace Araci.Core.Documents
 {
-    /// <summary>
-    /// Documento central da aplicação.
-    /// Futuramente:
-    /// - undo/redo
-    /// - save/load
-    /// - transactions
-    /// - múltiplas views
-    /// </summary>
+
     public class AraciDocument
     {
         // =========================
