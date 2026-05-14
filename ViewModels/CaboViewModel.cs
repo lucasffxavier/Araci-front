@@ -175,33 +175,112 @@ namespace Araci.ViewModels
         }
 
         // =========================
-        // MOVIMENTO
+        // MOVIMENTO COM LIMITE
         // =========================
 
         public override void Mover(
             Vector delta)
         {
+            double novoX1 =
+                X + delta.X;
+
+            double novoY1 =
+                Y + delta.Y;
+
+            double novoX2 =
+                X2 + delta.X;
+
+            double novoY2 =
+                Y2 + delta.Y;
+
             // =========================
-            // MOVE PONTO INICIAL
+            // LIMITES VIEWPORT
             // =========================
 
-            Transform.Mover(delta);
+            if (AppServices.Viewport != null)
+            {
+                double larguraViewport =
+                    AppServices.Viewport.Largura;
+
+                double alturaViewport =
+                    AppServices.Viewport.Altura;
+
+                double minX =
+                    Math.Min(novoX1, novoX2);
+
+                double maxX =
+                    Math.Max(novoX1, novoX2);
+
+                double minY =
+                    Math.Min(novoY1, novoY2);
+
+                double maxY =
+                    Math.Max(novoY1, novoY2);
+
+                // =========================
+                // AJUSTE HORIZONTAL
+                // =========================
+
+                if (minX < 0)
+                {
+                    double ajuste = -minX;
+
+                    novoX1 += ajuste;
+                    novoX2 += ajuste;
+                }
+
+                if (maxX > larguraViewport)
+                {
+                    double ajuste =
+                        maxX - larguraViewport;
+
+                    novoX1 -= ajuste;
+                    novoX2 -= ajuste;
+                }
+
+                // =========================
+                // AJUSTE VERTICAL
+                // =========================
+
+                if (minY < 0)
+                {
+                    double ajuste = -minY;
+
+                    novoY1 += ajuste;
+                    novoY2 += ajuste;
+                }
+
+                if (maxY > alturaViewport)
+                {
+                    double ajuste =
+                        maxY - alturaViewport;
+
+                    novoY1 -= ajuste;
+                    novoY2 -= ajuste;
+                }
+            }
+
+            // =========================
+            // APLICA POSIÇÕES
+            // =========================
+
+            Transform.X =
+                novoX1;
+
+            Transform.Y =
+                novoY1;
 
             _modelo.PosicaoX =
-                Transform.X;
+                novoX1;
 
             _modelo.PosicaoY =
-                Transform.Y;
+                novoY1;
 
-            // =========================
-            // MOVE PONTO FINAL
-            // =========================
+            _cabo.PosicaoX2 =
+                novoX2;
 
-            _cabo.PosicaoX2 +=
-                delta.X;
-
-            _cabo.PosicaoY2 +=
-                delta.Y;
+            _cabo.PosicaoY2 =
+                novoY2;
 
             AtualizarGeometria();
         }
@@ -227,10 +306,6 @@ namespace Araci.ViewModels
         public override void AplicarEstado(
             ElementoEstado estado)
         {
-            // =========================
-            // PONTO INICIAL
-            // =========================
-
             Transform.X =
                 estado.X;
 
@@ -242,10 +317,6 @@ namespace Araci.ViewModels
 
             _modelo.PosicaoY =
                 estado.Y;
-
-            // =========================
-            // PONTO FINAL
-            // =========================
 
             if (estado.PossuiSegundoPonto)
             {
