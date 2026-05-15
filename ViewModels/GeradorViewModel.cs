@@ -115,5 +115,21 @@ namespace Araci.ViewModels
                 OnPropertyChanged();
             }
         }
+
+        protected override string ValidateProperty(
+            string propertyName)
+        {
+            return propertyName switch
+            {
+                nameof(PotenciaAtivaKW) when PotenciaAtivaKW < 0 =>
+                    "Potencia ativa deve ser maior ou igual a zero.",
+
+                nameof(FatorPotencia) when FatorPotencia < 0 ||
+                                          FatorPotencia > 1 =>
+                    "Fator de potencia deve estar entre 0 e 1.",
+
+                _ => string.Empty
+            };
+        }
     }
 }

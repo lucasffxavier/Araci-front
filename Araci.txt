@@ -14,13 +14,8 @@ Araci Engine
 │   │   ├── AddElementoCommand.cs
 │   │   ├── CommandManager.cs
 │   │   ├── CompositeCommand.cs
-│   │   ├── DeleteCommand.cs
 │   │   ├── DeleteElementCommand.cs
-│   │   ├── ICommandHandler.cs
 │   │   ├── IUndoableCommand.cs
-│   │   ├── MoveCommand.cs
-│   │   ├── MoveElementCommand.cs
-│   │   ├── SelectCommand.cs
 │   │   └── TransactionScope.cs
 │   ├── Diagrama
 │   │   ├── InserirCabo
@@ -105,10 +100,12 @@ Araci Engine
 │   │   └── selecionar.png
 │   ├── Styles
 │   │   ├── MenuStyles.xaml
+│   │   ├── PropertyStyles.xaml
 │   │   ├── RibbonStyles.xaml
 │   │   └── Styles.xaml
 │   └── Templates
-│       └── DataTemplates.xaml
+│       ├── DataTemplates.xaml
+│       └── TypePropertiesTemplates.xaml
 ├── Ribbon
 │   ├── Tabs
 │   │   ├── AnaliseTab.xaml
@@ -129,6 +126,7 @@ Araci Engine
 │   ├── AppServices.cs
 │   ├── ClipboardService.cs
 │   ├── DragService.cs
+│   ├── EditorContext.cs
 │   ├── EditorState.cs
 │   ├── ElementoFactory.cs
 │   ├── MoveHudService.cs
@@ -140,6 +138,7 @@ Araci Engine
 │   └── ViewportService.cs
 ├── ViewModels
 │   ├── Base
+│   │   ├── RelayCommand.cs
 │   │   └── ViewModelBase.cs
 │   ├── VisualStates
 │   │   ├── ElementoGeometryState.cs
@@ -189,7 +188,11 @@ ARQUIVO: C:\Araci-Engine-Front\Araci Engine\App.xaml
 
                 <ResourceDictionary Source="Resources/Styles/Styles.xaml"/>
 
+                <ResourceDictionary Source="Resources/Styles/PropertyStyles.xaml"/>
+
                 <ResourceDictionary Source="Resources/Templates/DataTemplates.xaml"/>
+
+                <ResourceDictionary Source="Resources/Templates/TypePropertiesTemplates.xaml"/>
 
             </ResourceDictionary.MergedDictionaries>
         </ResourceDictionary>
@@ -198,21 +201,30 @@ ARQUIVO: C:\Araci-Engine-Front\Araci Engine\App.xaml
 </Application>
 
 
+
 ====================================================================================================
 ARQUIVO: C:\Araci-Engine-Front\Araci Engine\App.xaml.cs
 ====================================================================================================
 
-﻿using System;
-using System.Collections.Generic;
-using System.IO;
-using System.Linq;
+using System.Globalization;
 using System.Windows;
-using System.Windows.Controls;
+using System.Windows.Markup;
 
 namespace Araci;
 
 public partial class App : Application
 {
+    protected override void OnStartup(
+        StartupEventArgs e)
+    {
+        FrameworkElement.LanguageProperty.OverrideMetadata(
+            typeof(FrameworkElement),
+            new FrameworkPropertyMetadata(
+                XmlLanguage.GetLanguage(
+                    CultureInfo.CurrentCulture.IetfLanguageTag)));
+
+        base.OnStartup(e);
+    }
 }
 
 
@@ -251,8 +263,16 @@ namespace Araci.Core.Commands
 
         public void Execute()
         {
+            if (AppServices.Viewport != null)
+            {
+                AppServices.Viewport
+                    .AdicionarElemento(_elemento);
+
+                return;
+            }
+
             AppServices.Document
-                .AdicionarElemento(_elemento);
+                .AdicionarElemento(_elemento.Modelo);
         }
 
         // =========================
@@ -261,8 +281,16 @@ namespace Araci.Core.Commands
 
         public void Undo()
         {
+            if (AppServices.Viewport != null)
+            {
+                AppServices.Viewport
+                    .RemoverElemento(_elemento);
+
+                return;
+            }
+
             AppServices.Document
-                .RemoverElemento(_elemento);
+                .RemoverElemento(_elemento.Modelo);
         }
 
         // =========================
@@ -275,6 +303,7 @@ namespace Araci.Core.Commands
         }
     }
 }
+
 
 
 ====================================================================================================
@@ -415,27 +444,6 @@ namespace Araci.Core.Commands
 
 
 ====================================================================================================
-ARQUIVO: C:\Araci-Engine-Front\Araci Engine\Applications\Commands\DeleteCommand.cs
-====================================================================================================
-
-﻿using Araci.Services;
-using Araci.ViewModels;
-using System.Windows;
-
-namespace Araci.Applications.Commands
-{
-    public class DeleteCommand : ICommandHandler
-    {
-        public void Execute(ElementoViewModel vm, Vector? delta = null)
-        {
-            AppServices.Viewport?.RemoverElemento(vm);
-            SelectionService.Limpar();
-        }
-    }
-}
-
-
-====================================================================================================
 ARQUIVO: C:\Araci-Engine-Front\Araci Engine\Applications\Commands\DeleteElementCommand.cs
 ====================================================================================================
 
@@ -470,8 +478,16 @@ namespace Araci.Core.Commands
 
         public void Execute()
         {
-            AppServices.Document
-                .RemoverElemento(_vm);
+            if (AppServices.Viewport != null)
+            {
+                AppServices.Viewport
+                    .RemoverElemento(_vm);
+            }
+            else
+            {
+                AppServices.Document
+                    .RemoverElemento(_vm.Modelo);
+            }
 
             SelectionService
                 .Deselecionar(_vm);
@@ -483,8 +499,16 @@ namespace Araci.Core.Commands
 
         public void Undo()
         {
+            if (AppServices.Viewport != null)
+            {
+                AppServices.Viewport
+                    .AdicionarElemento(_vm);
+
+                return;
+            }
+
             AppServices.Document
-                .AdicionarElemento(_vm);
+                .AdicionarElemento(_vm.Modelo);
         }
 
         // =========================
@@ -498,21 +522,6 @@ namespace Araci.Core.Commands
     }
 }
 
-
-====================================================================================================
-ARQUIVO: C:\Araci-Engine-Front\Araci Engine\Applications\Commands\ICommandHandler.cs
-====================================================================================================
-
-﻿using Araci.ViewModels;
-using System.Windows;
-
-namespace Araci.Applications.Commands
-{
-    public interface ICommandHandler
-    {
-        void Execute(ElementoViewModel vm, Vector? delta = null);
-    }
-}
 
 
 ====================================================================================================
@@ -528,70 +537,6 @@ ARQUIVO: C:\Araci-Engine-Front\Araci Engine\Applications\Commands\IUndoableComma
         void Undo();
 
         void Redo();
-    }
-}
-
-
-====================================================================================================
-ARQUIVO: C:\Araci-Engine-Front\Araci Engine\Applications\Commands\MoveCommand.cs
-====================================================================================================
-
-﻿using Araci.ViewModels;
-using System.Windows;
-
-namespace Araci.Applications.Commands
-{
-    public class MoveCommand : ICommandHandler
-    {
-        public void Execute(
-            ElementoViewModel vm,
-            Vector? delta = null)
-        {
-            if (delta == null)
-                return;
-
-            vm.Mover(delta.Value);
-        }
-    }
-}
-
-
-====================================================================================================
-ARQUIVO: C:\Araci-Engine-Front\Araci Engine\Applications\Commands\MoveElementCommand.cs
-====================================================================================================
-
-﻿namespace Araci.Core.Commands
-{
-    // =========================
-    // OBSOLETO
-    // =========================
-    // Substituído por MoveElementoCommand.
-    // Remover futuramente do projeto.
-    // =========================
-
-    [System.Obsolete]
-    public class MoveElementCommand
-    {
-    }
-}
-
-
-====================================================================================================
-ARQUIVO: C:\Araci-Engine-Front\Araci Engine\Applications\Commands\SelectCommand.cs
-====================================================================================================
-
-﻿using Araci.Services;
-using Araci.ViewModels;
-using System.Windows;
-
-namespace Araci.Applications.Commands
-{
-    public class SelectCommand : ICommandHandler
-    {
-        public void Execute(ElementoViewModel vm, Vector? delta = null)
-        {
-            SelectionService.Selecionar(vm);
-        }
     }
 }
 
@@ -672,65 +617,40 @@ namespace Araci.Core.Transactions
 ARQUIVO: C:\Araci-Engine-Front\Araci Engine\Applications\Diagrama\InserirCabo\InserirCabo.cs
 ====================================================================================================
 
-﻿using Araci.Services;
+using Araci.Core.Commands;
+using Araci.Services;
 using Araci.ViewModels;
 
 namespace Araci.Applications.Diagrama.InserirCabo
 {
     public class InserirCaboApplication
     {
-        private readonly ViewportService
-            _viewportService;
-
-        public InserirCaboApplication(
-            ViewportService viewportService)
-        {
-            _viewportService =
-                viewportService;
-        }
-
         public void Executar()
         {
             CaboViewModel vm =
                 ElementoFactory
                     .CriarCaboVM();
 
-            _viewportService
-                .AdicionarElemento(vm);
+            AppServices.Commands.Execute(
+                new AddElementoCommand(vm));
         }
     }
 }
+
 
 
 ====================================================================================================
 ARQUIVO: C:\Araci-Engine-Front\Araci Engine\Applications\Diagrama\InserirCarga\InserirCarga.cs
 ====================================================================================================
 
-﻿using Araci.Services;
+using Araci.Core.Commands;
+using Araci.Services;
 using Araci.ViewModels;
 
 namespace Araci.Applications.Diagrama.InserirCarga
 {
     public class InserirCargaApplication
     {
-        // =========================
-        // SERVIÇO
-        // =========================
-
-        private readonly ViewportService
-            _viewportService;
-
-        // =========================
-        // CONSTRUTOR
-        // =========================
-
-        public InserirCargaApplication(
-            ViewportService viewportService)
-        {
-            _viewportService =
-                viewportService;
-        }
-
         // =========================
         // EXECUTAR
         // =========================
@@ -739,44 +659,28 @@ namespace Araci.Applications.Diagrama.InserirCarga
         {
             CargaViewModel vm =
                 ElementoFactory
-                .CriarCargaVM();
+                    .CriarCargaVM();
 
-            _viewportService
-                .AdicionarElemento(vm);
+            AppServices.Commands.Execute(
+                new AddElementoCommand(vm));
         }
     }
 }
+
 
 
 ====================================================================================================
 ARQUIVO: C:\Araci-Engine-Front\Araci Engine\Applications\Diagrama\InserirGerador\InserirGerador.cs
 ====================================================================================================
 
-﻿using Araci.Services;
+using Araci.Core.Commands;
+using Araci.Services;
 using Araci.ViewModels;
 
 namespace Araci.Applications.Diagrama.InserirGerador
 {
     public class InserirGeradorApplication
     {
-        // =========================
-        // SERVIÇO
-        // =========================
-
-        private readonly ViewportService
-            _viewportService;
-
-        // =========================
-        // CONSTRUTOR
-        // =========================
-
-        public InserirGeradorApplication(
-            ViewportService viewportService)
-        {
-            _viewportService =
-                viewportService;
-        }
-
         // =========================
         // EXECUTAR
         // =========================
@@ -785,13 +689,14 @@ namespace Araci.Applications.Diagrama.InserirGerador
         {
             GeradorViewModel vm =
                 ElementoFactory
-                .CriarGeradorVM();
+                    .CriarGeradorVM();
 
-            _viewportService
-                .AdicionarElemento(vm);
+            AppServices.Commands.Execute(
+                new AddElementoCommand(vm));
         }
     }
 }
+
 
 
 ====================================================================================================
@@ -1223,11 +1128,14 @@ namespace Araci.Applications.Editar.Selecionar
             {
                 var rect = AppServices.SelectionBox.Bounds;
 
-                foreach (var item in AppServices.Document.Elementos)
+                if (AppServices.Viewport != null)
                 {
-                    if (rect.IntersectsWith(item.Bounds))
+                    foreach (var item in AppServices.Viewport.Elementos)
                     {
-                        SelectionService.Selecionar(item, true);
+                        if (rect.IntersectsWith(item.Bounds))
+                        {
+                            SelectionService.Selecionar(item, true);
+                        }
                     }
                 }
 
@@ -1270,6 +1178,7 @@ namespace Araci.Applications.Editar.Selecionar
         }
     }
 }
+
 
 
 ====================================================================================================
@@ -1673,9 +1582,9 @@ namespace Araci.Core.Commands
 ARQUIVO: C:\Araci-Engine-Front\Araci Engine\Core\Documents\AraciDocument.cs
 ====================================================================================================
 
-﻿using System.Collections.ObjectModel;
+using System.Collections.ObjectModel;
 
-using Araci.ViewModels;
+using Araci.Models;
 
 namespace Araci.Core.Documents
 {
@@ -1686,7 +1595,7 @@ namespace Araci.Core.Documents
         // ELEMENTOS DO DOCUMENTO
         // =========================
 
-        public ObservableCollection<ElementoViewModel>
+        public ObservableCollection<Elemento>
             Elementos
         { get; }
 
@@ -1697,8 +1606,7 @@ namespace Araci.Core.Documents
         public AraciDocument()
         {
             Elementos =
-                new ObservableCollection<
-                    ElementoViewModel>();
+                new ObservableCollection<Elemento>();
         }
 
         // =========================
@@ -1706,7 +1614,7 @@ namespace Araci.Core.Documents
         // =========================
 
         public void AdicionarElemento(
-            ElementoViewModel elemento)
+            Elemento elemento)
         {
             if (!Elementos.Contains(elemento))
             {
@@ -1715,7 +1623,7 @@ namespace Araci.Core.Documents
         }
 
         public void RemoverElemento(
-            ElementoViewModel elemento)
+            Elemento elemento)
         {
             Elementos.Remove(elemento);
         }
@@ -1726,6 +1634,7 @@ namespace Araci.Core.Documents
         }
     }
 }
+
 
 
 ====================================================================================================
@@ -1876,8 +1785,6 @@ namespace Araci.Models
 
             PosicaoX2 = 400;
             PosicaoY2 = 100;
-
-            Tipo = new TipoCabo();
         }
 
         // =========================
@@ -1902,6 +1809,7 @@ namespace Araci.Models
         }
     }
 }
+
 
 
 ====================================================================================================
@@ -1950,8 +1858,6 @@ namespace Araci.Models
 
             PosicaoX = 500;
             PosicaoY = 250;
-
-            Tipo = new TipoCarga();
         }
 
         // =========================
@@ -1974,6 +1880,7 @@ namespace Araci.Models
         }
     }
 }
+
 
 
 ====================================================================================================
@@ -2093,8 +2000,6 @@ namespace Araci.Models
 
             PosicaoX = 300;
             PosicaoY = 200;
-
-            Tipo = new TipoGerador();
         }
 
         // =========================
@@ -2117,6 +2022,7 @@ namespace Araci.Models
         }
     }
 }
+
 
 
 ====================================================================================================
@@ -2307,70 +2213,99 @@ ARQUIVO: C:\Araci-Engine-Front\Araci Engine\Models\Tipos\TipoGerador.cs
 ARQUIVO: C:\Araci-Engine-Front\Araci Engine\Properties\CaboPropertiesView.xaml
 ====================================================================================================
 
-﻿<UserControl x:Class="Araci.Properties.CaboPropertiesView"
+<UserControl x:Class="Araci.Properties.CaboPropertiesView"
              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
 
     <Grid Background="#252526">
 
-        <ScrollViewer>
+        <ScrollViewer VerticalScrollBarVisibility="Auto">
 
             <StackPanel Margin="12">
 
                 <!-- HEADER -->
 
                 <TextBlock Text="PROPRIEDADES DO CABO"
-                           FontSize="18"
-                           FontWeight="SemiBold"
-                           Foreground="White"
-                           Margin="0,0,0,20"/>
+                           Style="{StaticResource PropertyHeaderTextBlockStyle}"/>
 
-                <!-- TIPO -->
+                <Grid>
 
-                <TextBlock Text="Tipo"
-                           Foreground="#CCCCCC"/>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="110"/>
+                        <ColumnDefinition Width="*"/>
+                    </Grid.ColumnDefinitions>
 
-                <ComboBox Margin="0,4,0,12"
-                          ItemsSource="{Binding TiposDisponiveis}"
-                          SelectedItem="{Binding Tipo}"
-                          DisplayMemberPath="NomeTipo"/>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="Auto"/>
+                    </Grid.RowDefinitions>
 
-                <Button Content="Visualizar propriedades de tipo"
-                        Height="32"
-                        Margin="0,0,0,20"
-                        Command="{Binding AbrirPropriedadesTipoCommand}"/>
+                    <!-- TIPO -->
 
-                <!-- NOME -->
+                    <ComboBox Grid.ColumnSpan="2"
+                              Style="{StaticResource PropertyFullComboBoxStyle}"
+                              ItemsSource="{Binding TiposDisponiveis}"
+                              SelectedItem="{Binding Tipo}"
+                              DisplayMemberPath="NomeTipo"/>
 
-                <TextBlock Text="Nome"
-                           Foreground="#CCCCCC"/>
+                    <Button Grid.Row="1"
+                            Grid.ColumnSpan="2"
+                            Style="{StaticResource PropertyFullButtonStyle}"
+                            Content="Visualizar propriedades de tipo"
+                            Command="{Binding AbrirPropriedadesTipoCommand}"/>
 
-                <TextBox Text="{Binding Nome}"
-                         Margin="0,4,0,12"/>
+                    <!-- NOME -->
 
-                <!-- BARRA 1 -->
+                    <TextBlock Grid.Row="2"
+                               Text="Nome"
+                               Style="{StaticResource PropertyLabelTextBlockStyle}"/>
 
-                <TextBlock Text="Barra 1"
-                           Foreground="#CCCCCC"/>
+                    <TextBox Grid.Row="2"
+                             Grid.Column="1"
+                             Text="{Binding Nome}"
+                             Style="{StaticResource PropertyValueTextBoxStyle}"/>
 
-                <TextBox Text="{Binding BarraOrigem}"
-                         Margin="0,4,0,12"/>
+                    <!-- BARRA 1 -->
 
-                <!-- BARRA 2 -->
+                    <TextBlock Grid.Row="3"
+                               Text="Barra 1"
+                               Style="{StaticResource PropertyLabelTextBlockStyle}"/>
 
-                <TextBlock Text="Barra 2"
-                           Foreground="#CCCCCC"/>
+                    <TextBox Grid.Row="3"
+                             Grid.Column="1"
+                             Text="{Binding BarraOrigem}"
+                             Style="{StaticResource PropertyValueTextBoxStyle}"/>
 
-                <TextBox Text="{Binding BarraDestino}"
-                         Margin="0,4,0,12"/>
+                    <!-- BARRA 2 -->
 
-                <!-- COMPRIMENTO -->
+                    <TextBlock Grid.Row="4"
+                               Text="Barra 2"
+                               Style="{StaticResource PropertyLabelTextBlockStyle}"/>
 
-                <TextBlock Text="Comprimento"
-                           Foreground="#CCCCCC"/>
+                    <TextBox Grid.Row="4"
+                             Grid.Column="1"
+                             Text="{Binding BarraDestino}"
+                             Style="{StaticResource PropertyValueTextBoxStyle}"/>
 
-                <TextBox Text="{Binding Comprimento}"
-                         Margin="0,4,0,12"/>
+                    <!-- COMPRIMENTO -->
+
+                    <TextBlock Grid.Row="5"
+                               Text="Comprimento"
+                               Style="{StaticResource PropertyLabelTextBlockStyle}"/>
+
+                    <TextBox Grid.Row="5"
+                             Grid.Column="1"
+                             Text="{Binding Comprimento,
+                                            ValidatesOnDataErrors=True,
+                                            ValidatesOnExceptions=True,
+                                            NotifyOnValidationError=True}"
+                             Style="{StaticResource PropertyNumericTextBoxStyle}"/>
+
+                </Grid>
 
             </StackPanel>
 
@@ -2379,6 +2314,7 @@ ARQUIVO: C:\Araci-Engine-Front\Araci Engine\Properties\CaboPropertiesView.xaml
     </Grid>
 
 </UserControl>
+
 
 
 ====================================================================================================
@@ -2403,115 +2339,123 @@ namespace Araci.Properties
 ARQUIVO: C:\Araci-Engine-Front\Araci Engine\Properties\CargaPropertiesView.xaml
 ====================================================================================================
 
-﻿<UserControl x:Class="Araci.Properties.CargaPropertiesView"
+<UserControl x:Class="Araci.Properties.CargaPropertiesView"
              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
 
     <Grid Background="#252526">
 
-        <Grid.RowDefinitions>
-            <RowDefinition Height="Auto"/>
-            <RowDefinition Height="*"/>
-        </Grid.RowDefinitions>
+        <ScrollViewer VerticalScrollBarVisibility="Auto">
 
-        <!-- HEADER -->
+            <StackPanel Margin="12">
 
-        <Border Background="#2D2D30"
-                BorderBrush="#3E3E42"
-                BorderThickness="0,0,0,1"
-                Padding="12">
+                <!-- HEADER -->
 
-            <TextBlock Text="PROPRIEDADES DA CARGA"
-                       FontSize="16"
-                       FontWeight="SemiBold"
-                       Foreground="White"/>
-        </Border>
+                <TextBlock Text="PROPRIEDADES DA CARGA"
+                           Style="{StaticResource PropertyHeaderTextBlockStyle}"/>
 
-        <!-- CONTEÚDO -->
+                <Grid>
 
-        <ScrollViewer Grid.Row="1"
-                      VerticalScrollBarVisibility="Auto">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="110"/>
+                        <ColumnDefinition Width="*"/>
+                    </Grid.ColumnDefinitions>
 
-            <Grid Margin="12">
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="Auto"/>
+                    </Grid.RowDefinitions>
 
-                <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="Auto"/>
-                    <ColumnDefinition Width="*"/>
-                </Grid.ColumnDefinitions>
+                    <!-- TIPO -->
 
-                <Grid.RowDefinitions>
-                    <RowDefinition Height="Auto"/>
-                    <RowDefinition Height="Auto"/>
-                    <RowDefinition Height="Auto"/>
-                    <RowDefinition Height="Auto"/>
-                    <RowDefinition Height="Auto"/>
-                </Grid.RowDefinitions>
+                    <ComboBox Grid.ColumnSpan="2"
+                              Style="{StaticResource PropertyFullComboBoxStyle}"
+                              ItemsSource="{Binding TiposDisponiveis}"
+                              SelectedItem="{Binding Tipo}"
+                              DisplayMemberPath="NomeTipo"/>
 
-                <!-- NOME -->
+                    <Button Grid.Row="1"
+                            Grid.ColumnSpan="2"
+                            Style="{StaticResource PropertyFullButtonStyle}"
+                            Content="Visualizar propriedades de tipo"
+                            Command="{Binding AbrirPropriedadesTipoCommand}"/>
 
-                <TextBlock Text="Nome"
-                           Foreground="#CCCCCC"
-                           Margin="0,0,10,12"/>
+                    <!-- NOME -->
 
-                <TextBox Grid.Column="1"
-                         Margin="0,0,0,12"
-                         Text="{Binding Nome, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"/>
+                    <TextBlock Grid.Row="2"
+                               Text="Nome"
+                               Style="{StaticResource PropertyLabelTextBlockStyle}"/>
 
-                <!-- BARRA -->
+                    <TextBox Grid.Row="2"
+                             Grid.Column="1"
+                             Text="{Binding Nome}"
+                             Style="{StaticResource PropertyValueTextBoxStyle}"/>
 
-                <TextBlock Grid.Row="1"
-                           Text="Barra"
-                           Foreground="#CCCCCC"
-                           Margin="0,0,10,12"/>
+                    <!-- BARRA -->
 
-                <TextBox Grid.Row="1"
-                         Grid.Column="1"
-                         Margin="0,0,0,12"
-                         Text="{Binding Barra, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"/>
+                    <TextBlock Grid.Row="3"
+                               Text="Barra"
+                               Style="{StaticResource PropertyLabelTextBlockStyle}"/>
 
-                <!-- POTÊNCIA -->
+                    <TextBox Grid.Row="3"
+                             Grid.Column="1"
+                             Text="{Binding Barra}"
+                             Style="{StaticResource PropertyValueTextBoxStyle}"/>
 
-                <TextBlock Grid.Row="2"
-                           Text="Potência kW"
-                           Foreground="#CCCCCC"
-                           Margin="0,0,10,12"/>
+                    <!-- ALIMENTADOR -->
 
-                <TextBox Grid.Row="2"
-                         Grid.Column="1"
-                         Margin="0,0,0,12"
-                         Text="{Binding PotenciaAtivaKW, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"/>
+                    <TextBlock Grid.Row="4"
+                               Text="Alimentador"
+                               Style="{StaticResource PropertyLabelTextBlockStyle}"/>
 
-                <!-- TENSÃO -->
+                    <TextBox Grid.Row="4"
+                             Grid.Column="1"
+                             Text="{Binding Alimentador}"
+                             Style="{StaticResource PropertyValueTextBoxStyle}"/>
 
-                <TextBlock Grid.Row="3"
-                           Text="Tensão kV"
-                           Foreground="#CCCCCC"
-                           Margin="0,0,10,12"/>
+                    <!-- POTENCIA ATIVA -->
 
-                <TextBox Grid.Row="3"
-                         Grid.Column="1"
-                         Margin="0,0,0,12"
-                         Text="{Binding TensaoKV, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"/>
+                    <TextBlock Grid.Row="5"
+                               Text="Potencia ativa"
+                               Style="{StaticResource PropertyLabelTextBlockStyle}"/>
 
-                <!-- CONEXÃO -->
+                    <TextBox Grid.Row="5"
+                             Grid.Column="1"
+                             Text="{Binding PotenciaAtivaKW,
+                                            ValidatesOnDataErrors=True,
+                                            ValidatesOnExceptions=True,
+                                            NotifyOnValidationError=True}"
+                             Style="{StaticResource PropertyNumericTextBoxStyle}"/>
 
-                <TextBlock Grid.Row="4"
-                           Text="Conexão"
-                           Foreground="#CCCCCC"
-                           Margin="0,0,10,12"/>
+                    <!-- POTENCIA REATIVA -->
 
-                <TextBox Grid.Row="4"
-                         Grid.Column="1"
-                         Margin="0,0,0,12"
-                         Text="{Binding Conexao, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"/>
+                    <TextBlock Grid.Row="6"
+                               Text="Potencia reativa"
+                               Style="{StaticResource PropertyLabelTextBlockStyle}"/>
 
-            </Grid>
+                    <TextBox Grid.Row="6"
+                             Grid.Column="1"
+                             Text="{Binding PotenciaReativaKvar,
+                                            ValidatesOnDataErrors=True,
+                                            ValidatesOnExceptions=True,
+                                            NotifyOnValidationError=True}"
+                             Style="{StaticResource PropertyNumericTextBoxStyle}"/>
+
+                </Grid>
+
+            </StackPanel>
 
         </ScrollViewer>
 
     </Grid>
 
 </UserControl>
+
 
 
 ====================================================================================================
@@ -2536,115 +2480,123 @@ namespace Araci.Properties
 ARQUIVO: C:\Araci-Engine-Front\Araci Engine\Properties\GeradorPropertiesView.xaml
 ====================================================================================================
 
-﻿<UserControl x:Class="Araci.Properties.GeradorPropertiesView"
+<UserControl x:Class="Araci.Properties.GeradorPropertiesView"
              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
 
     <Grid Background="#252526">
 
-        <Grid.RowDefinitions>
-            <RowDefinition Height="Auto"/>
-            <RowDefinition Height="*"/>
-        </Grid.RowDefinitions>
+        <ScrollViewer VerticalScrollBarVisibility="Auto">
 
-        <!-- HEADER -->
+            <StackPanel Margin="12">
 
-        <Border Background="#2D2D30"
-                BorderBrush="#3E3E42"
-                BorderThickness="0,0,0,1"
-                Padding="12">
+                <!-- HEADER -->
 
-            <TextBlock Text="PROPRIEDADES DO GERADOR"
-                       FontSize="16"
-                       FontWeight="SemiBold"
-                       Foreground="White"/>
-        </Border>
+                <TextBlock Text="PROPRIEDADES DO GERADOR"
+                           Style="{StaticResource PropertyHeaderTextBlockStyle}"/>
 
-        <!-- CONTEÚDO -->
+                <Grid>
 
-        <ScrollViewer Grid.Row="1"
-                      VerticalScrollBarVisibility="Auto">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="110"/>
+                        <ColumnDefinition Width="*"/>
+                    </Grid.ColumnDefinitions>
 
-            <Grid Margin="12">
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="Auto"/>
+                    </Grid.RowDefinitions>
 
-                <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="Auto"/>
-                    <ColumnDefinition Width="*"/>
-                </Grid.ColumnDefinitions>
+                    <!-- TIPO -->
 
-                <Grid.RowDefinitions>
-                    <RowDefinition Height="Auto"/>
-                    <RowDefinition Height="Auto"/>
-                    <RowDefinition Height="Auto"/>
-                    <RowDefinition Height="Auto"/>
-                    <RowDefinition Height="Auto"/>
-                </Grid.RowDefinitions>
+                    <ComboBox Grid.ColumnSpan="2"
+                              Style="{StaticResource PropertyFullComboBoxStyle}"
+                              ItemsSource="{Binding TiposDisponiveis}"
+                              SelectedItem="{Binding Tipo}"
+                              DisplayMemberPath="NomeTipo"/>
 
-                <!-- NOME -->
+                    <Button Grid.Row="1"
+                            Grid.ColumnSpan="2"
+                            Style="{StaticResource PropertyFullButtonStyle}"
+                            Content="Visualizar propriedades de tipo"
+                            Command="{Binding AbrirPropriedadesTipoCommand}"/>
 
-                <TextBlock Text="Nome"
-                           Foreground="#CCCCCC"
-                           Margin="0,0,10,12"/>
+                    <!-- NOME -->
 
-                <TextBox Grid.Column="1"
-                         Margin="0,0,0,12"
-                         Text="{Binding Nome, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"/>
+                    <TextBlock Grid.Row="2"
+                               Text="Nome"
+                               Style="{StaticResource PropertyLabelTextBlockStyle}"/>
 
-                <!-- BARRA -->
+                    <TextBox Grid.Row="2"
+                             Grid.Column="1"
+                             Text="{Binding Nome}"
+                             Style="{StaticResource PropertyValueTextBoxStyle}"/>
 
-                <TextBlock Grid.Row="1"
-                           Text="Barra"
-                           Foreground="#CCCCCC"
-                           Margin="0,0,10,12"/>
+                    <!-- BARRA -->
 
-                <TextBox Grid.Row="1"
-                         Grid.Column="1"
-                         Margin="0,0,0,12"
-                         Text="{Binding Barra, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"/>
+                    <TextBlock Grid.Row="3"
+                               Text="Barra"
+                               Style="{StaticResource PropertyLabelTextBlockStyle}"/>
 
-                <!-- POTÊNCIA -->
+                    <TextBox Grid.Row="3"
+                             Grid.Column="1"
+                             Text="{Binding Barra}"
+                             Style="{StaticResource PropertyValueTextBoxStyle}"/>
 
-                <TextBlock Grid.Row="2"
-                           Text="Potência kW"
-                           Foreground="#CCCCCC"
-                           Margin="0,0,10,12"/>
+                    <!-- ALIMENTADOR -->
 
-                <TextBox Grid.Row="2"
-                         Grid.Column="1"
-                         Margin="0,0,0,12"
-                         Text="{Binding PotenciaAtivaKW, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"/>
+                    <TextBlock Grid.Row="4"
+                               Text="Alimentador"
+                               Style="{StaticResource PropertyLabelTextBlockStyle}"/>
 
-                <!-- TENSÃO -->
+                    <TextBox Grid.Row="4"
+                             Grid.Column="1"
+                             Text="{Binding Alimentador}"
+                             Style="{StaticResource PropertyValueTextBoxStyle}"/>
 
-                <TextBlock Grid.Row="3"
-                           Text="Tensão kV"
-                           Foreground="#CCCCCC"
-                           Margin="0,0,10,12"/>
+                    <!-- POTENCIA ATIVA -->
 
-                <TextBox Grid.Row="3"
-                         Grid.Column="1"
-                         Margin="0,0,0,12"
-                         Text="{Binding TensaoKV, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"/>
+                    <TextBlock Grid.Row="5"
+                               Text="Potencia ativa"
+                               Style="{StaticResource PropertyLabelTextBlockStyle}"/>
 
-                <!-- FABRICANTE -->
+                    <TextBox Grid.Row="5"
+                             Grid.Column="1"
+                             Text="{Binding PotenciaAtivaKW,
+                                            ValidatesOnDataErrors=True,
+                                            ValidatesOnExceptions=True,
+                                            NotifyOnValidationError=True}"
+                             Style="{StaticResource PropertyNumericTextBoxStyle}"/>
 
-                <TextBlock Grid.Row="4"
-                           Text="Fabricante"
-                           Foreground="#CCCCCC"
-                           Margin="0,0,10,12"/>
+                    <!-- FATOR DE POTENCIA -->
 
-                <TextBox Grid.Row="4"
-                         Grid.Column="1"
-                         Margin="0,0,0,12"
-                         Text="{Binding Fabricante, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"/>
+                    <TextBlock Grid.Row="6"
+                               Text="Fator potencia"
+                               Style="{StaticResource PropertyLabelTextBlockStyle}"/>
 
-            </Grid>
+                    <TextBox Grid.Row="6"
+                             Grid.Column="1"
+                             Text="{Binding FatorPotencia,
+                                            ValidatesOnDataErrors=True,
+                                            ValidatesOnExceptions=True,
+                                            NotifyOnValidationError=True}"
+                             Style="{StaticResource PropertyNumericTextBoxStyle}"/>
+
+                </Grid>
+
+            </StackPanel>
 
         </ScrollViewer>
 
     </Grid>
 
 </UserControl>
+
 
 
 ====================================================================================================
@@ -2727,98 +2679,27 @@ namespace Araci.Properties
 ARQUIVO: C:\Araci-Engine-Front\Araci Engine\Properties\TypePropertiesWindow.xaml
 ====================================================================================================
 
-﻿<Window x:Class="Araci.Properties.TypePropertiesWindow"
+<Window x:Class="Araci.Properties.TypePropertiesWindow"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-        xmlns:viewModels="clr-namespace:Araci.ViewModels"
         Title="Propriedades de Tipo"
-        Width="420"
+        Width="460"
         Height="500"
         Background="#252526"
         WindowStartupLocation="CenterOwner">
 
     <Border Padding="12">
 
-        <ContentControl Content="{Binding}">
+        <ScrollViewer VerticalScrollBarVisibility="Auto">
 
-            <ContentControl.Resources>
+            <ContentControl Content="{Binding}"/>
 
-                <!-- CABO -->
-
-                <DataTemplate
-                    DataType="{x:Type viewModels:TipoCaboViewModel}">
-
-                    <StackPanel>
-
-                        <TextBlock Text="PROPRIEDADES DE TIPO"
-                                   FontSize="18"
-                                   FontWeight="SemiBold"
-                                   Foreground="White"
-                                   Margin="0,0,0,20"/>
-
-                        <TextBlock Text="Nome do Tipo"
-                                   Foreground="#CCCCCC"/>
-
-                        <TextBox Text="{Binding NomeTipo}"
-                                 IsReadOnly="True"
-                                 Margin="0,4,0,12"/>
-
-                        <TextBlock Text="Ampacidade"
-                                   Foreground="#CCCCCC"/>
-
-                        <TextBox Text="{Binding Ampacidade}"
-                                 IsReadOnly="True"
-                                 Margin="0,4,0,12"/>
-
-                        <TextBlock Text="Resistência"
-                                   Foreground="#CCCCCC"/>
-
-                        <TextBox Text="{Binding Resistencia}"
-                                 IsReadOnly="True"
-                                 Margin="0,4,0,12"/>
-
-                    </StackPanel>
-
-                </DataTemplate>
-
-                <!-- CARGA -->
-
-                <DataTemplate
-                    DataType="{x:Type viewModels:TipoCargaViewModel}">
-
-                    <StackPanel>
-
-                        <TextBlock Text="PROPRIEDADES DE TIPO"
-                                   FontSize="18"
-                                   FontWeight="SemiBold"
-                                   Foreground="White"
-                                   Margin="0,0,0,20"/>
-
-                        <TextBlock Text="Nome Tipo"
-                                   Foreground="#CCCCCC"/>
-
-                        <TextBox Text="{Binding NomeTipo}"
-                                 IsReadOnly="True"
-                                 Margin="0,4,0,12"/>
-
-                        <TextBlock Text="Tensão"
-                                   Foreground="#CCCCCC"/>
-
-                        <TextBox Text="{Binding TensaoKV}"
-                                 IsReadOnly="True"
-                                 Margin="0,4,0,12"/>
-
-                    </StackPanel>
-
-                </DataTemplate>
-
-            </ContentControl.Resources>
-
-        </ContentControl>
+        </ScrollViewer>
 
     </Border>
 
 </Window>
+
 
 
 ====================================================================================================
@@ -2889,6 +2770,100 @@ ARQUIVO: C:\Araci-Engine-Front\Araci Engine\Resources\Styles\MenuStyles.xaml
     </Style>
 
 </ResourceDictionary>
+
+
+====================================================================================================
+ARQUIVO: C:\Araci-Engine-Front\Araci Engine\Resources\Styles\PropertyStyles.xaml
+====================================================================================================
+
+<ResourceDictionary
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+
+    <Style x:Key="PropertyHeaderTextBlockStyle"
+           TargetType="TextBlock">
+        <Setter Property="FontSize"
+                Value="18"/>
+        <Setter Property="FontWeight"
+                Value="SemiBold"/>
+        <Setter Property="Foreground"
+                Value="White"/>
+        <Setter Property="Margin"
+                Value="0,0,0,20"/>
+    </Style>
+
+    <Style x:Key="PropertyLabelTextBlockStyle"
+           TargetType="TextBlock">
+        <Setter Property="Foreground"
+                Value="#CCCCCC"/>
+        <Setter Property="VerticalAlignment"
+                Value="Center"/>
+        <Setter Property="Margin"
+                Value="0,0,10,12"/>
+    </Style>
+
+    <Style x:Key="PropertyValueTextBoxStyle"
+           TargetType="TextBox">
+        <Setter Property="Grid.Column"
+                Value="1"/>
+        <Setter Property="Margin"
+                Value="0,0,0,12"/>
+        <Setter Property="Validation.ErrorTemplate">
+            <Setter.Value>
+                <ControlTemplate>
+                    <DockPanel LastChildFill="True">
+                        <Border BorderBrush="#E05A47"
+                                BorderThickness="1"
+                                CornerRadius="2">
+                            <AdornedElementPlaceholder/>
+                        </Border>
+                    </DockPanel>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+        <Style.Triggers>
+            <Trigger Property="Validation.HasError"
+                     Value="True">
+                <Setter Property="ToolTip"
+                        Value="{Binding RelativeSource={RelativeSource Self},
+                                        Path=(Validation.Errors)[0].ErrorContent}"/>
+                <Setter Property="BorderBrush"
+                        Value="#E05A47"/>
+            </Trigger>
+        </Style.Triggers>
+    </Style>
+
+    <Style x:Key="PropertyNumericTextBoxStyle"
+           TargetType="TextBox"
+           BasedOn="{StaticResource PropertyValueTextBoxStyle}"/>
+
+    <Style x:Key="PropertyReadOnlyTextBoxStyle"
+           TargetType="TextBox"
+           BasedOn="{StaticResource PropertyValueTextBoxStyle}">
+        <Setter Property="IsReadOnly"
+                Value="True"/>
+    </Style>
+
+    <Style x:Key="PropertyFullComboBoxStyle"
+           TargetType="ComboBox">
+        <Setter Property="Grid.ColumnSpan"
+                Value="2"/>
+        <Setter Property="Margin"
+                Value="0,0,0,12"/>
+    </Style>
+
+    <Style x:Key="PropertyFullButtonStyle"
+           TargetType="Button">
+        <Setter Property="Grid.ColumnSpan"
+                Value="2"/>
+        <Setter Property="Height"
+                Value="32"/>
+        <Setter Property="Margin"
+                Value="0,0,0,20"/>
+    </Style>
+
+</ResourceDictionary>
+
 
 
 ====================================================================================================
@@ -3016,6 +2991,274 @@ ARQUIVO: C:\Araci-Engine-Front\Araci Engine\Resources\Templates\DataTemplates.xa
     </DataTemplate>
 
 </ResourceDictionary>
+
+
+====================================================================================================
+ARQUIVO: C:\Araci-Engine-Front\Araci Engine\Resources\Templates\TypePropertiesTemplates.xaml
+====================================================================================================
+
+<ResourceDictionary
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:viewModels="clr-namespace:Araci.ViewModels">
+
+    <!-- ========================================================= -->
+    <!-- CABO -->
+    <!-- ========================================================= -->
+
+    <DataTemplate DataType="{x:Type viewModels:TipoCaboViewModel}">
+
+        <StackPanel>
+
+            <TextBlock Text="PROPRIEDADES DE TIPO"
+                       Style="{StaticResource PropertyHeaderTextBlockStyle}"/>
+
+            <Grid>
+
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="150"/>
+                    <ColumnDefinition Width="*"/>
+                </Grid.ColumnDefinitions>
+
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="Auto"/>
+                </Grid.RowDefinitions>
+
+                <TextBlock Text="Nome do Tipo"
+                           Style="{StaticResource PropertyLabelTextBlockStyle}"/>
+
+                <TextBox Text="{Binding NomeTipo}"
+                         Style="{StaticResource PropertyReadOnlyTextBoxStyle}"/>
+
+                <TextBlock Grid.Row="1"
+                           Text="Ampacidade"
+                           Style="{StaticResource PropertyLabelTextBlockStyle}"/>
+
+                <TextBox Grid.Row="1"
+                         Text="{Binding Ampacidade}"
+                         Style="{StaticResource PropertyReadOnlyTextBoxStyle}"/>
+
+                <TextBlock Grid.Row="2"
+                           Text="Resistencia"
+                           Style="{StaticResource PropertyLabelTextBlockStyle}"/>
+
+                <TextBox Grid.Row="2"
+                         Text="{Binding Resistencia}"
+                         Style="{StaticResource PropertyReadOnlyTextBoxStyle}"/>
+
+            </Grid>
+
+        </StackPanel>
+
+    </DataTemplate>
+
+    <!-- ========================================================= -->
+    <!-- CARGA -->
+    <!-- ========================================================= -->
+
+    <DataTemplate DataType="{x:Type viewModels:TipoCargaViewModel}">
+
+        <StackPanel>
+
+            <TextBlock Text="PROPRIEDADES DE TIPO"
+                       Style="{StaticResource PropertyHeaderTextBlockStyle}"/>
+
+            <Grid>
+
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="150"/>
+                    <ColumnDefinition Width="*"/>
+                </Grid.ColumnDefinitions>
+
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="Auto"/>
+                </Grid.RowDefinitions>
+
+                <TextBlock Text="Nome do Tipo"
+                           Style="{StaticResource PropertyLabelTextBlockStyle}"/>
+
+                <TextBox Text="{Binding NomeTipo}"
+                         Style="{StaticResource PropertyReadOnlyTextBoxStyle}"/>
+
+                <TextBlock Grid.Row="1"
+                           Text="Familia"
+                           Style="{StaticResource PropertyLabelTextBlockStyle}"/>
+
+                <TextBox Grid.Row="1"
+                         Text="{Binding Familia}"
+                         Style="{StaticResource PropertyReadOnlyTextBoxStyle}"/>
+
+                <TextBlock Grid.Row="2"
+                           Text="Categoria"
+                           Style="{StaticResource PropertyLabelTextBlockStyle}"/>
+
+                <TextBox Grid.Row="2"
+                         Text="{Binding Categoria}"
+                         Style="{StaticResource PropertyReadOnlyTextBoxStyle}"/>
+
+                <TextBlock Grid.Row="3"
+                           Text="Modelo de Carga"
+                           Style="{StaticResource PropertyLabelTextBlockStyle}"/>
+
+                <TextBox Grid.Row="3"
+                         Text="{Binding ModeloCarga}"
+                         Style="{StaticResource PropertyReadOnlyTextBoxStyle}"/>
+
+                <TextBlock Grid.Row="4"
+                           Text="Conexao"
+                           Style="{StaticResource PropertyLabelTextBlockStyle}"/>
+
+                <TextBox Grid.Row="4"
+                         Text="{Binding Conexao}"
+                         Style="{StaticResource PropertyReadOnlyTextBoxStyle}"/>
+
+                <TextBlock Grid.Row="5"
+                           Text="Tensao kV"
+                           Style="{StaticResource PropertyLabelTextBlockStyle}"/>
+
+                <TextBox Grid.Row="5"
+                         Text="{Binding TensaoKV}"
+                         Style="{StaticResource PropertyReadOnlyTextBoxStyle}"/>
+
+                <TextBlock Grid.Row="6"
+                           Text="Fases"
+                           Style="{StaticResource PropertyLabelTextBlockStyle}"/>
+
+                <TextBox Grid.Row="6"
+                         Text="{Binding Fases}"
+                         Style="{StaticResource PropertyReadOnlyTextBoxStyle}"/>
+
+                <TextBlock Grid.Row="7"
+                           Text="Fator de Potencia"
+                           Style="{StaticResource PropertyLabelTextBlockStyle}"/>
+
+                <TextBox Grid.Row="7"
+                         Text="{Binding FatorPotencia}"
+                         Style="{StaticResource PropertyReadOnlyTextBoxStyle}"/>
+
+            </Grid>
+
+        </StackPanel>
+
+    </DataTemplate>
+
+    <!-- ========================================================= -->
+    <!-- GERADOR -->
+    <!-- ========================================================= -->
+
+    <DataTemplate DataType="{x:Type viewModels:TipoGeradorViewModel}">
+
+        <StackPanel>
+
+            <TextBlock Text="PROPRIEDADES DE TIPO"
+                       Style="{StaticResource PropertyHeaderTextBlockStyle}"/>
+
+            <Grid>
+
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="150"/>
+                    <ColumnDefinition Width="*"/>
+                </Grid.ColumnDefinitions>
+
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="Auto"/>
+                </Grid.RowDefinitions>
+
+                <TextBlock Text="Nome do Tipo"
+                           Style="{StaticResource PropertyLabelTextBlockStyle}"/>
+
+                <TextBox Text="{Binding NomeTipo}"
+                         Style="{StaticResource PropertyReadOnlyTextBoxStyle}"/>
+
+                <TextBlock Grid.Row="1"
+                           Text="Familia"
+                           Style="{StaticResource PropertyLabelTextBlockStyle}"/>
+
+                <TextBox Grid.Row="1"
+                         Text="{Binding Familia}"
+                         Style="{StaticResource PropertyReadOnlyTextBoxStyle}"/>
+
+                <TextBlock Grid.Row="2"
+                           Text="Categoria"
+                           Style="{StaticResource PropertyLabelTextBlockStyle}"/>
+
+                <TextBox Grid.Row="2"
+                         Text="{Binding Categoria}"
+                         Style="{StaticResource PropertyReadOnlyTextBoxStyle}"/>
+
+                <TextBlock Grid.Row="3"
+                           Text="Categoria gerador"
+                           Style="{StaticResource PropertyLabelTextBlockStyle}"/>
+
+                <TextBox Grid.Row="3"
+                         Text="{Binding CategoriaGerador}"
+                         Style="{StaticResource PropertyReadOnlyTextBoxStyle}"/>
+
+                <TextBlock Grid.Row="4"
+                           Text="Fabricante"
+                           Style="{StaticResource PropertyLabelTextBlockStyle}"/>
+
+                <TextBox Grid.Row="4"
+                         Text="{Binding Fabricante}"
+                         Style="{StaticResource PropertyReadOnlyTextBoxStyle}"/>
+
+                <TextBlock Grid.Row="5"
+                           Text="Modelo"
+                           Style="{StaticResource PropertyLabelTextBlockStyle}"/>
+
+                <TextBox Grid.Row="5"
+                         Text="{Binding Modelo}"
+                         Style="{StaticResource PropertyReadOnlyTextBoxStyle}"/>
+
+                <TextBlock Grid.Row="6"
+                           Text="Potencia nominal"
+                           Style="{StaticResource PropertyLabelTextBlockStyle}"/>
+
+                <TextBox Grid.Row="6"
+                         Text="{Binding PotenciaNominalKW}"
+                         Style="{StaticResource PropertyReadOnlyTextBoxStyle}"/>
+
+                <TextBlock Grid.Row="7"
+                           Text="Tensao kV"
+                           Style="{StaticResource PropertyLabelTextBlockStyle}"/>
+
+                <TextBox Grid.Row="7"
+                         Text="{Binding TensaoKV}"
+                         Style="{StaticResource PropertyReadOnlyTextBoxStyle}"/>
+
+                <TextBlock Grid.Row="8"
+                           Text="Fases"
+                           Style="{StaticResource PropertyLabelTextBlockStyle}"/>
+
+                <TextBox Grid.Row="8"
+                         Text="{Binding Fases}"
+                         Style="{StaticResource PropertyReadOnlyTextBoxStyle}"/>
+
+            </Grid>
+
+        </StackPanel>
+
+    </DataTemplate>
+
+</ResourceDictionary>
+
 
 
 ====================================================================================================
@@ -3729,11 +3972,8 @@ namespace Araci.Ribbon.Tabs
             object sender,
             RoutedEventArgs e)
         {
-            if (AppServices.Viewport == null)
-                return;
-
             InserirGeradorApplication app =
-                new(AppServices.Viewport);
+                new();
 
             app.Executar();
         }
@@ -3746,11 +3986,8 @@ namespace Araci.Ribbon.Tabs
             object sender,
             RoutedEventArgs e)
         {
-            if (AppServices.Viewport == null)
-                return;
-
             InserirCargaApplication app =
-                new(AppServices.Viewport);
+                new();
 
             app.Executar();
         }
@@ -3763,11 +4000,8 @@ namespace Araci.Ribbon.Tabs
             object sender,
             RoutedEventArgs e)
         {
-            if (AppServices.Viewport == null)
-                return;
-
             InserirCaboApplication app =
-                new(AppServices.Viewport);
+                new();
 
             app.Executar();
         }
@@ -3778,6 +4012,7 @@ namespace Araci.Ribbon.Tabs
         }
     }
 }
+
 
 
 ====================================================================================================
@@ -4038,6 +4273,8 @@ namespace Araci.Ribbon.Tabs
 
         private readonly Brush _brushAtivo =  new SolidColorBrush(Color.FromRgb(210, 230, 255));
 
+        private bool _eventoFerramentaAssinado;
+
         // =========================
         // CONSTRUTOR
         // =========================
@@ -4047,6 +4284,8 @@ namespace Araci.Ribbon.Tabs
             InitializeComponent();
 
             Loaded += OnLoaded;
+
+            Unloaded += OnUnloaded;
         }
 
         // =========================
@@ -4055,9 +4294,46 @@ namespace Araci.Ribbon.Tabs
 
         private void OnLoaded(object sender, RoutedEventArgs e)
         {
-            AppServices.Tools.FerramentaAlterada += OnFerramentaAlterada;
+            AssinarEventoFerramenta();
 
             AtualizarBotoes(AppServices.Tools.FerramentaAtual);
+        }
+
+        // =========================
+        // UNLOADED
+        // =========================
+
+        private void OnUnloaded(object sender, RoutedEventArgs e)
+        {
+            DesassinarEventoFerramenta();
+        }
+
+        // =========================
+        // EVENTOS
+        // =========================
+
+        private void AssinarEventoFerramenta()
+        {
+            if (_eventoFerramentaAssinado)
+                return;
+
+            AppServices.Tools.FerramentaAlterada +=
+                OnFerramentaAlterada;
+
+            _eventoFerramentaAssinado =
+                true;
+        }
+
+        private void DesassinarEventoFerramenta()
+        {
+            if (!_eventoFerramentaAssinado)
+                return;
+
+            AppServices.Tools.FerramentaAlterada -=
+                OnFerramentaAlterada;
+
+            _eventoFerramentaAssinado =
+                false;
         }
 
         // =========================
@@ -4167,6 +4443,7 @@ namespace Araci.Ribbon.Tabs
 }
 
 
+
 ====================================================================================================
 ARQUIVO: C:\Araci-Engine-Front\Araci Engine\Ribbon\Tabs\GerenciarTab.xaml
 ====================================================================================================
@@ -4246,12 +4523,12 @@ namespace Araci.Ribbon.Tabs
 ARQUIVO: C:\Araci-Engine-Front\Araci Engine\Service\AppServices.cs
 ====================================================================================================
 
-﻿using System.Windows;
+using System.Windows;
 
-using Araci.Core.Documents;
-using Araci.Services;
 using Araci.Core.Commands;
+using Araci.Core.Documents;
 using Araci.Core.Transactions;
+using Araci.Services;
 using Araci.ViewModels;
 
 namespace Araci
@@ -4259,20 +4536,36 @@ namespace Araci
     public static class AppServices
     {
         // =========================
+        // CONTEXTO
+        // =========================
+
+        public static EditorContext Context
+        { get; private set; }
+            = new EditorContext();
+
+        public static void ResetContext(
+            EditorContext? context = null)
+        {
+            Context =
+                context ?? new EditorContext();
+        }
+
+        // =========================
         // DOCUMENTO CENTRAL
         // =========================
 
         public static AraciDocument Document
-        { get; set; }
-            = new AraciDocument();
+        {
+            get => Context.Document;
+            set => Context.Document = value;
+        }
 
         // =========================
         // TOOLS
         // =========================
 
-        public static ToolService Tools
-        { get; }
-            = new ToolService();
+        public static ToolService Tools =>
+            Context.Tools;
 
         // =========================
         // VIEWPORT
@@ -4280,66 +4573,64 @@ namespace Araci
 
         public static ViewportService?
             Viewport
-        { get; set; }
+        {
+            get => Context.Viewport;
+            set => Context.Viewport = value;
+        }
 
         public static FrameworkElement?
             ViewportReference
-        { get; set; }
+        {
+            get => Context.ViewportReference;
+            set => Context.ViewportReference = value;
+        }
 
         // =========================
         // EDITOR
         // =========================
 
-        public static EditorState Editor
-        { get; }
-            = new EditorState();
+        public static EditorState Editor =>
+            Context.Editor;
 
         // =========================
         // HUD
         // =========================
 
-        public static MoveHudService MoveHud
-        { get; }
-            = new MoveHudService();
+        public static MoveHudService MoveHud =>
+            Context.MoveHud;
 
         // =========================
         // SELECTION BOX
         // =========================
 
-        public static SelectionBoxViewModel
-            SelectionBox
-        { get; }
-            = new SelectionBoxViewModel();
+        public static SelectionBoxViewModel SelectionBox =>
+            Context.SelectionBox;
 
         // =========================
         // COMMANDS
         // =========================
 
-        public static CommandManager
-            Commands
-        { get; }
-            = new CommandManager();
+        public static CommandManager Commands =>
+            Context.Commands;
 
         // =========================
         // TRANSACTIONS
         // =========================
 
-        public static TransactionScope
-            BeginTransaction()
+        public static TransactionScope BeginTransaction()
         {
-            return new TransactionScope(Commands);
+            return Context.BeginTransaction();
         }
 
         // =========================
         // TYPES
         // =========================
 
-        public static TypeLibraryService
-            Types
-        { get; }
-            = new TypeLibraryService();
+        public static TypeLibraryService Types =>
+            Context.Types;
     }
 }
+
 
 
 ====================================================================================================
@@ -4573,6 +4864,102 @@ namespace Araci.Services
 
 
 ====================================================================================================
+ARQUIVO: C:\Araci-Engine-Front\Araci Engine\Service\EditorContext.cs
+====================================================================================================
+
+using System.Windows;
+
+using Araci.Core.Commands;
+using Araci.Core.Documents;
+using Araci.Core.Transactions;
+using Araci.ViewModels;
+
+namespace Araci.Services
+{
+    public class EditorContext
+    {
+        // =========================
+        // DOCUMENTO
+        // =========================
+
+        public AraciDocument Document
+        { get; set; }
+            = new AraciDocument();
+
+        // =========================
+        // TOOLS
+        // =========================
+
+        public ToolService Tools
+        { get; }
+            = new ToolService();
+
+        // =========================
+        // VIEWPORT
+        // =========================
+
+        public ViewportService?
+            Viewport
+        { get; set; }
+
+        public FrameworkElement?
+            ViewportReference
+        { get; set; }
+
+        // =========================
+        // EDITOR
+        // =========================
+
+        public EditorState Editor
+        { get; }
+            = new EditorState();
+
+        // =========================
+        // HUD
+        // =========================
+
+        public MoveHudService MoveHud
+        { get; }
+            = new MoveHudService();
+
+        // =========================
+        // SELECTION BOX
+        // =========================
+
+        public SelectionBoxViewModel SelectionBox
+        { get; }
+            = new SelectionBoxViewModel();
+
+        // =========================
+        // COMMANDS
+        // =========================
+
+        public CommandManager Commands
+        { get; }
+            = new CommandManager();
+
+        // =========================
+        // TYPES
+        // =========================
+
+        public TypeLibraryService Types
+        { get; }
+            = new TypeLibraryService();
+
+        // =========================
+        // TRANSACTIONS
+        // =========================
+
+        public TransactionScope BeginTransaction()
+        {
+            return new TransactionScope(Commands);
+        }
+    }
+}
+
+
+
+====================================================================================================
 ARQUIVO: C:\Araci-Engine-Front\Araci Engine\Service\EditorState.cs
 ====================================================================================================
 
@@ -4646,7 +5033,7 @@ namespace Araci.Services
 ARQUIVO: C:\Araci-Engine-Front\Araci Engine\Service\ElementoFactory.cs
 ====================================================================================================
 
-﻿using System;
+using System;
 
 using Araci.Models;
 using Araci.ViewModels;
@@ -4659,7 +5046,8 @@ namespace Araci.Services
         // VIEWMODEL
         // =========================
 
-        public static ElementoViewModel? CriarViewModel(Elemento modelo)
+        public static ElementoViewModel? CriarViewModel(
+            Elemento modelo)
         {
             return modelo switch
             {
@@ -4677,30 +5065,76 @@ namespace Araci.Services
         // CABO
         // =========================
 
+        public static Cabo CriarCabo()
+        {
+            var cabo =
+                new Cabo
+                {
+                    Tipo =
+                        AppServices.Types.TipoCaboPadrao
+                        ?? throw new InvalidOperationException(
+                            "Nenhum tipo de cabo cadastrado.")
+                };
+
+            return cabo;
+        }
+
         public static CaboViewModel CriarCaboVM()
         {
-            return new CaboViewModel(new Cabo());
+            return new CaboViewModel(
+                CriarCabo());
         }
 
         // =========================
         // CARGA
         // =========================
 
+        public static Carga CriarCarga()
+        {
+            var carga =
+                new Carga
+                {
+                    Tipo =
+                        AppServices.Types.TipoCargaPadrao
+                        ?? throw new InvalidOperationException(
+                            "Nenhum tipo de carga cadastrado.")
+                };
+
+            return carga;
+        }
+
         public static CargaViewModel CriarCargaVM()
         {
-            return new CargaViewModel(new Carga());
+            return new CargaViewModel(
+                CriarCarga());
         }
 
         // =========================
         // GERADOR
         // =========================
 
+        public static Gerador CriarGerador()
+        {
+            var gerador =
+                new Gerador
+                {
+                    Tipo =
+                        AppServices.Types.TipoGeradorPadrao
+                        ?? throw new InvalidOperationException(
+                            "Nenhum tipo de gerador cadastrado.")
+                };
+
+            return gerador;
+        }
+
         public static GeradorViewModel CriarGeradorVM()
         {
-            return new GeradorViewModel(new Gerador());
+            return new GeradorViewModel(
+                CriarGerador());
         }
     }
 }
+
 
 
 ====================================================================================================
@@ -5351,6 +5785,19 @@ namespace Araci.Services
         }
 
         // ====================================================
+        // PADRÕES
+        // ====================================================
+
+        public TipoCabo? TipoCaboPadrao =>
+            TiposCabos.FirstOrDefault();
+
+        public TipoCarga? TipoCargaPadrao =>
+            TiposCargas.FirstOrDefault();
+
+        public TipoGerador? TipoGeradorPadrao =>
+            TiposGeradores.FirstOrDefault();
+
+        // ====================================================
         // CABOS
         // ====================================================
 
@@ -5420,11 +5867,13 @@ namespace Araci.Services
 }
 
 
+
 ====================================================================================================
 ARQUIVO: C:\Araci-Engine-Front\Araci Engine\Service\ViewportService.cs
 ====================================================================================================
 
-﻿using System;
+using System;
+using System.Collections.ObjectModel;
 using System.Windows;
 
 using Araci.ViewModels;
@@ -5449,6 +5898,14 @@ namespace Araci.Services
             _vm = vm
                 ?? throw new ArgumentNullException(nameof(vm));
         }
+
+        // =========================
+        // ELEMENTOS VISUAIS
+        // =========================
+
+        public ObservableCollection<ElementoViewModel>
+            Elementos =>
+                _vm.Elementos;
 
         // =========================
         // TAMANHO
@@ -5497,14 +5954,10 @@ namespace Araci.Services
             if (vm == null)
                 return;
 
-            if (!_vm.Document
-                    .Elementos
-                    .Contains(vm))
-            {
-                _vm.Document
-                    .Elementos
-                    .Add(vm);
-            }
+            _vm.RegistrarViewModel(vm);
+
+            AppServices.Document
+                .AdicionarElemento(vm.Modelo);
         }
 
         public void RemoverElemento(
@@ -5513,14 +5966,51 @@ namespace Araci.Services
             if (vm == null)
                 return;
 
-            if (_vm.Document
-                    .Elementos
-                    .Contains(vm))
-            {
-                _vm.Document
-                    .Elementos
-                    .Remove(vm);
-            }
+            AppServices.Document
+                .RemoverElemento(vm.Modelo);
+        }
+    }
+}
+
+
+
+====================================================================================================
+ARQUIVO: C:\Araci-Engine-Front\Araci Engine\ViewModels\Base\RelayCommand.cs
+====================================================================================================
+
+﻿using System;
+using System.Windows.Input;
+
+namespace Araci.ViewModels.Base
+{
+    public class RelayCommand : ICommand
+    {
+        private readonly Action _execute;
+        private readonly Func<bool>? _canExecute;
+
+        public RelayCommand(Action execute, Func<bool>? canExecute = null)
+        {
+            _execute = execute
+                ?? throw new ArgumentNullException(nameof(execute));
+
+            _canExecute = canExecute;
+        }
+
+        public bool CanExecute(object? parameter)
+        {
+            return _canExecute?.Invoke() ?? true;
+        }
+
+        public void Execute(object? parameter)
+        {
+            _execute();
+        }
+
+        public event EventHandler? CanExecuteChanged;
+
+        public void RaiseCanExecuteChanged()
+        {
+            CanExecuteChanged?.Invoke(this, EventArgs.Empty);
         }
     }
 }
@@ -5530,14 +6020,28 @@ namespace Araci.Services
 ARQUIVO: C:\Araci-Engine-Front\Araci Engine\ViewModels\Base\ViewModelBase.cs
 ====================================================================================================
 
-﻿using System.ComponentModel;
+using System.ComponentModel;
 using System.Runtime.CompilerServices;
 
 namespace Araci.ViewModels.Base
 {
-    public abstract class ViewModelBase : INotifyPropertyChanged
+    public abstract class ViewModelBase
+        : INotifyPropertyChanged,
+          IDataErrorInfo
     {
         public event PropertyChangedEventHandler? PropertyChanged;
+
+        public string Error =>
+            string.Empty;
+
+        public string this[string columnName] =>
+            ValidateProperty(columnName);
+
+        protected virtual string ValidateProperty(
+            string propertyName)
+        {
+            return string.Empty;
+        }
 
         protected void OnPropertyChanged(
             [CallerMemberName] string? propertyName = null)
@@ -5565,6 +6069,7 @@ namespace Araci.ViewModels.Base
 }
 
 
+
 ====================================================================================================
 ARQUIVO: C:\Araci-Engine-Front\Araci Engine\ViewModels\CaboViewModel.cs
 ====================================================================================================
@@ -5590,6 +6095,8 @@ namespace Araci.ViewModels
         {
             _cabo = cabo
                 ?? throw new ArgumentNullException(nameof(cabo));
+
+            SelecionarPrimeiroTipoDisponivel();
 
             // =========================
             // GARANTE SEGUNDO PONTO
@@ -5712,6 +6219,18 @@ namespace Araci.ViewModels
 
                 OnPropertyChanged();
             }
+        }
+
+        protected override string ValidateProperty(
+            string propertyName)
+        {
+            return propertyName switch
+            {
+                nameof(Comprimento) when Comprimento < 0 =>
+                    "Comprimento deve ser maior ou igual a zero.",
+
+                _ => string.Empty
+            };
         }
 
 
@@ -5892,11 +6411,12 @@ namespace Araci.ViewModels
 }
 
 
+
 ====================================================================================================
 ARQUIVO: C:\Araci-Engine-Front\Araci Engine\ViewModels\CargaViewModel.cs
 ====================================================================================================
 
-﻿using Araci.Models;
+using Araci.Models;
 using System.Collections;
 using System.Windows.Media;
 
@@ -5905,20 +6425,28 @@ namespace Araci.ViewModels
     public class CargaViewModel
         : ElementoViewModel
     {
-        private readonly Carga _carga;
+        private readonly Carga
+            _carga;
 
-        protected override double LarguraBase => 70;
+        protected override double
+            LarguraBase =>
+                70;
 
-        protected override double AlturaBase => 70;
+        protected override double
+            AlturaBase =>
+                70;
 
-        public override IEnumerable TiposDisponiveis =>
-            AppServices.Types.TiposCargas;
+        public override IEnumerable
+            TiposDisponiveis =>
+                AppServices.Types.TiposCargas;
 
         public CargaViewModel(
             Carga carga)
             : base(carga)
         {
             _carga = carga;
+
+            SelecionarPrimeiroTipoDisponivel();
 
             VisualState.DefinirVisualBase(
                 Brushes.DimGray,
@@ -5927,17 +6455,22 @@ namespace Araci.ViewModels
             AtualizarGeometria();
         }
 
+        // =========================
+        // DADOS
+        // =========================
+
         public string Nome
         {
             get => _carga.Nome;
 
             set
             {
-                if (_carga.Nome != value)
-                {
-                    _carga.Nome = value;
-                    OnPropertyChanged();
-                }
+                if (_carga.Nome == value)
+                    return;
+
+                _carga.Nome = value;
+
+                OnPropertyChanged();
             }
         }
 
@@ -5947,11 +6480,27 @@ namespace Araci.ViewModels
 
             set
             {
-                if (_carga.Barra != value)
-                {
-                    _carga.Barra = value;
-                    OnPropertyChanged();
-                }
+                if (_carga.Barra == value)
+                    return;
+
+                _carga.Barra = value;
+
+                OnPropertyChanged();
+            }
+        }
+
+        public string Alimentador
+        {
+            get => _carga.Alimentador;
+
+            set
+            {
+                if (_carga.Alimentador == value)
+                    return;
+
+                _carga.Alimentador = value;
+
+                OnPropertyChanged();
             }
         }
 
@@ -5961,16 +6510,47 @@ namespace Araci.ViewModels
 
             set
             {
-                if (_carga.PotenciaAtivaKW != value)
-                {
-                    _carga.PotenciaAtivaKW = value;
-                    OnPropertyChanged();
-                }
+                if (_carga.PotenciaAtivaKW == value)
+                    return;
+
+                _carga.PotenciaAtivaKW = value;
+
+                OnPropertyChanged();
             }
         }
 
+        public double PotenciaReativaKvar
+        {
+            get => _carga.PotenciaReativaKvar;
+
+            set
+            {
+                if (_carga.PotenciaReativaKvar == value)
+                    return;
+
+                _carga.PotenciaReativaKvar = value;
+
+                OnPropertyChanged();
+            }
+        }
+
+        protected override string ValidateProperty(
+            string propertyName)
+        {
+            return propertyName switch
+            {
+                nameof(PotenciaAtivaKW) when PotenciaAtivaKW < 0 =>
+                    "Potencia ativa deve ser maior ou igual a zero.",
+
+                nameof(PotenciaReativaKvar) when PotenciaReativaKvar < 0 =>
+                    "Potencia reativa deve ser maior ou igual a zero.",
+
+                _ => string.Empty
+            };
+        }
     }
 }
+
 
 
 ====================================================================================================
@@ -6115,6 +6695,41 @@ namespace Araci.ViewModels
             TiposDisponiveis
         { get; }
 
+        protected void SelecionarPrimeiroTipoDisponivel()
+        {
+            TipoElemento? primeiroTipo =
+                null;
+
+            bool tipoAtualExisteNaLista =
+                false;
+
+            foreach (object? item in TiposDisponiveis)
+            {
+                if (item is not TipoElemento tipo)
+                    continue;
+
+                primeiroTipo ??=
+                    tipo;
+
+                if (ReferenceEquals(tipo, _modelo.Tipo))
+                {
+                    tipoAtualExisteNaLista =
+                        true;
+
+                    break;
+                }
+            }
+
+            if (tipoAtualExisteNaLista ||
+                primeiroTipo == null)
+            {
+                return;
+            }
+
+            Tipo =
+                primeiroTipo;
+        }
+
         public virtual TipoElementoViewModel?
             TipoViewModel =>
                 TipoElementoViewModelFactory
@@ -6124,10 +6739,11 @@ namespace Araci.ViewModels
         // COMANDO
         // ====================================================
 
-        public ICommand
-            AbrirPropriedadesTipoCommand =>
-                new RelayCommand(
-                    AbrirPropriedadesTipo);
+        private ICommand? _abrirPropriedadesTipoCommand;
+
+        public ICommand AbrirPropriedadesTipoCommand =>
+            _abrirPropriedadesTipoCommand ??=
+                new RelayCommand(AbrirPropriedadesTipo);
 
         private void AbrirPropriedadesTipo()
         {
@@ -6135,8 +6751,7 @@ namespace Araci.ViewModels
                 new TypePropertiesWindow
                 {
                     Owner =
-                        Application.Current
-                            .MainWindow,
+                        Application.Current.MainWindow,
 
                     DataContext =
                         TipoViewModel
@@ -6374,11 +6989,12 @@ namespace Araci.ViewModels
 }
 
 
+
 ====================================================================================================
 ARQUIVO: C:\Araci-Engine-Front\Araci Engine\ViewModels\GeradorViewModel.cs
 ====================================================================================================
 
-﻿using Araci.Models;
+using Araci.Models;
 using System.Collections;
 using System.Windows.Media;
 
@@ -6387,20 +7003,28 @@ namespace Araci.ViewModels
     public class GeradorViewModel
         : ElementoViewModel
     {
-        private readonly Gerador _gerador;
+        private readonly Gerador
+            _gerador;
 
-        protected override double LarguraBase => 80;
+        protected override double
+            LarguraBase =>
+                80;
 
-        protected override double AlturaBase => 80;
+        protected override double
+            AlturaBase =>
+                80;
 
-        public override IEnumerable TiposDisponiveis =>
-            AppServices.Types.TiposGeradores;
+        public override IEnumerable
+            TiposDisponiveis =>
+                AppServices.Types.TiposGeradores;
 
         public GeradorViewModel(
             Gerador gerador)
             : base(gerador)
         {
             _gerador = gerador;
+
+            SelecionarPrimeiroTipoDisponivel();
 
             VisualState.DefinirVisualBase(
                 Brushes.DimGray,
@@ -6409,17 +7033,22 @@ namespace Araci.ViewModels
             AtualizarGeometria();
         }
 
+        // =========================
+        // DADOS
+        // =========================
+
         public string Nome
         {
             get => _gerador.Nome;
 
             set
             {
-                if (_gerador.Nome != value)
-                {
-                    _gerador.Nome = value;
-                    OnPropertyChanged();
-                }
+                if (_gerador.Nome == value)
+                    return;
+
+                _gerador.Nome = value;
+
+                OnPropertyChanged();
             }
         }
 
@@ -6429,11 +7058,27 @@ namespace Araci.ViewModels
 
             set
             {
-                if (_gerador.Barra != value)
-                {
-                    _gerador.Barra = value;
-                    OnPropertyChanged();
-                }
+                if (_gerador.Barra == value)
+                    return;
+
+                _gerador.Barra = value;
+
+                OnPropertyChanged();
+            }
+        }
+
+        public string Alimentador
+        {
+            get => _gerador.Alimentador;
+
+            set
+            {
+                if (_gerador.Alimentador == value)
+                    return;
+
+                _gerador.Alimentador = value;
+
+                OnPropertyChanged();
             }
         }
 
@@ -6443,16 +7088,48 @@ namespace Araci.ViewModels
 
             set
             {
-                if (_gerador.PotenciaAtivaKW != value)
-                {
-                    _gerador.PotenciaAtivaKW = value;
-                    OnPropertyChanged();
-                }
+                if (_gerador.PotenciaAtivaKW == value)
+                    return;
+
+                _gerador.PotenciaAtivaKW = value;
+
+                OnPropertyChanged();
             }
         }
 
+        public double FatorPotencia
+        {
+            get => _gerador.FatorPotencia;
+
+            set
+            {
+                if (_gerador.FatorPotencia == value)
+                    return;
+
+                _gerador.FatorPotencia = value;
+
+                OnPropertyChanged();
+            }
+        }
+
+        protected override string ValidateProperty(
+            string propertyName)
+        {
+            return propertyName switch
+            {
+                nameof(PotenciaAtivaKW) when PotenciaAtivaKW < 0 =>
+                    "Potencia ativa deve ser maior ou igual a zero.",
+
+                nameof(FatorPotencia) when FatorPotencia < 0 ||
+                                          FatorPotencia > 1 =>
+                    "Fator de potencia deve estar entre 0 e 1.",
+
+                _ => string.Empty
+            };
+        }
     }
 }
+
 
 
 ====================================================================================================
@@ -6615,46 +7292,92 @@ ARQUIVO: C:\Araci-Engine-Front\Araci Engine\ViewModels\TipoCaboViewModel.cs
 
 namespace Araci.ViewModels
 {
-    public class TipoCaboViewModel
-        : TipoElementoViewModel
+    public class TipoCaboViewModel : TipoElementoViewModel
     {
-        // =========================
-        // TIPO FORTE
-        // =========================
-
-        protected TipoCabo TipoCabo =>
-            (TipoCabo)_tipo;
-
-        // =========================
-        // CONSTRUTOR
-        // =========================
+        protected TipoCabo TipoCabo => (TipoCabo)_tipo;
 
         public TipoCaboViewModel(TipoCabo tipo)
             : base(tipo)
         {
         }
 
-        // =========================
-        // PROPRIEDADES
-        // =========================
+        public double Resistencia
+        {
+            get => TipoCabo.Resistencia;
+            set
+            {
+                if (TipoCabo.Resistencia == value)
+                    return;
 
-        public double Resistencia =>
-            TipoCabo.Resistencia;
+                TipoCabo.Resistencia = value;
+                OnPropertyChanged();
+            }
+        }
 
-        public double Reatancia =>
-            TipoCabo.Reatancia;
+        public double Reatancia
+        {
+            get => TipoCabo.Reatancia;
+            set
+            {
+                if (TipoCabo.Reatancia == value)
+                    return;
 
-        public double Capacitancia =>
-            TipoCabo.Capacitancia;
+                TipoCabo.Reatancia = value;
+                OnPropertyChanged();
+            }
+        }
 
-        public double Ampacidade =>
-            TipoCabo.Ampacidade;
+        public double Capacitancia
+        {
+            get => TipoCabo.Capacitancia;
+            set
+            {
+                if (TipoCabo.Capacitancia == value)
+                    return;
 
-        public int Fases =>
-            TipoCabo.Fases;
+                TipoCabo.Capacitancia = value;
+                OnPropertyChanged();
+            }
+        }
 
-        public bool Neutro =>
-            TipoCabo.Neutro;
+        public double Ampacidade
+        {
+            get => TipoCabo.Ampacidade;
+            set
+            {
+                if (TipoCabo.Ampacidade == value)
+                    return;
+
+                TipoCabo.Ampacidade = value;
+                OnPropertyChanged();
+            }
+        }
+
+        public int Fases
+        {
+            get => TipoCabo.Fases;
+            set
+            {
+                if (TipoCabo.Fases == value)
+                    return;
+
+                TipoCabo.Fases = value;
+                OnPropertyChanged();
+            }
+        }
+
+        public bool Neutro
+        {
+            get => TipoCabo.Neutro;
+            set
+            {
+                if (TipoCabo.Neutro == value)
+                    return;
+
+                TipoCabo.Neutro = value;
+                OnPropertyChanged();
+            }
+        }
     }
 }
 
@@ -6663,7 +7386,7 @@ namespace Araci.ViewModels
 ARQUIVO: C:\Araci-Engine-Front\Araci Engine\ViewModels\TipoCargaViewModel.cs
 ====================================================================================================
 
-﻿using Araci.Models.Tipos;
+using Araci.Models.Tipos;
 
 namespace Araci.ViewModels
 {
@@ -6681,7 +7404,8 @@ namespace Araci.ViewModels
         // CONSTRUTOR
         // =========================
 
-        public TipoCargaViewModel(TipoCarga tipo)
+        public TipoCargaViewModel(
+            TipoCarga tipo)
             : base(tipo)
         {
         }
@@ -6690,22 +7414,83 @@ namespace Araci.ViewModels
         // PROPRIEDADES
         // =========================
 
-        public string ModeloCarga =>
-            TipoCarga.ModeloCarga;
+        public string ModeloCarga
+        {
+            get => TipoCarga.ModeloCarga;
 
-        public string Conexao =>
-            TipoCarga.Conexao;
+            set
+            {
+                if (TipoCarga.ModeloCarga == value)
+                    return;
 
-        public double TensaoKV =>
-            TipoCarga.TensaoKV;
+                TipoCarga.ModeloCarga = value;
 
-        public int Fases =>
-            TipoCarga.Fases;
+                OnPropertyChanged();
+            }
+        }
 
-        public double FatorPotencia =>
-            TipoCarga.FatorPotencia;
+        public string Conexao
+        {
+            get => TipoCarga.Conexao;
+
+            set
+            {
+                if (TipoCarga.Conexao == value)
+                    return;
+
+                TipoCarga.Conexao = value;
+
+                OnPropertyChanged();
+            }
+        }
+
+        public double TensaoKV
+        {
+            get => TipoCarga.TensaoKV;
+
+            set
+            {
+                if (TipoCarga.TensaoKV == value)
+                    return;
+
+                TipoCarga.TensaoKV = value;
+
+                OnPropertyChanged();
+            }
+        }
+
+        public int Fases
+        {
+            get => TipoCarga.Fases;
+
+            set
+            {
+                if (TipoCarga.Fases == value)
+                    return;
+
+                TipoCarga.Fases = value;
+
+                OnPropertyChanged();
+            }
+        }
+
+        public double FatorPotencia
+        {
+            get => TipoCarga.FatorPotencia;
+
+            set
+            {
+                if (TipoCarga.FatorPotencia == value)
+                    return;
+
+                TipoCarga.FatorPotencia = value;
+
+                OnPropertyChanged();
+            }
+        }
     }
 }
+
 
 
 ====================================================================================================
@@ -6717,8 +7502,7 @@ using Araci.ViewModels.Base;
 
 namespace Araci.ViewModels
 {
-    public abstract class TipoElementoViewModel
-        : ViewModelBase
+    public abstract class TipoElementoViewModel : ViewModelBase
     {
         protected readonly TipoElemento _tipo;
 
@@ -6727,17 +7511,46 @@ namespace Araci.ViewModels
             _tipo = tipo;
         }
 
-        public TipoElemento Tipo =>
-            _tipo;
+        public TipoElemento Tipo => _tipo;
 
-        public string NomeTipo =>
-            _tipo.NomeTipo;
+        public string NomeTipo
+        {
+            get => _tipo.NomeTipo;
+            set
+            {
+                if (_tipo.NomeTipo == value)
+                    return;
 
-        public string Familia =>
-            _tipo.Familia;
+                _tipo.NomeTipo = value;
+                OnPropertyChanged();
+            }
+        }
 
-        public string Categoria =>
-            _tipo.Categoria;
+        public string Familia
+        {
+            get => _tipo.Familia;
+            set
+            {
+                if (_tipo.Familia == value)
+                    return;
+
+                _tipo.Familia = value;
+                OnPropertyChanged();
+            }
+        }
+
+        public string Categoria
+        {
+            get => _tipo.Categoria;
+            set
+            {
+                if (_tipo.Categoria == value)
+                    return;
+
+                _tipo.Categoria = value;
+                OnPropertyChanged();
+            }
+        }
     }
 }
 
@@ -6746,18 +7559,56 @@ namespace Araci.ViewModels
 ARQUIVO: C:\Araci-Engine-Front\Araci Engine\ViewModels\TipoElementoViewModelFactory.cs
 ====================================================================================================
 
-﻿using Araci.Models.Tipos;
+using System.Collections.Generic;
+
+using Araci.Models.Tipos;
 
 namespace Araci.ViewModels
 {
     public static class TipoElementoViewModelFactory
     {
+        private static readonly Dictionary<TipoElemento, TipoElementoViewModel>
+            _cache = new();
+
         public static TipoElementoViewModel?
             Criar(TipoElemento? tipo)
         {
             if (tipo == null)
                 return null;
 
+            if (_cache.TryGetValue(
+                    tipo,
+                    out TipoElementoViewModel? existente))
+            {
+                return existente;
+            }
+
+            TipoElementoViewModel? criado =
+                CriarNovo(tipo);
+
+            if (criado != null)
+            {
+                _cache[tipo] =
+                    criado;
+            }
+
+            return criado;
+        }
+
+        public static void Remover(
+            TipoElemento tipo)
+        {
+            _cache.Remove(tipo);
+        }
+
+        public static void Limpar()
+        {
+            _cache.Clear();
+        }
+
+        private static TipoElementoViewModel?
+            CriarNovo(TipoElemento tipo)
+        {
             return tipo switch
             {
                 TipoCabo cabo =>
@@ -6776,11 +7627,12 @@ namespace Araci.ViewModels
 }
 
 
+
 ====================================================================================================
 ARQUIVO: C:\Araci-Engine-Front\Araci Engine\ViewModels\TipoGeradorViewModel.cs
 ====================================================================================================
 
-﻿using Araci.Models.Tipos;
+using Araci.Models.Tipos;
 
 namespace Araci.ViewModels
 {
@@ -6798,7 +7650,8 @@ namespace Araci.ViewModels
         // CONSTRUTOR
         // =========================
 
-        public TipoGeradorViewModel(TipoGerador tipo)
+        public TipoGeradorViewModel(
+            TipoGerador tipo)
             : base(tipo)
         {
         }
@@ -6807,41 +7660,122 @@ namespace Araci.ViewModels
         // PROPRIEDADES
         // =========================
 
-        public string CategoriaGerador =>
-            TipoGerador.CategoriaGerador;
+        public string CategoriaGerador
+        {
+            get => TipoGerador.CategoriaGerador;
 
-        public string Fabricante =>
-            TipoGerador.Fabricante;
+            set
+            {
+                if (TipoGerador.CategoriaGerador == value)
+                    return;
 
-        public string Modelo =>
-            TipoGerador.Modelo;
+                TipoGerador.CategoriaGerador = value;
 
-        public double PotenciaNominalKW =>
-            TipoGerador.PotenciaNominalKW;
+                OnPropertyChanged();
+            }
+        }
 
-        public double TensaoKV =>
-            TipoGerador.TensaoKV;
+        public string Fabricante
+        {
+            get => TipoGerador.Fabricante;
 
-        public int Fases =>
-            TipoGerador.Fases;
+            set
+            {
+                if (TipoGerador.Fabricante == value)
+                    return;
+
+                TipoGerador.Fabricante = value;
+
+                OnPropertyChanged();
+            }
+        }
+
+        public string Modelo
+        {
+            get => TipoGerador.Modelo;
+
+            set
+            {
+                if (TipoGerador.Modelo == value)
+                    return;
+
+                TipoGerador.Modelo = value;
+
+                OnPropertyChanged();
+            }
+        }
+
+        public double PotenciaNominalKW
+        {
+            get => TipoGerador.PotenciaNominalKW;
+
+            set
+            {
+                if (TipoGerador.PotenciaNominalKW == value)
+                    return;
+
+                TipoGerador.PotenciaNominalKW = value;
+
+                OnPropertyChanged();
+            }
+        }
+
+        public double TensaoKV
+        {
+            get => TipoGerador.TensaoKV;
+
+            set
+            {
+                if (TipoGerador.TensaoKV == value)
+                    return;
+
+                TipoGerador.TensaoKV = value;
+
+                OnPropertyChanged();
+            }
+        }
+
+        public int Fases
+        {
+            get => TipoGerador.Fases;
+
+            set
+            {
+                if (TipoGerador.Fases == value)
+                    return;
+
+                TipoGerador.Fases = value;
+
+                OnPropertyChanged();
+            }
+        }
     }
 }
+
 
 
 ====================================================================================================
 ARQUIVO: C:\Araci-Engine-Front\Araci Engine\ViewModels\ViewportViewModel.cs
 ====================================================================================================
 
-﻿using System.ComponentModel;
+using System.Collections.Generic;
+using System.Collections.ObjectModel;
+using System.Collections.Specialized;
+using System.ComponentModel;
 using System.Runtime.CompilerServices;
 
 using Araci.Core.Documents;
+using Araci.Models;
+using Araci.Services;
 
 namespace Araci.ViewModels
 {
     public class ViewportViewModel
         : INotifyPropertyChanged
     {
+        private readonly Dictionary<Elemento, ElementoViewModel>
+            _viewModelsPorModelo = new();
+
         // =========================
         // DOCUMENTO
         // =========================
@@ -6851,6 +7785,15 @@ namespace Araci.ViewModels
         { get; }
 
         // =========================
+        // ELEMENTOS VISUAIS
+        // =========================
+
+        public ObservableCollection<ElementoViewModel>
+            Elementos
+        { get; }
+            = new();
+
+        // =========================
         // CONSTRUTOR
         // =========================
 
@@ -6858,6 +7801,114 @@ namespace Araci.ViewModels
             AraciDocument document)
         {
             Document = document;
+
+            Document.Elementos.CollectionChanged +=
+                OnDocumentElementosChanged;
+
+            SincronizarComDocumento();
+        }
+
+        // =========================
+        // REGISTRO
+        // =========================
+
+        public void RegistrarViewModel(
+            ElementoViewModel vm)
+        {
+            _viewModelsPorModelo[vm.Modelo] =
+                vm;
+        }
+
+        // =========================
+        // SINCRONIZAÇÃO
+        // =========================
+
+        private void OnDocumentElementosChanged(
+            object? sender,
+            NotifyCollectionChangedEventArgs e)
+        {
+            if (e.Action == NotifyCollectionChangedAction.Reset)
+            {
+                Elementos.Clear();
+
+                return;
+            }
+
+            if (e.OldItems != null)
+            {
+                foreach (Elemento modelo in e.OldItems)
+                {
+                    RemoverViewModel(modelo);
+                }
+            }
+
+            if (e.NewItems != null)
+            {
+                foreach (Elemento modelo in e.NewItems)
+                {
+                    AdicionarViewModel(modelo);
+                }
+            }
+        }
+
+        private void SincronizarComDocumento()
+        {
+            Elementos.Clear();
+
+            foreach (Elemento modelo in Document.Elementos)
+            {
+                AdicionarViewModel(modelo);
+            }
+        }
+
+        private void AdicionarViewModel(
+            Elemento modelo)
+        {
+            ElementoViewModel? vm =
+                ObterOuCriarViewModel(modelo);
+
+            if (vm == null ||
+                Elementos.Contains(vm))
+            {
+                return;
+            }
+
+            Elementos.Add(vm);
+        }
+
+        private void RemoverViewModel(
+            Elemento modelo)
+        {
+            if (!_viewModelsPorModelo.TryGetValue(
+                    modelo,
+                    out ElementoViewModel? vm))
+            {
+                return;
+            }
+
+            Elementos.Remove(vm);
+        }
+
+        private ElementoViewModel? ObterOuCriarViewModel(
+            Elemento modelo)
+        {
+            if (_viewModelsPorModelo.TryGetValue(
+                    modelo,
+                    out ElementoViewModel? existente))
+            {
+                return existente;
+            }
+
+            ElementoViewModel? vm =
+                ElementoFactory.CriarViewModel(modelo);
+
+            if (vm != null)
+            {
+                _viewModelsPorModelo[modelo] =
+                    vm;
+            }
+
+            return vm;
         }
 
         // =========================
@@ -6877,6 +7928,7 @@ namespace Araci.ViewModels
         }
     }
 }
+
 
 
 ====================================================================================================
@@ -7203,7 +8255,7 @@ ARQUIVO: C:\Araci-Engine-Front\Araci Engine\Views\ViewportView.xaml
             <!-- ELEMENTOS -->
             <!-- ========================= -->
 
-            <ItemsControl ItemsSource="{Binding Document.Elementos}"
+            <ItemsControl ItemsSource="{Binding Elementos}"
                           ClipToBounds="True"
                           SnapsToDevicePixels="True"
                           HorizontalContentAlignment="Left"
@@ -7321,6 +8373,7 @@ ARQUIVO: C:\Araci-Engine-Front\Araci Engine\Views\ViewportView.xaml
     </Border>
 
 </UserControl>
+
 
 
 ====================================================================================================

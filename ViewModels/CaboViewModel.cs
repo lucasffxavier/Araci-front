@@ -145,6 +145,18 @@ namespace Araci.ViewModels
             }
         }
 
+        protected override string ValidateProperty(
+            string propertyName)
+        {
+            return propertyName switch
+            {
+                nameof(Comprimento) when Comprimento < 0 =>
+                    "Comprimento deve ser maior ou igual a zero.",
+
+                _ => string.Empty
+            };
+        }
+
 
         // =========================
         // GEOMETRIA

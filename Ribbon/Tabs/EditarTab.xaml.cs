@@ -21,6 +21,8 @@ namespace Araci.Ribbon.Tabs
 
         private readonly Brush _brushAtivo =  new SolidColorBrush(Color.FromRgb(210, 230, 255));
 
+        private bool _eventoFerramentaAssinado;
+
         // =========================
         // CONSTRUTOR
         // =========================
@@ -30,6 +32,8 @@ namespace Araci.Ribbon.Tabs
             InitializeComponent();
 
             Loaded += OnLoaded;
+
+            Unloaded += OnUnloaded;
         }
 
         // =========================
@@ -38,9 +42,46 @@ namespace Araci.Ribbon.Tabs
 
         private void OnLoaded(object sender, RoutedEventArgs e)
         {
-            AppServices.Tools.FerramentaAlterada += OnFerramentaAlterada;
+            AssinarEventoFerramenta();
 
             AtualizarBotoes(AppServices.Tools.FerramentaAtual);
+        }
+
+        // =========================
+        // UNLOADED
+        // =========================
+
+        private void OnUnloaded(object sender, RoutedEventArgs e)
+        {
+            DesassinarEventoFerramenta();
+        }
+
+        // =========================
+        // EVENTOS
+        // =========================
+
+        private void AssinarEventoFerramenta()
+        {
+            if (_eventoFerramentaAssinado)
+                return;
+
+            AppServices.Tools.FerramentaAlterada +=
+                OnFerramentaAlterada;
+
+            _eventoFerramentaAssinado =
+                true;
+        }
+
+        private void DesassinarEventoFerramenta()
+        {
+            if (!_eventoFerramentaAssinado)
+                return;
+
+            AppServices.Tools.FerramentaAlterada -=
+                OnFerramentaAlterada;
+
+            _eventoFerramentaAssinado =
+                false;
         }
 
         // =========================

@@ -1,11 +1,25 @@
-﻿using System.ComponentModel;
+using System.ComponentModel;
 using System.Runtime.CompilerServices;
 
 namespace Araci.ViewModels.Base
 {
-    public abstract class ViewModelBase : INotifyPropertyChanged
+    public abstract class ViewModelBase
+        : INotifyPropertyChanged,
+          IDataErrorInfo
     {
         public event PropertyChangedEventHandler? PropertyChanged;
+
+        public string Error =>
+            string.Empty;
+
+        public string this[string columnName] =>
+            ValidateProperty(columnName);
+
+        protected virtual string ValidateProperty(
+            string propertyName)
+        {
+            return string.Empty;
+        }
 
         protected void OnPropertyChanged(
             [CallerMemberName] string? propertyName = null)
