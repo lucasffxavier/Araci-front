@@ -1,9 +1,9 @@
-﻿using System.Windows;
+using System.Windows;
 
-using Araci.Core.Documents;
-using Araci.Services;
 using Araci.Core.Commands;
+using Araci.Core.Documents;
 using Araci.Core.Transactions;
+using Araci.Services;
 using Araci.ViewModels;
 
 namespace Araci
@@ -11,20 +11,36 @@ namespace Araci
     public static class AppServices
     {
         // =========================
+        // CONTEXTO
+        // =========================
+
+        public static EditorContext Context
+        { get; private set; }
+            = new EditorContext();
+
+        public static void ResetContext(
+            EditorContext? context = null)
+        {
+            Context =
+                context ?? new EditorContext();
+        }
+
+        // =========================
         // DOCUMENTO CENTRAL
         // =========================
 
         public static AraciDocument Document
-        { get; set; }
-            = new AraciDocument();
+        {
+            get => Context.Document;
+            set => Context.Document = value;
+        }
 
         // =========================
         // TOOLS
         // =========================
 
-        public static ToolService Tools
-        { get; }
-            = new ToolService();
+        public static ToolService Tools =>
+            Context.Tools;
 
         // =========================
         // VIEWPORT
@@ -32,63 +48,60 @@ namespace Araci
 
         public static ViewportService?
             Viewport
-        { get; set; }
+        {
+            get => Context.Viewport;
+            set => Context.Viewport = value;
+        }
 
         public static FrameworkElement?
             ViewportReference
-        { get; set; }
+        {
+            get => Context.ViewportReference;
+            set => Context.ViewportReference = value;
+        }
 
         // =========================
         // EDITOR
         // =========================
 
-        public static EditorState Editor
-        { get; }
-            = new EditorState();
+        public static EditorState Editor =>
+            Context.Editor;
 
         // =========================
         // HUD
         // =========================
 
-        public static MoveHudService MoveHud
-        { get; }
-            = new MoveHudService();
+        public static MoveHudService MoveHud =>
+            Context.MoveHud;
 
         // =========================
         // SELECTION BOX
         // =========================
 
-        public static SelectionBoxViewModel
-            SelectionBox
-        { get; }
-            = new SelectionBoxViewModel();
+        public static SelectionBoxViewModel SelectionBox =>
+            Context.SelectionBox;
 
         // =========================
         // COMMANDS
         // =========================
 
-        public static CommandManager
-            Commands
-        { get; }
-            = new CommandManager();
+        public static CommandManager Commands =>
+            Context.Commands;
 
         // =========================
         // TRANSACTIONS
         // =========================
 
-        public static TransactionScope
-            BeginTransaction()
+        public static TransactionScope BeginTransaction()
         {
-            return new TransactionScope(Commands);
+            return Context.BeginTransaction();
         }
 
         // =========================
         // TYPES
         // =========================
 
-        public static TypeLibraryService
-            Types
-        { get; }
-            = new TypeLibraryService();
+        public static TypeLibraryService Types =>
+            Context.Types;
     }
 }
