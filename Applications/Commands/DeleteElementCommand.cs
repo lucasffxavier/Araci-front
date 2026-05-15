@@ -13,14 +13,21 @@ namespace Araci.Core.Commands
         private readonly ElementoViewModel
             _vm;
 
+        private readonly EditorContext
+            _context;
+
         // =========================
         // CONSTRUTOR
         // =========================
 
         public DeleteElementCommand(
-            ElementoViewModel vm)
+            ElementoViewModel vm,
+            EditorContext? context = null)
         {
             _vm = vm;
+
+            _context = context
+                ?? AppServices.Current;
         }
 
         // =========================
@@ -40,7 +47,7 @@ namespace Araci.Core.Commands
                     .RemoverElemento(_vm.Modelo);
             }
 
-            SelectionService
+            _context.Selection
                 .Deselecionar(_vm);
         }
 

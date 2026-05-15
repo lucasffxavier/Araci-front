@@ -13,9 +13,14 @@ namespace Araci.Views
     {
         private readonly ViewportViewModel _viewportViewModel;
 
+        private readonly EditorContext _context;
+
         public ViewportView()
         {
             InitializeComponent();
+
+            _context =
+                AppServices.Current;
 
             if (AppServices.Document == null)
             {
@@ -165,7 +170,7 @@ namespace Araci.Views
             {
                 AppServices.Tools.VoltarParaSelecao();
 
-                SelectionService.Limpar();
+                _context.Selection.Limpar();
 
                 e.Handled = true;
             }

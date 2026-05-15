@@ -227,6 +227,14 @@ namespace Araci.ViewModels
 
             OnPropertyChanged(nameof(Y));
 
+            OnPropertyChanged(nameof(WorldX));
+
+            OnPropertyChanged(nameof(WorldY));
+
+            OnPropertyChanged(nameof(ScreenX));
+
+            OnPropertyChanged(nameof(ScreenY));
+
             OnPropertyChanged(nameof(Largura));
 
             OnPropertyChanged(nameof(Altura));
@@ -237,8 +245,14 @@ namespace Araci.ViewModels
         }
 
         // ====================================================
-        // POSIÇÃO
+        // POSIÇÃO EM MUNDO
         // ====================================================
+
+        public double WorldX =>
+            X;
+
+        public double WorldY =>
+            Y;
 
         public virtual double X
         {
@@ -283,6 +297,16 @@ namespace Araci.ViewModels
                 AtualizarGeometria();
             }
         }
+
+        // ====================================================
+        // POSIÇÃO EM TELA
+        // ====================================================
+
+        public virtual double ScreenX =>
+            Bounds.X;
+
+        public virtual double ScreenY =>
+            Bounds.Y;
 
         // ====================================================
         // MOVIMENTO

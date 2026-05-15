@@ -10,6 +10,19 @@ namespace Araci.Services
     public class EditorContext
     {
         // =========================
+        // CONSTRUTOR
+        // =========================
+
+        public EditorContext()
+        {
+            Move =
+                new MoveService(this);
+
+            Tools =
+                new ToolService(this);
+        }
+
+        // =========================
         // DOCUMENTO
         // =========================
 
@@ -23,7 +36,6 @@ namespace Araci.Services
 
         public ToolService Tools
         { get; }
-            = new ToolService();
 
         // =========================
         // VIEWPORT
@@ -68,6 +80,21 @@ namespace Araci.Services
         public CommandManager Commands
         { get; }
             = new CommandManager();
+
+        // =========================
+        // SELECTION
+        // =========================
+
+        public SelectionService Selection
+        { get; }
+            = new SelectionService();
+
+        // =========================
+        // MOVE
+        // =========================
+
+        public MoveService Move
+        { get; }
 
         // =========================
         // TYPES

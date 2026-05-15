@@ -14,14 +14,20 @@ namespace Araci
         // CONTEXTO
         // =========================
 
-        public static EditorContext Context
-        { get; private set; }
+        public static EditorContext Current
+        { get; set; }
             = new EditorContext();
+
+        public static EditorContext Context
+        {
+            get => Current;
+            private set => Current = value;
+        }
 
         public static void ResetContext(
             EditorContext? context = null)
         {
-            Context =
+            Current =
                 context ?? new EditorContext();
         }
 
@@ -31,8 +37,8 @@ namespace Araci
 
         public static AraciDocument Document
         {
-            get => Context.Document;
-            set => Context.Document = value;
+            get => Current.Document;
+            set => Current.Document = value;
         }
 
         // =========================
@@ -40,7 +46,7 @@ namespace Araci
         // =========================
 
         public static ToolService Tools =>
-            Context.Tools;
+            Current.Tools;
 
         // =========================
         // VIEWPORT
@@ -49,15 +55,15 @@ namespace Araci
         public static ViewportService?
             Viewport
         {
-            get => Context.Viewport;
-            set => Context.Viewport = value;
+            get => Current.Viewport;
+            set => Current.Viewport = value;
         }
 
         public static FrameworkElement?
             ViewportReference
         {
-            get => Context.ViewportReference;
-            set => Context.ViewportReference = value;
+            get => Current.ViewportReference;
+            set => Current.ViewportReference = value;
         }
 
         // =========================
@@ -65,28 +71,42 @@ namespace Araci
         // =========================
 
         public static EditorState Editor =>
-            Context.Editor;
+            Current.Editor;
 
         // =========================
         // HUD
         // =========================
 
         public static MoveHudService MoveHud =>
-            Context.MoveHud;
+            Current.MoveHud;
 
         // =========================
         // SELECTION BOX
         // =========================
 
         public static SelectionBoxViewModel SelectionBox =>
-            Context.SelectionBox;
+            Current.SelectionBox;
 
         // =========================
         // COMMANDS
         // =========================
 
         public static CommandManager Commands =>
-            Context.Commands;
+            Current.Commands;
+
+        // =========================
+        // SELECTION
+        // =========================
+
+        public static SelectionService Selection =>
+            Current.Selection;
+
+        // =========================
+        // MOVE
+        // =========================
+
+        public static MoveService Move =>
+            Current.Move;
 
         // =========================
         // TRANSACTIONS
@@ -94,7 +114,7 @@ namespace Araci
 
         public static TransactionScope BeginTransaction()
         {
-            return Context.BeginTransaction();
+            return Current.BeginTransaction();
         }
 
         // =========================
@@ -102,6 +122,6 @@ namespace Araci
         // =========================
 
         public static TypeLibraryService Types =>
-            Context.Types;
+            Current.Types;
     }
 }

@@ -23,14 +23,24 @@ namespace Araci.Services
 
         private ITool _ferramentaAtual;
 
+        private readonly EditorContext _context;
+
         // =========================
         // CONSTRUTOR
         // =========================
 
         public ToolService()
+            : this(AppServices.Current)
         {
+        }
+
+        public ToolService(EditorContext context)
+        {
+            _context = context
+                ?? throw new ArgumentNullException(nameof(context));
+
             _ferramentaAtual =
-                new SelecionarTool();
+                new SelecionarTool(_context);
 
             _ferramentaAtual.Ativar();
         }
@@ -78,7 +88,7 @@ namespace Araci.Services
                 return;
 
             FerramentaAtual =
-                new SelecionarTool();
+                new SelecionarTool(_context);
         }
 
         // =========================
@@ -130,7 +140,7 @@ namespace Araci.Services
 
             if (Keyboard.Modifiers == ModifierKeys.Control && key == Key.Z)
             {
-                AppServices.Commands.Undo();
+                _context.Commands.Undo();
 
                 return;
             }
@@ -141,7 +151,7 @@ namespace Araci.Services
 
             if (Keyboard.Modifiers == ModifierKeys.Control && key == Key.Y)
             {
-                AppServices.Commands.Redo();
+                _context.Commands.Redo();
 
                 return;
             }
@@ -152,7 +162,7 @@ namespace Araci.Services
 
             if (Keyboard.Modifiers == ModifierKeys.Control && key == Key.C)
             {
-                ClipboardService.CopiarSelecionados();
+                ClipboardService.CopiarSelecionados(_context);
 
                 return;
             }
@@ -163,7 +173,7 @@ namespace Araci.Services
 
             if (Keyboard.Modifiers == ModifierKeys.Control && key == Key.V)
             {
-                ClipboardService.Colar();
+                ClipboardService.Colar(_context);
 
                 return;
             }

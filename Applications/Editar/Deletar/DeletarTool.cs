@@ -11,6 +11,14 @@ namespace Araci.Applications.Editar.Deletar
 {
     public class DeletarTool : ITool
     {
+        private readonly EditorContext _context;
+
+        public DeletarTool(EditorContext context)
+        {
+            _context = context
+                ?? throw new System.ArgumentNullException(nameof(context));
+        }
+
         public string Nome => "Deletar";
 
         public bool MantemBotaoAtivado => true;
@@ -24,7 +32,7 @@ namespace Araci.Applications.Editar.Deletar
             Point position)
         {
             var selecionados =
-                SelectionService
+                _context.Selection
                     .Selecionados
                     .ToList();
 
@@ -32,12 +40,14 @@ namespace Araci.Applications.Editar.Deletar
                 return;
 
             using var tx =
-                AppServices.BeginTransaction();
+                _context.BeginTransaction();
 
             foreach (var item in selecionados)
             {
                 tx.Add(
-                    new DeleteElementCommand(item));
+                    new DeleteElementCommand(
+                        item,
+                        _context));
             }
 
             tx.Commit();

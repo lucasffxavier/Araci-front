@@ -26,11 +26,15 @@ namespace Araci.Services
         // COPIAR
         // =========================
 
-        public static void CopiarSelecionados()
+        public static void CopiarSelecionados(
+            EditorContext? context = null)
         {
+            var editorContext =
+                context ?? AppServices.Current;
+
             _buffer.Clear();
 
-            foreach (var item in SelectionService.Selecionados)
+            foreach (var item in editorContext.Selection.Selecionados)
             {
                 _buffer.Add(item.Modelo.Clonar());
             }
@@ -40,14 +44,19 @@ namespace Araci.Services
         // COLAR
         // =========================
 
-        public static void Colar()
+        public static void Colar(
+            EditorContext? context = null)
         {
+            var editorContext =
+                context ?? AppServices.Current;
+
             if (_buffer.Count == 0)
                 return;
 
             var novos = new List<ElementoViewModel>();
 
-            using var transaction = AppServices.BeginTransaction();
+            using var transaction =
+                editorContext.BeginTransaction();
 
             foreach (var item in _buffer)
             {
@@ -67,7 +76,9 @@ namespace Araci.Services
 
             transaction.Commit();
 
-            AtualizarSelecao(novos);
+            AtualizarSelecao(
+                editorContext,
+                novos);
 
             AtualizarBuffer(novos);
         }
@@ -92,13 +103,15 @@ namespace Araci.Services
         // SELEÇÃO
         // =========================
 
-        private static void AtualizarSelecao(List<ElementoViewModel> elementos)
+        private static void AtualizarSelecao(
+            EditorContext context,
+            List<ElementoViewModel> elementos)
         {
-            SelectionService.Limpar();
+            context.Selection.Limpar();
 
             foreach (var item in elementos)
             {
-                SelectionService.Selecionar(item, true);
+                context.Selection.Selecionar(item, true);
             }
         }
 

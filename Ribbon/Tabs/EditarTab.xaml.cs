@@ -145,29 +145,31 @@ namespace Araci.Ribbon.Tabs
         private void SelecionarButton_Click(object sender, RoutedEventArgs e)
         {
             AppServices.Tools.AtivarFerramenta(
-                new SelecionarTool());
+                new SelecionarTool(AppServices.Current));
         }
 
         private void MoverButton_Click(object sender, RoutedEventArgs e)
         {
             AppServices.Tools.AtivarFerramenta(
-                new MoverTool());
+                new MoverTool(AppServices.Current));
         }
 
         private void CopiarButton_Click(object sender, RoutedEventArgs e)
         {
-            ClipboardService.CopiarSelecionados();
+            ClipboardService.CopiarSelecionados(
+                AppServices.Current);
         }
 
         private void ColarButton_Click(object sender, RoutedEventArgs e)
         {
-            ClipboardService.Colar();
+            ClipboardService.Colar(
+                AppServices.Current);
         }
 
         private void DeletarButton_Click(object sender, RoutedEventArgs e)
         {
             AppServices.Tools.AtivarFerramenta(
-                new DeletarTool());
+                new DeletarTool(AppServices.Current));
         }
 
         // =========================

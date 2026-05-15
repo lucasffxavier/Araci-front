@@ -5,7 +5,7 @@ namespace Araci.ViewModels.VisualStates
     public class ElementoGeometryState
     {
         // =========================
-        // POSIÇÃO GLOBAL
+        // POSIÇÃO EM MUNDO
         // =========================
 
         public double X

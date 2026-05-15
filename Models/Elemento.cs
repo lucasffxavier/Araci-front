@@ -8,7 +8,7 @@ namespace Araci.Models
     public abstract class Elemento : IElementoClonavel
     {
         // =========================
-        // POSIÇÃO
+        // POSIÇÃO EM MUNDO
         // =========================
 
         public double PosicaoX { get; set; }

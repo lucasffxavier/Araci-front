@@ -7,6 +7,7 @@ using System.Windows.Input;
 
 using Araci.Applications.Editar.Base;
 using Araci.Applications.Editar.Selecionar;
+using Araci.Services;
 using Araci.ViewModels;
 
 namespace Araci.Applications.Editar.Mover
@@ -31,9 +32,13 @@ namespace Araci.Applications.Editar.Mover
         // CONSTRUTOR
         // =========================
 
-        public MoverTool()
+        public MoverTool(EditorContext context)
         {
+            var editorContext = context
+                ?? throw new System.ArgumentNullException(nameof(context));
+
             _selecionarTool = new SelecionarTool(
+                editorContext,
                 modoSoMover: true,
                 mostrarHud: true);
         }

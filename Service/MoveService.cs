@@ -6,15 +6,27 @@ using Araci.ViewModels;
 
 namespace Araci.Services
 {
-    public static class MoveService
+    public class MoveService
     {
+        private readonly EditorContext _context;
+
+        // =========================
+        // CONSTRUTOR
+        // =========================
+
+        public MoveService(EditorContext context)
+        {
+            _context = context
+                ?? throw new System.ArgumentNullException(nameof(context));
+        }
+
         // =========================
         // ESTADO DRAG
         // =========================
 
-        private static bool _movendo;
+        private bool _movendo;
 
-        private static readonly Dictionary<
+        private readonly Dictionary<
             ElementoViewModel,
             ElementoEstado>
             _estadoInicial = new();
@@ -23,7 +35,7 @@ namespace Araci.Services
         // BEGIN
         // =========================
 
-        public static void BeginMove(
+        public void BeginMove(
             IEnumerable<ElementoViewModel> elementos)
         {
             _estadoInicial.Clear();
@@ -41,7 +53,7 @@ namespace Araci.Services
         // MOVE VISUAL
         // =========================
 
-        public static void MoverVisual(
+        public void MoverVisual(
             ElementoViewModel vm,
             Vector delta)
         {
@@ -55,14 +67,14 @@ namespace Araci.Services
         // END MOVE
         // =========================
 
-        public static void EndMove(
+        public void EndMove(
             IEnumerable<ElementoViewModel> elementos)
         {
             if (!_movendo)
                 return;
 
             using var transaction =
-                AppServices.BeginTransaction();
+                _context.BeginTransaction();
 
             foreach (var vm in elementos)
             {

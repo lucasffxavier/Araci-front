@@ -18,6 +18,8 @@ namespace Araci.Applications.Editar.Selecionar
 
         private readonly bool _mostrarHud;
 
+        private readonly EditorContext _context;
+
         // =========================
         // ESTADO
         // =========================
@@ -44,8 +46,14 @@ namespace Araci.Applications.Editar.Selecionar
         // CONSTRUTOR
         // =========================
 
-        public SelecionarTool(bool modoSoMover = false, bool mostrarHud = false)
+        public SelecionarTool(
+            EditorContext context,
+            bool modoSoMover = false,
+            bool mostrarHud = false)
         {
+            _context = context
+                ?? throw new System.ArgumentNullException(nameof(context));
+
             _modoSoMover = modoSoMover;
 
             _mostrarHud = mostrarHud;
@@ -69,11 +77,11 @@ namespace Araci.Applications.Editar.Selecionar
 
             _selecionandoJanela = false;
 
-            AppServices.SelectionBox.Visivel = false;
+            _context.SelectionBox.Visivel = false;
 
-            AppServices.MoveHud.Visivel = false;
+            _context.MoveHud.Visivel = false;
 
-            AppServices.MoveHud.Reset();
+            _context.MoveHud.Reset();
         }
 
         // =========================
@@ -94,11 +102,11 @@ namespace Araci.Applications.Editar.Selecionar
                 {
                     if (ctrl)
                     {
-                        SelectionService.Toggle(vm);
+                        _context.Selection.Toggle(vm);
                     }
-                    else if (!SelectionService.Selecionados.Contains(vm))
+                    else if (!_context.Selection.Selecionados.Contains(vm))
                     {
-                        SelectionService.Selecionar(vm);
+                        _context.Selection.Selecionar(vm);
                     }
                 }
 
@@ -108,7 +116,7 @@ namespace Araci.Applications.Editar.Selecionar
 
                 _pontoInicialArrasto = position;
 
-                MoveService.BeginMove(SelectionService.Selecionados);
+                _context.Move.BeginMove(_context.Selection.Selecionados);
 
                 // =========================
                 // HUD
@@ -116,7 +124,7 @@ namespace Araci.Applications.Editar.Selecionar
 
                 if (_mostrarHud)
                 {
-                    var hud = AppServices.MoveHud;
+                    var hud = _context.MoveHud;
 
                     hud.Reset();
 
@@ -141,16 +149,16 @@ namespace Araci.Applications.Editar.Selecionar
 
             if (!ctrl)
             {
-                SelectionService.Limpar();
+                _context.Selection.Limpar();
             }
 
             _inicioJanela = position;
 
             _selecionandoJanela = true;
 
-            AppServices.SelectionBox.Visivel = true;
+            _context.SelectionBox.Visivel = true;
 
-            AppServices.SelectionBox.Atualizar(position, position);
+            _context.SelectionBox.Atualizar(position, position);
         }
 
         // =========================
@@ -169,9 +177,9 @@ namespace Araci.Applications.Editar.Selecionar
 
                 if (delta.X != 0 || delta.Y != 0)
                 {
-                    foreach (var item in SelectionService.Selecionados.ToList())
+                    foreach (var item in _context.Selection.Selecionados.ToList())
                     {
-                        MoveService.MoverVisual(item, delta);
+                        _context.Move.MoverVisual(item, delta);
                     }
                 }
 
@@ -183,7 +191,7 @@ namespace Araci.Applications.Editar.Selecionar
                 {
                     var deltaTotal = position - _pontoInicialArrasto;
 
-                    var hud = AppServices.MoveHud;
+                    var hud = _context.MoveHud;
 
                     hud.DeltaX = deltaTotal.X;
 
@@ -205,7 +213,7 @@ namespace Araci.Applications.Editar.Selecionar
 
             if (_selecionandoJanela)
             {
-                AppServices.SelectionBox.Atualizar(_inicioJanela, position);
+                _context.SelectionBox.Atualizar(_inicioJanela, position);
             }
         }
 
@@ -221,11 +229,11 @@ namespace Araci.Applications.Editar.Selecionar
 
             if (_arrastandoElementos)
             {
-                MoveService.EndMove(SelectionService.Selecionados.ToList());
+                _context.Move.EndMove(_context.Selection.Selecionados.ToList());
 
-                AppServices.MoveHud.Visivel = false;
+                _context.MoveHud.Visivel = false;
 
-                AppServices.MoveHud.Reset();
+                _context.MoveHud.Reset();
             }
 
             // =========================
@@ -234,20 +242,20 @@ namespace Araci.Applications.Editar.Selecionar
 
             if (_selecionandoJanela)
             {
-                var rect = AppServices.SelectionBox.Bounds;
+                var rect = _context.SelectionBox.Bounds;
 
-                if (AppServices.Viewport != null)
+                if (_context.Viewport != null)
                 {
-                    foreach (var item in AppServices.Viewport.Elementos)
+                    foreach (var item in _context.Viewport.Elementos)
                     {
                         if (rect.IntersectsWith(item.Bounds))
                         {
-                            SelectionService.Selecionar(item, true);
+                            _context.Selection.Selecionar(item, true);
                         }
                     }
                 }
 
-                AppServices.SelectionBox.Visivel = false;
+                _context.SelectionBox.Visivel = false;
             }
 
             _arrastandoElementos = false;
@@ -269,7 +277,7 @@ namespace Araci.Applications.Editar.Selecionar
 
         private Rect CalcularBoundsSelecionados()
         {
-            var items = SelectionService.Selecionados;
+            var items = _context.Selection.Selecionados;
 
             if (items.Count == 0)
                 return Rect.Empty;

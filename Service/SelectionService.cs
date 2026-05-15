@@ -5,13 +5,13 @@ using Araci.ViewModels;
 
 namespace Araci.Services
 {
-    public static class SelectionService
+    public class SelectionService
     {
         // =========================
         // SELECIONADOS
         // =========================
 
-        public static ObservableCollection<ElementoViewModel>
+        public ObservableCollection<ElementoViewModel>
             Selecionados
         { get; }
             = new();
@@ -20,7 +20,7 @@ namespace Araci.Services
         // PRINCIPAL
         // =========================
 
-        public static ElementoViewModel?
+        public ElementoViewModel?
             Principal =>
                 Selecionados.FirstOrDefault();
 
@@ -28,7 +28,7 @@ namespace Araci.Services
         // SELECIONAR
         // =========================
 
-        public static void Selecionar(
+        public void Selecionar(
             ElementoViewModel vm,
             bool adicionar = false)
         {
@@ -74,7 +74,7 @@ namespace Araci.Services
         // DESELECIONAR
         // =========================
 
-        public static void Deselecionar(
+        public void Deselecionar(
             ElementoViewModel vm)
         {
             if (vm == null)
@@ -99,7 +99,7 @@ namespace Araci.Services
         // TOGGLE
         // =========================
 
-        public static void Toggle(
+        public void Toggle(
             ElementoViewModel vm)
         {
             if (vm == null)
@@ -119,7 +119,7 @@ namespace Araci.Services
         // LIMPAR
         // =========================
 
-        public static void Limpar()
+        public void Limpar()
         {
             foreach (var item in
                      Selecionados.ToList())
@@ -137,7 +137,7 @@ namespace Araci.Services
         // SINCRONIZAÇÃO
         // =========================
 
-        public static void GarantirConsistencia()
+        public void GarantirConsistencia()
         {
             foreach (var item in
                      Selecionados.ToList())

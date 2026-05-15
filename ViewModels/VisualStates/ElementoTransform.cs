@@ -5,7 +5,7 @@ namespace Araci.ViewModels.VisualStates
     public class ElementoTransform
     {
         // =========================
-        // POSIÇÃO
+        // POSIÇÃO EM MUNDO
         // =========================
 
         public double X { get; set; }
