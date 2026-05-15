@@ -28,11 +28,8 @@ namespace Araci.Ribbon.Tabs
             object sender,
             RoutedEventArgs e)
         {
-            if (AppServices.Viewport == null)
-                return;
-
             InserirGeradorApplication app =
-                new(AppServices.Viewport);
+                new();
 
             app.Executar();
         }
@@ -45,11 +42,8 @@ namespace Araci.Ribbon.Tabs
             object sender,
             RoutedEventArgs e)
         {
-            if (AppServices.Viewport == null)
-                return;
-
             InserirCargaApplication app =
-                new(AppServices.Viewport);
+                new();
 
             app.Executar();
         }
@@ -62,11 +56,8 @@ namespace Araci.Ribbon.Tabs
             object sender,
             RoutedEventArgs e)
         {
-            if (AppServices.Viewport == null)
-                return;
-
             InserirCaboApplication app =
-                new(AppServices.Viewport);
+                new();
 
             app.Executar();
         }

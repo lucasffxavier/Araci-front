@@ -1,28 +1,11 @@
-﻿using Araci.Services;
+using Araci.Core.Commands;
+using Araci.Services;
 using Araci.ViewModels;
 
 namespace Araci.Applications.Diagrama.InserirGerador
 {
     public class InserirGeradorApplication
     {
-        // =========================
-        // SERVIÇO
-        // =========================
-
-        private readonly ViewportService
-            _viewportService;
-
-        // =========================
-        // CONSTRUTOR
-        // =========================
-
-        public InserirGeradorApplication(
-            ViewportService viewportService)
-        {
-            _viewportService =
-                viewportService;
-        }
-
         // =========================
         // EXECUTAR
         // =========================
@@ -31,10 +14,10 @@ namespace Araci.Applications.Diagrama.InserirGerador
         {
             GeradorViewModel vm =
                 ElementoFactory
-                .CriarGeradorVM();
+                    .CriarGeradorVM();
 
-            _viewportService
-                .AdicionarElemento(vm);
+            AppServices.Commands.Execute(
+                new AddElementoCommand(vm));
         }
     }
 }

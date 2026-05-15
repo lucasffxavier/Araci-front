@@ -1,4 +1,4 @@
-﻿using Araci.Models.Tipos;
+using Araci.Models.Tipos;
 
 namespace Araci.ViewModels
 {
@@ -16,7 +16,8 @@ namespace Araci.ViewModels
         // CONSTRUTOR
         // =========================
 
-        public TipoGeradorViewModel(TipoGerador tipo)
+        public TipoGeradorViewModel(
+            TipoGerador tipo)
             : base(tipo)
         {
         }
@@ -25,22 +26,94 @@ namespace Araci.ViewModels
         // PROPRIEDADES
         // =========================
 
-        public string CategoriaGerador =>
-            TipoGerador.CategoriaGerador;
+        public string CategoriaGerador
+        {
+            get => TipoGerador.CategoriaGerador;
 
-        public string Fabricante =>
-            TipoGerador.Fabricante;
+            set
+            {
+                if (TipoGerador.CategoriaGerador == value)
+                    return;
 
-        public string Modelo =>
-            TipoGerador.Modelo;
+                TipoGerador.CategoriaGerador = value;
 
-        public double PotenciaNominalKW =>
-            TipoGerador.PotenciaNominalKW;
+                OnPropertyChanged();
+            }
+        }
 
-        public double TensaoKV =>
-            TipoGerador.TensaoKV;
+        public string Fabricante
+        {
+            get => TipoGerador.Fabricante;
 
-        public int Fases =>
-            TipoGerador.Fases;
+            set
+            {
+                if (TipoGerador.Fabricante == value)
+                    return;
+
+                TipoGerador.Fabricante = value;
+
+                OnPropertyChanged();
+            }
+        }
+
+        public string Modelo
+        {
+            get => TipoGerador.Modelo;
+
+            set
+            {
+                if (TipoGerador.Modelo == value)
+                    return;
+
+                TipoGerador.Modelo = value;
+
+                OnPropertyChanged();
+            }
+        }
+
+        public double PotenciaNominalKW
+        {
+            get => TipoGerador.PotenciaNominalKW;
+
+            set
+            {
+                if (TipoGerador.PotenciaNominalKW == value)
+                    return;
+
+                TipoGerador.PotenciaNominalKW = value;
+
+                OnPropertyChanged();
+            }
+        }
+
+        public double TensaoKV
+        {
+            get => TipoGerador.TensaoKV;
+
+            set
+            {
+                if (TipoGerador.TensaoKV == value)
+                    return;
+
+                TipoGerador.TensaoKV = value;
+
+                OnPropertyChanged();
+            }
+        }
+
+        public int Fases
+        {
+            get => TipoGerador.Fases;
+
+            set
+            {
+                if (TipoGerador.Fases == value)
+                    return;
+
+                TipoGerador.Fases = value;
+
+                OnPropertyChanged();
+            }
+        }
     }
 }

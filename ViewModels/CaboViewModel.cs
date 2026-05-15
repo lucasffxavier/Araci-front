@@ -20,6 +20,8 @@ namespace Araci.ViewModels
             _cabo = cabo
                 ?? throw new ArgumentNullException(nameof(cabo));
 
+            SelecionarPrimeiroTipoDisponivel();
+
             // =========================
             // GARANTE SEGUNDO PONTO
             // =========================

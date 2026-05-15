@@ -71,6 +71,41 @@ namespace Araci.ViewModels
             TiposDisponiveis
         { get; }
 
+        protected void SelecionarPrimeiroTipoDisponivel()
+        {
+            TipoElemento? primeiroTipo =
+                null;
+
+            bool tipoAtualExisteNaLista =
+                false;
+
+            foreach (object? item in TiposDisponiveis)
+            {
+                if (item is not TipoElemento tipo)
+                    continue;
+
+                primeiroTipo ??=
+                    tipo;
+
+                if (ReferenceEquals(tipo, _modelo.Tipo))
+                {
+                    tipoAtualExisteNaLista =
+                        true;
+
+                    break;
+                }
+            }
+
+            if (tipoAtualExisteNaLista ||
+                primeiroTipo == null)
+            {
+                return;
+            }
+
+            Tipo =
+                primeiroTipo;
+        }
+
         public virtual TipoElementoViewModel?
             TipoViewModel =>
                 TipoElementoViewModelFactory

@@ -1,28 +1,11 @@
-﻿using Araci.Services;
+using Araci.Core.Commands;
+using Araci.Services;
 using Araci.ViewModels;
 
 namespace Araci.Applications.Diagrama.InserirCarga
 {
     public class InserirCargaApplication
     {
-        // =========================
-        // SERVIÇO
-        // =========================
-
-        private readonly ViewportService
-            _viewportService;
-
-        // =========================
-        // CONSTRUTOR
-        // =========================
-
-        public InserirCargaApplication(
-            ViewportService viewportService)
-        {
-            _viewportService =
-                viewportService;
-        }
-
         // =========================
         // EXECUTAR
         // =========================
@@ -31,10 +14,10 @@ namespace Araci.Applications.Diagrama.InserirCarga
         {
             CargaViewModel vm =
                 ElementoFactory
-                .CriarCargaVM();
+                    .CriarCargaVM();
 
-            _viewportService
-                .AdicionarElemento(vm);
+            AppServices.Commands.Execute(
+                new AddElementoCommand(vm));
         }
     }
 }
