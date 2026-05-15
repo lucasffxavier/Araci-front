@@ -1,9 +1,9 @@
 ﻿using System.Windows.Controls;
 using System.Windows.Media;
 using System.Windows.Shapes;
+using System.Windows.Data;
 
 using Araci.Controls.Base;
-using Araci.ViewModels;
 
 namespace Araci.Controls
 {
@@ -30,40 +30,54 @@ namespace Araci.Controls
             _canvas.Children.Add(_line);
 
             Content = _canvas;
+
+            ConfigurarBindings();
         }
 
-        protected override void AplicarEstadoVisual(
-            ElementoViewModel vm)
+        protected override bool UsaBindings =>
+            true;
+
+        private void ConfigurarBindings()
         {
-            Width =
-                vm.Largura;
+            SetBinding(
+                WidthProperty,
+                new Binding("RenderData.Largura"));
 
-            Height =
-                vm.Altura;
+            SetBinding(
+                HeightProperty,
+                new Binding("RenderData.Altura"));
 
-            _canvas.Width =
-                vm.Largura;
+            _canvas.SetBinding(
+                WidthProperty,
+                new Binding("RenderData.Largura"));
 
-            _canvas.Height =
-                vm.Altura;
+            _canvas.SetBinding(
+                HeightProperty,
+                new Binding("RenderData.Altura"));
 
-            _line.X1 =
-                vm.Geometry.PontoLocalInicial.X;
+            _line.SetBinding(
+                Line.X1Property,
+                new Binding("RenderData.PontoLocalInicial.X"));
 
-            _line.Y1 =
-                vm.Geometry.PontoLocalInicial.Y;
+            _line.SetBinding(
+                Line.Y1Property,
+                new Binding("RenderData.PontoLocalInicial.Y"));
 
-            _line.X2 =
-                vm.Geometry.PontoLocalFinal.X;
+            _line.SetBinding(
+                Line.X2Property,
+                new Binding("RenderData.PontoLocalFinal.X"));
 
-            _line.Y2 =
-                vm.Geometry.PontoLocalFinal.Y;
+            _line.SetBinding(
+                Line.Y2Property,
+                new Binding("RenderData.PontoLocalFinal.Y"));
 
-            _line.Stroke =
-                vm.Stroke;
+            _line.SetBinding(
+                Shape.StrokeProperty,
+                new Binding("RenderData.Stroke"));
 
-            _line.StrokeThickness =
-                vm.StrokeThickness;
+            _line.SetBinding(
+                Shape.StrokeThicknessProperty,
+                new Binding("RenderData.StrokeThickness"));
         }
     }
 }

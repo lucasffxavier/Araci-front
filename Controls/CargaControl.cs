@@ -1,9 +1,9 @@
 ﻿using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Shapes;
+using System.Windows.Data;
 
 using Araci.Controls.Base;
-using Araci.ViewModels;
 
 namespace Araci.Controls
 {
@@ -13,15 +13,10 @@ namespace Araci.Controls
 
         public CargaControl()
         {
-            Width = 70;
-            Height = 70;
-
             Cursor = Cursors.Hand;
 
             _rectangle = new Rectangle
             {
-                Width = 70,
-                Height = 70,
                 RadiusX = 6,
                 RadiusY = 6,
                 Fill =
@@ -31,13 +26,38 @@ namespace Araci.Controls
             };
 
             Content = _rectangle;
+
+            ConfigurarBindings();
         }
 
-        protected override void AplicarEstadoVisual(
-            ElementoViewModel vm)
+        protected override bool UsaBindings =>
+            true;
+
+        private void ConfigurarBindings()
         {
-            _rectangle.Stroke = vm.Stroke;
-            _rectangle.StrokeThickness = vm.StrokeThickness;
+            SetBinding(
+                WidthProperty,
+                new Binding("RenderData.Largura"));
+
+            SetBinding(
+                HeightProperty,
+                new Binding("RenderData.Altura"));
+
+            _rectangle.SetBinding(
+                WidthProperty,
+                new Binding("RenderData.Largura"));
+
+            _rectangle.SetBinding(
+                HeightProperty,
+                new Binding("RenderData.Altura"));
+
+            _rectangle.SetBinding(
+                Shape.StrokeProperty,
+                new Binding("RenderData.Stroke"));
+
+            _rectangle.SetBinding(
+                Shape.StrokeThicknessProperty,
+                new Binding("RenderData.StrokeThickness"));
         }
     }
 }

@@ -1,9 +1,9 @@
 ﻿using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Shapes;
+using System.Windows.Data;
 
 using Araci.Controls.Base;
-using Araci.ViewModels;
 
 namespace Araci.Controls
 {
@@ -13,15 +13,10 @@ namespace Araci.Controls
 
         public GeradorControl()
         {
-            Width = 80;
-            Height = 80;
-
             Cursor = Cursors.Hand;
 
             _ellipse = new Ellipse
             {
-                Width = 80,
-                Height = 80,
                 Fill =
                     new SolidColorBrush(
                         (Color)ColorConverter
@@ -29,13 +24,38 @@ namespace Araci.Controls
             };
 
             Content = _ellipse;
+
+            ConfigurarBindings();
         }
 
-        protected override void AplicarEstadoVisual(
-            ElementoViewModel vm)
+        protected override bool UsaBindings =>
+            true;
+
+        private void ConfigurarBindings()
         {
-            _ellipse.Stroke = vm.Stroke;
-            _ellipse.StrokeThickness = vm.StrokeThickness;
+            SetBinding(
+                WidthProperty,
+                new Binding("RenderData.Largura"));
+
+            SetBinding(
+                HeightProperty,
+                new Binding("RenderData.Altura"));
+
+            _ellipse.SetBinding(
+                WidthProperty,
+                new Binding("RenderData.Largura"));
+
+            _ellipse.SetBinding(
+                HeightProperty,
+                new Binding("RenderData.Altura"));
+
+            _ellipse.SetBinding(
+                Shape.StrokeProperty,
+                new Binding("RenderData.Stroke"));
+
+            _ellipse.SetBinding(
+                Shape.StrokeThicknessProperty,
+                new Binding("RenderData.StrokeThickness"));
         }
     }
 }

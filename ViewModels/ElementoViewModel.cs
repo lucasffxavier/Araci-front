@@ -4,6 +4,7 @@ using System.Windows;
 using System.Windows.Input;
 using System.Windows.Media;
 
+using Araci.Core.Rendering;
 using Araci.Models;
 using Araci.Models.Tipos;
 using Araci.Properties;
@@ -167,6 +168,8 @@ namespace Araci.ViewModels
                 OnPropertyChanged(nameof(Stroke));
 
                 OnPropertyChanged(nameof(StrokeThickness));
+
+                OnPropertyChanged(nameof(RenderData));
             }
         }
 
@@ -175,6 +178,19 @@ namespace Araci.ViewModels
 
         public double StrokeThickness =>
             VisualState.StrokeThickness;
+
+        // ====================================================
+        // RENDER
+        // ====================================================
+
+        public virtual ElementoRenderData RenderData =>
+            new ElementoRenderData(
+                Largura,
+                Altura,
+                Geometry.PontoLocalInicial,
+                Geometry.PontoLocalFinal,
+                Stroke,
+                StrokeThickness);
 
         // ====================================================
         // GEOMETRIA
@@ -242,6 +258,8 @@ namespace Araci.ViewModels
             OnPropertyChanged(nameof(Bounds));
 
             OnPropertyChanged(nameof(Centro));
+
+            OnPropertyChanged(nameof(RenderData));
         }
 
         // ====================================================

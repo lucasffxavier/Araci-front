@@ -22,6 +22,7 @@ namespace Araci.Controls.Base
         {
             nameof(ElementoViewModel.Stroke),
             nameof(ElementoViewModel.StrokeThickness),
+            nameof(ElementoViewModel.RenderData),
             nameof(ElementoViewModel.IsSelecionado),
             nameof(ElementoViewModel.X),
             nameof(ElementoViewModel.Y),
@@ -61,6 +62,9 @@ namespace Araci.Controls.Base
             object sender,
             System.Windows.RoutedEventArgs e)
         {
+            if (UsaBindings)
+                return;
+
             AtualizarVisual();
         }
 
@@ -80,6 +84,9 @@ namespace Araci.Controls.Base
 
             if (e.NewValue is ElementoViewModel novo)
             {
+                if (UsaBindings)
+                    return;
+
                 novo.PropertyChanged +=
                     OnViewModelPropertyChanged;
 
@@ -123,11 +130,16 @@ namespace Araci.Controls.Base
             AplicarEstadoVisual(vm);
         }
 
+        protected virtual bool UsaBindings =>
+            false;
+
         // =========================
         // APLICAR ESTADO VISUAL
         // =========================
 
-        protected abstract void AplicarEstadoVisual(
-            ElementoViewModel vm);
+        protected virtual void AplicarEstadoVisual(
+            ElementoViewModel vm)
+        {
+        }
     }
 }
