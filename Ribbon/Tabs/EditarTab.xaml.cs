@@ -36,6 +36,9 @@ namespace Araci.Ribbon.Tabs
             Unloaded += OnUnloaded;
         }
 
+        private EditorContext Context =>
+            AppServices.Current;
+
         // =========================
         // LOADED
         // =========================
@@ -44,7 +47,8 @@ namespace Araci.Ribbon.Tabs
         {
             AssinarEventoFerramenta();
 
-            AtualizarBotoes(AppServices.Tools.FerramentaAtual);
+            AtualizarBotoes(
+                Context.Tools.FerramentaAtual);
         }
 
         // =========================
@@ -65,7 +69,7 @@ namespace Araci.Ribbon.Tabs
             if (_eventoFerramentaAssinado)
                 return;
 
-            AppServices.Tools.FerramentaAlterada +=
+            Context.Tools.FerramentaAlterada +=
                 OnFerramentaAlterada;
 
             _eventoFerramentaAssinado =
@@ -77,7 +81,7 @@ namespace Araci.Ribbon.Tabs
             if (!_eventoFerramentaAssinado)
                 return;
 
-            AppServices.Tools.FerramentaAlterada -=
+            Context.Tools.FerramentaAlterada -=
                 OnFerramentaAlterada;
 
             _eventoFerramentaAssinado =
@@ -144,32 +148,32 @@ namespace Araci.Ribbon.Tabs
 
         private void SelecionarButton_Click(object sender, RoutedEventArgs e)
         {
-            AppServices.Tools.AtivarFerramenta(
-                new SelecionarTool(AppServices.Current));
+            Context.Tools.AtivarFerramenta(
+                new SelecionarTool(Context));
         }
 
         private void MoverButton_Click(object sender, RoutedEventArgs e)
         {
-            AppServices.Tools.AtivarFerramenta(
-                new MoverTool(AppServices.Current));
+            Context.Tools.AtivarFerramenta(
+                new MoverTool(Context));
         }
 
         private void CopiarButton_Click(object sender, RoutedEventArgs e)
         {
             ClipboardService.CopiarSelecionados(
-                AppServices.Current);
+                Context);
         }
 
         private void ColarButton_Click(object sender, RoutedEventArgs e)
         {
             ClipboardService.Colar(
-                AppServices.Current);
+                Context);
         }
 
         private void DeletarButton_Click(object sender, RoutedEventArgs e)
         {
-            AppServices.Tools.AtivarFerramenta(
-                new DeletarTool(AppServices.Current));
+            Context.Tools.AtivarFerramenta(
+                new DeletarTool(Context));
         }
 
         // =========================
@@ -178,7 +182,7 @@ namespace Araci.Ribbon.Tabs
 
         private void DesfazerButton_Click(object sender, RoutedEventArgs e)
         {
-            AppServices.Commands.Undo();
+            Context.Commands.Undo();
         }
 
         // =========================
@@ -187,7 +191,7 @@ namespace Araci.Ribbon.Tabs
 
         private void RefazerButton_Click(object sender, RoutedEventArgs e)
         {
-            AppServices.Commands.Redo();
+            Context.Commands.Redo();
         }
     }
 }

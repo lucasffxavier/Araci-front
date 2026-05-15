@@ -6,19 +6,24 @@ namespace Araci.Applications.Diagrama.InserirCabo
 {
     public class InserirCaboApplication
     {
+        private readonly EditorContext _context;
+
+        public InserirCaboApplication(EditorContext context)
+        {
+            _context = context
+                ?? throw new System.ArgumentNullException(nameof(context));
+        }
+
         public void Executar()
         {
             CaboViewModel vm =
-                ElementoFactory
+                _context.ElementoFactory
                     .CriarCaboVM();
 
-            var context =
-                AppServices.Current;
-
-            context.Commands.Execute(
+            _context.Commands.Execute(
                 new AddElementoCommand(
                     vm,
-                    context));
+                    _context));
         }
     }
 }

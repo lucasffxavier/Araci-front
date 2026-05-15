@@ -26,7 +26,8 @@ Araci Engine
 │   │       └── InserirGerador.cs
 │   ├── Editar
 │   │   ├── Base
-│   │   │   └── ITool.cs
+│   │   │   ├── ITool.cs
+│   │   │   └── ToolInputState.cs
 │   │   ├── Copiar
 │   │   ├── Deletar
 │   │   │   └── DeletarTool.cs
@@ -51,8 +52,14 @@ Araci Engine
 ├── Core
 │   ├── Commands
 │   │   └── MoveElementoCommand.cs
-│   └── Documents
-│       └── AraciDocument.cs
+│   ├── Documents
+│   │   └── AraciDocument.cs
+│   ├── Rendering
+│   │   └── ElementoRenderData.cs
+│   ├── Scenes
+│   │   └── Scene.cs
+│   └── Viewport
+│       └── Camera.cs
 ├── Models
 │   ├── Interfaces
 │   │   └── IElementoClonavel.cs
@@ -125,14 +132,15 @@ Araci Engine
 ├── Service
 │   ├── AppServices.cs
 │   ├── ClipboardService.cs
-│   ├── DragService.cs
 │   ├── EditorContext.cs
 │   ├── EditorState.cs
 │   ├── ElementoFactory.cs
+│   ├── InputRouter.cs
 │   ├── MoveHudService.cs
 │   ├── MoveHudState.cs
 │   ├── MoveService.cs
 │   ├── SelectionService.cs
+│   ├── SnapService.cs
 │   ├── ToolService.cs
 │   ├── TypeLibraryService.cs
 │   └── ViewportService.cs
@@ -233,7 +241,8 @@ public partial class App : Application
 ARQUIVO: C:\Araci-Engine-Front\Araci Engine\Applications\Commands\AddElementoCommand.cs
 ====================================================================================================
 
-﻿using Araci.ViewModels;
+using Araci.Services;
+using Araci.ViewModels;
 
 namespace Araci.Core.Commands
 {
@@ -247,14 +256,21 @@ namespace Araci.Core.Commands
         private readonly ElementoViewModel
             _elemento;
 
+        private readonly EditorContext
+            _context;
+
         // =========================
         // CONSTRUTOR
         // =========================
 
         public AddElementoCommand(
-            ElementoViewModel elemento)
+            ElementoViewModel elemento,
+            EditorContext context)
         {
             _elemento = elemento;
+
+            _context = context
+                ?? throw new System.ArgumentNullException(nameof(context));
         }
 
         // =========================
@@ -263,15 +279,10 @@ namespace Araci.Core.Commands
 
         public void Execute()
         {
-            if (AppServices.Viewport != null)
-            {
-                AppServices.Viewport
-                    .AdicionarElemento(_elemento);
+            _context.Viewport
+                ?.RegistrarViewModel(_elemento);
 
-                return;
-            }
-
-            AppServices.Document
+            _context.Document
                 .AdicionarElemento(_elemento.Modelo);
         }
 
@@ -281,15 +292,7 @@ namespace Araci.Core.Commands
 
         public void Undo()
         {
-            if (AppServices.Viewport != null)
-            {
-                AppServices.Viewport
-                    .RemoverElemento(_elemento);
-
-                return;
-            }
-
-            AppServices.Document
+            _context.Document
                 .RemoverElemento(_elemento.Modelo);
         }
 
@@ -462,14 +465,21 @@ namespace Araci.Core.Commands
         private readonly ElementoViewModel
             _vm;
 
+        private readonly EditorContext
+            _context;
+
         // =========================
         // CONSTRUTOR
         // =========================
 
         public DeleteElementCommand(
-            ElementoViewModel vm)
+            ElementoViewModel vm,
+            EditorContext context)
         {
             _vm = vm;
+
+            _context = context
+                ?? throw new System.ArgumentNullException(nameof(context));
         }
 
         // =========================
@@ -478,18 +488,10 @@ namespace Araci.Core.Commands
 
         public void Execute()
         {
-            if (AppServices.Viewport != null)
-            {
-                AppServices.Viewport
-                    .RemoverElemento(_vm);
-            }
-            else
-            {
-                AppServices.Document
-                    .RemoverElemento(_vm.Modelo);
-            }
+            _context.Document
+                .RemoverElemento(_vm.Modelo);
 
-            SelectionService
+            _context.Selection
                 .Deselecionar(_vm);
         }
 
@@ -499,15 +501,10 @@ namespace Araci.Core.Commands
 
         public void Undo()
         {
-            if (AppServices.Viewport != null)
-            {
-                AppServices.Viewport
-                    .AdicionarElemento(_vm);
+            _context.Viewport
+                ?.RegistrarViewModel(_vm);
 
-                return;
-            }
-
-            AppServices.Document
+            _context.Document
                 .AdicionarElemento(_vm.Modelo);
         }
 
@@ -625,14 +622,24 @@ namespace Araci.Applications.Diagrama.InserirCabo
 {
     public class InserirCaboApplication
     {
+        private readonly EditorContext _context;
+
+        public InserirCaboApplication(EditorContext context)
+        {
+            _context = context
+                ?? throw new System.ArgumentNullException(nameof(context));
+        }
+
         public void Executar()
         {
             CaboViewModel vm =
-                ElementoFactory
+                _context.ElementoFactory
                     .CriarCaboVM();
 
-            AppServices.Commands.Execute(
-                new AddElementoCommand(vm));
+            _context.Commands.Execute(
+                new AddElementoCommand(
+                    vm,
+                    _context));
         }
     }
 }
@@ -651,6 +658,14 @@ namespace Araci.Applications.Diagrama.InserirCarga
 {
     public class InserirCargaApplication
     {
+        private readonly EditorContext _context;
+
+        public InserirCargaApplication(EditorContext context)
+        {
+            _context = context
+                ?? throw new System.ArgumentNullException(nameof(context));
+        }
+
         // =========================
         // EXECUTAR
         // =========================
@@ -658,11 +673,13 @@ namespace Araci.Applications.Diagrama.InserirCarga
         public void Executar()
         {
             CargaViewModel vm =
-                ElementoFactory
+                _context.ElementoFactory
                     .CriarCargaVM();
 
-            AppServices.Commands.Execute(
-                new AddElementoCommand(vm));
+            _context.Commands.Execute(
+                new AddElementoCommand(
+                    vm,
+                    _context));
         }
     }
 }
@@ -681,6 +698,14 @@ namespace Araci.Applications.Diagrama.InserirGerador
 {
     public class InserirGeradorApplication
     {
+        private readonly EditorContext _context;
+
+        public InserirGeradorApplication(EditorContext context)
+        {
+            _context = context
+                ?? throw new System.ArgumentNullException(nameof(context));
+        }
+
         // =========================
         // EXECUTAR
         // =========================
@@ -688,11 +713,13 @@ namespace Araci.Applications.Diagrama.InserirGerador
         public void Executar()
         {
             GeradorViewModel vm =
-                ElementoFactory
+                _context.ElementoFactory
                     .CriarGeradorVM();
 
-            AppServices.Commands.Execute(
-                new AddElementoCommand(vm));
+            _context.Commands.Execute(
+                new AddElementoCommand(
+                    vm,
+                    _context));
         }
     }
 }
@@ -715,7 +742,10 @@ namespace Araci.Applications.Editar.Base
 
         bool MantemBotaoAtivado { get; }
 
-        void OnMouseDown(ElementoViewModel? vm, Point position);
+        void OnMouseDown(
+            ElementoViewModel? vm,
+            Point position,
+            ToolInputState inputState);
         void OnMouseMove(Point position);
         void OnMouseUp(Point position);
 
@@ -725,6 +755,31 @@ namespace Araci.Applications.Editar.Base
         void Desativar();
     }
 }
+
+
+
+====================================================================================================
+ARQUIVO: C:\Araci-Engine-Front\Araci Engine\Applications\Editar\Base\ToolInputState.cs
+====================================================================================================
+
+namespace Araci.Applications.Editar.Base
+{
+    public readonly struct ToolInputState
+    {
+        public ToolInputState(
+            bool isControlPressed)
+        {
+            IsControlPressed = isControlPressed;
+        }
+
+        public bool IsControlPressed
+        { get; }
+
+        public static ToolInputState Empty =>
+            new(false);
+    }
+}
+
 
 
 ====================================================================================================
@@ -744,6 +799,14 @@ namespace Araci.Applications.Editar.Deletar
 {
     public class DeletarTool : ITool
     {
+        private readonly EditorContext _context;
+
+        public DeletarTool(EditorContext context)
+        {
+            _context = context
+                ?? throw new System.ArgumentNullException(nameof(context));
+        }
+
         public string Nome => "Deletar";
 
         public bool MantemBotaoAtivado => true;
@@ -754,10 +817,11 @@ namespace Araci.Applications.Editar.Deletar
 
         public void OnMouseDown(
             ElementoViewModel? vm,
-            Point position)
+            Point position,
+            ToolInputState inputState)
         {
             var selecionados =
-                SelectionService
+                _context.Selection
                     .Selecionados
                     .ToList();
 
@@ -765,12 +829,14 @@ namespace Araci.Applications.Editar.Deletar
                 return;
 
             using var tx =
-                AppServices.BeginTransaction();
+                _context.BeginTransaction();
 
             foreach (var item in selecionados)
             {
                 tx.Add(
-                    new DeleteElementCommand(item));
+                    new DeleteElementCommand(
+                        item,
+                        _context));
             }
 
             tx.Commit();
@@ -783,6 +849,7 @@ namespace Araci.Applications.Editar.Deletar
         public void OnKeyDown(Key key) { }
     }
 }
+
 
 
 ====================================================================================================
@@ -798,6 +865,7 @@ using System.Windows.Input;
 
 using Araci.Applications.Editar.Base;
 using Araci.Applications.Editar.Selecionar;
+using Araci.Services;
 using Araci.ViewModels;
 
 namespace Araci.Applications.Editar.Mover
@@ -822,9 +890,13 @@ namespace Araci.Applications.Editar.Mover
         // CONSTRUTOR
         // =========================
 
-        public MoverTool()
+        public MoverTool(EditorContext context)
         {
+            var editorContext = context
+                ?? throw new System.ArgumentNullException(nameof(context));
+
             _selecionarTool = new SelecionarTool(
+                editorContext,
                 modoSoMover: true,
                 mostrarHud: true);
         }
@@ -851,9 +923,15 @@ namespace Araci.Applications.Editar.Mover
         // MOUSE DOWN
         // =========================
 
-        public void OnMouseDown(ElementoViewModel? vm, Point position)
+        public void OnMouseDown(
+            ElementoViewModel? vm,
+            Point position,
+            ToolInputState inputState)
         {
-            _selecionarTool.OnMouseDown(vm, position);
+            _selecionarTool.OnMouseDown(
+                vm,
+                position,
+                inputState);
         }
 
         // =========================
@@ -886,6 +964,7 @@ namespace Araci.Applications.Editar.Mover
 }
 
 
+
 ====================================================================================================
 ARQUIVO: C:\Araci-Engine-Front\Araci Engine\Applications\Editar\Selecionar\SelecionarTool.cs
 ====================================================================================================
@@ -909,6 +988,8 @@ namespace Araci.Applications.Editar.Selecionar
         private readonly bool _modoSoMover;
 
         private readonly bool _mostrarHud;
+
+        private readonly EditorContext _context;
 
         // =========================
         // ESTADO
@@ -936,8 +1017,14 @@ namespace Araci.Applications.Editar.Selecionar
         // CONSTRUTOR
         // =========================
 
-        public SelecionarTool(bool modoSoMover = false, bool mostrarHud = false)
+        public SelecionarTool(
+            EditorContext context,
+            bool modoSoMover = false,
+            bool mostrarHud = false)
         {
+            _context = context
+                ?? throw new System.ArgumentNullException(nameof(context));
+
             _modoSoMover = modoSoMover;
 
             _mostrarHud = mostrarHud;
@@ -961,20 +1048,27 @@ namespace Araci.Applications.Editar.Selecionar
 
             _selecionandoJanela = false;
 
-            AppServices.SelectionBox.Visivel = false;
+            _context.SelectionBox.Visivel = false;
 
-            AppServices.MoveHud.Visivel = false;
+            _context.MoveHud.Visivel = false;
 
-            AppServices.MoveHud.Reset();
+            _context.MoveHud.Reset();
         }
 
         // =========================
         // MOUSE DOWN
         // =========================
 
-        public void OnMouseDown(ElementoViewModel? vm, Point position)
+        public void OnMouseDown(
+            ElementoViewModel? vm,
+            Point position,
+            ToolInputState inputState)
         {
-            bool ctrl = Keyboard.Modifiers.HasFlag(ModifierKeys.Control);
+            Point worldPosition =
+                ScreenToWorld(position);
+
+            bool ctrl =
+                inputState.IsControlPressed;
 
             // =========================
             // CLIQUE EM ELEMENTO
@@ -986,21 +1080,24 @@ namespace Araci.Applications.Editar.Selecionar
                 {
                     if (ctrl)
                     {
-                        SelectionService.Toggle(vm);
+                        _context.Selection.Toggle(vm);
                     }
-                    else if (!SelectionService.Selecionados.Contains(vm))
+                    else if (!_context.Selection.Selecionados.Contains(vm))
                     {
-                        SelectionService.Selecionar(vm);
+                        _context.Selection.Selecionar(vm);
                     }
                 }
 
                 _arrastandoElementos = true;
 
-                _ultimoPontoMouse = position;
+                worldPosition =
+                    _context.Snap.SnapPoint(worldPosition);
 
-                _pontoInicialArrasto = position;
+                _ultimoPontoMouse = worldPosition;
 
-                MoveService.BeginMove(SelectionService.Selecionados);
+                _pontoInicialArrasto = worldPosition;
+
+                _context.Move.BeginMove(_context.Selection.Selecionados);
 
                 // =========================
                 // HUD
@@ -1008,7 +1105,7 @@ namespace Araci.Applications.Editar.Selecionar
 
                 if (_mostrarHud)
                 {
-                    var hud = AppServices.MoveHud;
+                    var hud = _context.MoveHud;
 
                     hud.Reset();
 
@@ -1033,16 +1130,18 @@ namespace Araci.Applications.Editar.Selecionar
 
             if (!ctrl)
             {
-                SelectionService.Limpar();
+                _context.Selection.Limpar();
             }
 
-            _inicioJanela = position;
+            _inicioJanela = worldPosition;
 
             _selecionandoJanela = true;
 
-            AppServices.SelectionBox.Visivel = true;
+            _context.SelectionBox.Visivel = true;
 
-            AppServices.SelectionBox.Atualizar(position, position);
+            _context.SelectionBox.Atualizar(
+                worldPosition,
+                worldPosition);
         }
 
         // =========================
@@ -1051,19 +1150,26 @@ namespace Araci.Applications.Editar.Selecionar
 
         public void OnMouseMove(Point position)
         {
+            Point worldPosition =
+                ScreenToWorld(position);
+
             // =========================
             // ARRASTO
             // =========================
 
             if (_arrastandoElementos)
             {
-                Vector delta = position - _ultimoPontoMouse;
+                worldPosition =
+                    _context.Snap.SnapPoint(worldPosition);
+
+                Vector delta =
+                    worldPosition - _ultimoPontoMouse;
 
                 if (delta.X != 0 || delta.Y != 0)
                 {
-                    foreach (var item in SelectionService.Selecionados.ToList())
+                    foreach (var item in _context.Selection.Selecionados.ToList())
                     {
-                        MoveService.MoverVisual(item, delta);
+                        _context.Move.MoverVisual(item, delta);
                     }
                 }
 
@@ -1073,9 +1179,10 @@ namespace Araci.Applications.Editar.Selecionar
 
                 if (_mostrarHud)
                 {
-                    var deltaTotal = position - _pontoInicialArrasto;
+                    var deltaTotal =
+                        worldPosition - _pontoInicialArrasto;
 
-                    var hud = AppServices.MoveHud;
+                    var hud = _context.MoveHud;
 
                     hud.DeltaX = deltaTotal.X;
 
@@ -1086,7 +1193,7 @@ namespace Araci.Applications.Editar.Selecionar
                     hud.AtualizarPosicao(bounds);
                 }
 
-                _ultimoPontoMouse = position;
+                _ultimoPontoMouse = worldPosition;
 
                 return;
             }
@@ -1097,7 +1204,9 @@ namespace Araci.Applications.Editar.Selecionar
 
             if (_selecionandoJanela)
             {
-                AppServices.SelectionBox.Atualizar(_inicioJanela, position);
+                _context.SelectionBox.Atualizar(
+                    _inicioJanela,
+                    worldPosition);
             }
         }
 
@@ -1113,11 +1222,11 @@ namespace Araci.Applications.Editar.Selecionar
 
             if (_arrastandoElementos)
             {
-                MoveService.EndMove(SelectionService.Selecionados.ToList());
+                _context.Move.EndMove(_context.Selection.Selecionados.ToList());
 
-                AppServices.MoveHud.Visivel = false;
+                _context.MoveHud.Visivel = false;
 
-                AppServices.MoveHud.Reset();
+                _context.MoveHud.Reset();
             }
 
             // =========================
@@ -1126,20 +1235,20 @@ namespace Araci.Applications.Editar.Selecionar
 
             if (_selecionandoJanela)
             {
-                var rect = AppServices.SelectionBox.Bounds;
+                var rect = _context.SelectionBox.Bounds;
 
-                if (AppServices.Viewport != null)
+                if (_context.Viewport != null)
                 {
-                    foreach (var item in AppServices.Viewport.Elementos)
+                    foreach (var item in _context.Viewport.Elementos)
                     {
                         if (rect.IntersectsWith(item.Bounds))
                         {
-                            SelectionService.Selecionar(item, true);
+                            _context.Selection.Selecionar(item, true);
                         }
                     }
                 }
 
-                AppServices.SelectionBox.Visivel = false;
+                _context.SelectionBox.Visivel = false;
             }
 
             _arrastandoElementos = false;
@@ -1161,7 +1270,7 @@ namespace Araci.Applications.Editar.Selecionar
 
         private Rect CalcularBoundsSelecionados()
         {
-            var items = SelectionService.Selecionados;
+            var items = _context.Selection.Selecionados;
 
             if (items.Count == 0)
                 return Rect.Empty;
@@ -1175,6 +1284,14 @@ namespace Araci.Applications.Editar.Selecionar
             double maxY = items.Max(i => i.Bounds.Bottom);
 
             return new Rect(minX, minY, maxX - minX, maxY - minY);
+        }
+
+        private Point ScreenToWorld(
+            Point screenPosition)
+        {
+            return _context.Viewport
+                ?.ScreenToWorld(screenPosition)
+                ?? screenPosition;
         }
     }
 }
@@ -1226,9 +1343,12 @@ namespace Araci.Controls.Base
         {
             nameof(ElementoViewModel.Stroke),
             nameof(ElementoViewModel.StrokeThickness),
+            nameof(ElementoViewModel.RenderData),
             nameof(ElementoViewModel.IsSelecionado),
             nameof(ElementoViewModel.X),
             nameof(ElementoViewModel.Y),
+            nameof(ElementoViewModel.WorldX),
+            nameof(ElementoViewModel.WorldY),
             nameof(ElementoViewModel.Largura),
             nameof(ElementoViewModel.Altura),
             nameof(ElementoViewModel.Bounds),
@@ -1261,6 +1381,9 @@ namespace Araci.Controls.Base
             object sender,
             System.Windows.RoutedEventArgs e)
         {
+            if (UsaBindings)
+                return;
+
             AtualizarVisual();
         }
 
@@ -1280,6 +1403,9 @@ namespace Araci.Controls.Base
 
             if (e.NewValue is ElementoViewModel novo)
             {
+                if (UsaBindings)
+                    return;
+
                 novo.PropertyChanged +=
                     OnViewModelPropertyChanged;
 
@@ -1323,14 +1449,20 @@ namespace Araci.Controls.Base
             AplicarEstadoVisual(vm);
         }
 
+        protected virtual bool UsaBindings =>
+            false;
+
         // =========================
         // APLICAR ESTADO VISUAL
         // =========================
 
-        protected abstract void AplicarEstadoVisual(
-            ElementoViewModel vm);
+        protected virtual void AplicarEstadoVisual(
+            ElementoViewModel vm)
+        {
+        }
     }
 }
+
 
 
 ====================================================================================================
@@ -1340,9 +1472,9 @@ ARQUIVO: C:\Araci-Engine-Front\Araci Engine\Controls\CaboControl.cs
 ﻿using System.Windows.Controls;
 using System.Windows.Media;
 using System.Windows.Shapes;
+using System.Windows.Data;
 
 using Araci.Controls.Base;
-using Araci.ViewModels;
 
 namespace Araci.Controls
 {
@@ -1369,43 +1501,58 @@ namespace Araci.Controls
             _canvas.Children.Add(_line);
 
             Content = _canvas;
+
+            ConfigurarBindings();
         }
 
-        protected override void AplicarEstadoVisual(
-            ElementoViewModel vm)
+        protected override bool UsaBindings =>
+            true;
+
+        private void ConfigurarBindings()
         {
-            Width =
-                vm.Largura;
+            SetBinding(
+                WidthProperty,
+                new Binding("RenderData.Largura"));
 
-            Height =
-                vm.Altura;
+            SetBinding(
+                HeightProperty,
+                new Binding("RenderData.Altura"));
 
-            _canvas.Width =
-                vm.Largura;
+            _canvas.SetBinding(
+                WidthProperty,
+                new Binding("RenderData.Largura"));
 
-            _canvas.Height =
-                vm.Altura;
+            _canvas.SetBinding(
+                HeightProperty,
+                new Binding("RenderData.Altura"));
 
-            _line.X1 =
-                vm.Geometry.PontoLocalInicial.X;
+            _line.SetBinding(
+                Line.X1Property,
+                new Binding("RenderData.PontoLocalInicial.X"));
 
-            _line.Y1 =
-                vm.Geometry.PontoLocalInicial.Y;
+            _line.SetBinding(
+                Line.Y1Property,
+                new Binding("RenderData.PontoLocalInicial.Y"));
 
-            _line.X2 =
-                vm.Geometry.PontoLocalFinal.X;
+            _line.SetBinding(
+                Line.X2Property,
+                new Binding("RenderData.PontoLocalFinal.X"));
 
-            _line.Y2 =
-                vm.Geometry.PontoLocalFinal.Y;
+            _line.SetBinding(
+                Line.Y2Property,
+                new Binding("RenderData.PontoLocalFinal.Y"));
 
-            _line.Stroke =
-                vm.Stroke;
+            _line.SetBinding(
+                Shape.StrokeProperty,
+                new Binding("RenderData.Stroke"));
 
-            _line.StrokeThickness =
-                vm.StrokeThickness;
+            _line.SetBinding(
+                Shape.StrokeThicknessProperty,
+                new Binding("RenderData.StrokeThickness"));
         }
     }
 }
+
 
 
 ====================================================================================================
@@ -1415,9 +1562,9 @@ ARQUIVO: C:\Araci-Engine-Front\Araci Engine\Controls\CargaControl.cs
 ﻿using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Shapes;
+using System.Windows.Data;
 
 using Araci.Controls.Base;
-using Araci.ViewModels;
 
 namespace Araci.Controls
 {
@@ -1427,15 +1574,10 @@ namespace Araci.Controls
 
         public CargaControl()
         {
-            Width = 70;
-            Height = 70;
-
             Cursor = Cursors.Hand;
 
             _rectangle = new Rectangle
             {
-                Width = 70,
-                Height = 70,
                 RadiusX = 6,
                 RadiusY = 6,
                 Fill =
@@ -1445,16 +1587,42 @@ namespace Araci.Controls
             };
 
             Content = _rectangle;
+
+            ConfigurarBindings();
         }
 
-        protected override void AplicarEstadoVisual(
-            ElementoViewModel vm)
+        protected override bool UsaBindings =>
+            true;
+
+        private void ConfigurarBindings()
         {
-            _rectangle.Stroke = vm.Stroke;
-            _rectangle.StrokeThickness = vm.StrokeThickness;
+            SetBinding(
+                WidthProperty,
+                new Binding("RenderData.Largura"));
+
+            SetBinding(
+                HeightProperty,
+                new Binding("RenderData.Altura"));
+
+            _rectangle.SetBinding(
+                WidthProperty,
+                new Binding("RenderData.Largura"));
+
+            _rectangle.SetBinding(
+                HeightProperty,
+                new Binding("RenderData.Altura"));
+
+            _rectangle.SetBinding(
+                Shape.StrokeProperty,
+                new Binding("RenderData.Stroke"));
+
+            _rectangle.SetBinding(
+                Shape.StrokeThicknessProperty,
+                new Binding("RenderData.StrokeThickness"));
         }
     }
 }
+
 
 
 ====================================================================================================
@@ -1464,9 +1632,9 @@ ARQUIVO: C:\Araci-Engine-Front\Araci Engine\Controls\GeradorControl.cs
 ﻿using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Shapes;
+using System.Windows.Data;
 
 using Araci.Controls.Base;
-using Araci.ViewModels;
 
 namespace Araci.Controls
 {
@@ -1476,15 +1644,10 @@ namespace Araci.Controls
 
         public GeradorControl()
         {
-            Width = 80;
-            Height = 80;
-
             Cursor = Cursors.Hand;
 
             _ellipse = new Ellipse
             {
-                Width = 80,
-                Height = 80,
                 Fill =
                     new SolidColorBrush(
                         (Color)ColorConverter
@@ -1492,16 +1655,42 @@ namespace Araci.Controls
             };
 
             Content = _ellipse;
+
+            ConfigurarBindings();
         }
 
-        protected override void AplicarEstadoVisual(
-            ElementoViewModel vm)
+        protected override bool UsaBindings =>
+            true;
+
+        private void ConfigurarBindings()
         {
-            _ellipse.Stroke = vm.Stroke;
-            _ellipse.StrokeThickness = vm.StrokeThickness;
+            SetBinding(
+                WidthProperty,
+                new Binding("RenderData.Largura"));
+
+            SetBinding(
+                HeightProperty,
+                new Binding("RenderData.Altura"));
+
+            _ellipse.SetBinding(
+                WidthProperty,
+                new Binding("RenderData.Largura"));
+
+            _ellipse.SetBinding(
+                HeightProperty,
+                new Binding("RenderData.Altura"));
+
+            _ellipse.SetBinding(
+                Shape.StrokeProperty,
+                new Binding("RenderData.Stroke"));
+
+            _ellipse.SetBinding(
+                Shape.StrokeThicknessProperty,
+                new Binding("RenderData.StrokeThickness"));
         }
     }
 }
+
 
 
 ====================================================================================================
@@ -1631,6 +1820,155 @@ namespace Araci.Core.Documents
         public void Limpar()
         {
             Elementos.Clear();
+        }
+    }
+}
+
+
+
+====================================================================================================
+ARQUIVO: C:\Araci-Engine-Front\Araci Engine\Core\Rendering\ElementoRenderData.cs
+====================================================================================================
+
+using System.Windows;
+using System.Windows.Media;
+
+namespace Araci.Core.Rendering
+{
+    public class ElementoRenderData
+    {
+        public ElementoRenderData(
+            double largura,
+            double altura,
+            Point pontoLocalInicial,
+            Point pontoLocalFinal,
+            Brush stroke,
+            double strokeThickness)
+        {
+            Largura = largura;
+            Altura = altura;
+            PontoLocalInicial = pontoLocalInicial;
+            PontoLocalFinal = pontoLocalFinal;
+            Stroke = stroke;
+            StrokeThickness = strokeThickness;
+        }
+
+        public double Largura
+        { get; }
+
+        public double Altura
+        { get; }
+
+        public Point PontoLocalInicial
+        { get; }
+
+        public Point PontoLocalFinal
+        { get; }
+
+        public Brush Stroke
+        { get; }
+
+        public double StrokeThickness
+        { get; }
+    }
+}
+
+
+
+====================================================================================================
+ARQUIVO: C:\Araci-Engine-Front\Araci Engine\Core\Scenes\Scene.cs
+====================================================================================================
+
+using System.Collections.ObjectModel;
+
+using Araci.ViewModels;
+
+namespace Araci.Core.Scenes
+{
+    public class Scene
+    {
+        public ObservableCollection<ElementoViewModel>
+            Elementos
+        { get; }
+            = new();
+    }
+}
+
+
+
+====================================================================================================
+ARQUIVO: C:\Araci-Engine-Front\Araci Engine\Core\Viewport\Camera.cs
+====================================================================================================
+
+using System;
+using System.ComponentModel;
+using System.Runtime.CompilerServices;
+using System.Windows;
+
+namespace Araci.Core.Viewport
+{
+    public class Camera : INotifyPropertyChanged
+    {
+        private double _zoom = 1.0;
+
+        private Point _offset;
+
+        public event PropertyChangedEventHandler?
+            PropertyChanged;
+
+        public double Zoom
+        {
+            get => _zoom;
+
+            set
+            {
+                double zoom =
+                    Math.Max(double.Epsilon, value);
+
+                if (_zoom == zoom)
+                    return;
+
+                _zoom = zoom;
+
+                OnPropertyChanged();
+            }
+        }
+
+        public Point Offset
+        {
+            get => _offset;
+
+            set
+            {
+                if (_offset == value)
+                    return;
+
+                _offset = value;
+
+                OnPropertyChanged();
+            }
+        }
+
+        public Point WorldToScreen(Point point)
+        {
+            return new Point(
+                point.X * Zoom + Offset.X,
+                point.Y * Zoom + Offset.Y);
+        }
+
+        public Point ScreenToWorld(Point point)
+        {
+            return new Point(
+                (point.X - Offset.X) / Zoom,
+                (point.Y - Offset.Y) / Zoom);
+        }
+
+        private void OnPropertyChanged(
+            [CallerMemberName] string? propertyName = null)
+        {
+            PropertyChanged?.Invoke(
+                this,
+                new PropertyChangedEventArgs(propertyName));
         }
     }
 }
@@ -1897,7 +2235,7 @@ namespace Araci.Models
     public abstract class Elemento : IElementoClonavel
     {
         // =========================
-        // POSIÇÃO
+        // POSIÇÃO EM MUNDO
         // =========================
 
         public double PosicaoX { get; set; }
@@ -1951,6 +2289,7 @@ namespace Araci.Models
         }
     }
 }
+
 
 
 ====================================================================================================
@@ -3964,6 +4303,9 @@ namespace Araci.Ribbon.Tabs
             InitializeComponent();
         }
 
+        private EditorContext Context =>
+            AppServices.Current;
+
         // =========================
         // GERADOR
         // =========================
@@ -3973,7 +4315,7 @@ namespace Araci.Ribbon.Tabs
             RoutedEventArgs e)
         {
             InserirGeradorApplication app =
-                new();
+                new(Context);
 
             app.Executar();
         }
@@ -3987,7 +4329,7 @@ namespace Araci.Ribbon.Tabs
             RoutedEventArgs e)
         {
             InserirCargaApplication app =
-                new();
+                new(Context);
 
             app.Executar();
         }
@@ -4001,7 +4343,7 @@ namespace Araci.Ribbon.Tabs
             RoutedEventArgs e)
         {
             InserirCaboApplication app =
-                new();
+                new(Context);
 
             app.Executar();
         }
@@ -4288,6 +4630,9 @@ namespace Araci.Ribbon.Tabs
             Unloaded += OnUnloaded;
         }
 
+        private EditorContext Context =>
+            AppServices.Current;
+
         // =========================
         // LOADED
         // =========================
@@ -4296,7 +4641,8 @@ namespace Araci.Ribbon.Tabs
         {
             AssinarEventoFerramenta();
 
-            AtualizarBotoes(AppServices.Tools.FerramentaAtual);
+            AtualizarBotoes(
+                Context.Tools.FerramentaAtual);
         }
 
         // =========================
@@ -4317,7 +4663,7 @@ namespace Araci.Ribbon.Tabs
             if (_eventoFerramentaAssinado)
                 return;
 
-            AppServices.Tools.FerramentaAlterada +=
+            Context.Tools.FerramentaAlterada +=
                 OnFerramentaAlterada;
 
             _eventoFerramentaAssinado =
@@ -4329,7 +4675,7 @@ namespace Araci.Ribbon.Tabs
             if (!_eventoFerramentaAssinado)
                 return;
 
-            AppServices.Tools.FerramentaAlterada -=
+            Context.Tools.FerramentaAlterada -=
                 OnFerramentaAlterada;
 
             _eventoFerramentaAssinado =
@@ -4396,30 +4742,32 @@ namespace Araci.Ribbon.Tabs
 
         private void SelecionarButton_Click(object sender, RoutedEventArgs e)
         {
-            AppServices.Tools.AtivarFerramenta(
-                new SelecionarTool());
+            Context.Tools.AtivarFerramenta(
+                new SelecionarTool(Context));
         }
 
         private void MoverButton_Click(object sender, RoutedEventArgs e)
         {
-            AppServices.Tools.AtivarFerramenta(
-                new MoverTool());
+            Context.Tools.AtivarFerramenta(
+                new MoverTool(Context));
         }
 
         private void CopiarButton_Click(object sender, RoutedEventArgs e)
         {
-            ClipboardService.CopiarSelecionados();
+            ClipboardService.CopiarSelecionados(
+                Context);
         }
 
         private void ColarButton_Click(object sender, RoutedEventArgs e)
         {
-            ClipboardService.Colar();
+            ClipboardService.Colar(
+                Context);
         }
 
         private void DeletarButton_Click(object sender, RoutedEventArgs e)
         {
-            AppServices.Tools.AtivarFerramenta(
-                new DeletarTool());
+            Context.Tools.AtivarFerramenta(
+                new DeletarTool(Context));
         }
 
         // =========================
@@ -4428,7 +4776,7 @@ namespace Araci.Ribbon.Tabs
 
         private void DesfazerButton_Click(object sender, RoutedEventArgs e)
         {
-            AppServices.Commands.Undo();
+            Context.Commands.Undo();
         }
 
         // =========================
@@ -4437,7 +4785,7 @@ namespace Araci.Ribbon.Tabs
 
         private void RefazerButton_Click(object sender, RoutedEventArgs e)
         {
-            AppServices.Commands.Redo();
+            Context.Commands.Redo();
         }
     }
 }
@@ -4523,8 +4871,6 @@ namespace Araci.Ribbon.Tabs
 ARQUIVO: C:\Araci-Engine-Front\Araci Engine\Service\AppServices.cs
 ====================================================================================================
 
-using System.Windows;
-
 using Araci.Core.Commands;
 using Araci.Core.Documents;
 using Araci.Core.Transactions;
@@ -4539,14 +4885,20 @@ namespace Araci
         // CONTEXTO
         // =========================
 
-        public static EditorContext Context
-        { get; private set; }
+        public static EditorContext Current
+        { get; set; }
             = new EditorContext();
+
+        public static EditorContext Context
+        {
+            get => Current;
+            private set => Current = value;
+        }
 
         public static void ResetContext(
             EditorContext? context = null)
         {
-            Context =
+            Current =
                 context ?? new EditorContext();
         }
 
@@ -4556,8 +4908,8 @@ namespace Araci
 
         public static AraciDocument Document
         {
-            get => Context.Document;
-            set => Context.Document = value;
+            get => Current.Document;
+            set => Current.Document = value;
         }
 
         // =========================
@@ -4565,7 +4917,14 @@ namespace Araci
         // =========================
 
         public static ToolService Tools =>
-            Context.Tools;
+            Current.Tools;
+
+        // =========================
+        // INPUT
+        // =========================
+
+        public static InputRouter Input =>
+            Current.Input;
 
         // =========================
         // VIEWPORT
@@ -4574,15 +4933,8 @@ namespace Araci
         public static ViewportService?
             Viewport
         {
-            get => Context.Viewport;
-            set => Context.Viewport = value;
-        }
-
-        public static FrameworkElement?
-            ViewportReference
-        {
-            get => Context.ViewportReference;
-            set => Context.ViewportReference = value;
+            get => Current.Viewport;
+            set => Current.Viewport = value;
         }
 
         // =========================
@@ -4590,28 +4942,49 @@ namespace Araci
         // =========================
 
         public static EditorState Editor =>
-            Context.Editor;
+            Current.Editor;
 
         // =========================
         // HUD
         // =========================
 
         public static MoveHudService MoveHud =>
-            Context.MoveHud;
+            Current.MoveHud;
 
         // =========================
         // SELECTION BOX
         // =========================
 
         public static SelectionBoxViewModel SelectionBox =>
-            Context.SelectionBox;
+            Current.SelectionBox;
 
         // =========================
         // COMMANDS
         // =========================
 
         public static CommandManager Commands =>
-            Context.Commands;
+            Current.Commands;
+
+        // =========================
+        // SELECTION
+        // =========================
+
+        public static SelectionService Selection =>
+            Current.Selection;
+
+        // =========================
+        // MOVE
+        // =========================
+
+        public static MoveService Move =>
+            Current.Move;
+
+        // =========================
+        // SNAP
+        // =========================
+
+        public static SnapService Snap =>
+            Current.Snap;
 
         // =========================
         // TRANSACTIONS
@@ -4619,7 +4992,7 @@ namespace Araci
 
         public static TransactionScope BeginTransaction()
         {
-            return Context.BeginTransaction();
+            return Current.BeginTransaction();
         }
 
         // =========================
@@ -4627,7 +5000,7 @@ namespace Araci
         // =========================
 
         public static TypeLibraryService Types =>
-            Context.Types;
+            Current.Types;
     }
 }
 
@@ -4665,11 +5038,16 @@ namespace Araci.Services
         // COPIAR
         // =========================
 
-        public static void CopiarSelecionados()
+        public static void CopiarSelecionados(
+            EditorContext context)
         {
+            var editorContext =
+                context
+                ?? throw new System.ArgumentNullException(nameof(context));
+
             _buffer.Clear();
 
-            foreach (var item in SelectionService.Selecionados)
+            foreach (var item in editorContext.Selection.Selecionados)
             {
                 _buffer.Add(item.Modelo.Clonar());
             }
@@ -4679,14 +5057,20 @@ namespace Araci.Services
         // COLAR
         // =========================
 
-        public static void Colar()
+        public static void Colar(
+            EditorContext context)
         {
+            var editorContext =
+                context
+                ?? throw new System.ArgumentNullException(nameof(context));
+
             if (_buffer.Count == 0)
                 return;
 
             var novos = new List<ElementoViewModel>();
 
-            using var transaction = AppServices.BeginTransaction();
+            using var transaction =
+                editorContext.BeginTransaction();
 
             foreach (var item in _buffer)
             {
@@ -4694,19 +5078,25 @@ namespace Araci.Services
 
                 AplicarOffset(clone);
 
-                var vm = ElementoFactory.CriarViewModel(clone);
+                var vm = editorContext.ElementoFactory
+                    .CriarViewModel(clone);
 
                 if (vm == null)
                     continue;
 
                 novos.Add(vm);
 
-                transaction.Add(new AddElementoCommand(vm));
+                transaction.Add(
+                    new AddElementoCommand(
+                        vm,
+                        editorContext));
             }
 
             transaction.Commit();
 
-            AtualizarSelecao(novos);
+            AtualizarSelecao(
+                editorContext,
+                novos);
 
             AtualizarBuffer(novos);
         }
@@ -4731,13 +5121,15 @@ namespace Araci.Services
         // SELEÇÃO
         // =========================
 
-        private static void AtualizarSelecao(List<ElementoViewModel> elementos)
+        private static void AtualizarSelecao(
+            EditorContext context,
+            List<ElementoViewModel> elementos)
         {
-            SelectionService.Limpar();
+            context.Selection.Limpar();
 
             foreach (var item in elementos)
             {
-                SelectionService.Selecionar(item, true);
+                context.Selection.Selecionar(item, true);
             }
         }
 
@@ -4758,119 +5150,14 @@ namespace Araci.Services
 }
 
 
-====================================================================================================
-ARQUIVO: C:\Araci-Engine-Front\Araci Engine\Service\DragService.cs
-====================================================================================================
-
-﻿using System;
-using System.Windows;
-using System.Windows.Input;
-using Araci.ViewModels;
-
-namespace Araci.Services
-{
-    public class DragService
-    {
-        private readonly UIElement _elemento;
-
-        private bool _arrastando;
-        private Point _ultimoPonto;
-
-        public event Action<Vector>? DragDelta;
-
-        public DragService(UIElement elemento)
-        {
-            _elemento = elemento;
-
-            _elemento.MouseLeftButtonDown += MouseDown;
-            _elemento.MouseMove += MouseMove;
-            _elemento.MouseLeftButtonUp += MouseUp;
-        }
-
-        private FrameworkElement? Ref =>
-            AppServices.ViewportReference;
-
-        private void MouseDown(
-            object sender,
-            MouseButtonEventArgs e)
-        {
-            if (_elemento is not FrameworkElement fe)
-                return;
-
-            if (fe.DataContext is not ElementoViewModel vm)
-                return;
-
-            if (Ref == null)
-                return;
-
-            _arrastando = true;
-
-            _ultimoPonto =
-                e.GetPosition(Ref);
-
-            AppServices.Tools
-                .HandleMouseDown(
-                    vm,
-                    _ultimoPonto);
-
-            e.Handled = true;
-
-            _elemento.CaptureMouse();
-        }
-
-        private void MouseMove(
-            object sender,
-            MouseEventArgs e)
-        {
-            if (Ref == null)
-                return;
-
-            Point pos =
-                e.GetPosition(Ref);
-
-            if (_arrastando)
-            {
-                Vector delta =
-                    pos - _ultimoPonto;
-
-                _ultimoPonto = pos;
-
-                DragDelta?.Invoke(delta);
-            }
-
-            AppServices.Tools
-                .HandleMouseMove(pos);
-        }
-
-        private void MouseUp(
-            object sender,
-            MouseButtonEventArgs e)
-        {
-            if (Ref == null)
-                return;
-
-            Point pos =
-                e.GetPosition(Ref);
-
-            _arrastando = false;
-
-            AppServices.Tools
-                .HandleMouseUp(pos);
-
-            _elemento.ReleaseMouseCapture();
-        }
-    }
-}
-
 
 ====================================================================================================
 ARQUIVO: C:\Araci-Engine-Front\Araci Engine\Service\EditorContext.cs
 ====================================================================================================
 
-using System.Windows;
-
 using Araci.Core.Commands;
 using Araci.Core.Documents;
+using Araci.Core.Scenes;
 using Araci.Core.Transactions;
 using Araci.ViewModels;
 
@@ -4878,6 +5165,31 @@ namespace Araci.Services
 {
     public class EditorContext
     {
+        // =========================
+        // CONSTRUTOR
+        // =========================
+
+        public EditorContext()
+        {
+            ElementoFactory =
+                new ElementoFactory(Types);
+
+            Selection =
+                new SelectionService(this);
+
+            MoveHud =
+                new MoveHudService(this);
+
+            Move =
+                new MoveService(this);
+
+            Tools =
+                new ToolService(this);
+
+            Input =
+                new InputRouter(this);
+        }
+
         // =========================
         // DOCUMENTO
         // =========================
@@ -4887,12 +5199,26 @@ namespace Araci.Services
             = new AraciDocument();
 
         // =========================
+        // SCENE
+        // =========================
+
+        public Scene Scene
+        { get; }
+            = new Scene();
+
+        // =========================
         // TOOLS
         // =========================
 
         public ToolService Tools
         { get; }
-            = new ToolService();
+
+        // =========================
+        // INPUT
+        // =========================
+
+        public InputRouter Input
+        { get; }
 
         // =========================
         // VIEWPORT
@@ -4900,10 +5226,6 @@ namespace Araci.Services
 
         public ViewportService?
             Viewport
-        { get; set; }
-
-        public FrameworkElement?
-            ViewportReference
         { get; set; }
 
         // =========================
@@ -4920,7 +5242,6 @@ namespace Araci.Services
 
         public MoveHudService MoveHud
         { get; }
-            = new MoveHudService();
 
         // =========================
         // SELECTION BOX
@@ -4939,12 +5260,41 @@ namespace Araci.Services
             = new CommandManager();
 
         // =========================
+        // SELECTION
+        // =========================
+
+        public SelectionService Selection
+        { get; }
+
+        // =========================
+        // MOVE
+        // =========================
+
+        public MoveService Move
+        { get; }
+
+        // =========================
+        // SNAP
+        // =========================
+
+        public SnapService Snap
+        { get; }
+            = new SnapService();
+
+        // =========================
         // TYPES
         // =========================
 
         public TypeLibraryService Types
         { get; }
             = new TypeLibraryService();
+
+        // =========================
+        // ELEMENTOS
+        // =========================
+
+        public ElementoFactory ElementoFactory
+        { get; }
 
         // =========================
         // TRANSACTIONS
@@ -5040,22 +5390,36 @@ using Araci.ViewModels;
 
 namespace Araci.Services
 {
-    public static class ElementoFactory
+    public class ElementoFactory
     {
+        private readonly TypeLibraryService _types;
+
+        public ElementoFactory(TypeLibraryService types)
+        {
+            _types = types
+                ?? throw new ArgumentNullException(nameof(types));
+        }
+
         // =========================
         // VIEWMODEL
         // =========================
 
-        public static ElementoViewModel? CriarViewModel(
+        public ElementoViewModel? CriarViewModel(
             Elemento modelo)
         {
             return modelo switch
             {
-                Cabo cabo => new CaboViewModel(cabo),
+                Cabo cabo => new CaboViewModel(
+                    cabo,
+                    _types),
 
-                Carga carga => new CargaViewModel(carga),
+                Carga carga => new CargaViewModel(
+                    carga,
+                    _types),
 
-                Gerador gerador => new GeradorViewModel(gerador),
+                Gerador gerador => new GeradorViewModel(
+                    gerador,
+                    _types),
 
                 _ => null
             };
@@ -5065,72 +5429,174 @@ namespace Araci.Services
         // CABO
         // =========================
 
-        public static Cabo CriarCabo()
+        public Cabo CriarCabo()
         {
-            var cabo =
-                new Cabo
-                {
-                    Tipo =
-                        AppServices.Types.TipoCaboPadrao
-                        ?? throw new InvalidOperationException(
-                            "Nenhum tipo de cabo cadastrado.")
-                };
-
-            return cabo;
+            return new Cabo
+            {
+                Tipo =
+                    _types.TipoCaboPadrao
+                    ?? throw new InvalidOperationException(
+                        "Nenhum tipo de cabo cadastrado.")
+            };
         }
 
-        public static CaboViewModel CriarCaboVM()
+        public CaboViewModel CriarCaboVM()
         {
             return new CaboViewModel(
-                CriarCabo());
+                CriarCabo(),
+                _types);
         }
 
         // =========================
         // CARGA
         // =========================
 
-        public static Carga CriarCarga()
+        public Carga CriarCarga()
         {
-            var carga =
-                new Carga
-                {
-                    Tipo =
-                        AppServices.Types.TipoCargaPadrao
-                        ?? throw new InvalidOperationException(
-                            "Nenhum tipo de carga cadastrado.")
-                };
-
-            return carga;
+            return new Carga
+            {
+                Tipo =
+                    _types.TipoCargaPadrao
+                    ?? throw new InvalidOperationException(
+                        "Nenhum tipo de carga cadastrado.")
+            };
         }
 
-        public static CargaViewModel CriarCargaVM()
+        public CargaViewModel CriarCargaVM()
         {
             return new CargaViewModel(
-                CriarCarga());
+                CriarCarga(),
+                _types);
         }
 
         // =========================
         // GERADOR
         // =========================
 
-        public static Gerador CriarGerador()
+        public Gerador CriarGerador()
         {
-            var gerador =
-                new Gerador
-                {
-                    Tipo =
-                        AppServices.Types.TipoGeradorPadrao
-                        ?? throw new InvalidOperationException(
-                            "Nenhum tipo de gerador cadastrado.")
-                };
-
-            return gerador;
+            return new Gerador
+            {
+                Tipo =
+                    _types.TipoGeradorPadrao
+                    ?? throw new InvalidOperationException(
+                        "Nenhum tipo de gerador cadastrado.")
+            };
         }
 
-        public static GeradorViewModel CriarGeradorVM()
+        public GeradorViewModel CriarGeradorVM()
         {
             return new GeradorViewModel(
-                CriarGerador());
+                CriarGerador(),
+                _types);
+        }
+    }
+}
+
+
+
+====================================================================================================
+ARQUIVO: C:\Araci-Engine-Front\Araci Engine\Service\InputRouter.cs
+====================================================================================================
+
+using System.Windows;
+using System.Windows.Input;
+
+using Araci.Applications.Editar.Base;
+using Araci.ViewModels;
+
+namespace Araci.Services
+{
+    public class InputRouter
+    {
+        private readonly EditorContext _context;
+
+        public InputRouter(EditorContext context)
+        {
+            _context = context
+                ?? throw new System.ArgumentNullException(nameof(context));
+        }
+
+        public ITool ToolAtual
+        {
+            get => _context.Tools.FerramentaAtual;
+            set => _context.Tools.AtivarFerramenta(value);
+        }
+
+        public void MouseDown(
+            ElementoViewModel? vm,
+            Point position)
+        {
+            ToolAtual.OnMouseDown(
+                vm,
+                position,
+                CapturarEstadoAtual());
+        }
+
+        public void MouseMove(
+            Point position)
+        {
+            ToolAtual.OnMouseMove(position);
+        }
+
+        public void MouseUp(
+            Point position)
+        {
+            ToolAtual.OnMouseUp(position);
+        }
+
+        public bool KeyDown(
+            Key key)
+        {
+            bool control =
+                Keyboard.Modifiers.HasFlag(ModifierKeys.Control);
+
+            if (control && key == Key.Z)
+            {
+                _context.Commands.Undo();
+
+                return true;
+            }
+
+            if (control && key == Key.Y)
+            {
+                _context.Commands.Redo();
+
+                return true;
+            }
+
+            if (control && key == Key.C)
+            {
+                ClipboardService.CopiarSelecionados(_context);
+
+                return true;
+            }
+
+            if (control && key == Key.V)
+            {
+                ClipboardService.Colar(_context);
+
+                return true;
+            }
+
+            if (key == Key.Escape)
+            {
+                _context.Tools.VoltarParaSelecao();
+
+                _context.Selection.Limpar();
+
+                return true;
+            }
+
+            ToolAtual.OnKeyDown(key);
+
+            return false;
+        }
+
+        private static ToolInputState CapturarEstadoAtual()
+        {
+            return new ToolInputState(
+                Keyboard.Modifiers.HasFlag(ModifierKeys.Control));
         }
     }
 }
@@ -5150,6 +5616,8 @@ namespace Araci.Services
     {
         private const double MARGEM = 10;
 
+        private readonly EditorContext _context;
+
         private bool _visivel;
         private double _x;
         private double _y;
@@ -5157,6 +5625,12 @@ namespace Araci.Services
         private double _deltaY;
 
         public event PropertyChangedEventHandler? PropertyChanged;
+
+        public MoveHudService(EditorContext context)
+        {
+            _context = context
+                ?? throw new System.ArgumentNullException(nameof(context));
+        }
 
         public bool Visivel
         {
@@ -5230,16 +5704,25 @@ namespace Araci.Services
         public void AtualizarPosicao(Rect bounds)
         {
             double viewportX =
-                AppServices.Viewport?.Largura ?? 1000;
+                _context.Viewport?.Largura ?? 1000;
 
             double viewportY =
-                AppServices.Viewport?.Altura ?? 800;
+                _context.Viewport?.Altura ?? 800;
+
+            Point worldPoint =
+                new(
+                    bounds.X + bounds.Width / 2,
+                    bounds.Y - 20);
+
+            Point screenPoint =
+                _context.Viewport?.WorldToScreen(worldPoint)
+                ?? worldPoint;
 
             double novoX =
-                bounds.X + bounds.Width / 2;
+                screenPoint.X;
 
             double novoY =
-                bounds.Y - 20; // acima do elemento
+                screenPoint.Y;
 
             // CLAMP VIEWPORT
             novoX = Math.Max(MARGEM, Math.Min(novoX, viewportX - MARGEM));
@@ -5262,6 +5745,7 @@ namespace Araci.Services
         }
     }
 }
+
 
 
 ====================================================================================================
@@ -5296,15 +5780,27 @@ using Araci.ViewModels;
 
 namespace Araci.Services
 {
-    public static class MoveService
+    public class MoveService
     {
+        private readonly EditorContext _context;
+
+        // =========================
+        // CONSTRUTOR
+        // =========================
+
+        public MoveService(EditorContext context)
+        {
+            _context = context
+                ?? throw new System.ArgumentNullException(nameof(context));
+        }
+
         // =========================
         // ESTADO DRAG
         // =========================
 
-        private static bool _movendo;
+        private bool _movendo;
 
-        private static readonly Dictionary<
+        private readonly Dictionary<
             ElementoViewModel,
             ElementoEstado>
             _estadoInicial = new();
@@ -5313,7 +5809,7 @@ namespace Araci.Services
         // BEGIN
         // =========================
 
-        public static void BeginMove(
+        public void BeginMove(
             IEnumerable<ElementoViewModel> elementos)
         {
             _estadoInicial.Clear();
@@ -5331,7 +5827,7 @@ namespace Araci.Services
         // MOVE VISUAL
         // =========================
 
-        public static void MoverVisual(
+        public void MoverVisual(
             ElementoViewModel vm,
             Vector delta)
         {
@@ -5345,14 +5841,14 @@ namespace Araci.Services
         // END MOVE
         // =========================
 
-        public static void EndMove(
+        public void EndMove(
             IEnumerable<ElementoViewModel> elementos)
         {
             if (!_movendo)
                 return;
 
             using var transaction =
-                AppServices.BeginTransaction();
+                _context.BeginTransaction();
 
             foreach (var vm in elementos)
             {
@@ -5391,6 +5887,7 @@ namespace Araci.Services
 }
 
 
+
 ====================================================================================================
 ARQUIVO: C:\Araci-Engine-Front\Araci Engine\Service\SelectionService.cs
 ====================================================================================================
@@ -5402,13 +5899,21 @@ using Araci.ViewModels;
 
 namespace Araci.Services
 {
-    public static class SelectionService
+    public class SelectionService
     {
+        private readonly EditorContext _context;
+
+        public SelectionService(EditorContext context)
+        {
+            _context = context
+                ?? throw new System.ArgumentNullException(nameof(context));
+        }
+
         // =========================
         // SELECIONADOS
         // =========================
 
-        public static ObservableCollection<ElementoViewModel>
+        public ObservableCollection<ElementoViewModel>
             Selecionados
         { get; }
             = new();
@@ -5417,7 +5922,7 @@ namespace Araci.Services
         // PRINCIPAL
         // =========================
 
-        public static ElementoViewModel?
+        public ElementoViewModel?
             Principal =>
                 Selecionados.FirstOrDefault();
 
@@ -5425,7 +5930,7 @@ namespace Araci.Services
         // SELECIONAR
         // =========================
 
-        public static void Selecionar(
+        public void Selecionar(
             ElementoViewModel vm,
             bool adicionar = false)
         {
@@ -5449,7 +5954,7 @@ namespace Araci.Services
             {
                 vm.IsSelecionado = true;
 
-                AppServices.Editor
+                _context.Editor
                     .ElementoSelecionado = vm;
 
                 return;
@@ -5463,7 +5968,7 @@ namespace Araci.Services
 
             Selecionados.Add(vm);
 
-            AppServices.Editor
+            _context.Editor
                 .ElementoSelecionado = vm;
         }
 
@@ -5471,7 +5976,7 @@ namespace Araci.Services
         // DESELECIONAR
         // =========================
 
-        public static void Deselecionar(
+        public void Deselecionar(
             ElementoViewModel vm)
         {
             if (vm == null)
@@ -5487,7 +5992,7 @@ namespace Araci.Services
 
             Selecionados.Remove(vm);
 
-            AppServices.Editor
+            _context.Editor
                 .ElementoSelecionado =
                     Principal;
         }
@@ -5496,7 +6001,7 @@ namespace Araci.Services
         // TOGGLE
         // =========================
 
-        public static void Toggle(
+        public void Toggle(
             ElementoViewModel vm)
         {
             if (vm == null)
@@ -5516,7 +6021,7 @@ namespace Araci.Services
         // LIMPAR
         // =========================
 
-        public static void Limpar()
+        public void Limpar()
         {
             foreach (var item in
                      Selecionados.ToList())
@@ -5526,7 +6031,7 @@ namespace Araci.Services
 
             Selecionados.Clear();
 
-            AppServices.Editor
+            _context.Editor
                 .ElementoSelecionado = null;
         }
 
@@ -5534,7 +6039,7 @@ namespace Araci.Services
         // SINCRONIZAÇÃO
         // =========================
 
-        public static void GarantirConsistencia()
+        public void GarantirConsistencia()
         {
             foreach (var item in
                      Selecionados.ToList())
@@ -5549,17 +6054,69 @@ namespace Araci.Services
 }
 
 
+
+====================================================================================================
+ARQUIVO: C:\Araci-Engine-Front\Araci Engine\Service\SnapService.cs
+====================================================================================================
+
+using System;
+using System.Windows;
+
+namespace Araci.Services
+{
+    public class SnapService
+    {
+        public bool Habilitado
+        { get; set; }
+            = true;
+
+        public double GridSpacing
+        { get; set; }
+            = 20;
+
+        public Point SnapPoint(Point point)
+        {
+            if (!Habilitado ||
+                GridSpacing <= 0)
+            {
+                return point;
+            }
+
+            return new Point(
+                SnapValue(point.X),
+                SnapValue(point.Y));
+        }
+
+        public Vector SnapDelta(Vector delta)
+        {
+            Point snapped =
+                SnapPoint(
+                    new Point(
+                        delta.X,
+                        delta.Y));
+
+            return new Vector(
+                snapped.X,
+                snapped.Y);
+        }
+
+        private double SnapValue(double value)
+        {
+            return Math.Round(value / GridSpacing) *
+                   GridSpacing;
+        }
+    }
+}
+
+
+
 ====================================================================================================
 ARQUIVO: C:\Araci-Engine-Front\Araci Engine\Service\ToolService.cs
 ====================================================================================================
 
 ﻿using System;
-using System.Windows;
-using System.Windows.Input;
-
 using Araci.Applications.Editar.Base;
 using Araci.Applications.Editar.Selecionar;
-using Araci.ViewModels;
 
 namespace Araci.Services
 {
@@ -5578,14 +6135,19 @@ namespace Araci.Services
 
         private ITool _ferramentaAtual;
 
+        private readonly EditorContext _context;
+
         // =========================
         // CONSTRUTOR
         // =========================
 
-        public ToolService()
+        public ToolService(EditorContext context)
         {
+            _context = context
+                ?? throw new ArgumentNullException(nameof(context));
+
             _ferramentaAtual =
-                new SelecionarTool();
+                new SelecionarTool(_context);
 
             _ferramentaAtual.Ativar();
         }
@@ -5633,104 +6195,12 @@ namespace Araci.Services
                 return;
 
             FerramentaAtual =
-                new SelecionarTool();
+                new SelecionarTool(_context);
         }
 
-        // =========================
-        // TOOLBAR
-        // =========================
-
-        public bool FerramentaAtivaMantida()
-        {
-            return FerramentaAtual
-                .MantemBotaoAtivado;
-        }
-
-        // =========================
-        // MOUSE DOWN
-        // =========================
-
-        public void HandleMouseDown(ElementoViewModel? vm, Point pos)
-        {
-            _ferramentaAtual.OnMouseDown(vm, pos);
-        }
-
-        // =========================
-        // MOUSE MOVE
-        // =========================
-
-        public void HandleMouseMove(Point pos)
-        {
-            _ferramentaAtual.OnMouseMove(pos);
-        }
-
-        // =========================
-        // MOUSE UP
-        // =========================
-
-        public void HandleMouseUp(Point pos)
-        {
-            _ferramentaAtual.OnMouseUp(pos);
-        }
-
-        // =========================
-        // KEYBOARD
-        // =========================
-
-        public void HandleKeyDown(Key key)
-        {
-            // =========================
-            // UNDO
-            // =========================
-
-            if (Keyboard.Modifiers == ModifierKeys.Control && key == Key.Z)
-            {
-                AppServices.Commands.Undo();
-
-                return;
-            }
-
-            // =========================
-            // REDO
-            // =========================
-
-            if (Keyboard.Modifiers == ModifierKeys.Control && key == Key.Y)
-            {
-                AppServices.Commands.Redo();
-
-                return;
-            }
-
-            // =========================
-            // COPY
-            // =========================
-
-            if (Keyboard.Modifiers == ModifierKeys.Control && key == Key.C)
-            {
-                ClipboardService.CopiarSelecionados();
-
-                return;
-            }
-
-            // =========================
-            // PASTE
-            // =========================
-
-            if (Keyboard.Modifiers == ModifierKeys.Control && key == Key.V)
-            {
-                ClipboardService.Colar();
-
-                return;
-            }
-
-            // =========================
-            // DISPATCH TOOL
-            // =========================
-
-            _ferramentaAtual.OnKeyDown(key);
-        }
     }
 }
+
 
 
 ====================================================================================================
@@ -5876,6 +6346,7 @@ using System;
 using System.Collections.ObjectModel;
 using System.Windows;
 
+using Araci.Core.Viewport;
 using Araci.ViewModels;
 
 namespace Araci.Services
@@ -5908,6 +6379,14 @@ namespace Araci.Services
                 _vm.Elementos;
 
         // =========================
+        // CAMERA
+        // =========================
+
+        public Camera Camera
+        { get; }
+            = new Camera();
+
+        // =========================
         // TAMANHO
         // =========================
 
@@ -5925,6 +6404,18 @@ namespace Araci.Services
                 0,
                 Largura,
                 Altura);
+
+        public Point WorldToScreen(
+            Point point)
+        {
+            return Camera.WorldToScreen(point);
+        }
+
+        public Point ScreenToWorld(
+            Point point)
+        {
+            return Camera.ScreenToWorld(point);
+        }
 
         // =========================
         // VIEWPORT
@@ -5948,26 +6439,13 @@ namespace Araci.Services
         // ELEMENTOS
         // =========================
 
-        public void AdicionarElemento(
+        public void RegistrarViewModel(
             ElementoViewModel vm)
         {
             if (vm == null)
                 return;
 
             _vm.RegistrarViewModel(vm);
-
-            AppServices.Document
-                .AdicionarElemento(vm.Modelo);
-        }
-
-        public void RemoverElemento(
-            ElementoViewModel vm)
-        {
-            if (vm == null)
-                return;
-
-            AppServices.Document
-                .RemoverElemento(vm.Modelo);
         }
     }
 }
@@ -6075,6 +6553,7 @@ ARQUIVO: C:\Araci-Engine-Front\Araci Engine\ViewModels\CaboViewModel.cs
 ====================================================================================================
 
 ﻿using Araci.Models;
+using Araci.Services;
 using System;
 using System.Collections;
 using System.Windows;
@@ -6088,10 +6567,12 @@ namespace Araci.ViewModels
         private readonly Cabo _cabo;
 
         public override IEnumerable TiposDisponiveis =>
-    AppServices.Types.TiposCabos;
+            Types.TiposCabos;
+
         public CaboViewModel(
-            Cabo cabo)
-            : base(cabo)
+            Cabo cabo,
+            TypeLibraryService types)
+            : base(cabo, types)
         {
             _cabo = cabo
                 ?? throw new ArgumentNullException(nameof(cabo));
@@ -6272,73 +6753,6 @@ namespace Araci.ViewModels
                 Y2 + delta.Y;
 
             // =========================
-            // LIMITES VIEWPORT
-            // =========================
-
-            if (AppServices.Viewport != null)
-            {
-                double larguraViewport =
-                    AppServices.Viewport.Largura;
-
-                double alturaViewport =
-                    AppServices.Viewport.Altura;
-
-                double minX =
-                    Math.Min(novoX1, novoX2);
-
-                double maxX =
-                    Math.Max(novoX1, novoX2);
-
-                double minY =
-                    Math.Min(novoY1, novoY2);
-
-                double maxY =
-                    Math.Max(novoY1, novoY2);
-
-                // =========================
-                // AJUSTE HORIZONTAL
-                // =========================
-
-                if (minX < 0)
-                {
-                    double ajuste = -minX;
-
-                    novoX1 += ajuste;
-                    novoX2 += ajuste;
-                }
-
-                if (maxX > larguraViewport)
-                {
-                    double ajuste =
-                        maxX - larguraViewport;
-
-                    novoX1 -= ajuste;
-                    novoX2 -= ajuste;
-                }
-
-                // =========================
-                // AJUSTE VERTICAL
-                // =========================
-
-                if (minY < 0)
-                {
-                    double ajuste = -minY;
-
-                    novoY1 += ajuste;
-                    novoY2 += ajuste;
-                }
-
-                if (maxY > alturaViewport)
-                {
-                    double ajuste =
-                        maxY - alturaViewport;
-
-                    novoY1 -= ajuste;
-                    novoY2 -= ajuste;
-                }
-            }
-
-            // =========================
             // APLICA POSIÇÕES
             // =========================
 
@@ -6417,6 +6831,7 @@ ARQUIVO: C:\Araci-Engine-Front\Araci Engine\ViewModels\CargaViewModel.cs
 ====================================================================================================
 
 using Araci.Models;
+using Araci.Services;
 using System.Collections;
 using System.Windows.Media;
 
@@ -6438,11 +6853,12 @@ namespace Araci.ViewModels
 
         public override IEnumerable
             TiposDisponiveis =>
-                AppServices.Types.TiposCargas;
+                Types.TiposCargas;
 
         public CargaViewModel(
-            Carga carga)
-            : base(carga)
+            Carga carga,
+            TypeLibraryService types)
+            : base(carga, types)
         {
             _carga = carga;
 
@@ -6628,9 +7044,11 @@ using System.Windows;
 using System.Windows.Input;
 using System.Windows.Media;
 
+using Araci.Core.Rendering;
 using Araci.Models;
 using Araci.Models.Tipos;
 using Araci.Properties;
+using Araci.Services;
 using Araci.ViewModels.Base;
 using Araci.ViewModels.VisualStates;
 
@@ -6646,10 +7064,14 @@ namespace Araci.ViewModels
         // ====================================================
 
         protected ElementoViewModel(
-            Elemento modelo)
+            Elemento modelo,
+            TypeLibraryService types)
         {
             _modelo = modelo
                 ?? throw new ArgumentNullException(nameof(modelo));
+
+            Types = types
+                ?? throw new ArgumentNullException(nameof(types));
 
             Transform =
                 new ElementoTransform(
@@ -6669,6 +7091,9 @@ namespace Araci.ViewModels
 
         public Elemento Modelo =>
             _modelo;
+
+        protected TypeLibraryService Types
+        { get; }
 
         // ====================================================
         // TIPO
@@ -6791,6 +7216,8 @@ namespace Araci.ViewModels
                 OnPropertyChanged(nameof(Stroke));
 
                 OnPropertyChanged(nameof(StrokeThickness));
+
+                OnPropertyChanged(nameof(RenderData));
             }
         }
 
@@ -6799,6 +7226,19 @@ namespace Araci.ViewModels
 
         public double StrokeThickness =>
             VisualState.StrokeThickness;
+
+        // ====================================================
+        // RENDER
+        // ====================================================
+
+        public virtual ElementoRenderData RenderData =>
+            new ElementoRenderData(
+                Largura,
+                Altura,
+                Geometry.PontoLocalInicial,
+                Geometry.PontoLocalFinal,
+                Stroke,
+                StrokeThickness);
 
         // ====================================================
         // GEOMETRIA
@@ -6851,6 +7291,10 @@ namespace Araci.ViewModels
 
             OnPropertyChanged(nameof(Y));
 
+            OnPropertyChanged(nameof(WorldX));
+
+            OnPropertyChanged(nameof(WorldY));
+
             OnPropertyChanged(nameof(Largura));
 
             OnPropertyChanged(nameof(Altura));
@@ -6858,11 +7302,19 @@ namespace Araci.ViewModels
             OnPropertyChanged(nameof(Bounds));
 
             OnPropertyChanged(nameof(Centro));
+
+            OnPropertyChanged(nameof(RenderData));
         }
 
         // ====================================================
-        // POSIÇÃO
+        // POSIÇÃO EM MUNDO
         // ====================================================
+
+        public double WorldX =>
+            X;
+
+        public double WorldY =>
+            Y;
 
         public virtual double X
         {
@@ -6870,17 +7322,14 @@ namespace Araci.ViewModels
 
             set
             {
-                double valorLimitado =
-                    LimitarX(value);
-
-                if (Transform.X == valorLimitado)
+                if (Transform.X == value)
                     return;
 
                 Transform.X =
-                    valorLimitado;
+                    value;
 
                 _modelo.PosicaoX =
-                    valorLimitado;
+                    value;
 
                 AtualizarGeometria();
             }
@@ -6892,17 +7341,14 @@ namespace Araci.ViewModels
 
             set
             {
-                double valorLimitado =
-                    LimitarY(value);
-
-                if (Transform.Y == valorLimitado)
+                if (Transform.Y == value)
                     return;
 
                 Transform.Y =
-                    valorLimitado;
+                    value;
 
                 _modelo.PosicaoY =
-                    valorLimitado;
+                    value;
 
                 AtualizarGeometria();
             }
@@ -6918,42 +7364,6 @@ namespace Araci.ViewModels
             X += delta.X;
 
             Y += delta.Y;
-        }
-
-        // ====================================================
-        // LIMITES VIEWPORT
-        // ====================================================
-
-        private double LimitarX(
-            double valor)
-        {
-            if (AppServices.Viewport == null)
-                return valor;
-
-            double max =
-                Math.Max(
-                    0,
-                    AppServices.Viewport.Largura - Largura);
-
-            return Math.Max(
-                0,
-                Math.Min(valor, max));
-        }
-
-        private double LimitarY(
-            double valor)
-        {
-            if (AppServices.Viewport == null)
-                return valor;
-
-            double max =
-                Math.Max(
-                    0,
-                    AppServices.Viewport.Altura - Altura);
-
-            return Math.Max(
-                0,
-                Math.Min(valor, max));
         }
 
         // ====================================================
@@ -6995,6 +7405,7 @@ ARQUIVO: C:\Araci-Engine-Front\Araci Engine\ViewModels\GeradorViewModel.cs
 ====================================================================================================
 
 using Araci.Models;
+using Araci.Services;
 using System.Collections;
 using System.Windows.Media;
 
@@ -7016,11 +7427,12 @@ namespace Araci.ViewModels
 
         public override IEnumerable
             TiposDisponiveis =>
-                AppServices.Types.TiposGeradores;
+                Types.TiposGeradores;
 
         public GeradorViewModel(
-            Gerador gerador)
-            : base(gerador)
+            Gerador gerador,
+            TypeLibraryService types)
+            : base(gerador, types)
         {
             _gerador = gerador;
 
@@ -7763,8 +8175,10 @@ using System.Collections.ObjectModel;
 using System.Collections.Specialized;
 using System.ComponentModel;
 using System.Runtime.CompilerServices;
+using System;
 
 using Araci.Core.Documents;
+using Araci.Core.Scenes;
 using Araci.Models;
 using Araci.Services;
 
@@ -7773,6 +8187,8 @@ namespace Araci.ViewModels
     public class ViewportViewModel
         : INotifyPropertyChanged
     {
+        private readonly EditorContext _context;
+
         private readonly Dictionary<Elemento, ElementoViewModel>
             _viewModelsPorModelo = new();
 
@@ -7785,22 +8201,49 @@ namespace Araci.ViewModels
         { get; }
 
         // =========================
+        // SCENE
+        // =========================
+
+        public Scene Scene
+        { get; }
+
+        public SelectionBoxViewModel SelectionBox
+        { get; }
+
+        public MoveHudService MoveHud
+        { get; }
+
+        // =========================
         // ELEMENTOS VISUAIS
         // =========================
 
         public ObservableCollection<ElementoViewModel>
             Elementos
-        { get; }
-            = new();
+            => Scene.Elementos;
 
         // =========================
         // CONSTRUTOR
         // =========================
 
         public ViewportViewModel(
-            AraciDocument document)
+            EditorContext context)
         {
-            Document = document;
+            ArgumentNullException.ThrowIfNull(context);
+
+            _context =
+                context;
+
+            Document =
+                context.Document;
+
+            Scene =
+                context.Scene;
+
+            SelectionBox =
+                context.SelectionBox;
+
+            MoveHud =
+                context.MoveHud;
 
             Document.Elementos.CollectionChanged +=
                 OnDocumentElementosChanged;
@@ -7900,7 +8343,8 @@ namespace Araci.ViewModels
             }
 
             ElementoViewModel? vm =
-                ElementoFactory.CriarViewModel(modelo);
+                _context.ElementoFactory
+                    .CriarViewModel(modelo);
 
             if (vm != null)
             {
@@ -7942,7 +8386,7 @@ namespace Araci.ViewModels.VisualStates
     public class ElementoGeometryState
     {
         // =========================
-        // POSIÇÃO GLOBAL
+        // POSIÇÃO EM MUNDO
         // =========================
 
         public double X
@@ -8056,6 +8500,7 @@ namespace Araci.ViewModels.VisualStates
 }
 
 
+
 ====================================================================================================
 ARQUIVO: C:\Araci-Engine-Front\Araci Engine\ViewModels\VisualStates\ElementoTransform.cs
 ====================================================================================================
@@ -8067,7 +8512,7 @@ namespace Araci.ViewModels.VisualStates
     public class ElementoTransform
     {
         // =========================
-        // POSIÇÃO
+        // POSIÇÃO EM MUNDO
         // =========================
 
         public double X { get; set; }
@@ -8102,6 +8547,7 @@ namespace Araci.ViewModels.VisualStates
         }
     }
 }
+
 
 
 ====================================================================================================
@@ -8228,11 +8674,11 @@ ARQUIVO: C:\Araci-Engine-Front\Araci Engine\Views\ViewportView.xaml
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:controls="clr-namespace:Araci.Controls"
              xmlns:viewModels="clr-namespace:Araci.ViewModels"
-             xmlns:app="clr-namespace:Araci"
              Focusable="True"
              PreviewMouseLeftButtonDown="OnPreviewMouseLeftButtonDown"
              PreviewMouseMove="OnPreviewMouseMove"
              PreviewMouseLeftButtonUp="OnPreviewMouseLeftButtonUp"
+             PreviewMouseWheel="OnPreviewMouseWheel"
              PreviewKeyDown="OnPreviewKeyDown"
              Loaded="OnLoaded">
 
@@ -8255,8 +8701,9 @@ ARQUIVO: C:\Araci-Engine-Front\Araci Engine\Views\ViewportView.xaml
             <!-- ELEMENTOS -->
             <!-- ========================= -->
 
-            <ItemsControl ItemsSource="{Binding Elementos}"
-                          ClipToBounds="True"
+            <ItemsControl x:Name="WorldLayer"
+                          ItemsSource="{Binding Elementos}"
+                          ClipToBounds="False"
                           SnapsToDevicePixels="True"
                           HorizontalContentAlignment="Left"
                           VerticalContentAlignment="Top">
@@ -8266,7 +8713,7 @@ ARQUIVO: C:\Araci-Engine-Front\Araci Engine\Views\ViewportView.xaml
 
                         <Canvas x:Name="ViewportCanvas"
                                 Background="#F4F4F4"
-                                ClipToBounds="True"
+                                ClipToBounds="False"
                                 SnapsToDevicePixels="True"
                                 UseLayoutRounding="True"/>
 
@@ -8277,10 +8724,10 @@ ARQUIVO: C:\Araci-Engine-Front\Araci Engine\Views\ViewportView.xaml
                     <Style TargetType="ContentPresenter">
 
                         <Setter Property="Canvas.Left"
-                            Value="{Binding X}"/>
+                            Value="{Binding WorldX}"/>
 
                         <Setter Property="Canvas.Top"
-                            Value="{Binding Y}"/>
+                            Value="{Binding WorldY}"/>
 
                     </Style>
                 </ItemsControl.ItemContainerStyle>
@@ -8307,7 +8754,8 @@ ARQUIVO: C:\Araci-Engine-Front\Araci Engine\Views\ViewportView.xaml
             <!-- JANELA DE SELEÇÃO -->
             <!-- ========================= -->
 
-            <Canvas IsHitTestVisible="False">
+            <Canvas x:Name="SelectionLayer"
+                    IsHitTestVisible="False">
 
                 <Rectangle
                     Stroke="#007ACC"
@@ -8315,14 +8763,13 @@ ARQUIVO: C:\Araci-Engine-Front\Araci Engine\Views\ViewportView.xaml
                     Fill="#22007ACC"
                     StrokeDashArray="3 2"
 
-                    Canvas.Left="{Binding Source={x:Static app:AppServices.SelectionBox}, Path=X}"
-                    Canvas.Top="{Binding Source={x:Static app:AppServices.SelectionBox}, Path=Y}"
+                    Canvas.Left="{Binding SelectionBox.X}"
+                    Canvas.Top="{Binding SelectionBox.Y}"
 
-                    Width="{Binding Source={x:Static app:AppServices.SelectionBox}, Path=Largura}"
-                    Height="{Binding Source={x:Static app:AppServices.SelectionBox}, Path=Altura}"
+                    Width="{Binding SelectionBox.Largura}"
+                    Height="{Binding SelectionBox.Altura}"
 
-                    Visibility="{Binding Source={x:Static app:AppServices.SelectionBox},
-                                         Path=Visivel,
+                    Visibility="{Binding SelectionBox.Visivel,
                                          Converter={StaticResource BooleanToVisibilityConverter}}"/>
 
             </Canvas>
@@ -8339,11 +8786,10 @@ ARQUIVO: C:\Araci-Engine-Front\Araci Engine\Views\ViewportView.xaml
                     CornerRadius="6"
                     Padding="8"
 
-                    Canvas.Left="{Binding Source={x:Static app:AppServices.MoveHud}, Path=X}"
-                    Canvas.Top="{Binding Source={x:Static app:AppServices.MoveHud}, Path=Y}"
+                    Canvas.Left="{Binding MoveHud.X}"
+                    Canvas.Top="{Binding MoveHud.Y}"
 
-                    Visibility="{Binding Source={x:Static app:AppServices.MoveHud},
-                                         Path=Visivel,
+                    Visibility="{Binding MoveHud.Visivel,
                                          Converter={StaticResource BooleanToVisibilityConverter}}">
 
                     <StackPanel>
@@ -8351,15 +8797,13 @@ ARQUIVO: C:\Araci-Engine-Front\Araci Engine\Views\ViewportView.xaml
                         <TextBlock
                             Foreground="White"
                             FontSize="12"
-                            Text="{Binding Source={x:Static app:AppServices.MoveHud},
-                                           Path=DeltaX,
+                            Text="{Binding MoveHud.DeltaX,
                                            StringFormat=ΔX: {0:F1}}"/>
 
                         <TextBlock
                             Foreground="White"
                             FontSize="12"
-                            Text="{Binding Source={x:Static app:AppServices.MoveHud},
-                                           Path=DeltaY,
+                            Text="{Binding MoveHud.DeltaY,
                                            StringFormat=ΔY: {0:F1}}"/>
 
                     </StackPanel>
@@ -8384,6 +8828,7 @@ ARQUIVO: C:\Araci-Engine-Front\Araci Engine\Views\ViewportView.xaml.cs
 using Araci.ViewModels;
 
 using System;
+using System.ComponentModel;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
@@ -8395,27 +8840,94 @@ namespace Araci.Views
     {
         private readonly ViewportViewModel _viewportViewModel;
 
+        private readonly EditorContext _context;
+
+        private readonly MatrixTransform _cameraTransform =
+            new();
+
         public ViewportView()
         {
             InitializeComponent();
 
-            if (AppServices.Document == null)
+            _context =
+                AppServices.Current;
+
+            if (_context.Document == null)
             {
-                AppServices.Document =
+                _context.Document =
                     new Core.Documents.AraciDocument();
             }
 
             _viewportViewModel =
                 new ViewportViewModel(
-                    AppServices.Document);
+                    _context);
 
             DataContext = _viewportViewModel;
 
-            AppServices.Viewport =
+            _context.Viewport =
                 new ViewportService(
                     _viewportViewModel);
 
-            AppServices.ViewportReference = this;
+            ConfigurarCamera();
+
+            Unloaded += OnUnloaded;
+        }
+
+        // =========================
+        // CAMERA
+        // =========================
+
+        private void ConfigurarCamera()
+        {
+            if (_context.Viewport == null)
+                return;
+
+            WorldLayer.RenderTransform =
+                _cameraTransform;
+
+            SelectionLayer.RenderTransform =
+                _cameraTransform;
+
+            _context.Viewport.Camera.PropertyChanged +=
+                OnCameraChanged;
+
+            AtualizarCameraTransform();
+        }
+
+        private void OnCameraChanged(
+            object? sender,
+            PropertyChangedEventArgs e)
+        {
+            AtualizarCameraTransform();
+        }
+
+        private void OnUnloaded(
+            object sender,
+            RoutedEventArgs e)
+        {
+            if (_context.Viewport != null)
+            {
+                _context.Viewport.Camera.PropertyChanged -=
+                    OnCameraChanged;
+            }
+        }
+
+        private void AtualizarCameraTransform()
+        {
+            if (_context.Viewport == null)
+                return;
+
+            var camera =
+                _context.Viewport.Camera;
+
+            _cameraTransform.Matrix =
+                new Matrix(
+                    camera.Zoom,
+                    0,
+                    0,
+                    camera.Zoom,
+                    camera.Offset.X,
+                    camera.Offset.Y);
         }
 
         // =========================
@@ -8442,7 +8954,7 @@ namespace Araci.Views
 
         private void AtualizarViewport()
         {
-            if (AppServices.Viewport == null)
+            if (_context.Viewport == null)
                 return;
 
             double larguraReal = ActualWidth;
@@ -8464,7 +8976,7 @@ namespace Araci.Views
 
             alturaReal = Math.Max(0, alturaReal);
 
-            AppServices.Viewport.AtualizarTamanho(
+            _context.Viewport.AtualizarTamanho(
                 new Size(
                     larguraReal,
                     alturaReal));
@@ -8510,7 +9022,11 @@ namespace Araci.Views
 
             var pos = GetPos(e);
 
-            AppServices.Tools.HandleMouseDown(vm, pos);
+            _context.Input.MouseDown(
+                vm,
+                pos);
+
+            CaptureMouse();
         }
 
         // =========================
@@ -8521,7 +9037,7 @@ namespace Araci.Views
         {
             var pos = GetPos(e);
 
-            AppServices.Tools.HandleMouseMove(pos);
+            _context.Input.MouseMove(pos);
         }
 
         // =========================
@@ -8532,7 +9048,50 @@ namespace Araci.Views
         {
             var pos = GetPos(e);
 
-            AppServices.Tools.HandleMouseUp(pos);
+            _context.Input.MouseUp(pos);
+
+            if (IsMouseCaptured)
+            {
+                ReleaseMouseCapture();
+            }
+        }
+
+        // =========================
+        // ZOOM
+        // =========================
+
+        private void OnPreviewMouseWheel(object sender, MouseWheelEventArgs e)
+        {
+            if (_context.Viewport == null)
+                return;
+
+            var camera =
+                _context.Viewport.Camera;
+
+            Point cursor =
+                GetPos(e);
+
+            Point worldBefore =
+                camera.ScreenToWorld(cursor);
+
+            double factor =
+                e.Delta > 0
+                    ? 1.1
+                    : 1 / 1.1;
+
+            camera.Zoom =
+                Math.Max(
+                    0.1,
+                    Math.Min(
+                        8,
+                        camera.Zoom * factor));
+
+            camera.Offset =
+                new Point(
+                    cursor.X - worldBefore.X * camera.Zoom,
+                    cursor.Y - worldBefore.Y * camera.Zoom);
+
+            e.Handled = true;
         }
 
         // =========================
@@ -8541,18 +9100,11 @@ namespace Araci.Views
 
         private void OnPreviewKeyDown(object sender, KeyEventArgs e)
         {
-            AppServices.Tools.HandleKeyDown(e.Key);
-
-            if (e.Key == Key.Escape)
-            {
-                AppServices.Tools.VoltarParaSelecao();
-
-                SelectionService.Limpar();
-
-                e.Handled = true;
-            }
+            e.Handled =
+                _context.Input.KeyDown(e.Key);
         }
     }
 }
+
 
 

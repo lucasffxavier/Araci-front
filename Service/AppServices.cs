@@ -1,5 +1,3 @@
-using System.Windows;
-
 using Araci.Core.Commands;
 using Araci.Core.Documents;
 using Araci.Core.Transactions;
@@ -64,13 +62,6 @@ namespace Araci
         {
             get => Current.Viewport;
             set => Current.Viewport = value;
-        }
-
-        public static FrameworkElement?
-            ViewportReference
-        {
-            get => Current.ViewportReference;
-            set => Current.ViewportReference = value;
         }
 
         // =========================

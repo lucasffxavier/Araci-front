@@ -5,22 +5,36 @@ using Araci.ViewModels;
 
 namespace Araci.Services
 {
-    public static class ElementoFactory
+    public class ElementoFactory
     {
+        private readonly TypeLibraryService _types;
+
+        public ElementoFactory(TypeLibraryService types)
+        {
+            _types = types
+                ?? throw new ArgumentNullException(nameof(types));
+        }
+
         // =========================
         // VIEWMODEL
         // =========================
 
-        public static ElementoViewModel? CriarViewModel(
+        public ElementoViewModel? CriarViewModel(
             Elemento modelo)
         {
             return modelo switch
             {
-                Cabo cabo => new CaboViewModel(cabo),
+                Cabo cabo => new CaboViewModel(
+                    cabo,
+                    _types),
 
-                Carga carga => new CargaViewModel(carga),
+                Carga carga => new CargaViewModel(
+                    carga,
+                    _types),
 
-                Gerador gerador => new GeradorViewModel(gerador),
+                Gerador gerador => new GeradorViewModel(
+                    gerador,
+                    _types),
 
                 _ => null
             };
@@ -30,72 +44,66 @@ namespace Araci.Services
         // CABO
         // =========================
 
-        public static Cabo CriarCabo()
+        public Cabo CriarCabo()
         {
-            var cabo =
-                new Cabo
-                {
-                    Tipo =
-                        AppServices.Types.TipoCaboPadrao
-                        ?? throw new InvalidOperationException(
-                            "Nenhum tipo de cabo cadastrado.")
-                };
-
-            return cabo;
+            return new Cabo
+            {
+                Tipo =
+                    _types.TipoCaboPadrao
+                    ?? throw new InvalidOperationException(
+                        "Nenhum tipo de cabo cadastrado.")
+            };
         }
 
-        public static CaboViewModel CriarCaboVM()
+        public CaboViewModel CriarCaboVM()
         {
             return new CaboViewModel(
-                CriarCabo());
+                CriarCabo(),
+                _types);
         }
 
         // =========================
         // CARGA
         // =========================
 
-        public static Carga CriarCarga()
+        public Carga CriarCarga()
         {
-            var carga =
-                new Carga
-                {
-                    Tipo =
-                        AppServices.Types.TipoCargaPadrao
-                        ?? throw new InvalidOperationException(
-                            "Nenhum tipo de carga cadastrado.")
-                };
-
-            return carga;
+            return new Carga
+            {
+                Tipo =
+                    _types.TipoCargaPadrao
+                    ?? throw new InvalidOperationException(
+                        "Nenhum tipo de carga cadastrado.")
+            };
         }
 
-        public static CargaViewModel CriarCargaVM()
+        public CargaViewModel CriarCargaVM()
         {
             return new CargaViewModel(
-                CriarCarga());
+                CriarCarga(),
+                _types);
         }
 
         // =========================
         // GERADOR
         // =========================
 
-        public static Gerador CriarGerador()
+        public Gerador CriarGerador()
         {
-            var gerador =
-                new Gerador
-                {
-                    Tipo =
-                        AppServices.Types.TipoGeradorPadrao
-                        ?? throw new InvalidOperationException(
-                            "Nenhum tipo de gerador cadastrado.")
-                };
-
-            return gerador;
+            return new Gerador
+            {
+                Tipo =
+                    _types.TipoGeradorPadrao
+                    ?? throw new InvalidOperationException(
+                        "Nenhum tipo de gerador cadastrado.")
+            };
         }
 
-        public static GeradorViewModel CriarGeradorVM()
+        public GeradorViewModel CriarGeradorVM()
         {
             return new GeradorViewModel(
-                CriarGerador());
+                CriarGerador(),
+                _types);
         }
     }
 }

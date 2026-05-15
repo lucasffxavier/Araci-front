@@ -1,4 +1,5 @@
 ﻿using Araci.Models;
+using Araci.Services;
 using System;
 using System.Collections;
 using System.Windows;
@@ -12,10 +13,12 @@ namespace Araci.ViewModels
         private readonly Cabo _cabo;
 
         public override IEnumerable TiposDisponiveis =>
-    AppServices.Types.TiposCabos;
+            Types.TiposCabos;
+
         public CaboViewModel(
-            Cabo cabo)
-            : base(cabo)
+            Cabo cabo,
+            TypeLibraryService types)
+            : base(cabo, types)
         {
             _cabo = cabo
                 ?? throw new ArgumentNullException(nameof(cabo));

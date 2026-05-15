@@ -6,6 +6,14 @@ namespace Araci.Applications.Diagrama.InserirCarga
 {
     public class InserirCargaApplication
     {
+        private readonly EditorContext _context;
+
+        public InserirCargaApplication(EditorContext context)
+        {
+            _context = context
+                ?? throw new System.ArgumentNullException(nameof(context));
+        }
+
         // =========================
         // EXECUTAR
         // =========================
@@ -13,16 +21,13 @@ namespace Araci.Applications.Diagrama.InserirCarga
         public void Executar()
         {
             CargaViewModel vm =
-                ElementoFactory
+                _context.ElementoFactory
                     .CriarCargaVM();
 
-            var context =
-                AppServices.Current;
-
-            context.Commands.Execute(
+            _context.Commands.Execute(
                 new AddElementoCommand(
                     vm,
-                    context));
+                    _context));
         }
     }
 }

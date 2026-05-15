@@ -8,6 +8,7 @@ using Araci.Core.Rendering;
 using Araci.Models;
 using Araci.Models.Tipos;
 using Araci.Properties;
+using Araci.Services;
 using Araci.ViewModels.Base;
 using Araci.ViewModels.VisualStates;
 
@@ -23,10 +24,14 @@ namespace Araci.ViewModels
         // ====================================================
 
         protected ElementoViewModel(
-            Elemento modelo)
+            Elemento modelo,
+            TypeLibraryService types)
         {
             _modelo = modelo
                 ?? throw new ArgumentNullException(nameof(modelo));
+
+            Types = types
+                ?? throw new ArgumentNullException(nameof(types));
 
             Transform =
                 new ElementoTransform(
@@ -46,6 +51,9 @@ namespace Araci.ViewModels
 
         public Elemento Modelo =>
             _modelo;
+
+        protected TypeLibraryService Types
+        { get; }
 
         // ====================================================
         // TIPO

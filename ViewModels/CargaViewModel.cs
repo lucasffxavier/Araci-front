@@ -1,4 +1,5 @@
 using Araci.Models;
+using Araci.Services;
 using System.Collections;
 using System.Windows.Media;
 
@@ -20,11 +21,12 @@ namespace Araci.ViewModels
 
         public override IEnumerable
             TiposDisponiveis =>
-                AppServices.Types.TiposCargas;
+                Types.TiposCargas;
 
         public CargaViewModel(
-            Carga carga)
-            : base(carga)
+            Carga carga,
+            TypeLibraryService types)
+            : base(carga, types)
         {
             _carga = carga;
 

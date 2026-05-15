@@ -15,6 +15,8 @@ namespace Araci.ViewModels
     public class ViewportViewModel
         : INotifyPropertyChanged
     {
+        private readonly EditorContext _context;
+
         private readonly Dictionary<Elemento, ElementoViewModel>
             _viewModelsPorModelo = new();
 
@@ -55,6 +57,9 @@ namespace Araci.ViewModels
             EditorContext context)
         {
             ArgumentNullException.ThrowIfNull(context);
+
+            _context =
+                context;
 
             Document =
                 context.Document;
@@ -166,7 +171,8 @@ namespace Araci.ViewModels
             }
 
             ElementoViewModel? vm =
-                ElementoFactory.CriarViewModel(modelo);
+                _context.ElementoFactory
+                    .CriarViewModel(modelo);
 
             if (vm != null)
             {

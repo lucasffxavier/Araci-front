@@ -42,8 +42,6 @@ namespace Araci.Views
                 new ViewportService(
                     _viewportViewModel);
 
-            _context.ViewportReference = this;
-
             ConfigurarCamera();
 
             Unloaded += OnUnloaded;

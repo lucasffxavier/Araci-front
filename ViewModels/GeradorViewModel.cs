@@ -1,4 +1,5 @@
 using Araci.Models;
+using Araci.Services;
 using System.Collections;
 using System.Windows.Media;
 
@@ -20,11 +21,12 @@ namespace Araci.ViewModels
 
         public override IEnumerable
             TiposDisponiveis =>
-                AppServices.Types.TiposGeradores;
+                Types.TiposGeradores;
 
         public GeradorViewModel(
-            Gerador gerador)
-            : base(gerador)
+            Gerador gerador,
+            TypeLibraryService types)
+            : base(gerador, types)
         {
             _gerador = gerador;
 

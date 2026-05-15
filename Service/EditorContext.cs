@@ -1,5 +1,3 @@
-using System.Windows;
-
 using Araci.Core.Commands;
 using Araci.Core.Documents;
 using Araci.Core.Scenes;
@@ -16,6 +14,9 @@ namespace Araci.Services
 
         public EditorContext()
         {
+            ElementoFactory =
+                new ElementoFactory(Types);
+
             Selection =
                 new SelectionService(this);
 
@@ -68,10 +69,6 @@ namespace Araci.Services
 
         public ViewportService?
             Viewport
-        { get; set; }
-
-        public FrameworkElement?
-            ViewportReference
         { get; set; }
 
         // =========================
@@ -134,6 +131,13 @@ namespace Araci.Services
         public TypeLibraryService Types
         { get; }
             = new TypeLibraryService();
+
+        // =========================
+        // ELEMENTOS
+        // =========================
+
+        public ElementoFactory ElementoFactory
+        { get; }
 
         // =========================
         // TRANSACTIONS

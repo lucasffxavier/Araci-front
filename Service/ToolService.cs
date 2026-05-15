@@ -82,15 +82,5 @@ namespace Araci.Services
                 new SelecionarTool(_context);
         }
 
-        // =========================
-        // TOOLBAR
-        // =========================
-
-        public bool FerramentaAtivaMantida()
-        {
-            return FerramentaAtual
-                .MantemBotaoAtivado;
-        }
-
     }
 }

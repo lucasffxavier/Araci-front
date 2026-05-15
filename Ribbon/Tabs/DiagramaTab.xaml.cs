@@ -20,6 +20,9 @@ namespace Araci.Ribbon.Tabs
             InitializeComponent();
         }
 
+        private EditorContext Context =>
+            AppServices.Current;
+
         // =========================
         // GERADOR
         // =========================
@@ -29,7 +32,7 @@ namespace Araci.Ribbon.Tabs
             RoutedEventArgs e)
         {
             InserirGeradorApplication app =
-                new();
+                new(Context);
 
             app.Executar();
         }
@@ -43,7 +46,7 @@ namespace Araci.Ribbon.Tabs
             RoutedEventArgs e)
         {
             InserirCargaApplication app =
-                new();
+                new(Context);
 
             app.Executar();
         }
@@ -57,7 +60,7 @@ namespace Araci.Ribbon.Tabs
             RoutedEventArgs e)
         {
             InserirCaboApplication app =
-                new();
+                new(Context);
 
             app.Executar();
         }

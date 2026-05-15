@@ -27,10 +27,11 @@ namespace Araci.Services
         // =========================
 
         public static void CopiarSelecionados(
-            EditorContext? context = null)
+            EditorContext context)
         {
             var editorContext =
-                context ?? AppServices.Current;
+                context
+                ?? throw new System.ArgumentNullException(nameof(context));
 
             _buffer.Clear();
 
@@ -45,10 +46,11 @@ namespace Araci.Services
         // =========================
 
         public static void Colar(
-            EditorContext? context = null)
+            EditorContext context)
         {
             var editorContext =
-                context ?? AppServices.Current;
+                context
+                ?? throw new System.ArgumentNullException(nameof(context));
 
             if (_buffer.Count == 0)
                 return;
@@ -64,7 +66,8 @@ namespace Araci.Services
 
                 AplicarOffset(clone);
 
-                var vm = ElementoFactory.CriarViewModel(clone);
+                var vm = editorContext.ElementoFactory
+                    .CriarViewModel(clone);
 
                 if (vm == null)
                     continue;
