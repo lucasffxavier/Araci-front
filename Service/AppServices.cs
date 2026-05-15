@@ -16,12 +16,6 @@ namespace Araci
         { get; set; }
             = new EditorContext();
 
-        public static EditorContext Context
-        {
-            get => Current;
-            private set => Current = value;
-        }
-
         public static void ResetContext(
             EditorContext? context = null)
         {
@@ -33,11 +27,8 @@ namespace Araci
         // DOCUMENTO CENTRAL
         // =========================
 
-        public static AraciDocument Document
-        {
-            get => Current.Document;
-            set => Current.Document = value;
-        }
+        public static AraciDocument Document =>
+            Current.Document;
 
         // =========================
         // TOOLS
@@ -57,12 +48,8 @@ namespace Araci
         // VIEWPORT
         // =========================
 
-        public static ViewportService?
-            Viewport
-        {
-            get => Current.Viewport;
-            set => Current.Viewport = value;
-        }
+        public static ViewportService? Viewport =>
+            Current.Viewport;
 
         // =========================
         // EDITOR
@@ -114,6 +101,20 @@ namespace Araci
             Current.Snap;
 
         // =========================
+        // TYPES
+        // =========================
+
+        public static TypeLibraryService Types =>
+            Current.Types;
+
+        // =========================
+        // ELEMENTOS
+        // =========================
+
+        public static ElementoFactory ElementoFactory =>
+            Current.ElementoFactory;
+
+        // =========================
         // TRANSACTIONS
         // =========================
 
@@ -121,12 +122,5 @@ namespace Araci
         {
             return Current.BeginTransaction();
         }
-
-        // =========================
-        // TYPES
-        // =========================
-
-        public static TypeLibraryService Types =>
-            Current.Types;
     }
 }

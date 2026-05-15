@@ -67,9 +67,16 @@ namespace Araci.Services
         // VIEWPORT
         // =========================
 
-        public ViewportService?
-            Viewport
-        { get; set; }
+        public ViewportService? Viewport
+        { get; private set; }
+
+        public void InicializarViewport(
+            ViewportViewModel viewportViewModel)
+        {
+            Viewport =
+                new ViewportService(
+                    viewportViewModel);
+        }
 
         // =========================
         // EDITOR

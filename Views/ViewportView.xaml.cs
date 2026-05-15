@@ -1,4 +1,4 @@
-﻿using Araci.Services;
+using Araci.Services;
 using Araci.ViewModels;
 
 using System;
@@ -26,21 +26,14 @@ namespace Araci.Views
             _context =
                 AppServices.Current;
 
-            if (_context.Document == null)
-            {
-                _context.Document =
-                    new Core.Documents.AraciDocument();
-            }
-
             _viewportViewModel =
                 new ViewportViewModel(
                     _context);
 
             DataContext = _viewportViewModel;
 
-            _context.Viewport =
-                new ViewportService(
-                    _viewportViewModel);
+            _context.InicializarViewport(
+                _viewportViewModel);
 
             ConfigurarCamera();
 
@@ -157,7 +150,7 @@ namespace Araci.Views
         }
 
         // =========================
-        // POSIÇÃO
+        // POSICAO
         // =========================
 
         private Point GetPos(MouseEventArgs e)
