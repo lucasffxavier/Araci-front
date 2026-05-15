@@ -11,16 +11,11 @@ namespace Araci.Views
 {
     public partial class ViewportView : UserControl
     {
-        private readonly ViewportViewModel
-            _viewportViewModel;
+        private readonly ViewportViewModel _viewportViewModel;
 
         public ViewportView()
         {
             InitializeComponent();
-
-            // =========================
-            // DOCUMENTO CENTRAL
-            // =========================
 
             if (AppServices.Document == null)
             {
@@ -28,38 +23,28 @@ namespace Araci.Views
                     new Core.Documents.AraciDocument();
             }
 
-            // =========================
-            // VIEWMODEL
-            // =========================
-
             _viewportViewModel =
                 new ViewportViewModel(
                     AppServices.Document);
 
-            DataContext =
-                _viewportViewModel;
-
-            // =========================
-            // VIEWPORT
-            // =========================
+            DataContext = _viewportViewModel;
 
             AppServices.Viewport =
                 new ViewportService(
                     _viewportViewModel);
 
-            AppServices.ViewportReference =
-                this;
+            AppServices.ViewportReference = this;
         }
 
         // =========================
         // LOADED
         // =========================
 
-        private void OnLoaded(
-            object sender,
-            RoutedEventArgs e)
+        private void OnLoaded(object sender, RoutedEventArgs e)
         {
             Focus();
+
+            Keyboard.Focus(this);
 
             AtualizarViewport();
 
@@ -78,11 +63,9 @@ namespace Araci.Views
             if (AppServices.Viewport == null)
                 return;
 
-            double larguraReal =
-                ActualWidth;
+            double larguraReal = ActualWidth;
 
-            double alturaReal =
-                ActualHeight;
+            double alturaReal = ActualHeight;
 
             if (RootBorder != null)
             {
@@ -95,11 +78,9 @@ namespace Araci.Views
                     RootBorder.BorderThickness.Bottom;
             }
 
-            larguraReal =
-                Math.Max(0, larguraReal);
+            larguraReal = Math.Max(0, larguraReal);
 
-            alturaReal =
-                Math.Max(0, alturaReal);
+            alturaReal = Math.Max(0, alturaReal);
 
             AppServices.Viewport.AtualizarTamanho(
                 new Size(
@@ -111,8 +92,7 @@ namespace Araci.Views
         // POSIÇÃO
         // =========================
 
-        private Point GetPos(
-            MouseEventArgs e)
+        private Point GetPos(MouseEventArgs e)
         {
             return e.GetPosition(this);
         }
@@ -121,17 +101,16 @@ namespace Araci.Views
         // MOUSE DOWN
         // =========================
 
-        private void OnPreviewMouseLeftButtonDown(
-            object sender,
-            MouseButtonEventArgs e)
+        private void OnPreviewMouseLeftButtonDown(object sender, MouseButtonEventArgs e)
         {
             Focus();
+
+            Keyboard.Focus(this);
 
             ElementoViewModel? vm = null;
 
             DependencyObject? origem =
-                e.OriginalSource
-                    as DependencyObject;
+                e.OriginalSource as DependencyObject;
 
             while (origem != null)
             {
@@ -139,67 +118,52 @@ namespace Araci.Views
                     fe.DataContext is ElementoViewModel elemento)
                 {
                     vm = elemento;
+
                     break;
                 }
 
                 origem =
-                    VisualTreeHelper
-                        .GetParent(origem);
+                    VisualTreeHelper.GetParent(origem);
             }
 
-            var pos =
-                GetPos(e);
+            var pos = GetPos(e);
 
-            AppServices.Tools.HandleMouseDown(
-                vm,
-                pos);
+            AppServices.Tools.HandleMouseDown(vm, pos);
         }
 
         // =========================
         // MOUSE MOVE
         // =========================
 
-        private void OnPreviewMouseMove(
-            object sender,
-            MouseEventArgs e)
+        private void OnPreviewMouseMove(object sender, MouseEventArgs e)
         {
-            var pos =
-                GetPos(e);
+            var pos = GetPos(e);
 
-            AppServices.Tools.HandleMouseMove(
-                pos);
+            AppServices.Tools.HandleMouseMove(pos);
         }
 
         // =========================
         // MOUSE UP
         // =========================
 
-        private void OnPreviewMouseLeftButtonUp(
-            object sender,
-            MouseButtonEventArgs e)
+        private void OnPreviewMouseLeftButtonUp(object sender, MouseButtonEventArgs e)
         {
-            var pos =
-                GetPos(e);
+            var pos = GetPos(e);
 
-            AppServices.Tools.HandleMouseUp(
-                pos);
+            AppServices.Tools.HandleMouseUp(pos);
         }
 
         // =========================
         // KEYBOARD
         // =========================
 
-        private void OnPreviewKeyDown(
-            object sender,
-            KeyEventArgs e)
+        private void OnPreviewKeyDown(object sender, KeyEventArgs e)
         {
-            AppServices.Tools.HandleKeyDown(
-                e.Key);
+            AppServices.Tools.HandleKeyDown(e.Key);
 
             if (e.Key == Key.Escape)
             {
-                AppServices.Tools
-                    .VoltarParaSelecao();
+                AppServices.Tools.VoltarParaSelecao();
 
                 SelectionService.Limpar();
 

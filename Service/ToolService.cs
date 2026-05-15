@@ -8,7 +8,6 @@ using Araci.ViewModels;
 
 namespace Araci.Services
 {
-
     public class ToolService
     {
         // =========================
@@ -22,8 +21,7 @@ namespace Araci.Services
         // ESTADO
         // =========================
 
-        private ITool
-            _ferramentaAtual;
+        private ITool _ferramentaAtual;
 
         // =========================
         // CONSTRUTOR
@@ -65,11 +63,9 @@ namespace Araci.Services
         // ATIVAR
         // =========================
 
-        public void AtivarFerramenta(
-            ITool ferramenta)
+        public void AtivarFerramenta(ITool ferramenta)
         {
-            FerramentaAtual =
-                ferramenta;
+            FerramentaAtual = ferramenta;
         }
 
         // =========================
@@ -78,11 +74,8 @@ namespace Araci.Services
 
         public void VoltarParaSelecao()
         {
-            if (_ferramentaAtual
-                is SelecionarTool)
-            {
+            if (_ferramentaAtual is SelecionarTool)
                 return;
-            }
 
             FerramentaAtual =
                 new SelecionarTool();
@@ -102,53 +95,42 @@ namespace Araci.Services
         // MOUSE DOWN
         // =========================
 
-        public void HandleMouseDown(
-            ElementoViewModel? vm,
-            Point pos)
+        public void HandleMouseDown(ElementoViewModel? vm, Point pos)
         {
-            _ferramentaAtual
-                .OnMouseDown(vm, pos);
+            _ferramentaAtual.OnMouseDown(vm, pos);
         }
 
         // =========================
         // MOUSE MOVE
         // =========================
 
-        public void HandleMouseMove(
-            Point pos)
+        public void HandleMouseMove(Point pos)
         {
-            _ferramentaAtual
-                .OnMouseMove(pos);
+            _ferramentaAtual.OnMouseMove(pos);
         }
 
         // =========================
         // MOUSE UP
         // =========================
 
-        public void HandleMouseUp(
-            Point pos)
+        public void HandleMouseUp(Point pos)
         {
-            _ferramentaAtual
-                .OnMouseUp(pos);
+            _ferramentaAtual.OnMouseUp(pos);
         }
 
         // =========================
         // KEYBOARD
         // =========================
 
-        public void HandleKeyDown(
-            Key key)
+        public void HandleKeyDown(Key key)
         {
             // =========================
             // UNDO
             // =========================
 
-            if (Keyboard.Modifiers ==
-                    ModifierKeys.Control &&
-                key == Key.Z)
+            if (Keyboard.Modifiers == ModifierKeys.Control && key == Key.Z)
             {
-                AppServices.Commands
-                    .Undo();
+                AppServices.Commands.Undo();
 
                 return;
             }
@@ -157,12 +139,31 @@ namespace Araci.Services
             // REDO
             // =========================
 
-            if (Keyboard.Modifiers ==
-                    ModifierKeys.Control &&
-                key == Key.Y)
+            if (Keyboard.Modifiers == ModifierKeys.Control && key == Key.Y)
             {
-                AppServices.Commands
-                    .Redo();
+                AppServices.Commands.Redo();
+
+                return;
+            }
+
+            // =========================
+            // COPY
+            // =========================
+
+            if (Keyboard.Modifiers == ModifierKeys.Control && key == Key.C)
+            {
+                ClipboardService.CopiarSelecionados();
+
+                return;
+            }
+
+            // =========================
+            // PASTE
+            // =========================
+
+            if (Keyboard.Modifiers == ModifierKeys.Control && key == Key.V)
+            {
+                ClipboardService.Colar();
 
                 return;
             }
@@ -171,8 +172,7 @@ namespace Araci.Services
             // DISPATCH TOOL
             // =========================
 
-            _ferramentaAtual
-                .OnKeyDown(key);
+            _ferramentaAtual.OnKeyDown(key);
         }
     }
 }
