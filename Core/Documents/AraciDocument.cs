@@ -1,6 +1,6 @@
-﻿using System.Collections.ObjectModel;
+using System.Collections.ObjectModel;
 
-using Araci.ViewModels;
+using Araci.Models;
 
 namespace Araci.Core.Documents
 {
@@ -11,7 +11,7 @@ namespace Araci.Core.Documents
         // ELEMENTOS DO DOCUMENTO
         // =========================
 
-        public ObservableCollection<ElementoViewModel>
+        public ObservableCollection<Elemento>
             Elementos
         { get; }
 
@@ -22,8 +22,7 @@ namespace Araci.Core.Documents
         public AraciDocument()
         {
             Elementos =
-                new ObservableCollection<
-                    ElementoViewModel>();
+                new ObservableCollection<Elemento>();
         }
 
         // =========================
@@ -31,7 +30,7 @@ namespace Araci.Core.Documents
         // =========================
 
         public void AdicionarElemento(
-            ElementoViewModel elemento)
+            Elemento elemento)
         {
             if (!Elementos.Contains(elemento))
             {
@@ -40,7 +39,7 @@ namespace Araci.Core.Documents
         }
 
         public void RemoverElemento(
-            ElementoViewModel elemento)
+            Elemento elemento)
         {
             Elementos.Remove(elemento);
         }

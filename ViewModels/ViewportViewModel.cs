@@ -1,13 +1,21 @@
-﻿using System.ComponentModel;
+using System.Collections.Generic;
+using System.Collections.ObjectModel;
+using System.Collections.Specialized;
+using System.ComponentModel;
 using System.Runtime.CompilerServices;
 
 using Araci.Core.Documents;
+using Araci.Models;
+using Araci.Services;
 
 namespace Araci.ViewModels
 {
     public class ViewportViewModel
         : INotifyPropertyChanged
     {
+        private readonly Dictionary<Elemento, ElementoViewModel>
+            _viewModelsPorModelo = new();
+
         // =========================
         // DOCUMENTO
         // =========================
@@ -17,6 +25,15 @@ namespace Araci.ViewModels
         { get; }
 
         // =========================
+        // ELEMENTOS VISUAIS
+        // =========================
+
+        public ObservableCollection<ElementoViewModel>
+            Elementos
+        { get; }
+            = new();
+
+        // =========================
         // CONSTRUTOR
         // =========================
 
@@ -24,6 +41,114 @@ namespace Araci.ViewModels
             AraciDocument document)
         {
             Document = document;
+
+            Document.Elementos.CollectionChanged +=
+                OnDocumentElementosChanged;
+
+            SincronizarComDocumento();
+        }
+
+        // =========================
+        // REGISTRO
+        // =========================
+
+        public void RegistrarViewModel(
+            ElementoViewModel vm)
+        {
+            _viewModelsPorModelo[vm.Modelo] =
+                vm;
+        }
+
+        // =========================
+        // SINCRONIZAÇÃO
+        // =========================
+
+        private void OnDocumentElementosChanged(
+            object? sender,
+            NotifyCollectionChangedEventArgs e)
+        {
+            if (e.Action == NotifyCollectionChangedAction.Reset)
+            {
+                Elementos.Clear();
+
+                return;
+            }
+
+            if (e.OldItems != null)
+            {
+                foreach (Elemento modelo in e.OldItems)
+                {
+                    RemoverViewModel(modelo);
+                }
+            }
+
+            if (e.NewItems != null)
+            {
+                foreach (Elemento modelo in e.NewItems)
+                {
+                    AdicionarViewModel(modelo);
+                }
+            }
+        }
+
+        private void SincronizarComDocumento()
+        {
+            Elementos.Clear();
+
+            foreach (Elemento modelo in Document.Elementos)
+            {
+                AdicionarViewModel(modelo);
+            }
+        }
+
+        private void AdicionarViewModel(
+            Elemento modelo)
+        {
+            ElementoViewModel? vm =
+                ObterOuCriarViewModel(modelo);
+
+            if (vm == null ||
+                Elementos.Contains(vm))
+            {
+                return;
+            }
+
+            Elementos.Add(vm);
+        }
+
+        private void RemoverViewModel(
+            Elemento modelo)
+        {
+            if (!_viewModelsPorModelo.TryGetValue(
+                    modelo,
+                    out ElementoViewModel? vm))
+            {
+                return;
+            }
+
+            Elementos.Remove(vm);
+        }
+
+        private ElementoViewModel? ObterOuCriarViewModel(
+            Elemento modelo)
+        {
+            if (_viewModelsPorModelo.TryGetValue(
+                    modelo,
+                    out ElementoViewModel? existente))
+            {
+                return existente;
+            }
+
+            ElementoViewModel? vm =
+                ElementoFactory.CriarViewModel(modelo);
+
+            if (vm != null)
+            {
+                _viewModelsPorModelo[modelo] =
+                    vm;
+            }
+
+            return vm;
         }
 
         // =========================

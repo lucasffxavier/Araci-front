@@ -8,7 +8,9 @@ namespace Araci.Applications.Commands
     {
         public void Execute(ElementoViewModel vm, Vector? delta = null)
         {
-            AppServices.Viewport?.RemoverElemento(vm);
+            AppServices.Viewport?
+                .RemoverElemento(vm);
+
             SelectionService.Limpar();
         }
     }

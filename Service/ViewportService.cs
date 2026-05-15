@@ -1,4 +1,5 @@
-﻿using System;
+using System;
+using System.Collections.ObjectModel;
 using System.Windows;
 
 using Araci.ViewModels;
@@ -23,6 +24,14 @@ namespace Araci.Services
             _vm = vm
                 ?? throw new ArgumentNullException(nameof(vm));
         }
+
+        // =========================
+        // ELEMENTOS VISUAIS
+        // =========================
+
+        public ObservableCollection<ElementoViewModel>
+            Elementos =>
+                _vm.Elementos;
 
         // =========================
         // TAMANHO
@@ -71,14 +80,10 @@ namespace Araci.Services
             if (vm == null)
                 return;
 
-            if (!_vm.Document
-                    .Elementos
-                    .Contains(vm))
-            {
-                _vm.Document
-                    .Elementos
-                    .Add(vm);
-            }
+            _vm.RegistrarViewModel(vm);
+
+            AppServices.Document
+                .AdicionarElemento(vm.Modelo);
         }
 
         public void RemoverElemento(
@@ -87,14 +92,8 @@ namespace Araci.Services
             if (vm == null)
                 return;
 
-            if (_vm.Document
-                    .Elementos
-                    .Contains(vm))
-            {
-                _vm.Document
-                    .Elementos
-                    .Remove(vm);
-            }
+            AppServices.Document
+                .RemoverElemento(vm.Modelo);
         }
     }
 }

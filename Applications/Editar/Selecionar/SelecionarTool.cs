@@ -236,11 +236,14 @@ namespace Araci.Applications.Editar.Selecionar
             {
                 var rect = AppServices.SelectionBox.Bounds;
 
-                foreach (var item in AppServices.Document.Elementos)
+                if (AppServices.Viewport != null)
                 {
-                    if (rect.IntersectsWith(item.Bounds))
+                    foreach (var item in AppServices.Viewport.Elementos)
                     {
-                        SelectionService.Selecionar(item, true);
+                        if (rect.IntersectsWith(item.Bounds))
+                        {
+                            SelectionService.Selecionar(item, true);
+                        }
                     }
                 }
 

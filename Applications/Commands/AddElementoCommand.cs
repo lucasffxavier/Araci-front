@@ -28,8 +28,16 @@ namespace Araci.Core.Commands
 
         public void Execute()
         {
+            if (AppServices.Viewport != null)
+            {
+                AppServices.Viewport
+                    .AdicionarElemento(_elemento);
+
+                return;
+            }
+
             AppServices.Document
-                .AdicionarElemento(_elemento);
+                .AdicionarElemento(_elemento.Modelo);
         }
 
         // =========================
@@ -38,8 +46,16 @@ namespace Araci.Core.Commands
 
         public void Undo()
         {
+            if (AppServices.Viewport != null)
+            {
+                AppServices.Viewport
+                    .RemoverElemento(_elemento);
+
+                return;
+            }
+
             AppServices.Document
-                .RemoverElemento(_elemento);
+                .RemoverElemento(_elemento.Modelo);
         }
 
         // =========================
