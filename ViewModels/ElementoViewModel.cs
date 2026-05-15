@@ -1,10 +1,14 @@
-﻿using Araci.Models;
+﻿using System;
+using System.Collections;
+using System.Windows;
+using System.Windows.Input;
+using System.Windows.Media;
+
+using Araci.Models;
+using Araci.Models.Tipos;
+using Araci.Properties;
 using Araci.ViewModels.Base;
 using Araci.ViewModels.VisualStates;
-
-using System;
-using System.Windows;
-using System.Windows.Media;
 
 namespace Araci.ViewModels
 {
@@ -13,14 +17,9 @@ namespace Araci.ViewModels
     {
         protected readonly Elemento _modelo;
 
-        public ElementoTransform Transform
-        { get; }
-
-        public ElementoVisualState VisualState
-        { get; }
-
-        public ElementoGeometryState Geometry
-        { get; }
+        // ====================================================
+        // CONSTRUTOR
+        // ====================================================
 
         protected ElementoViewModel(
             Elemento modelo)
@@ -40,12 +39,82 @@ namespace Araci.ViewModels
                 new ElementoGeometryState();
         }
 
+        // ====================================================
+        // MODELO
+        // ====================================================
+
         public Elemento Modelo =>
             _modelo;
 
-        // =========================
+        // ====================================================
+        // TIPO
+        // ====================================================
+
+        public TipoElemento Tipo
+        {
+            get => _modelo.Tipo!;
+
+            set
+            {
+                if (_modelo.Tipo == value)
+                    return;
+
+                _modelo.Tipo = value;
+
+                OnPropertyChanged();
+
+                OnPropertyChanged(nameof(TipoViewModel));
+            }
+        }
+
+        public abstract IEnumerable
+            TiposDisponiveis
+        { get; }
+
+        public virtual TipoElementoViewModel?
+            TipoViewModel =>
+                TipoElementoViewModelFactory
+                    .Criar(Tipo);
+
+        // ====================================================
+        // COMANDO
+        // ====================================================
+
+        private ICommand? _abrirPropriedadesTipoCommand;
+
+        public ICommand AbrirPropriedadesTipoCommand =>
+            _abrirPropriedadesTipoCommand ??=
+                new RelayCommand(AbrirPropriedadesTipo);
+
+        private void AbrirPropriedadesTipo()
+        {
+            var janela =
+                new TypePropertiesWindow
+                {
+                    Owner =
+                        Application.Current.MainWindow,
+
+                    DataContext =
+                        TipoViewModel
+                };
+
+            janela.ShowDialog();
+        }
+
+        // ====================================================
+        // TRANSFORM
+        // ====================================================
+
+        public ElementoTransform Transform
+        { get; }
+
+        // ====================================================
         // VISUAL
-        // =========================
+        // ====================================================
+
+        public ElementoVisualState
+            VisualState
+        { get; }
 
         public bool IsSelecionado
         {
@@ -72,9 +141,69 @@ namespace Araci.ViewModels
         public double StrokeThickness =>
             VisualState.StrokeThickness;
 
-        // =========================
+        // ====================================================
+        // GEOMETRIA
+        // ====================================================
+
+        public ElementoGeometryState
+            Geometry
+        { get; }
+
+        protected virtual double
+            LarguraBase =>
+                70;
+
+        protected virtual double
+            AlturaBase =>
+                70;
+
+        public virtual double
+            Largura =>
+                Geometry.Largura;
+
+        public virtual double
+            Altura =>
+                Geometry.Altura;
+
+        public virtual Rect
+            Bounds =>
+                Geometry.Bounds;
+
+        public virtual Point
+            Centro =>
+                Geometry.Centro;
+
+        protected virtual void
+            AtualizarGeometria()
+        {
+            Geometry.AtualizarRetangulo(
+                X,
+                Y,
+                LarguraBase,
+                AlturaBase);
+
+            NotificarGeometria();
+        }
+
+        protected void
+            NotificarGeometria()
+        {
+            OnPropertyChanged(nameof(X));
+
+            OnPropertyChanged(nameof(Y));
+
+            OnPropertyChanged(nameof(Largura));
+
+            OnPropertyChanged(nameof(Altura));
+
+            OnPropertyChanged(nameof(Bounds));
+
+            OnPropertyChanged(nameof(Centro));
+        }
+
+        // ====================================================
         // POSIÇÃO
-        // =========================
+        // ====================================================
 
         public virtual double X
         {
@@ -120,57 +249,9 @@ namespace Araci.ViewModels
             }
         }
 
-        // =========================
-        // GEOMETRIA
-        // =========================
-
-        protected virtual double LarguraBase =>
-            70;
-
-        protected virtual double AlturaBase =>
-            70;
-
-        public virtual double Largura =>
-            Geometry.Largura;
-
-        public virtual double Altura =>
-            Geometry.Altura;
-
-        public virtual Rect Bounds =>
-            Geometry.Bounds;
-
-        public virtual Point Centro =>
-            Geometry.Centro;
-
-        protected virtual void AtualizarGeometria()
-        {
-            Geometry.AtualizarRetangulo(
-                X,
-                Y,
-                LarguraBase,
-                AlturaBase);
-
-            NotificarGeometria();
-        }
-
-        protected void NotificarGeometria()
-        {
-            OnPropertyChanged(nameof(X));
-
-            OnPropertyChanged(nameof(Y));
-
-            OnPropertyChanged(nameof(Largura));
-
-            OnPropertyChanged(nameof(Altura));
-
-            OnPropertyChanged(nameof(Bounds));
-
-            OnPropertyChanged(nameof(Centro));
-        }
-
-        // =========================
+        // ====================================================
         // MOVIMENTO
-        // =========================
+        // ====================================================
 
         public virtual void Mover(
             Vector delta)
@@ -180,9 +261,9 @@ namespace Araci.ViewModels
             Y += delta.Y;
         }
 
-        // =========================
+        // ====================================================
         // LIMITES VIEWPORT
-        // =========================
+        // ====================================================
 
         private double LimitarX(
             double valor)
@@ -216,9 +297,9 @@ namespace Araci.ViewModels
                 Math.Min(valor, max));
         }
 
-        // =========================
+        // ====================================================
         // SNAPSHOT
-        // =========================
+        // ====================================================
 
         public virtual ElementoEstado
             CapturarEstado()

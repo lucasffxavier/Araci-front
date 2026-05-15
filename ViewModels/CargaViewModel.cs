@@ -1,4 +1,5 @@
 ﻿using Araci.Models;
+using System.Collections;
 using System.Windows.Media;
 
 namespace Araci.ViewModels
@@ -11,6 +12,9 @@ namespace Araci.ViewModels
         protected override double LarguraBase => 70;
 
         protected override double AlturaBase => 70;
+
+        public override IEnumerable TiposDisponiveis =>
+            AppServices.Types.TiposCargas;
 
         public CargaViewModel(
             Carga carga)
@@ -67,32 +71,5 @@ namespace Araci.ViewModels
             }
         }
 
-        public double TensaoKV
-        {
-            get => _carga.TensaoKV;
-
-            set
-            {
-                if (_carga.TensaoKV != value)
-                {
-                    _carga.TensaoKV = value;
-                    OnPropertyChanged();
-                }
-            }
-        }
-
-        public string Conexao
-        {
-            get => _carga.Conexao;
-
-            set
-            {
-                if (_carga.Conexao != value)
-                {
-                    _carga.Conexao = value;
-                    OnPropertyChanged();
-                }
-            }
-        }
     }
 }

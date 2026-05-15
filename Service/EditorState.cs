@@ -11,6 +11,9 @@ namespace Araci.Services
         private ElementoViewModel?
             _elementoSelecionado;
 
+        private TipoElementoViewModel?
+            _tipoSelecionado;
+
         public ElementoViewModel?
             ElementoSelecionado
         {
@@ -22,6 +25,25 @@ namespace Araci.Services
                     return;
 
                 _elementoSelecionado = value;
+
+                TipoSelecionado =
+                    value?.TipoViewModel;
+
+                OnPropertyChanged();
+            }
+        }
+
+        public TipoElementoViewModel?
+            TipoSelecionado
+        {
+            get => _tipoSelecionado;
+
+            set
+            {
+                if (_tipoSelecionado == value)
+                    return;
+
+                _tipoSelecionado = value;
 
                 OnPropertyChanged();
             }

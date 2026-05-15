@@ -1,8 +1,8 @@
-﻿using System;
+﻿using Araci.Models;
+using System;
+using System.Collections;
 using System.Windows;
 using System.Windows.Media;
-
-using Araci.Models;
 
 namespace Araci.ViewModels
 {
@@ -11,6 +11,8 @@ namespace Araci.ViewModels
     {
         private readonly Cabo _cabo;
 
+        public override IEnumerable TiposDisponiveis =>
+    AppServices.Types.TiposCabos;
         public CaboViewModel(
             Cabo cabo)
             : base(cabo)
@@ -141,20 +143,6 @@ namespace Araci.ViewModels
             }
         }
 
-        public string TipoCabo
-        {
-            get => _cabo.TipoCabo;
-
-            set
-            {
-                if (_cabo.TipoCabo == value)
-                    return;
-
-                _cabo.TipoCabo = value;
-
-                OnPropertyChanged();
-            }
-        }
 
         // =========================
         // GEOMETRIA

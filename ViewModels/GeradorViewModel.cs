@@ -1,4 +1,5 @@
 ﻿using Araci.Models;
+using System.Collections;
 using System.Windows.Media;
 
 namespace Araci.ViewModels
@@ -11,6 +12,9 @@ namespace Araci.ViewModels
         protected override double LarguraBase => 80;
 
         protected override double AlturaBase => 80;
+
+        public override IEnumerable TiposDisponiveis =>
+            AppServices.Types.TiposGeradores;
 
         public GeradorViewModel(
             Gerador gerador)
@@ -67,32 +71,5 @@ namespace Araci.ViewModels
             }
         }
 
-        public double TensaoKV
-        {
-            get => _gerador.TensaoKV;
-
-            set
-            {
-                if (_gerador.TensaoKV != value)
-                {
-                    _gerador.TensaoKV = value;
-                    OnPropertyChanged();
-                }
-            }
-        }
-
-        public string Fabricante
-        {
-            get => _gerador.Fabricante;
-
-            set
-            {
-                if (_gerador.Fabricante != value)
-                {
-                    _gerador.Fabricante = value;
-                    OnPropertyChanged();
-                }
-            }
-        }
     }
 }

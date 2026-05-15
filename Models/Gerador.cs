@@ -1,4 +1,6 @@
-﻿namespace Araci.Models
+﻿using Araci.Models.Tipos;
+
+namespace Araci.Models
 {
     public class Gerador : Elemento
     {
@@ -15,20 +17,11 @@
         public double FatorPotencia { get; set; }
 
         // =========================
-        // TIPO
+        // TIPO FORTE
         // =========================
 
-        public string TipoGerador { get; set; }
-
-        public string Fabricante { get; set; }
-
-        public string Modelo { get; set; }
-
-        public double PotenciaNominalKW { get; set; }
-
-        public double TensaoKV { get; set; }
-
-        public int Fases { get; set; }
+        public TipoGerador TipoGerador =>
+            (TipoGerador)Tipo!;
 
         // =========================
         // CONSTRUTOR
@@ -39,6 +32,7 @@
             Nome = "GER-01";
 
             Barra = "BUS-01";
+
             Alimentador = "AL-01";
 
             PotenciaAtivaKW = 5000;
@@ -48,19 +42,7 @@
             PosicaoX = 300;
             PosicaoY = 200;
 
-            TipoGerador = "Eólico";
-
-            Fabricante = "WEG";
-            Modelo = "WTG-5MW";
-
-            PotenciaNominalKW = 5000;
-
-            TensaoKV = 34.5;
-
-            Fases = 3;
-
-            Categoria = "Geradores";
-            Familia = "Geradores";
+            Tipo = new TipoGerador();
         }
 
         // =========================
@@ -78,17 +60,6 @@
 
             clone.PotenciaAtivaKW = PotenciaAtivaKW;
             clone.FatorPotencia = FatorPotencia;
-
-            clone.TipoGerador = TipoGerador;
-
-            clone.Fabricante = Fabricante;
-            clone.Modelo = Modelo;
-
-            clone.PotenciaNominalKW = PotenciaNominalKW;
-
-            clone.TensaoKV = TensaoKV;
-
-            clone.Fases = Fases;
 
             return clone;
         }

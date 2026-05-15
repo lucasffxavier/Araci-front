@@ -1,4 +1,6 @@
-﻿namespace Araci.Models
+﻿using Araci.Models.Tipos;
+
+namespace Araci.Models
 {
     public class Cabo : Elemento
     {
@@ -21,22 +23,11 @@
         public double PosicaoY2 { get; set; }
 
         // =========================
-        // TIPO
+        // TIPO FORTE
         // =========================
 
-        public string TipoCabo { get; set; }
-
-        public double Resistencia { get; set; }
-
-        public double Reatancia { get; set; }
-
-        public double Capacitancia { get; set; }
-
-        public double Ampacidade { get; set; }
-
-        public int Fases { get; set; }
-
-        public bool Neutro { get; set; }
+        public TipoCabo TipoCabo =>
+            (TipoCabo)Tipo!;
 
         // =========================
         // CONSTRUTOR
@@ -57,20 +48,7 @@
             PosicaoX2 = 400;
             PosicaoY2 = 100;
 
-            TipoCabo = "LC-500MCM";
-
-            Resistencia = 0.12;
-            Reatancia = 0.09;
-            Capacitancia = 0.001;
-
-            Ampacidade = 520;
-
-            Fases = 3;
-
-            Neutro = true;
-
-            Categoria = "Cabos";
-            Familia = "Cabos";
+            Tipo = new TipoCabo();
         }
 
         // =========================
@@ -90,17 +68,6 @@
 
             clone.PosicaoX2 = PosicaoX2;
             clone.PosicaoY2 = PosicaoY2;
-
-            clone.TipoCabo = TipoCabo;
-
-            clone.Resistencia = Resistencia;
-            clone.Reatancia = Reatancia;
-            clone.Capacitancia = Capacitancia;
-
-            clone.Ampacidade = Ampacidade;
-
-            clone.Fases = Fases;
-            clone.Neutro = Neutro;
 
             return clone;
         }

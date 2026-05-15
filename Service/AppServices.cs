@@ -81,5 +81,14 @@ namespace Araci
         {
             return new TransactionScope(Commands);
         }
+
+        // =========================
+        // TYPES
+        // =========================
+
+        public static TypeLibraryService
+            Types
+        { get; }
+            = new TypeLibraryService();
     }
 }

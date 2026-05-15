@@ -1,6 +1,7 @@
 ﻿using System;
 
 using Araci.Models.Interfaces;
+using Araci.Models.Tipos;
 
 namespace Araci.Models
 {
@@ -34,14 +35,10 @@ namespace Araci.Models
             = 1;
 
         // =========================
-        // BIM
+        // TIPO
         // =========================
 
-        public string Familia { get; set; }
-            = string.Empty;
-
-        public string Categoria { get; set; }
-            = string.Empty;
+        public TipoElemento? Tipo { get; set; }
 
         // =========================
         // CLONAGEM
@@ -61,8 +58,7 @@ namespace Araci.Models
             destino.Rotacao = Rotacao;
             destino.Escala = Escala;
 
-            destino.Familia = Familia;
-            destino.Categoria = Categoria;
+            destino.Tipo = Tipo;
         }
     }
 }
