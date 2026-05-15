@@ -1,3 +1,12 @@
+// =============================================================
+// AppServices — PROXY SOMENTE LEITURA de EditorContext
+// =============================================================
+// ⚠️ FASE 1: Este arquivo NÃO é mais a fonte da verdade.
+//    Existe apenas para compatibilidade durante a migração.
+//    Objetivo: remover completamente após todas as injeções.
+//    NUNCA escrever lógica nova aqui.
+// =============================================================
+
 using Araci.Core.Commands;
 using Araci.Core.Documents;
 using Araci.Core.Transactions;
@@ -6,10 +15,13 @@ using Araci.ViewModels;
 
 namespace Araci
 {
+    [System.Obsolete(
+        "AppServices será removido. Injete EditorContext diretamente.",
+        error: false)]
     public static class AppServices
     {
         // =========================
-        // CONTEXTO
+        // CONTEXTO RAIZ
         // =========================
 
         public static EditorContext Current
@@ -24,103 +36,50 @@ namespace Araci
         }
 
         // =========================
-        // DOCUMENTO CENTRAL
+        // PROXIES — APENAS LEITURA
+        // (não adicionar novos membros aqui)
         // =========================
 
         public static AraciDocument Document =>
             Current.Document;
 
-        // =========================
-        // TOOLS
-        // =========================
-
         public static ToolService Tools =>
             Current.Tools;
-
-        // =========================
-        // INPUT
-        // =========================
 
         public static InputRouter Input =>
             Current.Input;
 
-        // =========================
-        // VIEWPORT
-        // =========================
-
         public static ViewportService? Viewport =>
             Current.Viewport;
-
-        // =========================
-        // EDITOR
-        // =========================
 
         public static EditorState Editor =>
             Current.Editor;
 
-        // =========================
-        // HUD
-        // =========================
-
         public static MoveHudService MoveHud =>
             Current.MoveHud;
-
-        // =========================
-        // SELECTION BOX
-        // =========================
 
         public static SelectionBoxViewModel SelectionBox =>
             Current.SelectionBox;
 
-        // =========================
-        // COMMANDS
-        // =========================
-
         public static CommandManager Commands =>
             Current.Commands;
-
-        // =========================
-        // SELECTION
-        // =========================
 
         public static SelectionService Selection =>
             Current.Selection;
 
-        // =========================
-        // MOVE
-        // =========================
-
         public static MoveService Move =>
             Current.Move;
-
-        // =========================
-        // SNAP
-        // =========================
 
         public static SnapService Snap =>
             Current.Snap;
 
-        // =========================
-        // TYPES
-        // =========================
-
         public static TypeLibraryService Types =>
             Current.Types;
-
-        // =========================
-        // ELEMENTOS
-        // =========================
 
         public static ElementoFactory ElementoFactory =>
             Current.ElementoFactory;
 
-        // =========================
-        // TRANSACTIONS
-        // =========================
-
-        public static TransactionScope BeginTransaction()
-        {
-            return Current.BeginTransaction();
-        }
+        public static TransactionScope BeginTransaction() =>
+            Current.BeginTransaction();
     }
 }

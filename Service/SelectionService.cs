@@ -1,13 +1,30 @@
-﻿using System.Collections.ObjectModel;
-using System.Linq;
-
+﻿using Araci.Core.Events;
 using Araci.ViewModels;
+
+using System.Collections.Generic;
+using System.Collections.ObjectModel;
+using System.Linq;
 
 namespace Araci.Services
 {
     public class SelectionService
     {
+        // =====================================================
+        // DEPENDÊNCIAS
+        // =====================================================
+
         private readonly EditorContext _context;
+
+        // =====================================================
+        // ESTADO
+        // =====================================================
+
+        private readonly ObservableCollection<ElementoViewModel>
+            _selecionados = new();
+
+        // =====================================================
+        // CONSTRUTOR
+        // =====================================================
 
         public SelectionService(EditorContext context)
         {
@@ -15,146 +32,118 @@ namespace Araci.Services
                 ?? throw new System.ArgumentNullException(nameof(context));
         }
 
-        // =========================
-        // SELECIONADOS
-        // =========================
+        // =====================================================
+        // LEITURA
+        // =====================================================
+
+        public IReadOnlyList<ElementoViewModel>
+            Selecionados =>
+                _selecionados;
 
         public ObservableCollection<ElementoViewModel>
-            Selecionados
-        { get; }
-            = new();
+            SelecionadosObservable =>
+                _selecionados;
 
-        // =========================
-        // PRINCIPAL
-        // =========================
+        public bool TemSelecionados =>
+            _selecionados.Count > 0;
 
-        public ElementoViewModel?
-            Principal =>
-                Selecionados.FirstOrDefault();
-
-        // =========================
+        // =====================================================
         // SELECIONAR
-        // =========================
+        // =====================================================
 
         public void Selecionar(
             ElementoViewModel vm,
-            bool adicionar = false)
+            bool adicionarAoExistente = false)
         {
-            if (vm == null)
-                return;
-
-            // =========================
-            // LIMPA SE NÃO FOR MULTISELECT
-            // =========================
-
-            if (!adicionar)
+            if (!adicionarAoExistente)
             {
                 Limpar();
             }
 
-            // =========================
-            // EVITA DUPLICIDADE
-            // =========================
-
-            if (Selecionados.Contains(vm))
+            if (_selecionados.Contains(vm))
             {
-                vm.IsSelecionado = true;
-
-                _context.Editor
-                    .ElementoSelecionado = vm;
-
+                AtualizarElementoSelecionado();
                 return;
             }
-
-            // =========================
-            // MARCA VISUALMENTE
-            // =========================
 
             vm.IsSelecionado = true;
 
-            Selecionados.Add(vm);
+            _selecionados.Add(vm);
 
-            _context.Editor
-                .ElementoSelecionado = vm;
+            AtualizarElementoSelecionado();
+
+            PublicarAlteracao();
         }
 
-        // =========================
-        // DESELECIONAR
-        // =========================
+        // =====================================================
+        // TOGGLE
+        // =====================================================
 
-        public void Deselecionar(
-            ElementoViewModel vm)
+        public void Toggle(ElementoViewModel vm)
         {
-            if (vm == null)
-                return;
-
-            if (!Selecionados.Contains(vm))
+            if (_selecionados.Contains(vm))
             {
-                vm.IsSelecionado = false;
+                Deselecionar(vm);
                 return;
             }
+
+            Selecionar(vm, true);
+        }
+
+        // =====================================================
+        // DESELECIONAR
+        // =====================================================
+
+        public void Deselecionar(ElementoViewModel vm)
+        {
+            if (!_selecionados.Contains(vm))
+                return;
 
             vm.IsSelecionado = false;
 
-            Selecionados.Remove(vm);
+            _selecionados.Remove(vm);
 
-            _context.Editor
-                .ElementoSelecionado =
-                    Principal;
+            AtualizarElementoSelecionado();
+
+            PublicarAlteracao();
         }
 
-        // =========================
-        // TOGGLE
-        // =========================
-
-        public void Toggle(
-            ElementoViewModel vm)
-        {
-            if (vm == null)
-                return;
-
-            if (Selecionados.Contains(vm))
-            {
-                Deselecionar(vm);
-            }
-            else
-            {
-                Selecionar(vm, true);
-            }
-        }
-
-        // =========================
+        // =====================================================
         // LIMPAR
-        // =========================
+        // =====================================================
 
         public void Limpar()
         {
-            foreach (var item in
-                     Selecionados.ToList())
+            if (_selecionados.Count == 0)
+                return;
+
+            foreach (var vm in _selecionados)
             {
-                item.IsSelecionado = false;
+                vm.IsSelecionado = false;
             }
 
-            Selecionados.Clear();
+            _selecionados.Clear();
 
-            _context.Editor
-                .ElementoSelecionado = null;
+            AtualizarElementoSelecionado();
+
+            PublicarAlteracao();
         }
 
-        // =========================
-        // SINCRONIZAÇÃO
-        // =========================
+        // =====================================================
+        // AUXILIARES
+        // =====================================================
 
-        public void GarantirConsistencia()
+        private void AtualizarElementoSelecionado()
         {
-            foreach (var item in
-                     Selecionados.ToList())
-            {
-                if (item == null)
-                    continue;
+            _context.Editor.ElementoSelecionado =
+                _selecionados.LastOrDefault();
+        }
 
-                item.IsSelecionado = true;
-            }
+        private void PublicarAlteracao()
+        {
+            _context.Events.Publish(
+                new SelecaoAlteradaEvent(
+                    _selecionados.ToList()));
         }
     }
 }

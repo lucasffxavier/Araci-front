@@ -1,61 +1,45 @@
+using System;
+
+using Araci.Core.Events;
 using Araci.Services;
 using Araci.ViewModels;
 
 namespace Araci.Core.Commands
 {
-    public class AddElementoCommand
-        : IUndoableCommand
+    public class AddElementoCommand : IUndoableCommand
     {
-        // =========================
-        // ELEMENTO
-        // =========================
+        private readonly ElementoViewModel _elemento;
 
-        private readonly ElementoViewModel
-            _elemento;
-
-        private readonly EditorContext
-            _context;
-
-        // =========================
-        // CONSTRUTOR
-        // =========================
+        private readonly EditorContext _context;
 
         public AddElementoCommand(
             ElementoViewModel elemento,
             EditorContext context)
         {
-            _elemento = elemento;
+            _elemento = elemento
+                ?? throw new ArgumentNullException(nameof(elemento));
 
             _context = context
-                ?? throw new System.ArgumentNullException(nameof(context));
+                ?? throw new ArgumentNullException(nameof(context));
         }
-
-        // =========================
-        // EXECUTE
-        // =========================
 
         public void Execute()
         {
-            _context.Viewport
-                ?.RegistrarViewModel(_elemento);
+            _context.Document.AdicionarElemento(_elemento.Modelo);
 
-            _context.Document
-                .AdicionarElemento(_elemento.Modelo);
+            _context.Events.Publish(
+                new ElementoAdicionadoEvent(_elemento));
         }
-
-        // =========================
-        // UNDO
-        // =========================
 
         public void Undo()
         {
-            _context.Document
-                .RemoverElemento(_elemento.Modelo);
-        }
+            _context.Selection.Deselecionar(_elemento);
 
-        // =========================
-        // REDO
-        // =========================
+            _context.Document.RemoverElemento(_elemento.Modelo);
+
+            _context.Events.Publish(
+                new ElementoRemovidoEvent(_elemento));
+        }
 
         public void Redo()
         {

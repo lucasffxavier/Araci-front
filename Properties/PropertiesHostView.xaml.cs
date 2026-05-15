@@ -1,7 +1,5 @@
 ﻿using System.Windows.Controls;
 
-using Araci.Services;
-
 namespace Araci.Properties
 {
     public partial class PropertiesHostView
@@ -14,9 +12,6 @@ namespace Araci.Properties
         public PropertiesHostView()
         {
             InitializeComponent();
-
-            DataContext =
-                AppServices.Editor;
         }
     }
 }

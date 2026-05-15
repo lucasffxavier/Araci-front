@@ -12,23 +12,26 @@ namespace Araci.Views
 {
     public partial class ViewportView : UserControl
     {
-        private readonly ViewportViewModel _viewportViewModel;
+        private ViewportViewModel? _viewportViewModel;
 
-        private readonly EditorContext _context;
+        private EditorContext? _context;
 
-        private readonly MatrixTransform _cameraTransform =
-            new();
+        private readonly MatrixTransform
+            _cameraTransform = new();
 
         public ViewportView()
         {
             InitializeComponent();
+        }
 
-            _context =
-                AppServices.Current;
+        public void Inicializar(
+            EditorContext context)
+        {
+            _context = context
+                ?? throw new ArgumentNullException(nameof(context));
 
             _viewportViewModel =
-                new ViewportViewModel(
-                    _context);
+                new ViewportViewModel(_context);
 
             DataContext = _viewportViewModel;
 
@@ -40,13 +43,9 @@ namespace Araci.Views
             Unloaded += OnUnloaded;
         }
 
-        // =========================
-        // CAMERA
-        // =========================
-
         private void ConfigurarCamera()
         {
-            if (_context.Viewport == null)
+            if (_context?.Viewport == null)
                 return;
 
             WorldLayer.RenderTransform =
@@ -72,7 +71,7 @@ namespace Araci.Views
             object sender,
             RoutedEventArgs e)
         {
-            if (_context.Viewport != null)
+            if (_context?.Viewport != null)
             {
                 _context.Viewport.Camera.PropertyChanged -=
                     OnCameraChanged;
@@ -81,7 +80,7 @@ namespace Araci.Views
 
         private void AtualizarCameraTransform()
         {
-            if (_context.Viewport == null)
+            if (_context?.Viewport == null)
                 return;
 
             var camera =
@@ -97,11 +96,9 @@ namespace Araci.Views
                     camera.Offset.Y);
         }
 
-        // =========================
-        // LOADED
-        // =========================
-
-        private void OnLoaded(object sender, RoutedEventArgs e)
+        private void OnLoaded(
+            object sender,
+            RoutedEventArgs e)
         {
             Focus();
 
@@ -110,60 +107,43 @@ namespace Araci.Views
             AtualizarViewport();
 
             SizeChanged += (_, __) =>
-            {
                 AtualizarViewport();
-            };
         }
-
-        // =========================
-        // VIEWPORT SIZE
-        // =========================
 
         private void AtualizarViewport()
         {
-            if (_context.Viewport == null)
+            if (_context?.Viewport == null)
                 return;
 
-            double larguraReal = ActualWidth;
-
-            double alturaReal = ActualHeight;
+            double largura = ActualWidth;
+            double altura = ActualHeight;
 
             if (RootBorder != null)
             {
-                larguraReal -=
-                    RootBorder.BorderThickness.Left +
-                    RootBorder.BorderThickness.Right;
+                largura -= RootBorder.BorderThickness.Left
+                         + RootBorder.BorderThickness.Right;
 
-                alturaReal -=
-                    RootBorder.BorderThickness.Top +
-                    RootBorder.BorderThickness.Bottom;
+                altura -= RootBorder.BorderThickness.Top
+                        + RootBorder.BorderThickness.Bottom;
             }
 
-            larguraReal = Math.Max(0, larguraReal);
-
-            alturaReal = Math.Max(0, alturaReal);
+            largura = Math.Max(0, largura);
+            altura = Math.Max(0, altura);
 
             _context.Viewport.AtualizarTamanho(
-                new Size(
-                    larguraReal,
-                    alturaReal));
+                new Size(largura, altura));
         }
 
-        // =========================
-        // POSICAO
-        // =========================
+        private Point GetPos(MouseEventArgs e) =>
+            e.GetPosition(this);
 
-        private Point GetPos(MouseEventArgs e)
+        private void OnPreviewMouseLeftButtonDown(
+            object sender,
+            MouseButtonEventArgs e)
         {
-            return e.GetPosition(this);
-        }
+            if (_context == null)
+                return;
 
-        // =========================
-        // MOUSE DOWN
-        // =========================
-
-        private void OnPreviewMouseLeftButtonDown(object sender, MouseButtonEventArgs e)
-        {
             Focus();
 
             Keyboard.Focus(this);
@@ -176,99 +156,75 @@ namespace Araci.Views
             while (origem != null)
             {
                 if (origem is FrameworkElement fe &&
-                    fe.DataContext is ElementoViewModel elemento)
+                    fe.DataContext is ElementoViewModel el)
                 {
-                    vm = elemento;
-
+                    vm = el;
                     break;
                 }
 
-                origem =
-                    VisualTreeHelper.GetParent(origem);
+                origem = VisualTreeHelper.GetParent(origem);
             }
 
-            var pos = GetPos(e);
-
-            _context.Input.MouseDown(
-                vm,
-                pos);
+            _context.Input.MouseDown(vm, GetPos(e));
 
             CaptureMouse();
         }
 
-        // =========================
-        // MOUSE MOVE
-        // =========================
-
-        private void OnPreviewMouseMove(object sender, MouseEventArgs e)
+        private void OnPreviewMouseMove(
+            object sender,
+            MouseEventArgs e)
         {
-            var pos = GetPos(e);
-
-            _context.Input.MouseMove(pos);
+            _context?.Input.MouseMove(GetPos(e));
         }
 
-        // =========================
-        // MOUSE UP
-        // =========================
-
-        private void OnPreviewMouseLeftButtonUp(object sender, MouseButtonEventArgs e)
+        private void OnPreviewMouseLeftButtonUp(
+            object sender,
+            MouseButtonEventArgs e)
         {
-            var pos = GetPos(e);
-
-            _context.Input.MouseUp(pos);
+            _context?.Input.MouseUp(GetPos(e));
 
             if (IsMouseCaptured)
-            {
                 ReleaseMouseCapture();
-            }
         }
 
-        // =========================
-        // ZOOM
-        // =========================
-
-        private void OnPreviewMouseWheel(object sender, MouseWheelEventArgs e)
+        private void OnPreviewMouseWheel(
+            object sender,
+            MouseWheelEventArgs e)
         {
-            if (_context.Viewport == null)
+            if (_context?.Viewport == null)
                 return;
 
             var camera =
                 _context.Viewport.Camera;
 
-            Point cursor =
-                GetPos(e);
+            Point cursor = GetPos(e);
 
             Point worldBefore =
                 camera.ScreenToWorld(cursor);
 
             double factor =
-                e.Delta > 0
-                    ? 1.1
-                    : 1 / 1.1;
+                e.Delta > 0 ? 1.1 : 1 / 1.1;
 
-            camera.Zoom =
-                Math.Max(
-                    0.1,
-                    Math.Min(
-                        8,
-                        camera.Zoom * factor));
+            camera.Zoom = Math.Max(
+                0.1,
+                Math.Min(8, camera.Zoom * factor));
 
-            camera.Offset =
-                new Point(
-                    cursor.X - worldBefore.X * camera.Zoom,
-                    cursor.Y - worldBefore.Y * camera.Zoom);
+            camera.Offset = new Point(
+                cursor.X - worldBefore.X * camera.Zoom,
+                cursor.Y - worldBefore.Y * camera.Zoom);
 
             e.Handled = true;
         }
 
-        // =========================
-        // KEYBOARD
-        // =========================
-
-        private void OnPreviewKeyDown(object sender, KeyEventArgs e)
+        private void OnPreviewKeyDown(
+            object sender,
+            KeyEventArgs e)
         {
-            e.Handled =
-                _context.Input.KeyDown(e.Key);
+            if (_context != null)
+            {
+                e.Handled =
+                    _context.Input.KeyDown(e.Key);
+            }
         }
     }
 }

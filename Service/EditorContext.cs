@@ -1,5 +1,6 @@
 using Araci.Core.Commands;
 using Araci.Core.Documents;
+using Araci.Core.Events;
 using Araci.Core.Scenes;
 using Araci.Core.Transactions;
 using Araci.ViewModels;
@@ -13,7 +14,12 @@ namespace Araci.Services
         // =========================
 
         public EditorContext()
+            : this(new EventBus()) { }
+
+        public EditorContext(IEventBus eventBus)
         {
+            Events = eventBus;
+
             ElementoFactory =
                 new ElementoFactory(Types);
 
@@ -32,6 +38,13 @@ namespace Araci.Services
             Input =
                 new InputRouter(this);
         }
+
+        // =========================
+        // EVENTOS (novo)
+        // =========================
+
+        public IEventBus Events
+        { get; }
 
         // =========================
         // DOCUMENTO
@@ -79,7 +92,7 @@ namespace Araci.Services
         }
 
         // =========================
-        // EDITOR
+        // EDITOR STATE
         // =========================
 
         public EditorState Editor
@@ -140,7 +153,7 @@ namespace Araci.Services
             = new TypeLibraryService();
 
         // =========================
-        // ELEMENTOS
+        // FACTORY
         // =========================
 
         public ElementoFactory ElementoFactory

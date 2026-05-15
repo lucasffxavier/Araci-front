@@ -1,64 +1,45 @@
-﻿using Araci.Services;
+﻿using System;
+
+using Araci.Core.Events;
+using Araci.Services;
 using Araci.ViewModels;
 
 namespace Araci.Core.Commands
 {
-    public class DeleteElementCommand
-        : IUndoableCommand
+    public class DeleteElementCommand : IUndoableCommand
     {
-        // =========================
-        // ELEMENTO
-        // =========================
+        private readonly ElementoViewModel _vm;
 
-        private readonly ElementoViewModel
-            _vm;
-
-        private readonly EditorContext
-            _context;
-
-        // =========================
-        // CONSTRUTOR
-        // =========================
+        private readonly EditorContext _context;
 
         public DeleteElementCommand(
             ElementoViewModel vm,
             EditorContext context)
         {
-            _vm = vm;
+            _vm = vm
+                ?? throw new ArgumentNullException(nameof(vm));
 
             _context = context
-                ?? throw new System.ArgumentNullException(nameof(context));
+                ?? throw new ArgumentNullException(nameof(context));
         }
-
-        // =========================
-        // EXECUTE
-        // =========================
 
         public void Execute()
         {
-            _context.Document
-                .RemoverElemento(_vm.Modelo);
+            _context.Selection.Deselecionar(_vm);
 
-            _context.Selection
-                .Deselecionar(_vm);
+            _context.Document.RemoverElemento(_vm.Modelo);
+
+            _context.Events.Publish(
+                new ElementoRemovidoEvent(_vm));
         }
-
-        // =========================
-        // UNDO
-        // =========================
 
         public void Undo()
         {
-            _context.Viewport
-                ?.RegistrarViewModel(_vm);
+            _context.Document.AdicionarElemento(_vm.Modelo);
 
-            _context.Document
-                .AdicionarElemento(_vm.Modelo);
+            _context.Events.Publish(
+                new ElementoAdicionadoEvent(_vm));
         }
-
-        // =========================
-        // REDO
-        // =========================
 
         public void Redo()
         {

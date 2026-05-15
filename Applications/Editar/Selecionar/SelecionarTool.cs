@@ -126,7 +126,8 @@ namespace Araci.Applications.Editar.Selecionar
 
                 _pontoInicialArrasto = worldPosition;
 
-                _context.Move.BeginMove(_context.Selection.Selecionados);
+                _context.Move.BeginMove(
+                    _context.Selection.Selecionados);
 
                 // =========================
                 // HUD
@@ -138,7 +139,8 @@ namespace Araci.Applications.Editar.Selecionar
 
                     hud.Reset();
 
-                    var bounds = CalcularBoundsSelecionados();
+                    var bounds =
+                        CalcularBoundsSelecionados();
 
                     hud.AtualizarPosicao(bounds);
 
@@ -217,7 +219,8 @@ namespace Araci.Applications.Editar.Selecionar
 
                     hud.DeltaY = deltaTotal.Y;
 
-                    var bounds = CalcularBoundsSelecionados();
+                    var bounds =
+                        CalcularBoundsSelecionados();
 
                     hud.AtualizarPosicao(bounds);
                 }
@@ -251,7 +254,8 @@ namespace Araci.Applications.Editar.Selecionar
 
             if (_arrastandoElementos)
             {
-                _context.Move.EndMove(_context.Selection.Selecionados.ToList());
+                _context.Move.EndMove(
+                    _context.Selection.Selecionados.ToList());
 
                 _context.MoveHud.Visivel = false;
 
@@ -264,7 +268,8 @@ namespace Araci.Applications.Editar.Selecionar
 
             if (_selecionandoJanela)
             {
-                var rect = _context.SelectionBox.Bounds;
+                var rect =
+                    _context.SelectionBox.Bounds;
 
                 if (_context.Viewport != null)
                 {
@@ -299,20 +304,29 @@ namespace Araci.Applications.Editar.Selecionar
 
         private Rect CalcularBoundsSelecionados()
         {
-            var items = _context.Selection.Selecionados;
+            var items =
+                _context.Selection.Selecionados;
 
             if (items.Count == 0)
                 return Rect.Empty;
 
-            double minX = items.Min(i => i.Bounds.Left);
+            double minX =
+                items.Min(i => i.Bounds.Left);
 
-            double minY = items.Min(i => i.Bounds.Top);
+            double minY =
+                items.Min(i => i.Bounds.Top);
 
-            double maxX = items.Max(i => i.Bounds.Right);
+            double maxX =
+                items.Max(i => i.Bounds.Right);
 
-            double maxY = items.Max(i => i.Bounds.Bottom);
+            double maxY =
+                items.Max(i => i.Bounds.Bottom);
 
-            return new Rect(minX, minY, maxX - minX, maxY - minY);
+            return new Rect(
+                minX,
+                minY,
+                maxX - minX,
+                maxY - minY);
         }
 
         private Point ScreenToWorld(
