@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 
 using Araci.Models;
 using Araci.ViewModels;
@@ -11,7 +11,8 @@ namespace Araci.Services
         // VIEWMODEL
         // =========================
 
-        public static ElementoViewModel? CriarViewModel(Elemento modelo)
+        public static ElementoViewModel? CriarViewModel(
+            Elemento modelo)
         {
             return modelo switch
             {
@@ -29,27 +30,72 @@ namespace Araci.Services
         // CABO
         // =========================
 
+        public static Cabo CriarCabo()
+        {
+            var cabo =
+                new Cabo
+                {
+                    Tipo =
+                        AppServices.Types.TipoCaboPadrao
+                        ?? throw new InvalidOperationException(
+                            "Nenhum tipo de cabo cadastrado.")
+                };
+
+            return cabo;
+        }
+
         public static CaboViewModel CriarCaboVM()
         {
-            return new CaboViewModel(new Cabo());
+            return new CaboViewModel(
+                CriarCabo());
         }
 
         // =========================
         // CARGA
         // =========================
 
+        public static Carga CriarCarga()
+        {
+            var carga =
+                new Carga
+                {
+                    Tipo =
+                        AppServices.Types.TipoCargaPadrao
+                        ?? throw new InvalidOperationException(
+                            "Nenhum tipo de carga cadastrado.")
+                };
+
+            return carga;
+        }
+
         public static CargaViewModel CriarCargaVM()
         {
-            return new CargaViewModel(new Carga());
+            return new CargaViewModel(
+                CriarCarga());
         }
 
         // =========================
         // GERADOR
         // =========================
 
+        public static Gerador CriarGerador()
+        {
+            var gerador =
+                new Gerador
+                {
+                    Tipo =
+                        AppServices.Types.TipoGeradorPadrao
+                        ?? throw new InvalidOperationException(
+                            "Nenhum tipo de gerador cadastrado.")
+                };
+
+            return gerador;
+        }
+
         public static GeradorViewModel CriarGeradorVM()
         {
-            return new GeradorViewModel(new Gerador());
+            return new GeradorViewModel(
+                CriarGerador());
         }
     }
 }

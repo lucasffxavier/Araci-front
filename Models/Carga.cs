@@ -40,8 +40,6 @@ namespace Araci.Models
 
             PosicaoX = 500;
             PosicaoY = 250;
-
-            Tipo = new TipoCarga();
         }
 
         // =========================

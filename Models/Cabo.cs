@@ -47,8 +47,6 @@ namespace Araci.Models
 
             PosicaoX2 = 400;
             PosicaoY2 = 100;
-
-            Tipo = new TipoCabo();
         }
 
         // =========================

@@ -46,6 +46,19 @@ namespace Araci.Services
         }
 
         // ====================================================
+        // PADRÕES
+        // ====================================================
+
+        public TipoCabo? TipoCaboPadrao =>
+            TiposCabos.FirstOrDefault();
+
+        public TipoCarga? TipoCargaPadrao =>
+            TiposCargas.FirstOrDefault();
+
+        public TipoGerador? TipoGeradorPadrao =>
+            TiposGeradores.FirstOrDefault();
+
+        // ====================================================
         // CABOS
         // ====================================================
 

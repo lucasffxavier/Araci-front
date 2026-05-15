@@ -41,8 +41,6 @@ namespace Araci.Models
 
             PosicaoX = 300;
             PosicaoY = 200;
-
-            Tipo = new TipoGerador();
         }
 
         // =========================
