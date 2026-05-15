@@ -2,6 +2,7 @@ using System;
 using System.Collections.ObjectModel;
 using System.Windows;
 
+using Araci.Core.Viewport;
 using Araci.ViewModels;
 
 namespace Araci.Services
@@ -34,6 +35,14 @@ namespace Araci.Services
                 _vm.Elementos;
 
         // =========================
+        // CAMERA
+        // =========================
+
+        public Camera Camera
+        { get; }
+            = new Camera();
+
+        // =========================
         // TAMANHO
         // =========================
 
@@ -51,6 +60,18 @@ namespace Araci.Services
                 0,
                 Largura,
                 Altura);
+
+        public Point WorldToScreen(
+            Point point)
+        {
+            return Camera.WorldToScreen(point);
+        }
+
+        public Point ScreenToWorld(
+            Point point)
+        {
+            return Camera.ScreenToWorld(point);
+        }
 
         // =========================
         // VIEWPORT
