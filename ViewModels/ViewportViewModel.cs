@@ -5,6 +5,7 @@ using System.ComponentModel;
 using System.Runtime.CompilerServices;
 
 using Araci.Core.Documents;
+using Araci.Core.Scenes;
 using Araci.Models;
 using Araci.Services;
 
@@ -25,22 +26,31 @@ namespace Araci.ViewModels
         { get; }
 
         // =========================
+        // SCENE
+        // =========================
+
+        public Scene Scene
+        { get; }
+
+        // =========================
         // ELEMENTOS VISUAIS
         // =========================
 
         public ObservableCollection<ElementoViewModel>
             Elementos
-        { get; }
-            = new();
+            => Scene.Elementos;
 
         // =========================
         // CONSTRUTOR
         // =========================
 
         public ViewportViewModel(
-            AraciDocument document)
+            AraciDocument document,
+            Scene scene)
         {
             Document = document;
+
+            Scene = scene;
 
             Document.Elementos.CollectionChanged +=
                 OnDocumentElementosChanged;

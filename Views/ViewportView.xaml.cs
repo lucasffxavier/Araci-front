@@ -22,23 +22,24 @@ namespace Araci.Views
             _context =
                 AppServices.Current;
 
-            if (AppServices.Document == null)
+            if (_context.Document == null)
             {
-                AppServices.Document =
+                _context.Document =
                     new Core.Documents.AraciDocument();
             }
 
             _viewportViewModel =
                 new ViewportViewModel(
-                    AppServices.Document);
+                    _context.Document,
+                    _context.Scene);
 
             DataContext = _viewportViewModel;
 
-            AppServices.Viewport =
+            _context.Viewport =
                 new ViewportService(
                     _viewportViewModel);
 
-            AppServices.ViewportReference = this;
+            _context.ViewportReference = this;
         }
 
         // =========================
@@ -65,7 +66,7 @@ namespace Araci.Views
 
         private void AtualizarViewport()
         {
-            if (AppServices.Viewport == null)
+            if (_context.Viewport == null)
                 return;
 
             double larguraReal = ActualWidth;
@@ -87,7 +88,7 @@ namespace Araci.Views
 
             alturaReal = Math.Max(0, alturaReal);
 
-            AppServices.Viewport.AtualizarTamanho(
+            _context.Viewport.AtualizarTamanho(
                 new Size(
                     larguraReal,
                     alturaReal));

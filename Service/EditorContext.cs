@@ -2,6 +2,7 @@ using System.Windows;
 
 using Araci.Core.Commands;
 using Araci.Core.Documents;
+using Araci.Core.Scenes;
 using Araci.Core.Transactions;
 using Araci.ViewModels;
 
@@ -32,6 +33,14 @@ namespace Araci.Services
         public AraciDocument Document
         { get; set; }
             = new AraciDocument();
+
+        // =========================
+        // SCENE
+        // =========================
+
+        public Scene Scene
+        { get; }
+            = new Scene();
 
         // =========================
         // TOOLS
