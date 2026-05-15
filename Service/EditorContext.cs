@@ -20,6 +20,9 @@ namespace Araci.Services
 
             Tools =
                 new ToolService(this);
+
+            Input =
+                new InputRouter(this);
         }
 
         // =========================
@@ -35,6 +38,13 @@ namespace Araci.Services
         // =========================
 
         public ToolService Tools
+        { get; }
+
+        // =========================
+        // INPUT
+        // =========================
+
+        public InputRouter Input
         { get; }
 
         // =========================

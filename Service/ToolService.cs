@@ -1,10 +1,6 @@
 ﻿using System;
-using System.Windows;
-using System.Windows.Input;
-
 using Araci.Applications.Editar.Base;
 using Araci.Applications.Editar.Selecionar;
-using Araci.ViewModels;
 
 namespace Araci.Services
 {
@@ -101,88 +97,5 @@ namespace Araci.Services
                 .MantemBotaoAtivado;
         }
 
-        // =========================
-        // MOUSE DOWN
-        // =========================
-
-        public void HandleMouseDown(ElementoViewModel? vm, Point pos)
-        {
-            _ferramentaAtual.OnMouseDown(vm, pos);
-        }
-
-        // =========================
-        // MOUSE MOVE
-        // =========================
-
-        public void HandleMouseMove(Point pos)
-        {
-            _ferramentaAtual.OnMouseMove(pos);
-        }
-
-        // =========================
-        // MOUSE UP
-        // =========================
-
-        public void HandleMouseUp(Point pos)
-        {
-            _ferramentaAtual.OnMouseUp(pos);
-        }
-
-        // =========================
-        // KEYBOARD
-        // =========================
-
-        public void HandleKeyDown(Key key)
-        {
-            // =========================
-            // UNDO
-            // =========================
-
-            if (Keyboard.Modifiers == ModifierKeys.Control && key == Key.Z)
-            {
-                _context.Commands.Undo();
-
-                return;
-            }
-
-            // =========================
-            // REDO
-            // =========================
-
-            if (Keyboard.Modifiers == ModifierKeys.Control && key == Key.Y)
-            {
-                _context.Commands.Redo();
-
-                return;
-            }
-
-            // =========================
-            // COPY
-            // =========================
-
-            if (Keyboard.Modifiers == ModifierKeys.Control && key == Key.C)
-            {
-                ClipboardService.CopiarSelecionados(_context);
-
-                return;
-            }
-
-            // =========================
-            // PASTE
-            // =========================
-
-            if (Keyboard.Modifiers == ModifierKeys.Control && key == Key.V)
-            {
-                ClipboardService.Colar(_context);
-
-                return;
-            }
-
-            // =========================
-            // DISPATCH TOOL
-            // =========================
-
-            _ferramentaAtual.OnKeyDown(key);
-        }
     }
 }

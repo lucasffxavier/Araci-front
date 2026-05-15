@@ -88,9 +88,16 @@ namespace Araci.Applications.Editar.Selecionar
         // MOUSE DOWN
         // =========================
 
-        public void OnMouseDown(ElementoViewModel? vm, Point position)
+        public void OnMouseDown(
+            ElementoViewModel? vm,
+            Point position,
+            ToolInputState inputState)
         {
-            bool ctrl = Keyboard.Modifiers.HasFlag(ModifierKeys.Control);
+            Point worldPosition =
+                ScreenToWorld(position);
+
+            bool ctrl =
+                inputState.IsControlPressed;
 
             // =========================
             // CLIQUE EM ELEMENTO
@@ -112,9 +119,9 @@ namespace Araci.Applications.Editar.Selecionar
 
                 _arrastandoElementos = true;
 
-                _ultimoPontoMouse = position;
+                _ultimoPontoMouse = worldPosition;
 
-                _pontoInicialArrasto = position;
+                _pontoInicialArrasto = worldPosition;
 
                 _context.Move.BeginMove(_context.Selection.Selecionados);
 
@@ -152,13 +159,15 @@ namespace Araci.Applications.Editar.Selecionar
                 _context.Selection.Limpar();
             }
 
-            _inicioJanela = position;
+            _inicioJanela = worldPosition;
 
             _selecionandoJanela = true;
 
             _context.SelectionBox.Visivel = true;
 
-            _context.SelectionBox.Atualizar(position, position);
+            _context.SelectionBox.Atualizar(
+                worldPosition,
+                worldPosition);
         }
 
         // =========================
@@ -167,13 +176,17 @@ namespace Araci.Applications.Editar.Selecionar
 
         public void OnMouseMove(Point position)
         {
+            Point worldPosition =
+                ScreenToWorld(position);
+
             // =========================
             // ARRASTO
             // =========================
 
             if (_arrastandoElementos)
             {
-                Vector delta = position - _ultimoPontoMouse;
+                Vector delta =
+                    worldPosition - _ultimoPontoMouse;
 
                 if (delta.X != 0 || delta.Y != 0)
                 {
@@ -189,7 +202,8 @@ namespace Araci.Applications.Editar.Selecionar
 
                 if (_mostrarHud)
                 {
-                    var deltaTotal = position - _pontoInicialArrasto;
+                    var deltaTotal =
+                        worldPosition - _pontoInicialArrasto;
 
                     var hud = _context.MoveHud;
 
@@ -202,7 +216,7 @@ namespace Araci.Applications.Editar.Selecionar
                     hud.AtualizarPosicao(bounds);
                 }
 
-                _ultimoPontoMouse = position;
+                _ultimoPontoMouse = worldPosition;
 
                 return;
             }
@@ -213,7 +227,9 @@ namespace Araci.Applications.Editar.Selecionar
 
             if (_selecionandoJanela)
             {
-                _context.SelectionBox.Atualizar(_inicioJanela, position);
+                _context.SelectionBox.Atualizar(
+                    _inicioJanela,
+                    worldPosition);
             }
         }
 
@@ -291,6 +307,14 @@ namespace Araci.Applications.Editar.Selecionar
             double maxY = items.Max(i => i.Bounds.Bottom);
 
             return new Rect(minX, minY, maxX - minX, maxY - minY);
+        }
+
+        private Point ScreenToWorld(
+            Point screenPosition)
+        {
+            return _context.Viewport
+                ?.ScreenToWorld(screenPosition)
+                ?? screenPosition;
         }
     }
 }

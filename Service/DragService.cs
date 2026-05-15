@@ -44,8 +44,8 @@ namespace Araci.Services
             _ultimoPonto =
                 e.GetPosition(Ref);
 
-            AppServices.Tools
-                .HandleMouseDown(
+            AppServices.Input
+                .MouseDown(
                     vm,
                     _ultimoPonto);
 
@@ -74,8 +74,8 @@ namespace Araci.Services
                 DragDelta?.Invoke(delta);
             }
 
-            AppServices.Tools
-                .HandleMouseMove(pos);
+            AppServices.Input
+                .MouseMove(pos);
         }
 
         private void MouseUp(
@@ -90,8 +90,8 @@ namespace Araci.Services
 
             _arrastando = false;
 
-            AppServices.Tools
-                .HandleMouseUp(pos);
+            AppServices.Input
+                .MouseUp(pos);
 
             _elemento.ReleaseMouseCapture();
         }

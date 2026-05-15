@@ -49,6 +49,13 @@ namespace Araci
             Current.Tools;
 
         // =========================
+        // INPUT
+        // =========================
+
+        public static InputRouter Input =>
+            Current.Input;
+
+        // =========================
         // VIEWPORT
         // =========================
 

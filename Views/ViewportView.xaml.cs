@@ -133,7 +133,9 @@ namespace Araci.Views
 
             var pos = GetPos(e);
 
-            AppServices.Tools.HandleMouseDown(vm, pos);
+            _context.Input.MouseDown(
+                vm,
+                pos);
         }
 
         // =========================
@@ -144,7 +146,7 @@ namespace Araci.Views
         {
             var pos = GetPos(e);
 
-            AppServices.Tools.HandleMouseMove(pos);
+            _context.Input.MouseMove(pos);
         }
 
         // =========================
@@ -155,7 +157,7 @@ namespace Araci.Views
         {
             var pos = GetPos(e);
 
-            AppServices.Tools.HandleMouseUp(pos);
+            _context.Input.MouseUp(pos);
         }
 
         // =========================
@@ -164,16 +166,8 @@ namespace Araci.Views
 
         private void OnPreviewKeyDown(object sender, KeyEventArgs e)
         {
-            AppServices.Tools.HandleKeyDown(e.Key);
-
-            if (e.Key == Key.Escape)
-            {
-                AppServices.Tools.VoltarParaSelecao();
-
-                _context.Selection.Limpar();
-
-                e.Handled = true;
-            }
+            e.Handled =
+                _context.Input.KeyDown(e.Key);
         }
     }
 }

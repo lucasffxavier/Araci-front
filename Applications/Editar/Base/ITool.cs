@@ -10,7 +10,10 @@ namespace Araci.Applications.Editar.Base
 
         bool MantemBotaoAtivado { get; }
 
-        void OnMouseDown(ElementoViewModel? vm, Point position);
+        void OnMouseDown(
+            ElementoViewModel? vm,
+            Point position,
+            ToolInputState inputState);
         void OnMouseMove(Point position);
         void OnMouseUp(Point position);
 

@@ -29,7 +29,8 @@ namespace Araci.Applications.Editar.Deletar
 
         public void OnMouseDown(
             ElementoViewModel? vm,
-            Point position)
+            Point position,
+            ToolInputState inputState)
         {
             var selecionados =
                 _context.Selection

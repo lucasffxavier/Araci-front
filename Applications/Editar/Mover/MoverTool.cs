@@ -65,9 +65,15 @@ namespace Araci.Applications.Editar.Mover
         // MOUSE DOWN
         // =========================
 
-        public void OnMouseDown(ElementoViewModel? vm, Point position)
+        public void OnMouseDown(
+            ElementoViewModel? vm,
+            Point position,
+            ToolInputState inputState)
         {
-            _selecionarTool.OnMouseDown(vm, position);
+            _selecionarTool.OnMouseDown(
+                vm,
+                position,
+                inputState);
         }
 
         // =========================
