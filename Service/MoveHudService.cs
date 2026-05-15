@@ -7,6 +7,8 @@ namespace Araci.Services
     {
         private const double MARGEM = 10;
 
+        private readonly EditorContext _context;
+
         private bool _visivel;
         private double _x;
         private double _y;
@@ -14,6 +16,12 @@ namespace Araci.Services
         private double _deltaY;
 
         public event PropertyChangedEventHandler? PropertyChanged;
+
+        public MoveHudService(EditorContext context)
+        {
+            _context = context
+                ?? throw new System.ArgumentNullException(nameof(context));
+        }
 
         public bool Visivel
         {
@@ -87,16 +95,25 @@ namespace Araci.Services
         public void AtualizarPosicao(Rect bounds)
         {
             double viewportX =
-                AppServices.Viewport?.Largura ?? 1000;
+                _context.Viewport?.Largura ?? 1000;
 
             double viewportY =
-                AppServices.Viewport?.Altura ?? 800;
+                _context.Viewport?.Altura ?? 800;
+
+            Point worldPoint =
+                new(
+                    bounds.X + bounds.Width / 2,
+                    bounds.Y - 20);
+
+            Point screenPoint =
+                _context.Viewport?.WorldToScreen(worldPoint)
+                ?? worldPoint;
 
             double novoX =
-                bounds.X + bounds.Width / 2;
+                screenPoint.X;
 
             double novoY =
-                bounds.Y - 20; // acima do elemento
+                screenPoint.Y;
 
             // CLAMP VIEWPORT
             novoX = Math.Max(MARGEM, Math.Min(novoX, viewportX - MARGEM));

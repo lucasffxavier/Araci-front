@@ -16,8 +16,13 @@ namespace Araci.Applications.Diagrama.InserirCarga
                 ElementoFactory
                     .CriarCargaVM();
 
-            AppServices.Commands.Execute(
-                new AddElementoCommand(vm));
+            var context =
+                AppServices.Current;
+
+            context.Commands.Execute(
+                new AddElementoCommand(
+                    vm,
+                    context));
         }
     }
 }

@@ -116,6 +116,13 @@ namespace Araci
             Current.Move;
 
         // =========================
+        // SNAP
+        // =========================
+
+        public static SnapService Snap =>
+            Current.Snap;
+
+        // =========================
         // TRANSACTIONS
         // =========================
 

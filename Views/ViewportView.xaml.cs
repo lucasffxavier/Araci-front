@@ -2,6 +2,7 @@
 using Araci.ViewModels;
 
 using System;
+using System.ComponentModel;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
@@ -14,6 +15,9 @@ namespace Araci.Views
         private readonly ViewportViewModel _viewportViewModel;
 
         private readonly EditorContext _context;
+
+        private readonly MatrixTransform _cameraTransform =
+            new();
 
         public ViewportView()
         {
@@ -37,9 +41,58 @@ namespace Araci.Views
 
             _context.Viewport =
                 new ViewportService(
-                    _viewportViewModel);
+                    _viewportViewModel,
+                    _context);
 
             _context.ViewportReference = this;
+
+            ConfigurarCamera();
+        }
+
+        // =========================
+        // CAMERA
+        // =========================
+
+        private void ConfigurarCamera()
+        {
+            if (_context.Viewport == null)
+                return;
+
+            WorldLayer.RenderTransform =
+                _cameraTransform;
+
+            SelectionLayer.RenderTransform =
+                _cameraTransform;
+
+            _context.Viewport.Camera.PropertyChanged +=
+                OnCameraChanged;
+
+            AtualizarCameraTransform();
+        }
+
+        private void OnCameraChanged(
+            object? sender,
+            PropertyChangedEventArgs e)
+        {
+            AtualizarCameraTransform();
+        }
+
+        private void AtualizarCameraTransform()
+        {
+            if (_context.Viewport == null)
+                return;
+
+            var camera =
+                _context.Viewport.Camera;
+
+            _cameraTransform.Matrix =
+                new Matrix(
+                    camera.Zoom,
+                    0,
+                    0,
+                    camera.Zoom,
+                    camera.Offset.X,
+                    camera.Offset.Y);
         }
 
         // =========================
@@ -137,6 +190,8 @@ namespace Araci.Views
             _context.Input.MouseDown(
                 vm,
                 pos);
+
+            CaptureMouse();
         }
 
         // =========================
@@ -159,6 +214,49 @@ namespace Araci.Views
             var pos = GetPos(e);
 
             _context.Input.MouseUp(pos);
+
+            if (IsMouseCaptured)
+            {
+                ReleaseMouseCapture();
+            }
+        }
+
+        // =========================
+        // ZOOM
+        // =========================
+
+        private void OnPreviewMouseWheel(object sender, MouseWheelEventArgs e)
+        {
+            if (_context.Viewport == null)
+                return;
+
+            var camera =
+                _context.Viewport.Camera;
+
+            Point cursor =
+                GetPos(e);
+
+            Point worldBefore =
+                camera.ScreenToWorld(cursor);
+
+            double factor =
+                e.Delta > 0
+                    ? 1.1
+                    : 1 / 1.1;
+
+            camera.Zoom =
+                Math.Max(
+                    0.1,
+                    Math.Min(
+                        8,
+                        camera.Zoom * factor));
+
+            camera.Offset =
+                new Point(
+                    cursor.X - worldBefore.X * camera.Zoom,
+                    cursor.Y - worldBefore.Y * camera.Zoom);
+
+            e.Handled = true;
         }
 
         // =========================

@@ -71,7 +71,10 @@ namespace Araci.Services
 
                 novos.Add(vm);
 
-                transaction.Add(new AddElementoCommand(vm));
+                transaction.Add(
+                    new AddElementoCommand(
+                        vm,
+                        editorContext));
             }
 
             transaction.Commit();

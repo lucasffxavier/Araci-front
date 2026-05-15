@@ -119,6 +119,9 @@ namespace Araci.Applications.Editar.Selecionar
 
                 _arrastandoElementos = true;
 
+                worldPosition =
+                    _context.Snap.SnapPoint(worldPosition);
+
                 _ultimoPontoMouse = worldPosition;
 
                 _pontoInicialArrasto = worldPosition;
@@ -185,6 +188,9 @@ namespace Araci.Applications.Editar.Selecionar
 
             if (_arrastandoElementos)
             {
+                worldPosition =
+                    _context.Snap.SnapPoint(worldPosition);
+
                 Vector delta =
                     worldPosition - _ultimoPontoMouse;
 

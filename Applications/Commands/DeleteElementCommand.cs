@@ -36,14 +36,14 @@ namespace Araci.Core.Commands
 
         public void Execute()
         {
-            if (AppServices.Viewport != null)
+            if (_context.Viewport != null)
             {
-                AppServices.Viewport
+                _context.Viewport
                     .RemoverElemento(_vm);
             }
             else
             {
-                AppServices.Document
+                _context.Document
                     .RemoverElemento(_vm.Modelo);
             }
 
@@ -57,15 +57,15 @@ namespace Araci.Core.Commands
 
         public void Undo()
         {
-            if (AppServices.Viewport != null)
+            if (_context.Viewport != null)
             {
-                AppServices.Viewport
+                _context.Viewport
                     .AdicionarElemento(_vm);
 
                 return;
             }
 
-            AppServices.Document
+            _context.Document
                 .AdicionarElemento(_vm.Modelo);
         }
 

@@ -7,6 +7,14 @@ namespace Araci.Services
 {
     public class SelectionService
     {
+        private readonly EditorContext _context;
+
+        public SelectionService(EditorContext context)
+        {
+            _context = context
+                ?? throw new System.ArgumentNullException(nameof(context));
+        }
+
         // =========================
         // SELECIONADOS
         // =========================
@@ -52,7 +60,7 @@ namespace Araci.Services
             {
                 vm.IsSelecionado = true;
 
-                AppServices.Editor
+                _context.Editor
                     .ElementoSelecionado = vm;
 
                 return;
@@ -66,7 +74,7 @@ namespace Araci.Services
 
             Selecionados.Add(vm);
 
-            AppServices.Editor
+            _context.Editor
                 .ElementoSelecionado = vm;
         }
 
@@ -90,7 +98,7 @@ namespace Araci.Services
 
             Selecionados.Remove(vm);
 
-            AppServices.Editor
+            _context.Editor
                 .ElementoSelecionado =
                     Principal;
         }
@@ -129,7 +137,7 @@ namespace Araci.Services
 
             Selecionados.Clear();
 
-            AppServices.Editor
+            _context.Editor
                 .ElementoSelecionado = null;
         }
 

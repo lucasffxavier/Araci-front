@@ -16,6 +16,12 @@ namespace Araci.Services
 
         public EditorContext()
         {
+            Selection =
+                new SelectionService(this);
+
+            MoveHud =
+                new MoveHudService(this);
+
             Move =
                 new MoveService(this);
 
@@ -82,7 +88,6 @@ namespace Araci.Services
 
         public MoveHudService MoveHud
         { get; }
-            = new MoveHudService();
 
         // =========================
         // SELECTION BOX
@@ -106,7 +111,6 @@ namespace Araci.Services
 
         public SelectionService Selection
         { get; }
-            = new SelectionService();
 
         // =========================
         // MOVE
@@ -114,6 +118,14 @@ namespace Araci.Services
 
         public MoveService Move
         { get; }
+
+        // =========================
+        // SNAP
+        // =========================
+
+        public SnapService Snap
+        { get; }
+            = new SnapService();
 
         // =========================
         // TYPES

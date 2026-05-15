@@ -12,8 +12,13 @@ namespace Araci.Applications.Diagrama.InserirCabo
                 ElementoFactory
                     .CriarCaboVM();
 
-            AppServices.Commands.Execute(
-                new AddElementoCommand(vm));
+            var context =
+                AppServices.Current;
+
+            context.Commands.Execute(
+                new AddElementoCommand(
+                    vm,
+                    context));
         }
     }
 }

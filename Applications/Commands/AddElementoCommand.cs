@@ -1,4 +1,5 @@
-﻿using Araci.ViewModels;
+using Araci.Services;
+using Araci.ViewModels;
 
 namespace Araci.Core.Commands
 {
@@ -12,14 +13,21 @@ namespace Araci.Core.Commands
         private readonly ElementoViewModel
             _elemento;
 
+        private readonly EditorContext
+            _context;
+
         // =========================
         // CONSTRUTOR
         // =========================
 
         public AddElementoCommand(
-            ElementoViewModel elemento)
+            ElementoViewModel elemento,
+            EditorContext? context = null)
         {
             _elemento = elemento;
+
+            _context = context
+                ?? AppServices.Current;
         }
 
         // =========================
@@ -28,15 +36,15 @@ namespace Araci.Core.Commands
 
         public void Execute()
         {
-            if (AppServices.Viewport != null)
+            if (_context.Viewport != null)
             {
-                AppServices.Viewport
+                _context.Viewport
                     .AdicionarElemento(_elemento);
 
                 return;
             }
 
-            AppServices.Document
+            _context.Document
                 .AdicionarElemento(_elemento.Modelo);
         }
 
@@ -46,15 +54,15 @@ namespace Araci.Core.Commands
 
         public void Undo()
         {
-            if (AppServices.Viewport != null)
+            if (_context.Viewport != null)
             {
-                AppServices.Viewport
+                _context.Viewport
                     .RemoverElemento(_elemento);
 
                 return;
             }
 
-            AppServices.Document
+            _context.Document
                 .RemoverElemento(_elemento.Modelo);
         }
 

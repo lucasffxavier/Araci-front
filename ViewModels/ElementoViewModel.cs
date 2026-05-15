@@ -278,17 +278,14 @@ namespace Araci.ViewModels
 
             set
             {
-                double valorLimitado =
-                    LimitarX(value);
-
-                if (Transform.X == valorLimitado)
+                if (Transform.X == value)
                     return;
 
                 Transform.X =
-                    valorLimitado;
+                    value;
 
                 _modelo.PosicaoX =
-                    valorLimitado;
+                    value;
 
                 AtualizarGeometria();
             }
@@ -300,17 +297,14 @@ namespace Araci.ViewModels
 
             set
             {
-                double valorLimitado =
-                    LimitarY(value);
-
-                if (Transform.Y == valorLimitado)
+                if (Transform.Y == value)
                     return;
 
                 Transform.Y =
-                    valorLimitado;
+                    value;
 
                 _modelo.PosicaoY =
-                    valorLimitado;
+                    value;
 
                 AtualizarGeometria();
             }
@@ -321,10 +315,10 @@ namespace Araci.ViewModels
         // ====================================================
 
         public virtual double ScreenX =>
-            Bounds.X;
+            WorldX;
 
         public virtual double ScreenY =>
-            Bounds.Y;
+            WorldY;
 
         // ====================================================
         // MOVIMENTO
@@ -336,42 +330,6 @@ namespace Araci.ViewModels
             X += delta.X;
 
             Y += delta.Y;
-        }
-
-        // ====================================================
-        // LIMITES VIEWPORT
-        // ====================================================
-
-        private double LimitarX(
-            double valor)
-        {
-            if (AppServices.Viewport == null)
-                return valor;
-
-            double max =
-                Math.Max(
-                    0,
-                    AppServices.Viewport.Largura - Largura);
-
-            return Math.Max(
-                0,
-                Math.Min(valor, max));
-        }
-
-        private double LimitarY(
-            double valor)
-        {
-            if (AppServices.Viewport == null)
-                return valor;
-
-            double max =
-                Math.Max(
-                    0,
-                    AppServices.Viewport.Altura - Altura);
-
-            return Math.Max(
-                0,
-                Math.Min(valor, max));
         }
 
         // ====================================================
