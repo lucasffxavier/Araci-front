@@ -3,6 +3,7 @@ using System.Collections.ObjectModel;
 using System.Collections.Specialized;
 using System.ComponentModel;
 using System.Runtime.CompilerServices;
+using System;
 
 using Araci.Core.Documents;
 using Araci.Core.Scenes;
@@ -32,6 +33,12 @@ namespace Araci.ViewModels
         public Scene Scene
         { get; }
 
+        public SelectionBoxViewModel SelectionBox
+        { get; }
+
+        public MoveHudService MoveHud
+        { get; }
+
         // =========================
         // ELEMENTOS VISUAIS
         // =========================
@@ -45,12 +52,21 @@ namespace Araci.ViewModels
         // =========================
 
         public ViewportViewModel(
-            AraciDocument document,
-            Scene scene)
+            EditorContext context)
         {
-            Document = document;
+            ArgumentNullException.ThrowIfNull(context);
 
-            Scene = scene;
+            Document =
+                context.Document;
+
+            Scene =
+                context.Scene;
+
+            SelectionBox =
+                context.SelectionBox;
+
+            MoveHud =
+                context.MoveHud;
 
             Document.Elementos.CollectionChanged +=
                 OnDocumentElementosChanged;

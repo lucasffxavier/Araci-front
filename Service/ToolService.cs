@@ -25,11 +25,6 @@ namespace Araci.Services
         // CONSTRUTOR
         // =========================
 
-        public ToolService()
-            : this(AppServices.Current)
-        {
-        }
-
         public ToolService(EditorContext context)
         {
             _context = context

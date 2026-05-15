@@ -28,8 +28,6 @@ namespace Araci.Controls.Base
             nameof(ElementoViewModel.Y),
             nameof(ElementoViewModel.WorldX),
             nameof(ElementoViewModel.WorldY),
-            nameof(ElementoViewModel.ScreenX),
-            nameof(ElementoViewModel.ScreenY),
             nameof(ElementoViewModel.Largura),
             nameof(ElementoViewModel.Altura),
             nameof(ElementoViewModel.Bounds),

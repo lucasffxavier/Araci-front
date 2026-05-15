@@ -22,12 +22,12 @@ namespace Araci.Core.Commands
 
         public DeleteElementCommand(
             ElementoViewModel vm,
-            EditorContext? context = null)
+            EditorContext context)
         {
             _vm = vm;
 
             _context = context
-                ?? AppServices.Current;
+                ?? throw new System.ArgumentNullException(nameof(context));
         }
 
         // =========================
@@ -36,16 +36,8 @@ namespace Araci.Core.Commands
 
         public void Execute()
         {
-            if (_context.Viewport != null)
-            {
-                _context.Viewport
-                    .RemoverElemento(_vm);
-            }
-            else
-            {
-                _context.Document
-                    .RemoverElemento(_vm.Modelo);
-            }
+            _context.Document
+                .RemoverElemento(_vm.Modelo);
 
             _context.Selection
                 .Deselecionar(_vm);
@@ -57,13 +49,8 @@ namespace Araci.Core.Commands
 
         public void Undo()
         {
-            if (_context.Viewport != null)
-            {
-                _context.Viewport
-                    .AdicionarElemento(_vm);
-
-                return;
-            }
+            _context.Viewport
+                ?.RegistrarViewModel(_vm);
 
             _context.Document
                 .AdicionarElemento(_vm.Modelo);

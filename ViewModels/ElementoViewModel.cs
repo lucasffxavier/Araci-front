@@ -247,10 +247,6 @@ namespace Araci.ViewModels
 
             OnPropertyChanged(nameof(WorldY));
 
-            OnPropertyChanged(nameof(ScreenX));
-
-            OnPropertyChanged(nameof(ScreenY));
-
             OnPropertyChanged(nameof(Largura));
 
             OnPropertyChanged(nameof(Altura));
@@ -309,16 +305,6 @@ namespace Araci.ViewModels
                 AtualizarGeometria();
             }
         }
-
-        // ====================================================
-        // POSIÇÃO EM TELA
-        // ====================================================
-
-        public virtual double ScreenX =>
-            WorldX;
-
-        public virtual double ScreenY =>
-            WorldY;
 
         // ====================================================
         // MOVIMENTO

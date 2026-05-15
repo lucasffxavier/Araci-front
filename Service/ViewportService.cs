@@ -15,21 +15,15 @@ namespace Araci.Services
 
         private readonly ViewportViewModel _vm;
 
-        private readonly EditorContext _context;
-
         // =========================
         // CONSTRUTOR
         // =========================
 
         public ViewportService(
-            ViewportViewModel vm,
-            EditorContext context)
+            ViewportViewModel vm)
         {
             _vm = vm
                 ?? throw new ArgumentNullException(nameof(vm));
-
-            _context = context
-                ?? throw new ArgumentNullException(nameof(context));
         }
 
         // =========================
@@ -101,26 +95,13 @@ namespace Araci.Services
         // ELEMENTOS
         // =========================
 
-        public void AdicionarElemento(
+        public void RegistrarViewModel(
             ElementoViewModel vm)
         {
             if (vm == null)
                 return;
 
             _vm.RegistrarViewModel(vm);
-
-            _context.Document
-                .AdicionarElemento(vm.Modelo);
-        }
-
-        public void RemoverElemento(
-            ElementoViewModel vm)
-        {
-            if (vm == null)
-                return;
-
-            _context.Document
-                .RemoverElemento(vm.Modelo);
         }
     }
 }

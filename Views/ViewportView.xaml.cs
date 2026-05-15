@@ -34,19 +34,19 @@ namespace Araci.Views
 
             _viewportViewModel =
                 new ViewportViewModel(
-                    _context.Document,
-                    _context.Scene);
+                    _context);
 
             DataContext = _viewportViewModel;
 
             _context.Viewport =
                 new ViewportService(
-                    _viewportViewModel,
-                    _context);
+                    _viewportViewModel);
 
             _context.ViewportReference = this;
 
             ConfigurarCamera();
+
+            Unloaded += OnUnloaded;
         }
 
         // =========================
@@ -75,6 +75,17 @@ namespace Araci.Views
             PropertyChangedEventArgs e)
         {
             AtualizarCameraTransform();
+        }
+
+        private void OnUnloaded(
+            object sender,
+            RoutedEventArgs e)
+        {
+            if (_context.Viewport != null)
+            {
+                _context.Viewport.Camera.PropertyChanged -=
+                    OnCameraChanged;
+            }
         }
 
         private void AtualizarCameraTransform()

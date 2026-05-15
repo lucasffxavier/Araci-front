@@ -22,12 +22,12 @@ namespace Araci.Core.Commands
 
         public AddElementoCommand(
             ElementoViewModel elemento,
-            EditorContext? context = null)
+            EditorContext context)
         {
             _elemento = elemento;
 
             _context = context
-                ?? AppServices.Current;
+                ?? throw new System.ArgumentNullException(nameof(context));
         }
 
         // =========================
@@ -36,13 +36,8 @@ namespace Araci.Core.Commands
 
         public void Execute()
         {
-            if (_context.Viewport != null)
-            {
-                _context.Viewport
-                    .AdicionarElemento(_elemento);
-
-                return;
-            }
+            _context.Viewport
+                ?.RegistrarViewModel(_elemento);
 
             _context.Document
                 .AdicionarElemento(_elemento.Modelo);
@@ -54,14 +49,6 @@ namespace Araci.Core.Commands
 
         public void Undo()
         {
-            if (_context.Viewport != null)
-            {
-                _context.Viewport
-                    .RemoverElemento(_elemento);
-
-                return;
-            }
-
             _context.Document
                 .RemoverElemento(_elemento.Modelo);
         }
