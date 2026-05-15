@@ -47,37 +47,20 @@
             Nome = "CB-01";
 
             BarraOrigem = "BUS-01";
-
             BarraDestino = "BUS-02";
 
             Comprimento = 120;
 
-            // =========================
-            // PONTO INICIAL
-            // =========================
-
             PosicaoX = 100;
-
             PosicaoY = 100;
 
-            // =========================
-            // PONTO FINAL
-            // =========================
-
             PosicaoX2 = 400;
-
             PosicaoY2 = 100;
-
-            // =========================
-            // TIPO
-            // =========================
 
             TipoCabo = "LC-500MCM";
 
             Resistencia = 0.12;
-
             Reatancia = 0.09;
-
             Capacitancia = 0.001;
 
             Ampacidade = 520;
@@ -87,8 +70,39 @@
             Neutro = true;
 
             Categoria = "Cabos";
-
             Familia = "Cabos";
+        }
+
+        // =========================
+        // CLONAGEM
+        // =========================
+
+        public override Elemento Clonar()
+        {
+            var clone = new Cabo();
+
+            CopiarBasePara(clone);
+
+            clone.BarraOrigem = BarraOrigem;
+            clone.BarraDestino = BarraDestino;
+
+            clone.Comprimento = Comprimento;
+
+            clone.PosicaoX2 = PosicaoX2;
+            clone.PosicaoY2 = PosicaoY2;
+
+            clone.TipoCabo = TipoCabo;
+
+            clone.Resistencia = Resistencia;
+            clone.Reatancia = Reatancia;
+            clone.Capacitancia = Capacitancia;
+
+            clone.Ampacidade = Ampacidade;
+
+            clone.Fases = Fases;
+            clone.Neutro = Neutro;
+
+            return clone;
         }
     }
 }

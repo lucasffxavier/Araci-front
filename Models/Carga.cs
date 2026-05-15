@@ -14,7 +14,6 @@
 
         public double PotenciaReativaKvar { get; set; }
 
-
         // =========================
         // TIPO
         // =========================
@@ -38,15 +37,12 @@
             Nome = "LOAD-01";
 
             Barra = "BUS-03";
-
             Alimentador = "AL-01";
 
             PotenciaAtivaKW = 1500;
-
             PotenciaReativaKvar = 450;
 
             PosicaoX = 500;
-
             PosicaoY = 250;
 
             ModeloCarga = "Potência Constante";
@@ -60,8 +56,35 @@
             FatorPotencia = 0.96;
 
             Categoria = "Cargas";
-
             Familia = "Cargas";
+        }
+
+        // =========================
+        // CLONAGEM
+        // =========================
+
+        public override Elemento Clonar()
+        {
+            var clone = new Carga();
+
+            CopiarBasePara(clone);
+
+            clone.Barra = Barra;
+            clone.Alimentador = Alimentador;
+
+            clone.PotenciaAtivaKW = PotenciaAtivaKW;
+            clone.PotenciaReativaKvar = PotenciaReativaKvar;
+
+            clone.ModeloCarga = ModeloCarga;
+            clone.Conexao = Conexao;
+
+            clone.TensaoKV = TensaoKV;
+
+            clone.Fases = Fases;
+
+            clone.FatorPotencia = FatorPotencia;
+
+            return clone;
         }
     }
 }

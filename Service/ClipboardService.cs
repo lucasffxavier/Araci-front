@@ -1,6 +1,4 @@
 ﻿using System.Collections.Generic;
-using System.Linq;
-using System.Windows;
 
 using Araci.Core.Commands;
 using Araci.Models;
@@ -34,12 +32,7 @@ namespace Araci.Services
 
             foreach (var item in SelectionService.Selecionados)
             {
-                var clone = ClonarModelo(item.Modelo);
-
-                if (clone != null)
-                {
-                    _buffer.Add(clone);
-                }
+                _buffer.Add(item.Modelo.Clonar());
             }
         }
 
@@ -56,202 +49,71 @@ namespace Araci.Services
 
             using var transaction = AppServices.BeginTransaction();
 
-            foreach (var modelo in _buffer)
+            foreach (var item in _buffer)
             {
-                var cloneModelo = ClonarModelo(modelo);
+                var clone = item.Clonar();
 
-                if (cloneModelo == null)
-                    continue;
+                AplicarOffset(clone);
 
-                cloneModelo.PosicaoX += OFFSET_X;
-                cloneModelo.PosicaoY += OFFSET_Y;
-
-                if (cloneModelo is Cabo cabo)
-                {
-                    cabo.PosicaoX2 += OFFSET_X;
-                    cabo.PosicaoY2 += OFFSET_Y;
-                }
-
-                var vm = CriarViewModel(cloneModelo);
+                var vm = ElementoFactory.CriarViewModel(clone);
 
                 if (vm == null)
                     continue;
 
                 novos.Add(vm);
 
-                transaction.Add(
-                    new AddElementoCommand(vm));
+                transaction.Add(new AddElementoCommand(vm));
             }
 
             transaction.Commit();
 
+            AtualizarSelecao(novos);
+
+            AtualizarBuffer(novos);
+        }
+
+        // =========================
+        // OFFSET
+        // =========================
+
+        private static void AplicarOffset(Elemento elemento)
+        {
+            elemento.PosicaoX += OFFSET_X;
+            elemento.PosicaoY += OFFSET_Y;
+
+            if (elemento is Cabo cabo)
+            {
+                cabo.PosicaoX2 += OFFSET_X;
+                cabo.PosicaoY2 += OFFSET_Y;
+            }
+        }
+
+        // =========================
+        // SELEÇÃO
+        // =========================
+
+        private static void AtualizarSelecao(List<ElementoViewModel> elementos)
+        {
             SelectionService.Limpar();
 
-            foreach (var item in novos)
+            foreach (var item in elementos)
             {
                 SelectionService.Selecionar(item, true);
             }
+        }
 
+        // =========================
+        // BUFFER
+        // =========================
+
+        private static void AtualizarBuffer(List<ElementoViewModel> elementos)
+        {
             _buffer.Clear();
 
-            foreach (var item in novos)
+            foreach (var item in elementos)
             {
-                var clone = ClonarModelo(item.Modelo);
-
-                if (clone != null)
-                {
-                    _buffer.Add(clone);
-                }
+                _buffer.Add(item.Modelo.Clonar());
             }
-        }
-
-        // =========================
-        // CLONAR MODELO
-        // =========================
-
-        private static Elemento? ClonarModelo(Elemento modelo)
-        {
-            // =========================
-            // CABO
-            // =========================
-
-            if (modelo is Cabo cabo)
-            {
-                return new Cabo
-                {
-                    Id = System.Guid.NewGuid(),
-
-                    Nome = cabo.Nome,
-
-                    PosicaoX = cabo.PosicaoX,
-                    PosicaoY = cabo.PosicaoY,
-
-                    PosicaoX2 = cabo.PosicaoX2,
-                    PosicaoY2 = cabo.PosicaoY2,
-
-                    BarraOrigem = cabo.BarraOrigem,
-                    BarraDestino = cabo.BarraDestino,
-
-                    Comprimento = cabo.Comprimento,
-
-                    TipoCabo = cabo.TipoCabo,
-
-                    Resistencia = cabo.Resistencia,
-                    Reatancia = cabo.Reatancia,
-                    Capacitancia = cabo.Capacitancia,
-                    Ampacidade = cabo.Ampacidade,
-
-                    Fases = cabo.Fases,
-                    Neutro = cabo.Neutro,
-
-                    Categoria = cabo.Categoria,
-                    Familia = cabo.Familia,
-
-                    Rotacao = cabo.Rotacao,
-                    Escala = cabo.Escala
-                };
-            }
-
-            // =========================
-            // CARGA
-            // =========================
-
-            if (modelo is Carga carga)
-            {
-                return new Carga
-                {
-                    Id = System.Guid.NewGuid(),
-
-                    Nome = carga.Nome,
-
-                    PosicaoX = carga.PosicaoX,
-                    PosicaoY = carga.PosicaoY,
-
-                    Barra = carga.Barra,
-                    Alimentador = carga.Alimentador,
-
-                    PotenciaAtivaKW = carga.PotenciaAtivaKW,
-                    PotenciaReativaKvar = carga.PotenciaReativaKvar,
-
-                    ModeloCarga = carga.ModeloCarga,
-                    Conexao = carga.Conexao,
-
-                    TensaoKV = carga.TensaoKV,
-                    Fases = carga.Fases,
-
-                    FatorPotencia = carga.FatorPotencia,
-
-                    Categoria = carga.Categoria,
-                    Familia = carga.Familia,
-
-                    Rotacao = carga.Rotacao,
-                    Escala = carga.Escala
-                };
-            }
-
-            // =========================
-            // GERADOR
-            // =========================
-
-            if (modelo is Gerador gerador)
-            {
-                return new Gerador
-                {
-                    Id = System.Guid.NewGuid(),
-
-                    Nome = gerador.Nome,
-
-                    PosicaoX = gerador.PosicaoX,
-                    PosicaoY = gerador.PosicaoY,
-
-                    Barra = gerador.Barra,
-                    Alimentador = gerador.Alimentador,
-
-                    PotenciaAtivaKW = gerador.PotenciaAtivaKW,
-                    FatorPotencia = gerador.FatorPotencia,
-
-                    TipoGerador = gerador.TipoGerador,
-                    Fabricante = gerador.Fabricante,
-                    Modelo = gerador.Modelo,
-
-                    PotenciaNominalKW = gerador.PotenciaNominalKW,
-
-                    TensaoKV = gerador.TensaoKV,
-                    Fases = gerador.Fases,
-
-                    Categoria = gerador.Categoria,
-                    Familia = gerador.Familia,
-
-                    Rotacao = gerador.Rotacao,
-                    Escala = gerador.Escala
-                };
-            }
-
-            return null;
-        }
-
-        // =========================
-        // VIEWMODEL
-        // =========================
-
-        private static ElementoViewModel? CriarViewModel(Elemento modelo)
-        {
-            if (modelo is Cabo cabo)
-            {
-                return new CaboViewModel(cabo);
-            }
-
-            if (modelo is Carga carga)
-            {
-                return new CargaViewModel(carga);
-            }
-
-            if (modelo is Gerador gerador)
-            {
-                return new GeradorViewModel(gerador);
-            }
-
-            return null;
         }
     }
 }
