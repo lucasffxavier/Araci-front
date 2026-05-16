@@ -12,6 +12,7 @@ namespace Araci.Properties
         public PropertiesHostView()
         {
             InitializeComponent();
+
         }
     }
 }

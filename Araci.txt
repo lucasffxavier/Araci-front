@@ -54,6 +54,11 @@ Araci Engine
 │   │   └── MoveElementoCommand.cs
 │   ├── Documents
 │   │   └── AraciDocument.cs
+│   ├── Events
+│   │   ├── Editorevents.cs
+│   │   └── Eventbus.cs
+│   ├── Features
+│   │   └── Ifeaturemodule.cs
 │   ├── Rendering
 │   │   └── ElementoRenderData.cs
 │   ├── Scenes
@@ -241,64 +246,48 @@ public partial class App : Application
 ARQUIVO: C:\Araci-Engine-Front\Araci Engine\Applications\Commands\AddElementoCommand.cs
 ====================================================================================================
 
+using System;
+
+using Araci.Core.Events;
 using Araci.Services;
 using Araci.ViewModels;
 
 namespace Araci.Core.Commands
 {
-    public class AddElementoCommand
-        : IUndoableCommand
+    public class AddElementoCommand : IUndoableCommand
     {
-        // =========================
-        // ELEMENTO
-        // =========================
+        private readonly ElementoViewModel _elemento;
 
-        private readonly ElementoViewModel
-            _elemento;
-
-        private readonly EditorContext
-            _context;
-
-        // =========================
-        // CONSTRUTOR
-        // =========================
+        private readonly EditorContext _context;
 
         public AddElementoCommand(
             ElementoViewModel elemento,
             EditorContext context)
         {
-            _elemento = elemento;
+            _elemento = elemento
+                ?? throw new ArgumentNullException(nameof(elemento));
 
             _context = context
-                ?? throw new System.ArgumentNullException(nameof(context));
+                ?? throw new ArgumentNullException(nameof(context));
         }
-
-        // =========================
-        // EXECUTE
-        // =========================
 
         public void Execute()
         {
-            _context.Viewport
-                ?.RegistrarViewModel(_elemento);
+            _context.Document.AdicionarElemento(_elemento.Modelo);
 
-            _context.Document
-                .AdicionarElemento(_elemento.Modelo);
+            _context.Events.Publish(
+                new ElementoAdicionadoEvent(_elemento));
         }
-
-        // =========================
-        // UNDO
-        // =========================
 
         public void Undo()
         {
-            _context.Document
-                .RemoverElemento(_elemento.Modelo);
-        }
+            _context.Selection.Deselecionar(_elemento);
 
-        // =========================
-        // REDO
-        // =========================
+            _context.Document.RemoverElemento(_elemento.Modelo);
+
+            _context.Events.Publish(
+                new ElementoRemovidoEvent(_elemento));
+        }
 
         public void Redo()
         {
@@ -306,7 +295,6 @@ namespace Araci.Core.Commands
         }
     }
 }
-
 
 
 ====================================================================================================
@@ -450,67 +438,48 @@ namespace Araci.Core.Commands
 ARQUIVO: C:\Araci-Engine-Front\Araci Engine\Applications\Commands\DeleteElementCommand.cs
 ====================================================================================================
 
-﻿using Araci.Services;
+﻿using System;
+
+using Araci.Core.Events;
+using Araci.Services;
 using Araci.ViewModels;
 
 namespace Araci.Core.Commands
 {
-    public class DeleteElementCommand
-        : IUndoableCommand
+    public class DeleteElementCommand : IUndoableCommand
     {
-        // =========================
-        // ELEMENTO
-        // =========================
+        private readonly ElementoViewModel _vm;
 
-        private readonly ElementoViewModel
-            _vm;
-
-        private readonly EditorContext
-            _context;
-
-        // =========================
-        // CONSTRUTOR
-        // =========================
+        private readonly EditorContext _context;
 
         public DeleteElementCommand(
             ElementoViewModel vm,
             EditorContext context)
         {
-            _vm = vm;
+            _vm = vm
+                ?? throw new ArgumentNullException(nameof(vm));
 
             _context = context
-                ?? throw new System.ArgumentNullException(nameof(context));
+                ?? throw new ArgumentNullException(nameof(context));
         }
-
-        // =========================
-        // EXECUTE
-        // =========================
 
         public void Execute()
         {
-            _context.Document
-                .RemoverElemento(_vm.Modelo);
+            _context.Selection.Deselecionar(_vm);
 
-            _context.Selection
-                .Deselecionar(_vm);
+            _context.Document.RemoverElemento(_vm.Modelo);
+
+            _context.Events.Publish(
+                new ElementoRemovidoEvent(_vm));
         }
-
-        // =========================
-        // UNDO
-        // =========================
 
         public void Undo()
         {
-            _context.Viewport
-                ?.RegistrarViewModel(_vm);
+            _context.Document.AdicionarElemento(_vm.Modelo);
 
-            _context.Document
-                .AdicionarElemento(_vm.Modelo);
+            _context.Events.Publish(
+                new ElementoAdicionadoEvent(_vm));
         }
-
-        // =========================
-        // REDO
-        // =========================
 
         public void Redo()
         {
@@ -518,7 +487,6 @@ namespace Araci.Core.Commands
         }
     }
 }
-
 
 
 ====================================================================================================
@@ -1097,7 +1065,8 @@ namespace Araci.Applications.Editar.Selecionar
 
                 _pontoInicialArrasto = worldPosition;
 
-                _context.Move.BeginMove(_context.Selection.Selecionados);
+                _context.Move.BeginMove(
+                    _context.Selection.Selecionados);
 
                 // =========================
                 // HUD
@@ -1109,7 +1078,8 @@ namespace Araci.Applications.Editar.Selecionar
 
                     hud.Reset();
 
-                    var bounds = CalcularBoundsSelecionados();
+                    var bounds =
+                        CalcularBoundsSelecionados();
 
                     hud.AtualizarPosicao(bounds);
 
@@ -1188,7 +1158,8 @@ namespace Araci.Applications.Editar.Selecionar
 
                     hud.DeltaY = deltaTotal.Y;
 
-                    var bounds = CalcularBoundsSelecionados();
+                    var bounds =
+                        CalcularBoundsSelecionados();
 
                     hud.AtualizarPosicao(bounds);
                 }
@@ -1222,7 +1193,8 @@ namespace Araci.Applications.Editar.Selecionar
 
             if (_arrastandoElementos)
             {
-                _context.Move.EndMove(_context.Selection.Selecionados.ToList());
+                _context.Move.EndMove(
+                    _context.Selection.Selecionados.ToList());
 
                 _context.MoveHud.Visivel = false;
 
@@ -1235,7 +1207,8 @@ namespace Araci.Applications.Editar.Selecionar
 
             if (_selecionandoJanela)
             {
-                var rect = _context.SelectionBox.Bounds;
+                var rect =
+                    _context.SelectionBox.Bounds;
 
                 if (_context.Viewport != null)
                 {
@@ -1270,20 +1243,29 @@ namespace Araci.Applications.Editar.Selecionar
 
         private Rect CalcularBoundsSelecionados()
         {
-            var items = _context.Selection.Selecionados;
+            var items =
+                _context.Selection.Selecionados;
 
             if (items.Count == 0)
                 return Rect.Empty;
 
-            double minX = items.Min(i => i.Bounds.Left);
+            double minX =
+                items.Min(i => i.Bounds.Left);
 
-            double minY = items.Min(i => i.Bounds.Top);
+            double minY =
+                items.Min(i => i.Bounds.Top);
 
-            double maxX = items.Max(i => i.Bounds.Right);
+            double maxX =
+                items.Max(i => i.Bounds.Right);
 
-            double maxY = items.Max(i => i.Bounds.Bottom);
+            double maxY =
+                items.Max(i => i.Bounds.Bottom);
 
-            return new Rect(minX, minY, maxX - minX, maxY - minY);
+            return new Rect(
+                minX,
+                minY,
+                maxX - minX,
+                maxY - minY);
         }
 
         private Point ScreenToWorld(
@@ -1295,7 +1277,6 @@ namespace Araci.Applications.Editar.Selecionar
         }
     }
 }
-
 
 
 ====================================================================================================
@@ -1827,6 +1808,240 @@ namespace Araci.Core.Documents
 
 
 ====================================================================================================
+ARQUIVO: C:\Araci-Engine-Front\Araci Engine\Core\Events\Editorevents.cs
+====================================================================================================
+
+﻿// =============================================================
+// FASE 2 — EVENTOS DE DOMÍNIO DO EDITOR
+// =============================================================
+// Cada evento é um registro imutável (readonly struct ou class).
+// Commands disparam. Services escutam. UI pode observar.
+// NUNCA conter lógica — apenas dados do que ocorreu.
+// =============================================================
+
+using System.Collections.Generic;
+using Araci.ViewModels;
+
+namespace Araci.Core.Events
+{
+    // ----------------------------------------------------------
+    // ELEMENTOS
+    // ----------------------------------------------------------
+
+    public sealed class ElementoAdicionadoEvent : IEditorEvent
+    {
+        public ElementoViewModel Elemento { get; }
+
+        public ElementoAdicionadoEvent(
+            ElementoViewModel elemento)
+        {
+            Elemento = elemento;
+        }
+    }
+
+    public sealed class ElementoRemovidoEvent : IEditorEvent
+    {
+        public ElementoViewModel Elemento { get; }
+
+        public ElementoRemovidoEvent(
+            ElementoViewModel elemento)
+        {
+            Elemento = elemento;
+        }
+    }
+
+    public sealed class ElementoMovidoEvent : IEditorEvent
+    {
+        public ElementoViewModel Elemento { get; }
+
+        public ElementoMovidoEvent(
+            ElementoViewModel elemento)
+        {
+            Elemento = elemento;
+        }
+    }
+
+    // ----------------------------------------------------------
+    // SELEÇÃO
+    // ----------------------------------------------------------
+
+    public sealed class SelecaoAlteradaEvent : IEditorEvent
+    {
+        public IReadOnlyList<ElementoViewModel>
+            Selecionados
+        { get; }
+
+        public SelecaoAlteradaEvent(
+            IReadOnlyList<ElementoViewModel> selecionados)
+        {
+            Selecionados = selecionados;
+        }
+    }
+
+    // ----------------------------------------------------------
+    // DOCUMENTO
+    // ----------------------------------------------------------
+
+    public sealed class DocumentoCarregadoEvent : IEditorEvent
+    {
+        public string CaminhoArquivo { get; }
+
+        public DocumentoCarregadoEvent(string caminho)
+        {
+            CaminhoArquivo = caminho;
+        }
+    }
+
+    public sealed class DocumentoSalvoEvent : IEditorEvent
+    {
+        public string CaminhoArquivo { get; }
+
+        public DocumentoSalvoEvent(string caminho)
+        {
+            CaminhoArquivo = caminho;
+        }
+    }
+}
+
+
+====================================================================================================
+ARQUIVO: C:\Araci-Engine-Front\Araci Engine\Core\Events\Eventbus.cs
+====================================================================================================
+
+﻿// =============================================================
+// FASE 2 — SISTEMA DE EVENTOS INTERNO
+// =============================================================
+// Permite que Commands e Services disparem eventos sem
+// depender de referências diretas entre si.
+// Uso: context.Events.Publish(new ElementoAdicionadoEvent(vm));
+// =============================================================
+
+using System;
+using System.Collections.Generic;
+
+namespace Araci.Core.Events
+{
+    // ----------------------------------------------------------
+    // CONTRATO BASE
+    // ----------------------------------------------------------
+
+    public interface IEditorEvent { }
+
+    // ----------------------------------------------------------
+    // INTERFACE DO BUS
+    // ----------------------------------------------------------
+
+    public interface IEventBus
+    {
+        void Publish<TEvent>(TEvent evento)
+            where TEvent : IEditorEvent;
+
+        IDisposable Subscribe<TEvent>(
+            Action<TEvent> handler)
+            where TEvent : IEditorEvent;
+    }
+
+    // ----------------------------------------------------------
+    // IMPLEMENTAÇÃO
+    // ----------------------------------------------------------
+
+    public sealed class EventBus : IEventBus
+    {
+        private readonly Dictionary<Type, List<object>>
+            _handlers = new();
+
+        // =========================
+        // PUBLISH
+        // =========================
+
+        public void Publish<TEvent>(TEvent evento)
+            where TEvent : IEditorEvent
+        {
+            var tipo = typeof(TEvent);
+
+            if (!_handlers.TryGetValue(tipo, out var lista))
+                return;
+
+            foreach (var h in lista)
+            {
+                ((Action<TEvent>)h).Invoke(evento);
+            }
+        }
+
+        // =========================
+        // SUBSCRIBE
+        // =========================
+
+        public IDisposable Subscribe<TEvent>(
+            Action<TEvent> handler)
+            where TEvent : IEditorEvent
+        {
+            var tipo = typeof(TEvent);
+
+            if (!_handlers.ContainsKey(tipo))
+                _handlers[tipo] = new List<object>();
+
+            _handlers[tipo].Add(handler);
+
+            return new Subscription(() =>
+                _handlers[tipo].Remove(handler));
+        }
+
+        // ----------------------------------------------------------
+        // SUBSCRIPTION (auto-dispose)
+        // ----------------------------------------------------------
+
+        private sealed class Subscription : IDisposable
+        {
+            private readonly Action _remover;
+
+            public Subscription(Action remover)
+            {
+                _remover = remover;
+            }
+
+            public void Dispose() => _remover();
+        }
+    }
+}
+
+
+====================================================================================================
+ARQUIVO: C:\Araci-Engine-Front\Araci Engine\Core\Features\Ifeaturemodule.cs
+====================================================================================================
+
+﻿// =============================================================
+// FASE 6 (PREPARAÇÃO) — CONTRATO DE FEATURE MODULE
+// =============================================================
+// Cada funcionalidade do editor implementa IFeatureModule.
+// O bootstrap registra as features no contexto.
+// O core NUNCA conhece as features diretamente.
+//
+// Fluxo:
+//   1. Feature implementa IFeatureModule
+//   2. Bootstrap chama feature.Registrar(context)
+//   3. Feature se conecta a eventos/commands/tools
+//   4. Feature se desconecta em Desregistrar()
+// =============================================================
+
+namespace Araci.Core.Features
+{
+    public interface IFeatureModule
+    {
+        // Nome descritivo (para logs e diagnóstico)
+        string Nome { get; }
+
+        // Conecta a feature ao contexto
+        void Registrar(
+            Araci.Services.EditorContext context);
+
+        // Remove assinaturas e libera recursos
+        void Desregistrar();
+    }
+}
+
+
+====================================================================================================
 ARQUIVO: C:\Araci-Engine-Front\Araci Engine\Core\Rendering\ElementoRenderData.cs
 ====================================================================================================
 
@@ -2050,21 +2265,53 @@ ARQUIVO: C:\Araci-Engine-Front\Araci Engine\MainWindow.xaml
 ARQUIVO: C:\Araci-Engine-Front\Araci Engine\MainWindow.xaml.cs
 ====================================================================================================
 
-﻿using System.Windows;
+﻿using Araci.Services;
+
+using System.Windows;
+using System.Windows.Controls.Primitives;
 
 namespace Araci
 {
     public partial class MainWindow : Window
     {
+        private readonly EditorContext _context;
+
         public MainWindow()
         {
             InitializeComponent();
+
+            _context = new EditorContext();
+
+#pragma warning disable CS0618
+            AppServices.Current = _context;
+#pragma warning restore CS0618
+
+            Viewport.Inicializar(_context);
+
+            InicializarRibbon();
         }
 
-        public void ToggleArquivoMenu(UIElement target)
+        private void InicializarRibbon()
         {
-            ArquivoPopup.PlacementTarget = target;
-            ArquivoPopup.IsOpen = !ArquivoPopup.IsOpen;
+            DataContext = _context;
+        }
+
+        public void ToggleArquivoMenu(
+            UIElement referencia)
+        {
+            if (ArquivoPopup.IsOpen)
+            {
+                ArquivoPopup.IsOpen = false;
+                return;
+            }
+
+            ArquivoPopup.PlacementTarget =
+                referencia;
+
+            ArquivoPopup.Placement =
+                PlacementMode.Bottom;
+
+            ArquivoPopup.IsOpen = true;
         }
     }
 }
@@ -2975,7 +3222,7 @@ ARQUIVO: C:\Araci-Engine-Front\Araci Engine\Properties\PropertiesHostView.xaml
         <Grid>
 
             <ContentControl
-                Content="{Binding ElementoSelecionado}"
+                Content="{Binding Editor.ElementoSelecionado}"
                 HorizontalContentAlignment="Stretch"
                 VerticalContentAlignment="Stretch"/>
 
@@ -2992,8 +3239,6 @@ ARQUIVO: C:\Araci-Engine-Front\Araci Engine\Properties\PropertiesHostView.xaml.c
 
 ﻿using System.Windows.Controls;
 
-using Araci.Services;
-
 namespace Araci.Properties
 {
     public partial class PropertiesHostView
@@ -3006,9 +3251,6 @@ namespace Araci.Properties
         public PropertiesHostView()
         {
             InitializeComponent();
-
-            DataContext =
-                AppServices.Editor;
         }
     }
 }
@@ -4871,6 +5113,15 @@ namespace Araci.Ribbon.Tabs
 ARQUIVO: C:\Araci-Engine-Front\Araci Engine\Service\AppServices.cs
 ====================================================================================================
 
+// =============================================================
+// AppServices — PROXY SOMENTE LEITURA de EditorContext
+// =============================================================
+// ⚠️ FASE 1: Este arquivo NÃO é mais a fonte da verdade.
+//    Existe apenas para compatibilidade durante a migração.
+//    Objetivo: remover completamente após todas as injeções.
+//    NUNCA escrever lógica nova aqui.
+// =============================================================
+
 using Araci.Core.Commands;
 using Araci.Core.Documents;
 using Araci.Core.Transactions;
@@ -4879,10 +5130,13 @@ using Araci.ViewModels;
 
 namespace Araci
 {
+    [System.Obsolete(
+        "AppServices será removido. Injete EditorContext diretamente.",
+        error: false)]
     public static class AppServices
     {
         // =========================
-        // CONTEXTO
+        // CONTEXTO RAIZ
         // =========================
 
         public static EditorContext Current
@@ -4897,107 +5151,53 @@ namespace Araci
         }
 
         // =========================
-        // DOCUMENTO CENTRAL
+        // PROXIES — APENAS LEITURA
+        // (não adicionar novos membros aqui)
         // =========================
 
         public static AraciDocument Document =>
             Current.Document;
 
-        // =========================
-        // TOOLS
-        // =========================
-
         public static ToolService Tools =>
             Current.Tools;
-
-        // =========================
-        // INPUT
-        // =========================
 
         public static InputRouter Input =>
             Current.Input;
 
-        // =========================
-        // VIEWPORT
-        // =========================
-
         public static ViewportService? Viewport =>
             Current.Viewport;
-
-        // =========================
-        // EDITOR
-        // =========================
 
         public static EditorState Editor =>
             Current.Editor;
 
-        // =========================
-        // HUD
-        // =========================
-
         public static MoveHudService MoveHud =>
             Current.MoveHud;
-
-        // =========================
-        // SELECTION BOX
-        // =========================
 
         public static SelectionBoxViewModel SelectionBox =>
             Current.SelectionBox;
 
-        // =========================
-        // COMMANDS
-        // =========================
-
         public static CommandManager Commands =>
             Current.Commands;
-
-        // =========================
-        // SELECTION
-        // =========================
 
         public static SelectionService Selection =>
             Current.Selection;
 
-        // =========================
-        // MOVE
-        // =========================
-
         public static MoveService Move =>
             Current.Move;
-
-        // =========================
-        // SNAP
-        // =========================
 
         public static SnapService Snap =>
             Current.Snap;
 
-        // =========================
-        // TYPES
-        // =========================
-
         public static TypeLibraryService Types =>
             Current.Types;
-
-        // =========================
-        // ELEMENTOS
-        // =========================
 
         public static ElementoFactory ElementoFactory =>
             Current.ElementoFactory;
 
-        // =========================
-        // TRANSACTIONS
-        // =========================
-
-        public static TransactionScope BeginTransaction()
-        {
-            return Current.BeginTransaction();
-        }
+        public static TransactionScope BeginTransaction() =>
+            Current.BeginTransaction();
     }
 }
-
 
 
 ====================================================================================================
@@ -5151,6 +5351,7 @@ ARQUIVO: C:\Araci-Engine-Front\Araci Engine\Service\EditorContext.cs
 
 using Araci.Core.Commands;
 using Araci.Core.Documents;
+using Araci.Core.Events;
 using Araci.Core.Scenes;
 using Araci.Core.Transactions;
 using Araci.ViewModels;
@@ -5164,7 +5365,12 @@ namespace Araci.Services
         // =========================
 
         public EditorContext()
+            : this(new EventBus()) { }
+
+        public EditorContext(IEventBus eventBus)
         {
+            Events = eventBus;
+
             ElementoFactory =
                 new ElementoFactory(Types);
 
@@ -5183,6 +5389,13 @@ namespace Araci.Services
             Input =
                 new InputRouter(this);
         }
+
+        // =========================
+        // EVENTOS (novo)
+        // =========================
+
+        public IEventBus Events
+        { get; }
 
         // =========================
         // DOCUMENTO
@@ -5230,7 +5443,7 @@ namespace Araci.Services
         }
 
         // =========================
-        // EDITOR
+        // EDITOR STATE
         // =========================
 
         public EditorState Editor
@@ -5291,7 +5504,7 @@ namespace Araci.Services
             = new TypeLibraryService();
 
         // =========================
-        // ELEMENTOS
+        // FACTORY
         // =========================
 
         public ElementoFactory ElementoFactory
@@ -5307,7 +5520,6 @@ namespace Araci.Services
         }
     }
 }
-
 
 
 ====================================================================================================
@@ -5893,16 +6105,33 @@ namespace Araci.Services
 ARQUIVO: C:\Araci-Engine-Front\Araci Engine\Service\SelectionService.cs
 ====================================================================================================
 
-﻿using System.Collections.ObjectModel;
-using System.Linq;
-
+﻿using Araci.Core.Events;
 using Araci.ViewModels;
+
+using System.Collections.Generic;
+using System.Collections.ObjectModel;
+using System.Linq;
 
 namespace Araci.Services
 {
     public class SelectionService
     {
+        // =====================================================
+        // DEPENDÊNCIAS
+        // =====================================================
+
         private readonly EditorContext _context;
+
+        // =====================================================
+        // ESTADO
+        // =====================================================
+
+        private readonly ObservableCollection<ElementoViewModel>
+            _selecionados = new();
+
+        // =====================================================
+        // CONSTRUTOR
+        // =====================================================
 
         public SelectionService(EditorContext context)
         {
@@ -5910,150 +6139,121 @@ namespace Araci.Services
                 ?? throw new System.ArgumentNullException(nameof(context));
         }
 
-        // =========================
-        // SELECIONADOS
-        // =========================
+        // =====================================================
+        // LEITURA
+        // =====================================================
+
+        public IReadOnlyList<ElementoViewModel>
+            Selecionados =>
+                _selecionados;
 
         public ObservableCollection<ElementoViewModel>
-            Selecionados
-        { get; }
-            = new();
+            SelecionadosObservable =>
+                _selecionados;
 
-        // =========================
-        // PRINCIPAL
-        // =========================
+        public bool TemSelecionados =>
+            _selecionados.Count > 0;
 
-        public ElementoViewModel?
-            Principal =>
-                Selecionados.FirstOrDefault();
-
-        // =========================
+        // =====================================================
         // SELECIONAR
-        // =========================
+        // =====================================================
 
         public void Selecionar(
             ElementoViewModel vm,
-            bool adicionar = false)
+            bool adicionarAoExistente = false)
         {
-            if (vm == null)
-                return;
-
-            // =========================
-            // LIMPA SE NÃO FOR MULTISELECT
-            // =========================
-
-            if (!adicionar)
+            if (!adicionarAoExistente)
             {
                 Limpar();
             }
 
-            // =========================
-            // EVITA DUPLICIDADE
-            // =========================
-
-            if (Selecionados.Contains(vm))
+            if (_selecionados.Contains(vm))
             {
-                vm.IsSelecionado = true;
-
-                _context.Editor
-                    .ElementoSelecionado = vm;
-
+                AtualizarElementoSelecionado();
                 return;
             }
-
-            // =========================
-            // MARCA VISUALMENTE
-            // =========================
 
             vm.IsSelecionado = true;
 
-            Selecionados.Add(vm);
+            _selecionados.Add(vm);
 
-            _context.Editor
-                .ElementoSelecionado = vm;
+            AtualizarElementoSelecionado();
+
+            PublicarAlteracao();
         }
 
-        // =========================
-        // DESELECIONAR
-        // =========================
+        // =====================================================
+        // TOGGLE
+        // =====================================================
 
-        public void Deselecionar(
-            ElementoViewModel vm)
+        public void Toggle(ElementoViewModel vm)
         {
-            if (vm == null)
-                return;
-
-            if (!Selecionados.Contains(vm))
+            if (_selecionados.Contains(vm))
             {
-                vm.IsSelecionado = false;
+                Deselecionar(vm);
                 return;
             }
+
+            Selecionar(vm, true);
+        }
+
+        // =====================================================
+        // DESELECIONAR
+        // =====================================================
+
+        public void Deselecionar(ElementoViewModel vm)
+        {
+            if (!_selecionados.Contains(vm))
+                return;
 
             vm.IsSelecionado = false;
 
-            Selecionados.Remove(vm);
+            _selecionados.Remove(vm);
 
-            _context.Editor
-                .ElementoSelecionado =
-                    Principal;
+            AtualizarElementoSelecionado();
+
+            PublicarAlteracao();
         }
 
-        // =========================
-        // TOGGLE
-        // =========================
-
-        public void Toggle(
-            ElementoViewModel vm)
-        {
-            if (vm == null)
-                return;
-
-            if (Selecionados.Contains(vm))
-            {
-                Deselecionar(vm);
-            }
-            else
-            {
-                Selecionar(vm, true);
-            }
-        }
-
-        // =========================
+        // =====================================================
         // LIMPAR
-        // =========================
+        // =====================================================
 
         public void Limpar()
         {
-            foreach (var item in
-                     Selecionados.ToList())
+            if (_selecionados.Count == 0)
+                return;
+
+            foreach (var vm in _selecionados)
             {
-                item.IsSelecionado = false;
+                vm.IsSelecionado = false;
             }
 
-            Selecionados.Clear();
+            _selecionados.Clear();
 
-            _context.Editor
-                .ElementoSelecionado = null;
+            AtualizarElementoSelecionado();
+
+            PublicarAlteracao();
         }
 
-        // =========================
-        // SINCRONIZAÇÃO
-        // =========================
+        // =====================================================
+        // AUXILIARES
+        // =====================================================
 
-        public void GarantirConsistencia()
+        private void AtualizarElementoSelecionado()
         {
-            foreach (var item in
-                     Selecionados.ToList())
-            {
-                if (item == null)
-                    continue;
+            _context.Editor.ElementoSelecionado =
+                _selecionados.LastOrDefault();
+        }
 
-                item.IsSelecionado = true;
-            }
+        private void PublicarAlteracao()
+        {
+            _context.Events.Publish(
+                new SelecaoAlteradaEvent(
+                    _selecionados.ToList()));
         }
     }
 }
-
 
 
 ====================================================================================================
@@ -8839,23 +9039,26 @@ namespace Araci.Views
 {
     public partial class ViewportView : UserControl
     {
-        private readonly ViewportViewModel _viewportViewModel;
+        private ViewportViewModel? _viewportViewModel;
 
-        private readonly EditorContext _context;
+        private EditorContext? _context;
 
-        private readonly MatrixTransform _cameraTransform =
-            new();
+        private readonly MatrixTransform
+            _cameraTransform = new();
 
         public ViewportView()
         {
             InitializeComponent();
+        }
 
-            _context =
-                AppServices.Current;
+        public void Inicializar(
+            EditorContext context)
+        {
+            _context = context
+                ?? throw new ArgumentNullException(nameof(context));
 
             _viewportViewModel =
-                new ViewportViewModel(
-                    _context);
+                new ViewportViewModel(_context);
 
             DataContext = _viewportViewModel;
 
@@ -8867,13 +9070,9 @@ namespace Araci.Views
             Unloaded += OnUnloaded;
         }
 
-        // =========================
-        // CAMERA
-        // =========================
-
         private void ConfigurarCamera()
         {
-            if (_context.Viewport == null)
+            if (_context?.Viewport == null)
                 return;
 
             WorldLayer.RenderTransform =
@@ -8899,7 +9098,7 @@ namespace Araci.Views
             object sender,
             RoutedEventArgs e)
         {
-            if (_context.Viewport != null)
+            if (_context?.Viewport != null)
             {
                 _context.Viewport.Camera.PropertyChanged -=
                     OnCameraChanged;
@@ -8908,7 +9107,7 @@ namespace Araci.Views
 
         private void AtualizarCameraTransform()
         {
-            if (_context.Viewport == null)
+            if (_context?.Viewport == null)
                 return;
 
             var camera =
@@ -8924,11 +9123,9 @@ namespace Araci.Views
                     camera.Offset.Y);
         }
 
-        // =========================
-        // LOADED
-        // =========================
-
-        private void OnLoaded(object sender, RoutedEventArgs e)
+        private void OnLoaded(
+            object sender,
+            RoutedEventArgs e)
         {
             Focus();
 
@@ -8937,60 +9134,43 @@ namespace Araci.Views
             AtualizarViewport();
 
             SizeChanged += (_, __) =>
-            {
                 AtualizarViewport();
-            };
         }
-
-        // =========================
-        // VIEWPORT SIZE
-        // =========================
 
         private void AtualizarViewport()
         {
-            if (_context.Viewport == null)
+            if (_context?.Viewport == null)
                 return;
 
-            double larguraReal = ActualWidth;
-
-            double alturaReal = ActualHeight;
+            double largura = ActualWidth;
+            double altura = ActualHeight;
 
             if (RootBorder != null)
             {
-                larguraReal -=
-                    RootBorder.BorderThickness.Left +
-                    RootBorder.BorderThickness.Right;
+                largura -= RootBorder.BorderThickness.Left
+                         + RootBorder.BorderThickness.Right;
 
-                alturaReal -=
-                    RootBorder.BorderThickness.Top +
-                    RootBorder.BorderThickness.Bottom;
+                altura -= RootBorder.BorderThickness.Top
+                        + RootBorder.BorderThickness.Bottom;
             }
 
-            larguraReal = Math.Max(0, larguraReal);
-
-            alturaReal = Math.Max(0, alturaReal);
+            largura = Math.Max(0, largura);
+            altura = Math.Max(0, altura);
 
             _context.Viewport.AtualizarTamanho(
-                new Size(
-                    larguraReal,
-                    alturaReal));
+                new Size(largura, altura));
         }
 
-        // =========================
-        // POSICAO
-        // =========================
+        private Point GetPos(MouseEventArgs e) =>
+            e.GetPosition(this);
 
-        private Point GetPos(MouseEventArgs e)
+        private void OnPreviewMouseLeftButtonDown(
+            object sender,
+            MouseButtonEventArgs e)
         {
-            return e.GetPosition(this);
-        }
+            if (_context == null)
+                return;
 
-        // =========================
-        // MOUSE DOWN
-        // =========================
-
-        private void OnPreviewMouseLeftButtonDown(object sender, MouseButtonEventArgs e)
-        {
             Focus();
 
             Keyboard.Focus(this);
@@ -9003,102 +9183,77 @@ namespace Araci.Views
             while (origem != null)
             {
                 if (origem is FrameworkElement fe &&
-                    fe.DataContext is ElementoViewModel elemento)
+                    fe.DataContext is ElementoViewModel el)
                 {
-                    vm = elemento;
-
+                    vm = el;
                     break;
                 }
 
-                origem =
-                    VisualTreeHelper.GetParent(origem);
+                origem = VisualTreeHelper.GetParent(origem);
             }
 
-            var pos = GetPos(e);
-
-            _context.Input.MouseDown(
-                vm,
-                pos);
+            _context.Input.MouseDown(vm, GetPos(e));
 
             CaptureMouse();
         }
 
-        // =========================
-        // MOUSE MOVE
-        // =========================
-
-        private void OnPreviewMouseMove(object sender, MouseEventArgs e)
+        private void OnPreviewMouseMove(
+            object sender,
+            MouseEventArgs e)
         {
-            var pos = GetPos(e);
-
-            _context.Input.MouseMove(pos);
+            _context?.Input.MouseMove(GetPos(e));
         }
 
-        // =========================
-        // MOUSE UP
-        // =========================
-
-        private void OnPreviewMouseLeftButtonUp(object sender, MouseButtonEventArgs e)
+        private void OnPreviewMouseLeftButtonUp(
+            object sender,
+            MouseButtonEventArgs e)
         {
-            var pos = GetPos(e);
-
-            _context.Input.MouseUp(pos);
+            _context?.Input.MouseUp(GetPos(e));
 
             if (IsMouseCaptured)
-            {
                 ReleaseMouseCapture();
-            }
         }
 
-        // =========================
-        // ZOOM
-        // =========================
-
-        private void OnPreviewMouseWheel(object sender, MouseWheelEventArgs e)
+        private void OnPreviewMouseWheel(
+            object sender,
+            MouseWheelEventArgs e)
         {
-            if (_context.Viewport == null)
+            if (_context?.Viewport == null)
                 return;
 
             var camera =
                 _context.Viewport.Camera;
 
-            Point cursor =
-                GetPos(e);
+            Point cursor = GetPos(e);
 
             Point worldBefore =
                 camera.ScreenToWorld(cursor);
 
             double factor =
-                e.Delta > 0
-                    ? 1.1
-                    : 1 / 1.1;
+                e.Delta > 0 ? 1.1 : 1 / 1.1;
 
-            camera.Zoom =
-                Math.Max(
-                    0.1,
-                    Math.Min(
-                        8,
-                        camera.Zoom * factor));
+            camera.Zoom = Math.Max(
+                0.1,
+                Math.Min(8, camera.Zoom * factor));
 
-            camera.Offset =
-                new Point(
-                    cursor.X - worldBefore.X * camera.Zoom,
-                    cursor.Y - worldBefore.Y * camera.Zoom);
+            camera.Offset = new Point(
+                cursor.X - worldBefore.X * camera.Zoom,
+                cursor.Y - worldBefore.Y * camera.Zoom);
 
             e.Handled = true;
         }
 
-        // =========================
-        // KEYBOARD
-        // =========================
-
-        private void OnPreviewKeyDown(object sender, KeyEventArgs e)
+        private void OnPreviewKeyDown(
+            object sender,
+            KeyEventArgs e)
         {
-            e.Handled =
-                _context.Input.KeyDown(e.Key);
+            if (_context != null)
+            {
+                e.Handled =
+                    _context.Input.KeyDown(e.Key);
+            }
         }
     }
 }
-
 
 

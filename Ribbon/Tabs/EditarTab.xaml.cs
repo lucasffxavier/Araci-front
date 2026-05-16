@@ -1,4 +1,5 @@
-﻿using System.Windows;
+﻿using System;
+using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Media;
 
@@ -17,9 +18,16 @@ namespace Araci.Ribbon.Tabs
         // CORES
         // =========================
 
-        private readonly Brush _brushNormal = Brushes.Transparent;
+        private readonly Brush _brushNormal =
+            Brushes.Transparent;
 
-        private readonly Brush _brushAtivo =  new SolidColorBrush(Color.FromRgb(210, 230, 255));
+        private readonly Brush _brushAtivo =
+            new SolidColorBrush(
+                Color.FromRgb(210, 230, 255));
+
+        // =========================
+        // ESTADO
+        // =========================
 
         private bool _eventoFerramentaAssinado;
 
@@ -36,14 +44,22 @@ namespace Araci.Ribbon.Tabs
             Unloaded += OnUnloaded;
         }
 
+        // =========================
+        // CONTEXT
+        // =========================
+
         private EditorContext Context =>
-            AppServices.Current;
+            DataContext as EditorContext
+            ?? throw new InvalidOperationException(
+                "EditorContext não encontrado no DataContext.");
 
         // =========================
         // LOADED
         // =========================
 
-        private void OnLoaded(object sender, RoutedEventArgs e)
+        private void OnLoaded(
+            object sender,
+            RoutedEventArgs e)
         {
             AssinarEventoFerramenta();
 
@@ -55,7 +71,9 @@ namespace Araci.Ribbon.Tabs
         // UNLOADED
         // =========================
 
-        private void OnUnloaded(object sender, RoutedEventArgs e)
+        private void OnUnloaded(
+            object sender,
+            RoutedEventArgs e)
         {
             DesassinarEventoFerramenta();
         }
@@ -92,7 +110,8 @@ namespace Araci.Ribbon.Tabs
         // EVENTO TOOL
         // =========================
 
-        private void OnFerramentaAlterada(ITool tool)
+        private void OnFerramentaAlterada(
+            ITool tool)
         {
             AtualizarBotoes(tool);
         }
@@ -101,7 +120,8 @@ namespace Araci.Ribbon.Tabs
         // VISUAL
         // =========================
 
-        private void AtualizarBotoes(ITool tool)
+        private void AtualizarBotoes(
+            ITool tool)
         {
             ResetarBotoes();
 
@@ -112,19 +132,22 @@ namespace Araci.Ribbon.Tabs
             {
                 case "Selecionar":
 
-                    SelecionarButton.Background = _brushAtivo;
+                    SelecionarButton.Background =
+                        _brushAtivo;
 
                     break;
 
                 case "Mover":
 
-                    MoverButton.Background = _brushAtivo;
+                    MoverButton.Background =
+                        _brushAtivo;
 
                     break;
 
                 case "Deletar":
 
-                    DeletarButton.Background = _brushAtivo;
+                    DeletarButton.Background =
+                        _brushAtivo;
 
                     break;
             }
@@ -146,31 +169,41 @@ namespace Araci.Ribbon.Tabs
         // BOTÕES
         // =========================
 
-        private void SelecionarButton_Click(object sender, RoutedEventArgs e)
+        private void SelecionarButton_Click(
+            object sender,
+            RoutedEventArgs e)
         {
             Context.Tools.AtivarFerramenta(
                 new SelecionarTool(Context));
         }
 
-        private void MoverButton_Click(object sender, RoutedEventArgs e)
+        private void MoverButton_Click(
+            object sender,
+            RoutedEventArgs e)
         {
             Context.Tools.AtivarFerramenta(
                 new MoverTool(Context));
         }
 
-        private void CopiarButton_Click(object sender, RoutedEventArgs e)
+        private void CopiarButton_Click(
+            object sender,
+            RoutedEventArgs e)
         {
             ClipboardService.CopiarSelecionados(
                 Context);
         }
 
-        private void ColarButton_Click(object sender, RoutedEventArgs e)
+        private void ColarButton_Click(
+            object sender,
+            RoutedEventArgs e)
         {
             ClipboardService.Colar(
                 Context);
         }
 
-        private void DeletarButton_Click(object sender, RoutedEventArgs e)
+        private void DeletarButton_Click(
+            object sender,
+            RoutedEventArgs e)
         {
             Context.Tools.AtivarFerramenta(
                 new DeletarTool(Context));
@@ -180,7 +213,9 @@ namespace Araci.Ribbon.Tabs
         // UNDO
         // =========================
 
-        private void DesfazerButton_Click(object sender, RoutedEventArgs e)
+        private void DesfazerButton_Click(
+            object sender,
+            RoutedEventArgs e)
         {
             Context.Commands.Undo();
         }
@@ -189,7 +224,9 @@ namespace Araci.Ribbon.Tabs
         // REDO
         // =========================
 
-        private void RefazerButton_Click(object sender, RoutedEventArgs e)
+        private void RefazerButton_Click(
+            object sender,
+            RoutedEventArgs e)
         {
             Context.Commands.Redo();
         }

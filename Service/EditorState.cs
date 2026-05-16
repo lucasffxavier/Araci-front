@@ -1,20 +1,19 @@
 ﻿using System.ComponentModel;
 using System.Runtime.CompilerServices;
 
-using Araci.ViewModels;
-
-namespace Araci.Services
+namespace Araci.ViewModels
 {
     public class EditorState
         : INotifyPropertyChanged
     {
-        private ElementoViewModel?
+        // =========================
+        // ELEMENTO SELECIONADO
+        // =========================
+
+        private object?
             _elementoSelecionado;
 
-        private TipoElementoViewModel?
-            _tipoSelecionado;
-
-        public ElementoViewModel?
+        public object?
             ElementoSelecionado
         {
             get => _elementoSelecionado;
@@ -26,39 +25,24 @@ namespace Araci.Services
 
                 _elementoSelecionado = value;
 
-                TipoSelecionado =
-                    value?.TipoViewModel;
-
                 OnPropertyChanged();
             }
         }
 
-        public TipoElementoViewModel?
-            TipoSelecionado
-        {
-            get => _tipoSelecionado;
-
-            set
-            {
-                if (_tipoSelecionado == value)
-                    return;
-
-                _tipoSelecionado = value;
-
-                OnPropertyChanged();
-            }
-        }
+        // =========================
+        // PROPERTY CHANGED
+        // =========================
 
         public event PropertyChangedEventHandler?
             PropertyChanged;
 
-        private void OnPropertyChanged(
+        protected virtual void OnPropertyChanged(
             [CallerMemberName]
-            string? nome = null)
+            string? propertyName = null)
         {
             PropertyChanged?.Invoke(
                 this,
-                new PropertyChangedEventArgs(nome));
+                new PropertyChangedEventArgs(propertyName));
         }
     }
 }

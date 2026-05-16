@@ -1,4 +1,5 @@
-﻿using System.Windows;
+﻿using System;
+using System.Windows;
 using System.Windows.Controls;
 
 using Araci.Applications.Diagrama.InserirCabo;
@@ -20,8 +21,14 @@ namespace Araci.Ribbon.Tabs
             InitializeComponent();
         }
 
+        // =========================
+        // CONTEXT
+        // =========================
+
         private EditorContext Context =>
-            AppServices.Current;
+            DataContext as EditorContext
+            ?? throw new InvalidOperationException(
+                "EditorContext não encontrado no DataContext.");
 
         // =========================
         // GERADOR
@@ -65,9 +72,14 @@ namespace Araci.Ribbon.Tabs
             app.Executar();
         }
 
-        private void UserControl_Loaded(object sender, RoutedEventArgs e)
-        {
+        // =========================
+        // LOADED
+        // =========================
 
+        private void UserControl_Loaded(
+            object sender,
+            RoutedEventArgs e)
+        {
         }
     }
 }
