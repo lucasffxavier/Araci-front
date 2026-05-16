@@ -1,7 +1,4 @@
-﻿// =========================
-// ARQUIVO: Controls/Base/ElementoControlBase.cs
-// =========================
-
+﻿using System.Collections.Generic;
 using System.ComponentModel;
 using System.Windows.Controls;
 using System.Windows.Input;
@@ -13,34 +10,29 @@ namespace Araci.Controls.Base
     public abstract class ElementoControlBase
         : UserControl
     {
-        // =========================
-        // PROPRIEDADES VISUAIS
-        // =========================
-
-        private static readonly System.Collections.Generic.HashSet<string>
+        private static readonly HashSet<string>
             _propriedadesVisuais = new()
         {
             nameof(ElementoViewModel.Stroke),
             nameof(ElementoViewModel.StrokeThickness),
             nameof(ElementoViewModel.RenderData),
             nameof(ElementoViewModel.IsSelecionado),
+
             nameof(ElementoViewModel.X),
             nameof(ElementoViewModel.Y),
+
             nameof(ElementoViewModel.WorldX),
             nameof(ElementoViewModel.WorldY),
+
             nameof(ElementoViewModel.Largura),
             nameof(ElementoViewModel.Altura),
+
             nameof(ElementoViewModel.Bounds),
             nameof(ElementoViewModel.Centro),
-            nameof(ElementoViewModel.Geometry),
 
             "X2",
             "Y2",
         };
-
-        // =========================
-        // CONSTRUTOR
-        // =========================
 
         protected ElementoControlBase()
         {
@@ -52,10 +44,6 @@ namespace Araci.Controls.Base
                 OnDataContextChanged;
         }
 
-        // =========================
-        // LOADED
-        // =========================
-
         private void OnLoaded(
             object sender,
             System.Windows.RoutedEventArgs e)
@@ -65,10 +53,6 @@ namespace Araci.Controls.Base
 
             AtualizarVisual();
         }
-
-        // =========================
-        // DATA CONTEXT CHANGED
-        // =========================
 
         private void OnDataContextChanged(
             object sender,
@@ -92,19 +76,10 @@ namespace Araci.Controls.Base
             }
         }
 
-        // =========================
-        // PROPERTY CHANGED FILTRADO
-        // =========================
-
         private void OnViewModelPropertyChanged(
             object? sender,
             PropertyChangedEventArgs e)
         {
-            // =========================
-            // FILTRAGEM DE PROPRIEDADES
-            // =========================
-
-
             bool deveAtualizar =
                 string.IsNullOrEmpty(e.PropertyName) ||
                 _propriedadesVisuais.Contains(
@@ -116,10 +91,6 @@ namespace Araci.Controls.Base
             AtualizarVisual();
         }
 
-        // =========================
-        // ATUALIZAR VISUAL
-        // =========================
-
         protected virtual void AtualizarVisual()
         {
             if (DataContext is not ElementoViewModel vm)
@@ -130,10 +101,6 @@ namespace Araci.Controls.Base
 
         protected virtual bool UsaBindings =>
             false;
-
-        // =========================
-        // APLICAR ESTADO VISUAL
-        // =========================
 
         protected virtual void AplicarEstadoVisual(
             ElementoViewModel vm)

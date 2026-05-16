@@ -1,103 +1,45 @@
+using System.Collections;
+
+using Araci.Core.SceneNodes;
 using Araci.Models;
 using Araci.Services;
-using System.Collections;
-using System.Windows.Media;
 
 namespace Araci.ViewModels
 {
     public class CargaViewModel
         : ElementoViewModel
     {
-        private readonly Carga
-            _carga;
-
-        protected override double
-            LarguraBase =>
-                70;
-
-        protected override double
-            AlturaBase =>
-                70;
-
-        public override IEnumerable
-            TiposDisponiveis =>
-                Types.TiposCargas;
-
         public CargaViewModel(
-            Carga carga,
+            Carga modelo,
             TypeLibraryService types)
-            : base(carga, types)
+            : base(
+                modelo,
+                new EquipamentoNode(modelo),
+                types)
         {
-            _carga = carga;
-
             SelecionarPrimeiroTipoDisponivel();
-
-            VisualState.DefinirVisualBase(
-                Brushes.DimGray,
-                2);
-
-            AtualizarGeometria();
         }
 
-        // =========================
-        // DADOS
-        // =========================
+        public Carga Carga =>
+            (Carga)Modelo;
 
-        public string Nome
-        {
-            get => _carga.Nome;
-
-            set
-            {
-                if (_carga.Nome == value)
-                    return;
-
-                _carga.Nome = value;
-
-                OnPropertyChanged();
-            }
-        }
-
-        public string Barra
-        {
-            get => _carga.Barra;
-
-            set
-            {
-                if (_carga.Barra == value)
-                    return;
-
-                _carga.Barra = value;
-
-                OnPropertyChanged();
-            }
-        }
-
-        public string Alimentador
-        {
-            get => _carga.Alimentador;
-
-            set
-            {
-                if (_carga.Alimentador == value)
-                    return;
-
-                _carga.Alimentador = value;
-
-                OnPropertyChanged();
-            }
-        }
+        public override IEnumerable TiposDisponiveis =>
+            Types.TiposCargas;
 
         public double PotenciaAtivaKW
         {
-            get => _carga.PotenciaAtivaKW;
+            get => Carga.PotenciaAtivaKW;
 
             set
             {
-                if (_carga.PotenciaAtivaKW == value)
+                if (Carga.PotenciaAtivaKW
+                    == value)
+                {
                     return;
+                }
 
-                _carga.PotenciaAtivaKW = value;
+                Carga.PotenciaAtivaKW =
+                    value;
 
                 OnPropertyChanged();
             }
@@ -105,32 +47,81 @@ namespace Araci.ViewModels
 
         public double PotenciaReativaKvar
         {
-            get => _carga.PotenciaReativaKvar;
+            get => Carga.PotenciaReativaKvar;
 
             set
             {
-                if (_carga.PotenciaReativaKvar == value)
+                if (Carga.PotenciaReativaKvar
+                    == value)
+                {
                     return;
+                }
 
-                _carga.PotenciaReativaKvar = value;
+                Carga.PotenciaReativaKvar =
+                    value;
 
                 OnPropertyChanged();
             }
         }
 
-        protected override string ValidateProperty(
-            string propertyName)
+        public string Nome
         {
-            return propertyName switch
+            get => Carga.Nome;
+
+            set
             {
-                nameof(PotenciaAtivaKW) when PotenciaAtivaKW < 0 =>
-                    "Potencia ativa deve ser maior ou igual a zero.",
+                if (Carga.Nome
+                    == value)
+                {
+                    return;
+                }
 
-                nameof(PotenciaReativaKvar) when PotenciaReativaKvar < 0 =>
-                    "Potencia reativa deve ser maior ou igual a zero.",
+                Carga.Nome =
+                    value;
 
-                _ => string.Empty
-            };
+                OnPropertyChanged();
+            }
         }
+
+
+        public string Barra
+        {
+            get => Carga.Barra;
+
+            set
+            {
+                if (Carga.Barra
+                    == value)
+                {
+                    return;
+                }
+
+                Carga.Barra =
+                    value;
+
+                OnPropertyChanged();
+            }
+        }
+
+
+        public string Alimentador
+        {
+            get => Carga.Alimentador;
+
+            set
+            {
+                if (Carga.Alimentador
+                    == value)
+                {
+                    return;
+                }
+
+                Carga.Alimentador =
+                    value;
+
+                OnPropertyChanged();
+            }
+        }
+
     }
 }

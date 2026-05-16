@@ -1,103 +1,45 @@
+using System.Collections;
+
+using Araci.Core.SceneNodes;
 using Araci.Models;
 using Araci.Services;
-using System.Collections;
-using System.Windows.Media;
 
 namespace Araci.ViewModels
 {
     public class GeradorViewModel
         : ElementoViewModel
     {
-        private readonly Gerador
-            _gerador;
-
-        protected override double
-            LarguraBase =>
-                80;
-
-        protected override double
-            AlturaBase =>
-                80;
-
-        public override IEnumerable
-            TiposDisponiveis =>
-                Types.TiposGeradores;
-
         public GeradorViewModel(
-            Gerador gerador,
+            Gerador modelo,
             TypeLibraryService types)
-            : base(gerador, types)
+            : base(
+                modelo,
+                new EquipamentoNode(modelo),
+                types)
         {
-            _gerador = gerador;
-
             SelecionarPrimeiroTipoDisponivel();
-
-            VisualState.DefinirVisualBase(
-                Brushes.DimGray,
-                2);
-
-            AtualizarGeometria();
         }
 
-        // =========================
-        // DADOS
-        // =========================
+        public Gerador Gerador =>
+            (Gerador)Modelo;
 
-        public string Nome
-        {
-            get => _gerador.Nome;
-
-            set
-            {
-                if (_gerador.Nome == value)
-                    return;
-
-                _gerador.Nome = value;
-
-                OnPropertyChanged();
-            }
-        }
-
-        public string Barra
-        {
-            get => _gerador.Barra;
-
-            set
-            {
-                if (_gerador.Barra == value)
-                    return;
-
-                _gerador.Barra = value;
-
-                OnPropertyChanged();
-            }
-        }
-
-        public string Alimentador
-        {
-            get => _gerador.Alimentador;
-
-            set
-            {
-                if (_gerador.Alimentador == value)
-                    return;
-
-                _gerador.Alimentador = value;
-
-                OnPropertyChanged();
-            }
-        }
+        public override IEnumerable TiposDisponiveis =>
+            Types.TiposGeradores;
 
         public double PotenciaAtivaKW
         {
-            get => _gerador.PotenciaAtivaKW;
+            get => Gerador.PotenciaAtivaKW;
 
             set
             {
-                if (_gerador.PotenciaAtivaKW == value)
+                if (Gerador.PotenciaAtivaKW
+                    == value)
+                {
                     return;
+                }
 
-                _gerador.PotenciaAtivaKW = value;
+                Gerador.PotenciaAtivaKW =
+                    value;
 
                 OnPropertyChanged();
             }
@@ -105,33 +47,80 @@ namespace Araci.ViewModels
 
         public double FatorPotencia
         {
-            get => _gerador.FatorPotencia;
+            get => Gerador.FatorPotencia;
 
             set
             {
-                if (_gerador.FatorPotencia == value)
+                if (Gerador.FatorPotencia
+                    == value)
+                {
                     return;
+                }
 
-                _gerador.FatorPotencia = value;
+                Gerador.FatorPotencia =
+                    value;
 
                 OnPropertyChanged();
             }
         }
 
-        protected override string ValidateProperty(
-            string propertyName)
+        public string Alimentador
         {
-            return propertyName switch
+            get => Gerador.Alimentador;
+
+            set
             {
-                nameof(PotenciaAtivaKW) when PotenciaAtivaKW < 0 =>
-                    "Potencia ativa deve ser maior ou igual a zero.",
+                if (Gerador.Alimentador
+                    == value)
+                {
+                    return;
+                }
 
-                nameof(FatorPotencia) when FatorPotencia < 0 ||
-                                          FatorPotencia > 1 =>
-                    "Fator de potencia deve estar entre 0 e 1.",
+                Gerador.Alimentador =
+                    value;
 
-                _ => string.Empty
-            };
+                OnPropertyChanged();
+            }
+        }
+
+
+        public string Nome
+        {
+            get => Gerador.Nome;
+
+            set
+            {
+                if (Gerador.Nome
+                    == value)
+                {
+                    return;
+                }
+
+                Gerador.Nome =
+                    value;
+
+                OnPropertyChanged();
+            }
+        }
+
+
+        public string Barra
+        {
+            get => Gerador.Barra;
+
+            set
+            {
+                if (Gerador.Barra
+                    == value)
+                {
+                    return;
+                }
+
+                Gerador.Barra =
+                    value;
+
+                OnPropertyChanged();
+            }
         }
     }
 }

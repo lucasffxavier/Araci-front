@@ -5,6 +5,7 @@ using System.Windows.Input;
 using System.Windows.Media;
 
 using Araci.Core.Rendering;
+using Araci.Core.SceneNodes;
 using Araci.Models;
 using Araci.Models.Tipos;
 using Araci.Properties;
@@ -17,118 +18,143 @@ namespace Araci.ViewModels
     public abstract class ElementoViewModel
         : ViewModelBase
     {
-        protected readonly Elemento _modelo;
+        // =========================
+        // CAMPOS
+        // =========================
 
-        // ====================================================
+        private readonly ElementoNode _node;
+
+        private ICommand? _abrirPropriedadesTipoCommand;
+
+        // =========================
         // CONSTRUTOR
-        // ====================================================
+        // =========================
 
         protected ElementoViewModel(
             Elemento modelo,
+            ElementoNode node,
             TypeLibraryService types)
         {
-            _modelo = modelo
-                ?? throw new ArgumentNullException(nameof(modelo));
+            Modelo =
+                modelo ??
+                throw new ArgumentNullException(
+                    nameof(modelo));
 
-            Types = types
-                ?? throw new ArgumentNullException(nameof(types));
+            _node =
+                node ??
+                throw new ArgumentNullException(
+                    nameof(node));
 
-            Transform =
-                new ElementoTransform(
-                    modelo.PosicaoX,
-                    modelo.PosicaoY);
+            Types =
+                types ??
+                throw new ArgumentNullException(
+                    nameof(types));
 
             VisualState =
                 new ElementoVisualState();
 
-            Geometry =
-                new ElementoGeometryState();
+            _node.AtualizarGeometria();
         }
 
-        // ====================================================
+        // =========================
         // MODELO
-        // ====================================================
+        // =========================
 
-        public Elemento Modelo =>
-            _modelo;
+        public Elemento Modelo
+        {
+            get;
+        }
+
+        // =========================
+        // NODE
+        // =========================
+
+        public ElementoNode Node =>
+            _node;
 
         protected TypeLibraryService Types
-        { get; }
+        {
+            get;
+        }
 
-        // ====================================================
+        // =========================
         // TIPO
-        // ====================================================
+        // =========================
 
         public TipoElemento Tipo
         {
-            get => _modelo.Tipo!;
+            get => Modelo.Tipo!;
 
             set
             {
-                if (_modelo.Tipo == value)
+                if (ReferenceEquals(
+                        Modelo.Tipo,
+                        value))
+                {
                     return;
+                }
 
-                _modelo.Tipo = value;
+                Modelo.Tipo = value;
 
                 OnPropertyChanged();
 
-                OnPropertyChanged(nameof(TipoViewModel));
+                OnPropertyChanged(
+                    nameof(TipoViewModel));
             }
         }
 
-        public abstract IEnumerable
-            TiposDisponiveis
-        { get; }
+        public abstract IEnumerable TiposDisponiveis
+        {
+            get;
+        }
 
         protected void SelecionarPrimeiroTipoDisponivel()
         {
             TipoElemento? primeiroTipo =
                 null;
 
-            bool tipoAtualExisteNaLista =
+            bool tipoAtualExiste =
                 false;
 
-            foreach (object? item in TiposDisponiveis)
+            foreach (object? item
+                     in TiposDisponiveis)
             {
                 if (item is not TipoElemento tipo)
                     continue;
 
-                primeiroTipo ??=
-                    tipo;
+                primeiroTipo ??= tipo;
 
-                if (ReferenceEquals(tipo, _modelo.Tipo))
+                if (ReferenceEquals(
+                        tipo,
+                        Modelo.Tipo))
                 {
-                    tipoAtualExisteNaLista =
-                        true;
-
+                    tipoAtualExiste = true;
                     break;
                 }
             }
 
-            if (tipoAtualExisteNaLista ||
-                primeiroTipo == null)
-            {
+            if (tipoAtualExiste)
                 return;
-            }
 
-            Tipo =
-                primeiroTipo;
+            if (primeiroTipo == null)
+                return;
+
+            Tipo = primeiroTipo;
         }
 
         public virtual TipoElementoViewModel?
             TipoViewModel =>
-                TipoElementoViewModelFactory
-                    .Criar(Tipo);
+            TipoElementoViewModelFactory
+                .Criar(Tipo);
 
-        // ====================================================
-        // COMANDO
-        // ====================================================
-
-        private ICommand? _abrirPropriedadesTipoCommand;
+        // =========================
+        // COMANDOS
+        // =========================
 
         public ICommand AbrirPropriedadesTipoCommand =>
             _abrirPropriedadesTipoCommand ??=
-                new RelayCommand(AbrirPropriedadesTipo);
+            new RelayCommand(
+                AbrirPropriedadesTipo);
 
         private void AbrirPropriedadesTipo()
         {
@@ -136,7 +162,8 @@ namespace Araci.ViewModels
                 new TypePropertiesWindow
                 {
                     Owner =
-                        Application.Current.MainWindow,
+                        Application.Current
+                            .MainWindow,
 
                     DataContext =
                         TipoViewModel
@@ -145,20 +172,14 @@ namespace Araci.ViewModels
             janela.ShowDialog();
         }
 
-        // ====================================================
-        // TRANSFORM
-        // ====================================================
-
-        public ElementoTransform Transform
-        { get; }
-
-        // ====================================================
+        // =========================
         // VISUAL
-        // ====================================================
+        // =========================
 
-        public ElementoVisualState
-            VisualState
-        { get; }
+        public ElementoVisualState VisualState
+        {
+            get;
+        }
 
         public bool IsSelecionado
         {
@@ -166,18 +187,25 @@ namespace Araci.ViewModels
 
             set
             {
-                if (VisualState.IsSelecionado == value)
+                if (VisualState.IsSelecionado
+                    == value)
+                {
                     return;
+                }
 
-                VisualState.AtualizarSelecao(value);
+                VisualState
+                    .AtualizarSelecao(value);
 
                 OnPropertyChanged();
 
-                OnPropertyChanged(nameof(Stroke));
+                OnPropertyChanged(
+                    nameof(Stroke));
 
-                OnPropertyChanged(nameof(StrokeThickness));
+                OnPropertyChanged(
+                    nameof(StrokeThickness));
 
-                OnPropertyChanged(nameof(RenderData));
+                OnPropertyChanged(
+                    nameof(RenderData));
             }
         }
 
@@ -187,148 +215,125 @@ namespace Araci.ViewModels
         public double StrokeThickness =>
             VisualState.StrokeThickness;
 
-        // ====================================================
+        // =========================
         // RENDER
-        // ====================================================
+        // =========================
 
         public virtual ElementoRenderData RenderData =>
-            new ElementoRenderData(
+            new(
                 Largura,
                 Altura,
-                Geometry.PontoLocalInicial,
-                Geometry.PontoLocalFinal,
+                PontoLocalInicial,
+                PontoLocalFinal,
                 Stroke,
                 StrokeThickness);
 
-        // ====================================================
+        protected virtual Point PontoLocalInicial =>
+            new(0, 0);
+
+        protected virtual Point PontoLocalFinal =>
+            new(Largura, Altura);
+
+        // =========================
         // GEOMETRIA
-        // ====================================================
-
-        public ElementoGeometryState
-            Geometry
-        { get; }
-
-        protected virtual double
-            LarguraBase =>
-                70;
-
-        protected virtual double
-            AlturaBase =>
-                70;
-
-        public virtual double
-            Largura =>
-                Geometry.Largura;
-
-        public virtual double
-            Altura =>
-                Geometry.Altura;
-
-        public virtual Rect
-            Bounds =>
-                Geometry.Bounds;
-
-        public virtual Point
-            Centro =>
-                Geometry.Centro;
-
-        protected virtual void
-            AtualizarGeometria()
-        {
-            Geometry.AtualizarRetangulo(
-                X,
-                Y,
-                LarguraBase,
-                AlturaBase);
-
-            NotificarGeometria();
-        }
-
-        protected void
-            NotificarGeometria()
-        {
-            OnPropertyChanged(nameof(X));
-
-            OnPropertyChanged(nameof(Y));
-
-            OnPropertyChanged(nameof(WorldX));
-
-            OnPropertyChanged(nameof(WorldY));
-
-            OnPropertyChanged(nameof(Largura));
-
-            OnPropertyChanged(nameof(Altura));
-
-            OnPropertyChanged(nameof(Bounds));
-
-            OnPropertyChanged(nameof(Centro));
-
-            OnPropertyChanged(nameof(RenderData));
-        }
-
-        // ====================================================
-        // POSIÇÃO EM MUNDO
-        // ====================================================
-
-        public double WorldX =>
-            X;
-
-        public double WorldY =>
-            Y;
+        // =========================
 
         public virtual double X
         {
-            get => Transform.X;
+            get => Node.X;
 
             set
             {
-                if (Transform.X == value)
+                if (Math.Abs(Node.X - value)
+                    < 0.0001)
+                {
                     return;
+                }
 
-                Transform.X =
-                    value;
+                Node.X = value;
 
-                _modelo.PosicaoX =
-                    value;
-
-                AtualizarGeometria();
+                AtualizarNode();
             }
         }
 
         public virtual double Y
         {
-            get => Transform.Y;
+            get => Node.Y;
 
             set
             {
-                if (Transform.Y == value)
+                if (Math.Abs(Node.Y - value)
+                    < 0.0001)
+                {
                     return;
+                }
 
-                Transform.Y =
-                    value;
+                Node.Y = value;
 
-                _modelo.PosicaoY =
-                    value;
-
-                AtualizarGeometria();
+                AtualizarNode();
             }
         }
 
-        // ====================================================
-        // MOVIMENTO
-        // ====================================================
+        public virtual double WorldX =>
+            Node.X;
 
-        public virtual void Mover(
-            Vector delta)
+        public virtual double WorldY =>
+            Node.Y;
+
+        public virtual double Largura =>
+            Node.Largura;
+
+        public virtual double Altura =>
+            Node.Altura;
+
+        public virtual Rect Bounds =>
+            Node.Bounds;
+
+        public virtual Point Centro =>
+            Node.Centro;
+
+        // =========================
+        // UPDATE
+        // =========================
+
+        protected virtual void AtualizarNode()
         {
-            X += delta.X;
+            Node.AtualizarGeometria();
 
-            Y += delta.Y;
+            NotificarGeometria();
         }
 
-        // ====================================================
-        // SNAPSHOT
-        // ====================================================
+        protected virtual void NotificarGeometria()
+        {
+            OnPropertyChanged(nameof(X));
+            OnPropertyChanged(nameof(Y));
+
+            OnPropertyChanged(nameof(WorldX));
+            OnPropertyChanged(nameof(WorldY));
+
+            OnPropertyChanged(nameof(Largura));
+            OnPropertyChanged(nameof(Altura));
+
+            OnPropertyChanged(nameof(Bounds));
+            OnPropertyChanged(nameof(Centro));
+
+            OnPropertyChanged(nameof(RenderData));
+        }
+
+        // =========================
+        // MOVIMENTAÇÃO
+        // =========================
+
+        public virtual void Mover(Vector delta)
+        {
+            Node.Mover(delta);
+
+            NotificarGeometria();
+        }
+
+        // =========================
+        // ESTADO
+        // =========================
 
         public virtual ElementoEstado
             CapturarEstado()
@@ -341,19 +346,10 @@ namespace Araci.ViewModels
         public virtual void AplicarEstado(
             ElementoEstado estado)
         {
-            Transform.X =
-                estado.X;
+            Node.X = estado.X;
+            Node.Y = estado.Y;
 
-            Transform.Y =
-                estado.Y;
-
-            _modelo.PosicaoX =
-                estado.X;
-
-            _modelo.PosicaoY =
-                estado.Y;
-
-            AtualizarGeometria();
+            AtualizarNode();
         }
     }
 }

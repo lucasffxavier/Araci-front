@@ -2,36 +2,15 @@
 
 namespace Araci.Models
 {
-    public class Cabo : Elemento
+    public class Cabo
+        : ElementoLinear
     {
-        // =========================
-        // INSTÂNCIA
-        // =========================
-
         public string BarraOrigem { get; set; }
 
         public string BarraDestino { get; set; }
 
-        public double Comprimento { get; set; }
-
-        // =========================
-        // GEOMETRIA
-        // =========================
-
-        public double PosicaoX2 { get; set; }
-
-        public double PosicaoY2 { get; set; }
-
-        // =========================
-        // TIPO FORTE
-        // =========================
-
         public TipoCabo TipoCabo =>
             (TipoCabo)Tipo!;
-
-        // =========================
-        // CONSTRUTOR
-        // =========================
 
         public Cabo()
         {
@@ -49,23 +28,14 @@ namespace Araci.Models
             PosicaoY2 = 100;
         }
 
-        // =========================
-        // CLONAGEM
-        // =========================
-
         public override Elemento Clonar()
         {
             var clone = new Cabo();
 
-            CopiarBasePara(clone);
+            CopiarLinearPara(clone);
 
             clone.BarraOrigem = BarraOrigem;
             clone.BarraDestino = BarraDestino;
-
-            clone.Comprimento = Comprimento;
-
-            clone.PosicaoX2 = PosicaoX2;
-            clone.PosicaoY2 = PosicaoY2;
 
             return clone;
         }

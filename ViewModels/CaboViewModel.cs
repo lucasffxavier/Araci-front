@@ -1,54 +1,46 @@
-﻿using Araci.Models;
-using Araci.Services;
-using System;
-using System.Collections;
+﻿using System.Collections;
 using System.Windows;
-using System.Windows.Media;
+
+using Araci.Core.SceneNodes;
+using Araci.Models;
+using Araci.Services;
 
 namespace Araci.ViewModels
 {
     public class CaboViewModel
         : ElementoViewModel
     {
-        private readonly Cabo _cabo;
+        // =========================
+        // CONSTRUTOR
+        // =========================
+
+        public CaboViewModel(
+            Cabo modelo,
+            TypeLibraryService types)
+            : base(
+                modelo,
+                new CaboNode(modelo),
+                types)
+        {
+            SelecionarPrimeiroTipoDisponivel();
+        }
+
+        // =========================
+        // MODELO
+        // =========================
+
+        public Cabo Cabo =>
+            (Cabo)Modelo;
+
+        private CaboNode CaboNode =>
+            (CaboNode)Node;
+
+        // =========================
+        // TIPOS
+        // =========================
 
         public override IEnumerable TiposDisponiveis =>
             Types.TiposCabos;
-
-        public CaboViewModel(
-            Cabo cabo,
-            TypeLibraryService types)
-            : base(cabo, types)
-        {
-            _cabo = cabo
-                ?? throw new ArgumentNullException(nameof(cabo));
-
-            SelecionarPrimeiroTipoDisponivel();
-
-            // =========================
-            // GARANTE SEGUNDO PONTO
-            // =========================
-
-            if (_cabo.PosicaoX2 == 0 &&
-                _cabo.PosicaoY2 == 0)
-            {
-                _cabo.PosicaoX2 =
-                    _cabo.PosicaoX + 120;
-
-                _cabo.PosicaoY2 =
-                    _cabo.PosicaoY;
-            }
-
-            // =========================
-            // VISUAL BASE
-            // =========================
-
-            VisualState.DefinirVisualBase(
-                Brushes.Black,
-                4);
-
-            AtualizarGeometria();
-        }
 
         // =========================
         // EXTREMIDADE FINAL
@@ -56,48 +48,56 @@ namespace Araci.ViewModels
 
         public double X2
         {
-            get => _cabo.PosicaoX2;
+            get => Cabo.PosicaoX2;
 
             set
             {
-                if (_cabo.PosicaoX2 == value)
+                if (Cabo.PosicaoX2 == value)
                     return;
 
-                _cabo.PosicaoX2 = value;
+                Cabo.PosicaoX2 = value;
 
-                AtualizarGeometria();
+                CaboNode.AtualizarGeometria();
+
+                NotificarGeometria();
+
+                OnPropertyChanged(nameof(X2));
             }
         }
 
         public double Y2
         {
-            get => _cabo.PosicaoY2;
+            get => Cabo.PosicaoY2;
 
             set
             {
-                if (_cabo.PosicaoY2 == value)
+                if (Cabo.PosicaoY2 == value)
                     return;
 
-                _cabo.PosicaoY2 = value;
+                Cabo.PosicaoY2 = value;
 
-                AtualizarGeometria();
+                CaboNode.AtualizarGeometria();
+
+                NotificarGeometria();
+
+                OnPropertyChanged(nameof(Y2));
             }
         }
 
-        // =========================
-        // DADOS
-        // =========================
-
         public string Nome
         {
-            get => _cabo.Nome;
+            get => Cabo.Nome;
 
             set
             {
-                if (_cabo.Nome == value)
+                if (Cabo.Nome
+                    == value)
+                {
                     return;
+                }
 
-                _cabo.Nome = value;
+                Cabo.Nome =
+                    value;
 
                 OnPropertyChanged();
             }
@@ -105,14 +105,18 @@ namespace Araci.ViewModels
 
         public string BarraOrigem
         {
-            get => _cabo.BarraOrigem;
+            get => Cabo.BarraOrigem;
 
             set
             {
-                if (_cabo.BarraOrigem == value)
+                if (Cabo.BarraOrigem
+                    == value)
+                {
                     return;
+                }
 
-                _cabo.BarraOrigem = value;
+                Cabo.BarraOrigem =
+                    value;
 
                 OnPropertyChanged();
             }
@@ -120,14 +124,18 @@ namespace Araci.ViewModels
 
         public string BarraDestino
         {
-            get => _cabo.BarraDestino;
+            get => Cabo.Nome;
 
             set
             {
-                if (_cabo.BarraDestino == value)
+                if (Cabo.BarraDestino
+                    == value)
+                {
                     return;
+                }
 
-                _cabo.BarraDestino = value;
+                Cabo.BarraDestino =
+                    value;
 
                 OnPropertyChanged();
             }
@@ -135,96 +143,55 @@ namespace Araci.ViewModels
 
         public double Comprimento
         {
-            get => _cabo.Comprimento;
+            get => Cabo.Comprimento;
 
             set
             {
-                if (_cabo.Comprimento == value)
+                if (Cabo.Comprimento
+                    == value)
+                {
                     return;
+                }
 
-                _cabo.Comprimento = value;
+                Cabo.Comprimento =
+                    value;
 
                 OnPropertyChanged();
             }
         }
 
-        protected override string ValidateProperty(
-            string propertyName)
-        {
-            return propertyName switch
-            {
-                nameof(Comprimento) when Comprimento < 0 =>
-                    "Comprimento deve ser maior ou igual a zero.",
-
-                _ => string.Empty
-            };
-        }
-
 
         // =========================
-        // GEOMETRIA
+        // PONTOS LOCAIS
         // =========================
 
-        protected override void AtualizarGeometria()
-        {
-            Geometry.AtualizarLinha(
-                X,
-                Y,
-                X2,
-                Y2);
+        protected override Point
+            PontoLocalInicial =>
+            new(
+                Cabo.PosicaoX - Bounds.X,
+                Cabo.PosicaoY - Bounds.Y);
 
-            NotificarGeometria();
+        protected override Point
+            PontoLocalFinal =>
+            new(
+                Cabo.PosicaoX2 - Bounds.X,
+                Cabo.PosicaoY2 - Bounds.Y);
+
+        // =========================
+        // MOVIMENTAÇÃO
+        // =========================
+
+        public override void Mover(
+            Vector delta)
+        {
+            base.Mover(delta);
 
             OnPropertyChanged(nameof(X2));
             OnPropertyChanged(nameof(Y2));
         }
 
         // =========================
-        // MOVIMENTO COM LIMITE
-        // =========================
-
-        public override void Mover(
-            Vector delta)
-        {
-            double novoX1 =
-                X + delta.X;
-
-            double novoY1 =
-                Y + delta.Y;
-
-            double novoX2 =
-                X2 + delta.X;
-
-            double novoY2 =
-                Y2 + delta.Y;
-
-            // =========================
-            // APLICA POSIÇÕES
-            // =========================
-
-            Transform.X =
-                novoX1;
-
-            Transform.Y =
-                novoY1;
-
-            _modelo.PosicaoX =
-                novoX1;
-
-            _modelo.PosicaoY =
-                novoY1;
-
-            _cabo.PosicaoX2 =
-                novoX2;
-
-            _cabo.PosicaoY2 =
-                novoY2;
-
-            AtualizarGeometria();
-        }
-
-        // =========================
-        // SNAPSHOT
+        // ESTADO
         // =========================
 
         public override ElementoEstado
@@ -237,35 +204,21 @@ namespace Araci.ViewModels
                 Y2);
         }
 
-        // =========================
-        // RESTAURAÇÃO
-        // =========================
-
         public override void AplicarEstado(
             ElementoEstado estado)
         {
-            Transform.X =
-                estado.X;
+            Cabo.PosicaoX = estado.X;
+            Cabo.PosicaoY = estado.Y;
 
-            Transform.Y =
-                estado.Y;
+            Cabo.PosicaoX2 = estado.X2;
+            Cabo.PosicaoY2 = estado.Y2;
 
-            _modelo.PosicaoX =
-                estado.X;
+            CaboNode.AtualizarGeometria();
 
-            _modelo.PosicaoY =
-                estado.Y;
+            NotificarGeometria();
 
-            if (estado.PossuiSegundoPonto)
-            {
-                _cabo.PosicaoX2 =
-                    estado.X2;
-
-                _cabo.PosicaoY2 =
-                    estado.Y2;
-            }
-
-            AtualizarGeometria();
+            OnPropertyChanged(nameof(X2));
+            OnPropertyChanged(nameof(Y2));
         }
     }
 }

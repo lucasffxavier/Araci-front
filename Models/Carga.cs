@@ -2,30 +2,13 @@
 
 namespace Araci.Models
 {
-    public class Carga : Elemento
+    public class Carga
+        : ElementoEquipamento
     {
-        // =========================
-        // INSTÂNCIA
-        // =========================
-
-        public string Barra { get; set; }
-
-        public string Alimentador { get; set; }
-
-        public double PotenciaAtivaKW { get; set; }
-
         public double PotenciaReativaKvar { get; set; }
-
-        // =========================
-        // TIPO FORTE
-        // =========================
 
         public TipoCarga TipoCarga =>
             (TipoCarga)Tipo!;
-
-        // =========================
-        // CONSTRUTOR
-        // =========================
 
         public Carga()
         {
@@ -42,21 +25,14 @@ namespace Araci.Models
             PosicaoY = 250;
         }
 
-        // =========================
-        // CLONAGEM
-        // =========================
-
         public override Elemento Clonar()
         {
             var clone = new Carga();
 
-            CopiarBasePara(clone);
+            CopiarEquipamentoPara(clone);
 
-            clone.Barra = Barra;
-            clone.Alimentador = Alimentador;
-
-            clone.PotenciaAtivaKW = PotenciaAtivaKW;
-            clone.PotenciaReativaKvar = PotenciaReativaKvar;
+            clone.PotenciaReativaKvar =
+                PotenciaReativaKvar;
 
             return clone;
         }

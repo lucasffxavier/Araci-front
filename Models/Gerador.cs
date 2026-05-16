@@ -2,30 +2,13 @@
 
 namespace Araci.Models
 {
-    public class Gerador : Elemento
+    public class Gerador
+        : ElementoEquipamento
     {
-        // =========================
-        // INSTÂNCIA
-        // =========================
-
-        public string Barra { get; set; }
-
-        public string Alimentador { get; set; }
-
-        public double PotenciaAtivaKW { get; set; }
-
         public double FatorPotencia { get; set; }
-
-        // =========================
-        // TIPO FORTE
-        // =========================
 
         public TipoGerador TipoGerador =>
             (TipoGerador)Tipo!;
-
-        // =========================
-        // CONSTRUTOR
-        // =========================
 
         public Gerador()
         {
@@ -43,21 +26,14 @@ namespace Araci.Models
             PosicaoY = 200;
         }
 
-        // =========================
-        // CLONAGEM
-        // =========================
-
         public override Elemento Clonar()
         {
             var clone = new Gerador();
 
-            CopiarBasePara(clone);
+            CopiarEquipamentoPara(clone);
 
-            clone.Barra = Barra;
-            clone.Alimentador = Alimentador;
-
-            clone.PotenciaAtivaKW = PotenciaAtivaKW;
-            clone.FatorPotencia = FatorPotencia;
+            clone.FatorPotencia =
+                FatorPotencia;
 
             return clone;
         }
