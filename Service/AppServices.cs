@@ -1,12 +1,3 @@
-// =============================================================
-// AppServices — PROXY SOMENTE LEITURA de EditorContext
-// =============================================================
-// ⚠️ FASE 1: Este arquivo NÃO é mais a fonte da verdade.
-//    Existe apenas para compatibilidade durante a migração.
-//    Objetivo: remover completamente após todas as injeções.
-//    NUNCA escrever lógica nova aqui.
-// =============================================================
-
 using Araci.Core.Commands;
 using Araci.Core.Documents;
 using Araci.Core.Transactions;
@@ -20,9 +11,6 @@ namespace Araci
         error: false)]
     public static class AppServices
     {
-        // =========================
-        // CONTEXTO RAIZ
-        // =========================
 
         public static EditorContext Current
         { get; set; }
@@ -34,11 +22,6 @@ namespace Araci
             Current =
                 context ?? new EditorContext();
         }
-
-        // =========================
-        // PROXIES — APENAS LEITURA
-        // (não adicionar novos membros aqui)
-        // =========================
 
         public static AraciDocument Document =>
             Current.Document;

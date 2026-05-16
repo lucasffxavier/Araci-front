@@ -1,8 +1,4 @@
-﻿// =========================
-// ARQUIVO: Applications/Editar/Mover/MoverTool.cs
-// =========================
-
-using System.Windows;
+﻿using System.Windows;
 using System.Windows.Input;
 
 using Araci.Applications.Editar.Base;
