@@ -25,10 +25,8 @@ namespace Araci.Ribbon.Tabs
         // CONTEXT
         // =========================
 
-        private EditorContext Context =>
-            DataContext as EditorContext
-            ?? throw new InvalidOperationException(
-                "EditorContext não encontrado no DataContext.");
+        private EditorContext? Context =>
+            DataContext as EditorContext;
 
         // =========================
         // GERADOR
@@ -38,6 +36,8 @@ namespace Araci.Ribbon.Tabs
             object sender,
             RoutedEventArgs e)
         {
+            if (Context == null) return;
+
             InserirGeradorApplication app =
                 new(Context);
 
@@ -52,6 +52,8 @@ namespace Araci.Ribbon.Tabs
             object sender,
             RoutedEventArgs e)
         {
+            if (Context == null) return;
+
             InserirCargaApplication app =
                 new(Context);
 
@@ -66,6 +68,8 @@ namespace Araci.Ribbon.Tabs
             object sender,
             RoutedEventArgs e)
         {
+            if (Context == null) return;
+
             InserirCaboApplication app =
                 new(Context);
 

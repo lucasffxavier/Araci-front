@@ -15,10 +15,6 @@ namespace Araci
 
             _context = new EditorContext();
 
-#pragma warning disable CS0618
-            AppServices.Current = _context;
-#pragma warning restore CS0618
-
             Viewport.Inicializar(_context);
 
             InicializarRibbon();

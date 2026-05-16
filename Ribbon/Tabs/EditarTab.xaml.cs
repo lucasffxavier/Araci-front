@@ -1,5 +1,4 @@
-﻿using System;
-using System.Windows;
+﻿using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Media;
 
@@ -48,10 +47,8 @@ namespace Araci.Ribbon.Tabs
         // CONTEXT
         // =========================
 
-        private EditorContext Context =>
-            DataContext as EditorContext
-            ?? throw new InvalidOperationException(
-                "EditorContext não encontrado no DataContext.");
+        private EditorContext? Context =>
+            DataContext as EditorContext;
 
         // =========================
         // LOADED
@@ -61,6 +58,8 @@ namespace Araci.Ribbon.Tabs
             object sender,
             RoutedEventArgs e)
         {
+            if (Context == null) return;
+
             AssinarEventoFerramenta();
 
             AtualizarBotoes(
@@ -87,6 +86,8 @@ namespace Araci.Ribbon.Tabs
             if (_eventoFerramentaAssinado)
                 return;
 
+            if (Context == null) return;
+
             Context.Tools.FerramentaAlterada +=
                 OnFerramentaAlterada;
 
@@ -98,6 +99,8 @@ namespace Araci.Ribbon.Tabs
         {
             if (!_eventoFerramentaAssinado)
                 return;
+
+            if (Context == null) return;
 
             Context.Tools.FerramentaAlterada -=
                 OnFerramentaAlterada;
@@ -173,6 +176,7 @@ namespace Araci.Ribbon.Tabs
             object sender,
             RoutedEventArgs e)
         {
+            if (Context == null) return;
             Context.Tools.AtivarFerramenta(
                 new SelecionarTool(Context));
         }
@@ -181,6 +185,7 @@ namespace Araci.Ribbon.Tabs
             object sender,
             RoutedEventArgs e)
         {
+            if (Context == null) return;
             Context.Tools.AtivarFerramenta(
                 new MoverTool(Context));
         }
@@ -189,6 +194,7 @@ namespace Araci.Ribbon.Tabs
             object sender,
             RoutedEventArgs e)
         {
+            if (Context == null) return;
             ClipboardService.CopiarSelecionados(
                 Context);
         }
@@ -197,6 +203,7 @@ namespace Araci.Ribbon.Tabs
             object sender,
             RoutedEventArgs e)
         {
+            if (Context == null) return;
             ClipboardService.Colar(
                 Context);
         }
@@ -205,6 +212,7 @@ namespace Araci.Ribbon.Tabs
             object sender,
             RoutedEventArgs e)
         {
+            if (Context == null) return;
             Context.Tools.AtivarFerramenta(
                 new DeletarTool(Context));
         }
@@ -217,7 +225,7 @@ namespace Araci.Ribbon.Tabs
             object sender,
             RoutedEventArgs e)
         {
-            Context.Commands.Undo();
+            Context?.Commands.Undo();
         }
 
         // =========================
@@ -228,7 +236,7 @@ namespace Araci.Ribbon.Tabs
             object sender,
             RoutedEventArgs e)
         {
-            Context.Commands.Redo();
+            Context?.Commands.Redo();
         }
     }
 }
