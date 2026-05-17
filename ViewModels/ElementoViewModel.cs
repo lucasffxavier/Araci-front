@@ -12,6 +12,9 @@ using Araci.Properties;
 using Araci.Services;
 using Araci.ViewModels.Base;
 using Araci.ViewModels.VisualStates;
+using System.Collections.ObjectModel;
+using System.Linq;
+
 
 namespace Araci.ViewModels
 {
@@ -351,5 +354,16 @@ namespace Araci.ViewModels
 
             AtualizarNode();
         }
+
+        private ObservableCollection<ParameterViewModel>?
+            _parametros;
+
+        public ObservableCollection<ParameterViewModel>
+            Parametros =>
+            _parametros ??=
+                new ObservableCollection<ParameterViewModel>(
+                    Modelo.Parametros.Values
+                        .Select(p =>
+                            new ParameterViewModel(p)));
     }
 }

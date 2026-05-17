@@ -5,10 +5,21 @@ namespace Araci.Models
     public class Carga
         : ElementoEquipamento
     {
-        public double PotenciaReativaKvar { get; set; }
+        public const string PARAM_POTENCIA_REATIVA =
+            "PotenciaReativaKvar";
 
         public TipoCarga TipoCarga =>
             (TipoCarga)Tipo!;
+
+        public double PotenciaReativaKvar
+        {
+            get => Obter<double>(
+                PARAM_POTENCIA_REATIVA);
+
+            set => Definir(
+                PARAM_POTENCIA_REATIVA,
+                value);
+        }
 
         public Carga()
         {
@@ -19,7 +30,11 @@ namespace Araci.Models
             Alimentador = "AL-01";
 
             PotenciaAtivaKW = 1500;
-            PotenciaReativaKvar = 450;
+
+            DefinirParametro(
+                new Parameter<double>(
+                    PARAM_POTENCIA_REATIVA,
+                    450));
 
             PosicaoX = 500;
             PosicaoY = 250;
@@ -30,9 +45,6 @@ namespace Araci.Models
             var clone = new Carga();
 
             CopiarEquipamentoPara(clone);
-
-            clone.PotenciaReativaKvar =
-                PotenciaReativaKvar;
 
             return clone;
         }

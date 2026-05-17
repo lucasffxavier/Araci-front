@@ -220,5 +220,7 @@ namespace Araci.ViewModels
             OnPropertyChanged(nameof(X2));
             OnPropertyChanged(nameof(Y2));
         }
+
+
     }
 }
