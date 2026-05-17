@@ -1,29 +1,31 @@
-﻿using System.Windows.Input;
-using System.Windows.Media;
-using System.Windows.Shapes;
-using System.Windows.Data;
+﻿using System.Windows.Data;
+using System.Windows.Input;
 
 using Araci.Controls.Base;
 
+using SharpVectors.Converters;
+
 namespace Araci.Controls
 {
-    public class GeradorControl : ElementoControlBase
+    public class GeradorControl
+        : ElementoControlBase
     {
-        private readonly Ellipse _ellipse;
+        private readonly SvgViewbox _svg;
 
         public GeradorControl()
         {
             Cursor = Cursors.Hand;
 
-            _ellipse = new Ellipse
+            _svg = new SvgViewbox
             {
-                Fill =
-                    new SolidColorBrush(
-                        (Color)ColorConverter
-                            .ConvertFromString("#007ACC"))
+                Stretch = System.Windows.Media.Stretch.Fill,
+
+                Source = new System.Uri(
+                    "pack://application:,,,/Assets/Svg/gerador.svg",
+                    System.UriKind.Absolute)
             };
 
-            Content = _ellipse;
+            Content = _svg;
 
             ConfigurarBindings();
         }
@@ -41,21 +43,13 @@ namespace Araci.Controls
                 HeightProperty,
                 new Binding("RenderData.Altura"));
 
-            _ellipse.SetBinding(
+            _svg.SetBinding(
                 WidthProperty,
                 new Binding("RenderData.Largura"));
 
-            _ellipse.SetBinding(
+            _svg.SetBinding(
                 HeightProperty,
                 new Binding("RenderData.Altura"));
-
-            _ellipse.SetBinding(
-                Shape.StrokeProperty,
-                new Binding("RenderData.Stroke"));
-
-            _ellipse.SetBinding(
-                Shape.StrokeThicknessProperty,
-                new Binding("RenderData.StrokeThickness"));
         }
     }
 }

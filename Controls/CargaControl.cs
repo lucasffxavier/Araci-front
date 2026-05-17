@@ -1,31 +1,31 @@
-﻿using System.Windows.Input;
-using System.Windows.Media;
-using System.Windows.Shapes;
-using System.Windows.Data;
+﻿using System.Windows.Data;
+using System.Windows.Input;
 
 using Araci.Controls.Base;
 
+using SharpVectors.Converters;
+
 namespace Araci.Controls
 {
-    public class CargaControl : ElementoControlBase
+    public class CargaControl
+        : ElementoControlBase
     {
-        private readonly Rectangle _rectangle;
+        private readonly SvgViewbox _svg;
 
         public CargaControl()
         {
             Cursor = Cursors.Hand;
 
-            _rectangle = new Rectangle
+            _svg = new SvgViewbox
             {
-                RadiusX = 6,
-                RadiusY = 6,
-                Fill =
-                    new SolidColorBrush(
-                        (Color)ColorConverter
-                            .ConvertFromString("#E0A800"))
+                Stretch = System.Windows.Media.Stretch.Fill,
+
+                Source = new System.Uri(
+                    "pack://application:,,,/Assets/Svg/carga.svg",
+                    System.UriKind.Absolute)
             };
 
-            Content = _rectangle;
+            Content = _svg;
 
             ConfigurarBindings();
         }
@@ -43,21 +43,13 @@ namespace Araci.Controls
                 HeightProperty,
                 new Binding("RenderData.Altura"));
 
-            _rectangle.SetBinding(
+            _svg.SetBinding(
                 WidthProperty,
                 new Binding("RenderData.Largura"));
 
-            _rectangle.SetBinding(
+            _svg.SetBinding(
                 HeightProperty,
                 new Binding("RenderData.Altura"));
-
-            _rectangle.SetBinding(
-                Shape.StrokeProperty,
-                new Binding("RenderData.Stroke"));
-
-            _rectangle.SetBinding(
-                Shape.StrokeThicknessProperty,
-                new Binding("RenderData.StrokeThickness"));
         }
     }
 }
