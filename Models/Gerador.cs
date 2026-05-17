@@ -5,10 +5,37 @@ namespace Araci.Models
     public class Gerador
         : ElementoEquipamento
     {
-        public double FatorPotencia { get; set; }
+        // =========================
+        // PARÂMETROS
+        // =========================
+
+        public const string PARAM_FATOR_POTENCIA =
+            "FatorPotencia";
+
+        // =========================
+        // TIPO
+        // =========================
 
         public TipoGerador TipoGerador =>
             (TipoGerador)Tipo!;
+
+        // =========================
+        // WRAPPERS BIM
+        // =========================
+
+        public double FatorPotencia
+        {
+            get => Obter<double>(
+                PARAM_FATOR_POTENCIA);
+
+            set => Definir(
+                PARAM_FATOR_POTENCIA,
+                value);
+        }
+
+        // =========================
+        // CONSTRUTOR
+        // =========================
 
         public Gerador()
         {
@@ -20,20 +47,24 @@ namespace Araci.Models
 
             PotenciaAtivaKW = 5000;
 
-            FatorPotencia = 0.98;
+            DefinirParametro(
+                new Parameter<double>(
+                    PARAM_FATOR_POTENCIA,
+                    0.98));
 
             PosicaoX = 300;
             PosicaoY = 200;
         }
+
+        // =========================
+        // CLONAGEM
+        // =========================
 
         public override Elemento Clonar()
         {
             var clone = new Gerador();
 
             CopiarEquipamentoPara(clone);
-
-            clone.FatorPotencia =
-                FatorPotencia;
 
             return clone;
         }

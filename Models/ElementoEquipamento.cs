@@ -9,14 +9,11 @@ namespace Araci.Models
         // PARÂMETROS BIM
         // =========================
 
-        public const string PARAM_BARRA =
-            "Barra";
+        public const string PARAM_BARRA = "Barra";
 
-        public const string PARAM_ALIMENTADOR =
-            "Alimentador";
+        public const string PARAM_ALIMENTADOR = "Alimentador";
 
-        public const string PARAM_POTENCIA_KW =
-            "PotenciaAtivaKW";
+        public const string PARAM_POTENCIA_KW = "PotenciaAtivaKW";
 
         // =========================
         // CONSTRUTOR
