@@ -1,18 +1,136 @@
-﻿namespace Araci.Models.Tipos
+﻿using System;
+using System.Collections.Generic;
+
+namespace Araci.Models.Tipos
 {
     public abstract class TipoElemento
     {
         // =========================
-        // IDENTIFICAÇÃO
+        // PARÂMETROS BASE
         // =========================
 
-        public string NomeTipo { get; set; }
-            = string.Empty;
+        public const string PARAM_NOME_TIPO =
+            "NomeTipo";
 
-        public string Familia { get; set; }
-            = string.Empty;
+        public const string PARAM_FAMILIA =
+            "Familia";
 
-        public string Categoria { get; set; }
-            = string.Empty;
+        public const string PARAM_CATEGORIA =
+            "Categoria";
+
+        // =========================
+        // CAMPOS
+        // =========================
+
+        private readonly Dictionary<string, Parameter>
+            _parametros = new();
+
+        // =========================
+        // CONSTRUTOR
+        // =========================
+
+        protected TipoElemento()
+        {
+            DefinirParametro(
+                new Parameter<string>(
+                    PARAM_NOME_TIPO,
+                    string.Empty));
+
+            DefinirParametro(
+                new Parameter<string>(
+                    PARAM_FAMILIA,
+                    string.Empty));
+
+            DefinirParametro(
+                new Parameter<string>(
+                    PARAM_CATEGORIA,
+                    string.Empty));
+        }
+
+        // =========================
+        // WRAPPERS BIM BASE
+        // =========================
+
+        public string NomeTipo
+        {
+            get => Obter<string>(
+                PARAM_NOME_TIPO);
+
+            set => Definir(
+                PARAM_NOME_TIPO,
+                value);
+        }
+
+        public string Familia
+        {
+            get => Obter<string>(
+                PARAM_FAMILIA);
+
+            set => Definir(
+                PARAM_FAMILIA,
+                value);
+        }
+
+        public string Categoria
+        {
+            get => Obter<string>(
+                PARAM_CATEGORIA);
+
+            set => Definir(
+                PARAM_CATEGORIA,
+                value);
+        }
+
+        // =========================
+        // PARÂMETROS
+        // =========================
+
+        public IReadOnlyDictionary<string, Parameter>
+            Parametros =>
+            _parametros;
+
+        protected void DefinirParametro(
+            Parameter parameter)
+        {
+            _parametros[parameter.Nome] =
+                parameter;
+        }
+
+        public bool PossuiParametro(
+            string nome)
+        {
+            return _parametros.ContainsKey(nome);
+        }
+
+        public T Obter<T>(
+            string nome)
+        {
+            if (!_parametros.TryGetValue(
+                    nome,
+                    out var parameter))
+            {
+                throw new InvalidOperationException(
+                    $"Parâmetro de tipo '{nome}' não encontrado.");
+            }
+
+            return ((Parameter<T>)parameter)
+                .Valor;
+        }
+
+        public void Definir<T>(
+            string nome,
+            T valor)
+        {
+            if (!_parametros.TryGetValue(
+                    nome,
+                    out var parameter))
+            {
+                throw new InvalidOperationException(
+                    $"Parâmetro de tipo '{nome}' não encontrado.");
+            }
+
+            ((Parameter<T>)parameter).Valor =
+                valor!;
+        }
     }
 }
