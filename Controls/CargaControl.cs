@@ -1,14 +1,12 @@
-﻿using System.Windows.Data;
+﻿using System;
+using System.Windows.Data;
 using System.Windows.Input;
-
 using Araci.Controls.Base;
-
 using SharpVectors.Converters;
 
 namespace Araci.Controls
 {
-    public class CargaControl
-        : ElementoControlBase
+    public class CargaControl : ElementoControlBase
     {
         private readonly SvgViewbox _svg;
 
@@ -19,37 +17,22 @@ namespace Araci.Controls
             _svg = new SvgViewbox
             {
                 Stretch = System.Windows.Media.Stretch.Fill,
-
-                Source = new System.Uri(
-                    "pack://application:,,,/Assets/Svg/carga.svg",
-                    System.UriKind.Absolute)
+                Source = new Uri("pack://application:,,,/Araci;component/Assets/Svg/carga.svg", UriKind.Absolute)
             };
 
             Content = _svg;
-
             ConfigurarBindings();
         }
 
-        protected override bool UsaBindings =>
-            true;
+        protected override bool UsaBindings => true;
 
         private void ConfigurarBindings()
         {
-            SetBinding(
-                WidthProperty,
-                new Binding("RenderData.Largura"));
+            SetBinding(WidthProperty, new Binding("RenderData.Largura"));
+            SetBinding(HeightProperty, new Binding("RenderData.Altura"));
 
-            SetBinding(
-                HeightProperty,
-                new Binding("RenderData.Altura"));
-
-            _svg.SetBinding(
-                WidthProperty,
-                new Binding("RenderData.Largura"));
-
-            _svg.SetBinding(
-                HeightProperty,
-                new Binding("RenderData.Altura"));
+            _svg.SetBinding(WidthProperty, new Binding("RenderData.Largura"));
+            _svg.SetBinding(HeightProperty, new Binding("RenderData.Altura"));
         }
     }
 }

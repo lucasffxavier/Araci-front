@@ -10,24 +10,15 @@ namespace Araci.Applications.Diagrama.InserirGerador
 
         public InserirGeradorApplication(EditorContext context)
         {
-            _context = context
-                ?? throw new System.ArgumentNullException(nameof(context));
+            _context = context ?? throw new System.ArgumentNullException(nameof(context));
         }
-
-        // =========================
-        // EXECUTAR
-        // =========================
 
         public void Executar()
         {
-            GeradorViewModel vm =
-                _context.ElementoFactory
-                    .CriarGeradorVM();
-
-            _context.Commands.Execute(
-                new AddElementoCommand(
-                    vm,
-                    _context));
+            GeradorViewModel vm = _context.ElementoFactory.CriarGeradorVM();
+            vm.X = 150;
+            vm.Y = 150;
+            _context.Commands.Execute(new AddElementoCommand(vm, _context));
         }
     }
 }
