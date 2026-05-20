@@ -4,9 +4,7 @@ namespace Araci.Models
 {
     public abstract class Parameter
     {
-        protected Parameter(
-            string nome,
-            Type tipo)
+        protected Parameter(string nome, Type tipo)
         {
             Nome = nome;
             Tipo = tipo;
@@ -16,21 +14,16 @@ namespace Araci.Models
 
         public Type Tipo { get; }
 
-        public abstract object? ValorObjeto
-        {
-            get;
-            set;
-        }
+        public abstract object? ValorObjeto { get; set; }
+
+        public abstract Parameter Clonar();
     }
 
-    public sealed class Parameter<T>
-        : Parameter
+    public sealed class Parameter<T> : Parameter
     {
         private T _valor;
 
-        public Parameter(
-            string nome,
-            T valor)
+        public Parameter(string nome, T valor)
             : base(nome, typeof(T))
         {
             _valor = valor;
@@ -39,14 +32,12 @@ namespace Araci.Models
         public T Valor
         {
             get => _valor;
-
             set => _valor = value;
         }
 
         public override object? ValorObjeto
         {
             get => _valor;
-
             set
             {
                 if (value is T typed)
@@ -61,11 +52,13 @@ namespace Araci.Models
                     return;
                 }
 
-                _valor =
-                    (T)Convert.ChangeType(
-                        value,
-                        typeof(T));
+                _valor = (T)Convert.ChangeType(value, typeof(T));
             }
+        }
+
+        public override Parameter Clonar()
+        {
+            return new Parameter<T>(Nome, _valor);
         }
     }
 }

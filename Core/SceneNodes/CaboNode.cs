@@ -1,4 +1,6 @@
 ﻿using System;
+using System.Collections.Generic;
+using System.Linq;
 using System.Windows;
 using Araci.Models;
 
@@ -8,48 +10,121 @@ namespace Araci.Core.SceneNodes
     {
         private readonly Cabo _cabo;
 
+        private double _x;
+        private double _y;
+
         public CaboNode(Cabo cabo)
             : base(cabo)
         {
-            _cabo = cabo;
+            _cabo = cabo ?? throw new ArgumentNullException(nameof(cabo));
 
+            InicializarPosicao();
             AtualizarGeometria();
         }
 
-        public Point PontoInicial =>
-            new(_cabo.PosicaoX, _cabo.PosicaoY);
+        // =========================
+        // POSIÇÃO (ESTÁVEL)
+        // =========================
 
-        public Point PontoFinal =>
-            new(_cabo.PosicaoX2, _cabo.PosicaoY2);
+        public override double X => _x;
+
+        public override double Y => _y;
 
         public override double Largura =>
-            Math.Abs(_cabo.PosicaoX2 - _cabo.PosicaoX);
+            Bounds.Width;
 
         public override double Altura =>
-            Math.Abs(_cabo.PosicaoY2 - _cabo.PosicaoY);
+            Bounds.Height;
+
+        // =========================
+        // INICIALIZAÇÃO
+        // =========================
+
+        private void InicializarPosicao()
+        {
+            if (_cabo.Vertices.Count == 0)
+            {
+                _x = 0;
+                _y = 0;
+                return;
+            }
+
+            var p = _cabo.Vertices[0];
+
+            _x = p.X;
+            _y = p.Y;
+        }
+
+        // =========================
+        // MOVIMENTO
+        // =========================
 
         public override void Mover(Vector delta)
         {
-            _cabo.PosicaoX += delta.X;
-            _cabo.PosicaoY += delta.Y;
-            _cabo.PosicaoX2 += delta.X;
-            _cabo.PosicaoY2 += delta.Y;
+            if (delta.X == 0 && delta.Y == 0)
+                return;
+
+            _x += delta.X;
+            _y += delta.Y;
+
+            for (int i = 0; i < _cabo.Vertices.Count; i++)
+            {
+                var p = _cabo.Vertices[i];
+
+                _cabo.Vertices[i] =
+                    new Point(
+                        p.X + delta.X,
+                        p.Y + delta.Y);
+            }
+
+            if (_cabo.PreviewPonto.HasValue)
+            {
+                var preview = _cabo.PreviewPonto.Value;
+
+                _cabo.PreviewPonto =
+                    new Point(
+                        preview.X + delta.X,
+                        preview.Y + delta.Y);
+            }
 
             AtualizarGeometria();
         }
 
+        // =========================
+        // GEOMETRIA
+        // =========================
+
         public override void AtualizarGeometria()
         {
-            double x = Math.Min(_cabo.PosicaoX, _cabo.PosicaoX2);
-            double y = Math.Min(_cabo.PosicaoY, _cabo.PosicaoY2);
+            var pontos = new List<Point>();
 
-            double largura =
-                Math.Abs(_cabo.PosicaoX2 - _cabo.PosicaoX);
+            pontos.AddRange(_cabo.Vertices);
 
-            double altura =
-                Math.Abs(_cabo.PosicaoY2 - _cabo.PosicaoY);
+            if (_cabo.PreviewPonto.HasValue)
+            {
+                pontos.Add(_cabo.PreviewPonto.Value);
+            }
 
-            Bounds = new Rect(x, y, largura, altura);
+            if (pontos.Count == 0)
+            {
+                Bounds = Rect.Empty;
+                return;
+            }
+
+            double minX = pontos.Min(p => p.X);
+            double minY = pontos.Min(p => p.Y);
+            double maxX = pontos.Max(p => p.X);
+            double maxY = pontos.Max(p => p.Y);
+
+            double largura = Math.Max(1, maxX - minX);
+            double altura = Math.Max(1, maxY - minY);
+
+            Bounds = new Rect(
+                minX,
+                minY,
+                largura,
+                altura);
+
         }
     }
 }

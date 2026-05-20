@@ -159,10 +159,7 @@ namespace Araci.Models
 
             foreach (var kv in _parametros)
             {
-                destino._parametros[kv.Key] =
-                    new Parameter<object>(
-                        kv.Key,
-                        kv.Value.ValorObjeto!);
+                destino._parametros[kv.Key] =  kv.Value.Clonar();
             }
         }
     }

@@ -278,7 +278,7 @@ namespace Araci.ViewModels
         }
 
         public virtual double WorldX =>
-            Node.X;
+           Node.X;
 
         public virtual double WorldY =>
             Node.Y;

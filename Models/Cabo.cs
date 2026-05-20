@@ -1,4 +1,6 @@
-﻿using Araci.Models.Tipos;
+﻿using System.Collections.ObjectModel;
+using System.Windows;
+using Araci.Models.Tipos;
 
 namespace Araci.Models
 {
@@ -13,6 +15,14 @@ namespace Araci.Models
 
         public const string PARAM_COMPRIMENTO =
             "Comprimento";
+
+        public ObservableCollection<Point>
+            Vertices
+        { get; }
+            = new();
+
+        public Point? PreviewPonto
+        { get; set; }
 
         public TipoCabo TipoCabo =>
             (TipoCabo)Tipo!;
@@ -65,12 +75,6 @@ namespace Araci.Models
                 new Parameter<double>(
                     PARAM_COMPRIMENTO,
                     120));
-
-            PosicaoX = 100;
-            PosicaoY = 100;
-
-            PosicaoX2 = 400;
-            PosicaoY2 = 100;
         }
 
         public override Elemento Clonar()
@@ -80,6 +84,14 @@ namespace Araci.Models
             CopiarLinearPara(clone);
 
             CopiarBasePara(clone);
+
+            foreach (Point p in Vertices)
+            {
+                clone.Vertices.Add(p);
+            }
+
+            clone.PreviewPonto =
+                PreviewPonto;
 
             return clone;
         }

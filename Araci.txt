@@ -28,6 +28,10 @@ Araci Engine
 │       │   └── MoverTool.cs
 │       └── Selecionar
 │           └── SelecionarTool.cs
+├── Assets
+│   └── Svg
+│       ├── carga.svg
+│       └── gerador.svg
 ├── Controls
 │   ├── Base
 │   │   └── ElementoControlBase.cs
@@ -175,7 +179,6 @@ Araci Engine
 ├── Araci.csproj.user
 ├── Araci.slnx
 ├── Araci.txt
-├── Araci2.txt
 ├── AssemblyInfo.cs
 ├── MainWindow.xaml
 └── MainWindow.xaml.cs
@@ -576,6 +579,9 @@ namespace Araci.Core.Transactions
 ARQUIVO: C:\Araci-Engine-Front\Araci Engine\Applications\Diagrama\InserirCabo\InserirCabo.cs
 ====================================================================================================
 
+using System.Windows;
+using System.Windows.Input;
+using Araci.Applications.Editar.Base;
 using Araci.Core.Commands;
 using Araci.Services;
 using Araci.ViewModels;
@@ -588,24 +594,134 @@ namespace Araci.Applications.Diagrama.InserirCabo
 
         public InserirCaboApplication(EditorContext context)
         {
-            _context = context
-                ?? throw new System.ArgumentNullException(nameof(context));
+            _context =
+                context
+                ?? throw new System.ArgumentNullException(
+                    nameof(context));
         }
 
         public void Executar()
         {
-            CaboViewModel vm =
-                _context.ElementoFactory
-                    .CriarCaboVM();
+            _context.Input.ToolAtual =
+                new InserirCaboTool(_context);
+        }
+    }
 
-            _context.Commands.Execute(
-                new AddElementoCommand(
-                    vm,
-                    _context));
+    public class InserirCaboTool : ITool
+    {
+        private readonly EditorContext _context;
+
+        private CaboViewModel? _caboAtual;
+
+        private bool _inserindo;
+
+        public InserirCaboTool(EditorContext context)
+        {
+            _context = context;
+        }
+
+        public string Nome =>
+            "Inserir Cabo";
+
+        public bool MantemBotaoAtivado =>
+            true;
+
+        public void Ativar()
+        {
+        }
+
+        public void Desativar()
+        {
+            Cancelar();
+        }
+
+        public void OnMouseDown(
+            ElementoViewModel? vm,
+            Point position,
+            ToolInputState inputState)
+        {
+            Point world = position;
+
+            if (!_inserindo)
+            {
+                _caboAtual =
+                    _context.ElementoFactory
+                        .CriarCaboVM();
+
+                _caboAtual.Iniciar(world);
+
+                _context.Commands.Execute(
+                    new AddElementoCommand(
+                        _caboAtual,
+                        _context));
+
+                _inserindo = true;
+
+                return;
+            }
+
+            _caboAtual?.ConfirmarSegmento(world);
+        }
+
+        public void OnMouseMove(Point position)
+        {
+            if (!_inserindo ||
+                _caboAtual == null)
+            {
+                return;
+            }
+
+            _caboAtual.AtualizarPreview(position);
+        }
+
+        public void OnMouseUp(Point position)
+        {
+        }
+
+        public void OnKeyDown(Key key)
+        {
+            if (key == Key.Enter)
+            {
+                Finalizar();
+                return;
+            }
+
+            if (key == Key.Escape)
+            {
+                Cancelar();
+            }
+        }
+
+        private void Finalizar()
+        {
+            if (_caboAtual == null)
+            {
+                return;
+            }
+
+            _caboAtual.RemoverPreview();
+
+            _caboAtual = null;
+
+            _inserindo = false;
+
+            _context.Tools
+                .VoltarParaSelecao();
+        }
+
+        private void Cancelar()
+        {
+            if (_caboAtual != null)
+            {
+                _caboAtual.RemoverPreview();
+            }
+
+            _caboAtual = null;
+
+            _inserindo = false;
         }
     }
 }
-
 
 
 ====================================================================================================
@@ -1406,124 +1522,190 @@ namespace Araci.Controls.Base
 ARQUIVO: C:\Araci-Engine-Front\Araci Engine\Controls\CaboControl.cs
 ====================================================================================================
 
-﻿using System.Windows.Controls;
+﻿using System.Collections.Specialized;
+using System.Windows;
+using System.Windows.Controls;
 using System.Windows.Media;
 using System.Windows.Shapes;
-using System.Windows.Data;
-
 using Araci.Controls.Base;
+using Araci.ViewModels;
 
 namespace Araci.Controls
 {
-    public class CaboControl
-        : ElementoControlBase
+    public class CaboControl : ElementoControlBase
     {
-        private readonly Canvas _canvas;
+        private readonly Canvas _root;
 
-        private readonly Line _line;
+        private readonly Polyline _polyline;
+
+        // Área de hit test
+        private readonly Polyline _hitArea;
+
+        private CaboViewModel? _vmAtual;
 
         public CaboControl()
         {
             ClipToBounds = false;
 
-            _canvas = new Canvas();
+            _root = new Canvas
+            {
+                ClipToBounds = false,
+                Background = Brushes.Transparent
+            };
 
-            _line = new Line
+            _hitArea = new Polyline
+            {
+                Stroke = Brushes.Transparent,
+                StrokeThickness = 12,
+                IsHitTestVisible = true
+            };
+
+            _polyline = new Polyline
             {
                 Stroke = Brushes.Black,
                 StrokeThickness = 4,
-                SnapsToDevicePixels = true
+                SnapsToDevicePixels = true,
+                StrokeLineJoin = PenLineJoin.Round,
+                StrokeStartLineCap = PenLineCap.Round,
+                StrokeEndLineCap = PenLineCap.Round,
+                IsHitTestVisible = false
             };
 
-            _canvas.Children.Add(_line);
+            _root.Children.Add(_hitArea);
+            _root.Children.Add(_polyline);
 
-            Content = _canvas;
+            Content = _root;
 
-            ConfigurarBindings();
+            Loaded += OnLoaded;
+            Unloaded += OnUnloaded;
         }
 
-        protected override bool UsaBindings =>
-            true;
+        protected override bool UsaBindings => false;
 
-        private void ConfigurarBindings()
+        private void OnLoaded(object sender, RoutedEventArgs e)
         {
-            SetBinding(
-                WidthProperty,
-                new Binding("RenderData.Largura"));
+            Conectar();
+        }
 
-            SetBinding(
-                HeightProperty,
-                new Binding("RenderData.Altura"));
+        private void OnUnloaded(object sender, RoutedEventArgs e)
+        {
+            Desconectar();
+        }
 
-            _canvas.SetBinding(
-                WidthProperty,
-                new Binding("RenderData.Largura"));
+        private void Conectar()
+        {
+            Desconectar();
 
-            _canvas.SetBinding(
-                HeightProperty,
-                new Binding("RenderData.Altura"));
+            if (DataContext is not CaboViewModel vm)
+                return;
 
-            _line.SetBinding(
-                Line.X1Property,
-                new Binding("RenderData.PontoLocalInicial.X"));
+            _vmAtual = vm;
 
-            _line.SetBinding(
-                Line.Y1Property,
-                new Binding("RenderData.PontoLocalInicial.Y"));
+            vm.Cabo.Vertices.CollectionChanged += OnVerticesChanged;
 
-            _line.SetBinding(
-                Line.X2Property,
-                new Binding("RenderData.PontoLocalFinal.X"));
+            AtualizarPolyline();
+        }
 
-            _line.SetBinding(
-                Line.Y2Property,
-                new Binding("RenderData.PontoLocalFinal.Y"));
+        private void Desconectar()
+        {
+            if (_vmAtual == null)
+                return;
 
-            _line.SetBinding(
-                Shape.StrokeProperty,
-                new Binding("RenderData.Stroke"));
+            _vmAtual.Cabo.Vertices.CollectionChanged -= OnVerticesChanged;
 
-            _line.SetBinding(
-                Shape.StrokeThicknessProperty,
-                new Binding("RenderData.StrokeThickness"));
+            _vmAtual = null;
+        }
+
+        private void OnVerticesChanged(object? sender, NotifyCollectionChangedEventArgs e)
+        {
+            AtualizarPolyline();
+        }
+
+        private void AtualizarPolyline()
+        {
+            if (_vmAtual == null)
+                return;
+
+            var cabo = _vmAtual.Cabo;
+
+            _polyline.Points.Clear();
+            _hitArea.Points.Clear();
+
+            double offsetX = _vmAtual.WorldX;
+            double offsetY = _vmAtual.WorldY;
+
+            // 🔥 ORDEM CORRETA:
+            // 1. VÉRTICES
+            foreach (var p in cabo.Vertices)
+            {
+                var local = new Point(
+                    p.X - offsetX,
+                    p.Y - offsetY);
+
+                _polyline.Points.Add(local);
+                _hitArea.Points.Add(local);
+            }
+
+            // 2. PREVIEW (EXTENSÃO FINAL)
+            if (cabo.PreviewPonto.HasValue)
+            {
+                var p = cabo.PreviewPonto.Value;
+
+                var local = new Point(
+                    p.X - offsetX,
+                    p.Y - offsetY);
+
+                _polyline.Points.Add(local);
+                _hitArea.Points.Add(local);
+            }
+        }
+
+        protected override void AplicarEstadoVisual(ElementoViewModel vm)
+        {
+            base.AplicarEstadoVisual(vm);
+
+            if (vm is not CaboViewModel cabo)
+                return;
+
+            _polyline.Stroke = cabo.Stroke;
+            _polyline.StrokeThickness = cabo.StrokeThickness;
         }
     }
 }
-
 
 
 ====================================================================================================
 ARQUIVO: C:\Araci-Engine-Front\Araci Engine\Controls\CargaControl.cs
 ====================================================================================================
 
-﻿using System.Windows.Input;
-using System.Windows.Media;
-using System.Windows.Shapes;
-using System.Windows.Data;
+﻿using System.Windows.Data;
+using System.Windows.Input;
 
 using Araci.Controls.Base;
 
+using SharpVectors.Converters;
+
 namespace Araci.Controls
 {
-    public class CargaControl : ElementoControlBase
+    public class CargaControl
+        : ElementoControlBase
     {
-        private readonly Rectangle _rectangle;
+        private readonly SvgViewbox _svg;
 
         public CargaControl()
         {
             Cursor = Cursors.Hand;
 
-            _rectangle = new Rectangle
+            _svg = new SvgViewbox
             {
-                RadiusX = 6,
-                RadiusY = 6,
-                Fill =
-                    new SolidColorBrush(
-                        (Color)ColorConverter
-                            .ConvertFromString("#E0A800"))
+                Stretch = System.Windows.Media.Stretch.Fill,
+
+                Source = new System.Uri(
+                    "pack://application:,,,/Assets/Svg/carga.svg",
+                    System.UriKind.Absolute)
             };
 
-            Content = _rectangle;
+            Content = _svg;
 
             ConfigurarBindings();
         }
@@ -1541,57 +1723,50 @@ namespace Araci.Controls
                 HeightProperty,
                 new Binding("RenderData.Altura"));
 
-            _rectangle.SetBinding(
+            _svg.SetBinding(
                 WidthProperty,
                 new Binding("RenderData.Largura"));
 
-            _rectangle.SetBinding(
+            _svg.SetBinding(
                 HeightProperty,
                 new Binding("RenderData.Altura"));
-
-            _rectangle.SetBinding(
-                Shape.StrokeProperty,
-                new Binding("RenderData.Stroke"));
-
-            _rectangle.SetBinding(
-                Shape.StrokeThicknessProperty,
-                new Binding("RenderData.StrokeThickness"));
         }
     }
 }
-
 
 
 ====================================================================================================
 ARQUIVO: C:\Araci-Engine-Front\Araci Engine\Controls\GeradorControl.cs
 ====================================================================================================
 
-﻿using System.Windows.Input;
-using System.Windows.Media;
-using System.Windows.Shapes;
-using System.Windows.Data;
+﻿using System.Windows.Data;
+using System.Windows.Input;
 
 using Araci.Controls.Base;
 
+using SharpVectors.Converters;
+
 namespace Araci.Controls
 {
-    public class GeradorControl : ElementoControlBase
+    public class GeradorControl
+        : ElementoControlBase
     {
-        private readonly Ellipse _ellipse;
+        private readonly SvgViewbox _svg;
 
         public GeradorControl()
         {
             Cursor = Cursors.Hand;
 
-            _ellipse = new Ellipse
+            _svg = new SvgViewbox
             {
-                Fill =
-                    new SolidColorBrush(
-                        (Color)ColorConverter
-                            .ConvertFromString("#007ACC"))
+                Stretch = System.Windows.Media.Stretch.Fill,
+
+                Source = new System.Uri(
+                    "pack://application:,,,/Assets/Svg/gerador.svg",
+                    System.UriKind.Absolute)
             };
 
-            Content = _ellipse;
+            Content = _svg;
 
             ConfigurarBindings();
         }
@@ -1609,25 +1784,16 @@ namespace Araci.Controls
                 HeightProperty,
                 new Binding("RenderData.Altura"));
 
-            _ellipse.SetBinding(
+            _svg.SetBinding(
                 WidthProperty,
                 new Binding("RenderData.Largura"));
 
-            _ellipse.SetBinding(
+            _svg.SetBinding(
                 HeightProperty,
                 new Binding("RenderData.Altura"));
-
-            _ellipse.SetBinding(
-                Shape.StrokeProperty,
-                new Binding("RenderData.Stroke"));
-
-            _ellipse.SetBinding(
-                Shape.StrokeThicknessProperty,
-                new Binding("RenderData.StrokeThickness"));
         }
     }
 }
-
 
 
 ====================================================================================================
@@ -2051,6 +2217,8 @@ ARQUIVO: C:\Araci-Engine-Front\Araci Engine\Core\SceneNodes\CaboNode.cs
 ====================================================================================================
 
 ﻿using System;
+using System.Collections.Generic;
+using System.Linq;
 using System.Windows;
 using Araci.Models;
 
@@ -2060,48 +2228,121 @@ namespace Araci.Core.SceneNodes
     {
         private readonly Cabo _cabo;
 
+        private double _x;
+        private double _y;
+
         public CaboNode(Cabo cabo)
             : base(cabo)
         {
-            _cabo = cabo;
+            _cabo = cabo ?? throw new ArgumentNullException(nameof(cabo));
 
+            InicializarPosicao();
             AtualizarGeometria();
         }
 
-        public Point PontoInicial =>
-            new(_cabo.PosicaoX, _cabo.PosicaoY);
+        // =========================
+        // POSIÇÃO (ESTÁVEL)
+        // =========================
 
-        public Point PontoFinal =>
-            new(_cabo.PosicaoX2, _cabo.PosicaoY2);
+        public override double X => _x;
+
+        public override double Y => _y;
 
         public override double Largura =>
-            Math.Abs(_cabo.PosicaoX2 - _cabo.PosicaoX);
+            Bounds.Width;
 
         public override double Altura =>
-            Math.Abs(_cabo.PosicaoY2 - _cabo.PosicaoY);
+            Bounds.Height;
+
+        // =========================
+        // INICIALIZAÇÃO
+        // =========================
+
+        private void InicializarPosicao()
+        {
+            if (_cabo.Vertices.Count == 0)
+            {
+                _x = 0;
+                _y = 0;
+                return;
+            }
+
+            var p = _cabo.Vertices[0];
+
+            _x = p.X;
+            _y = p.Y;
+        }
+
+        // =========================
+        // MOVIMENTO
+        // =========================
 
         public override void Mover(Vector delta)
         {
-            _cabo.PosicaoX += delta.X;
-            _cabo.PosicaoY += delta.Y;
-            _cabo.PosicaoX2 += delta.X;
-            _cabo.PosicaoY2 += delta.Y;
+            if (delta.X == 0 && delta.Y == 0)
+                return;
+
+            _x += delta.X;
+            _y += delta.Y;
+
+            for (int i = 0; i < _cabo.Vertices.Count; i++)
+            {
+                var p = _cabo.Vertices[i];
+
+                _cabo.Vertices[i] =
+                    new Point(
+                        p.X + delta.X,
+                        p.Y + delta.Y);
+            }
+
+            if (_cabo.PreviewPonto.HasValue)
+            {
+                var preview = _cabo.PreviewPonto.Value;
+
+                _cabo.PreviewPonto =
+                    new Point(
+                        preview.X + delta.X,
+                        preview.Y + delta.Y);
+            }
 
             AtualizarGeometria();
         }
 
+        // =========================
+        // GEOMETRIA
+        // =========================
+
         public override void AtualizarGeometria()
         {
-            double x = Math.Min(_cabo.PosicaoX, _cabo.PosicaoX2);
-            double y = Math.Min(_cabo.PosicaoY, _cabo.PosicaoY2);
+            var pontos = new List<Point>();
 
-            double largura =
-                Math.Abs(_cabo.PosicaoX2 - _cabo.PosicaoX);
+            pontos.AddRange(_cabo.Vertices);
 
-            double altura =
-                Math.Abs(_cabo.PosicaoY2 - _cabo.PosicaoY);
+            if (_cabo.PreviewPonto.HasValue)
+            {
+                pontos.Add(_cabo.PreviewPonto.Value);
+            }
 
-            Bounds = new Rect(x, y, largura, altura);
+            if (pontos.Count == 0)
+            {
+                Bounds = Rect.Empty;
+                return;
+            }
+
+            double minX = pontos.Min(p => p.X);
+            double minY = pontos.Min(p => p.Y);
+            double maxX = pontos.Max(p => p.X);
+            double maxY = pontos.Max(p => p.Y);
+
+            double largura = Math.Max(1, maxX - minX);
+            double altura = Math.Max(1, maxY - minY);
+
+            Bounds = new Rect(
+                minX,
+                minY,
+                largura,
+                altura);
+
         }
     }
 }
@@ -2414,7 +2655,9 @@ namespace Araci
 ARQUIVO: C:\Araci-Engine-Front\Araci Engine\Models\Cabo.cs
 ====================================================================================================
 
-﻿using Araci.Models.Tipos;
+﻿using System.Collections.ObjectModel;
+using System.Windows;
+using Araci.Models.Tipos;
 
 namespace Araci.Models
 {
@@ -2429,6 +2672,14 @@ namespace Araci.Models
 
         public const string PARAM_COMPRIMENTO =
             "Comprimento";
+
+        public ObservableCollection<Point>
+            Vertices
+        { get; }
+            = new();
+
+        public Point? PreviewPonto
+        { get; set; }
 
         public TipoCabo TipoCabo =>
             (TipoCabo)Tipo!;
@@ -2481,12 +2732,6 @@ namespace Araci.Models
                 new Parameter<double>(
                     PARAM_COMPRIMENTO,
                     120));
-
-            PosicaoX = 100;
-            PosicaoY = 100;
-
-            PosicaoX2 = 400;
-            PosicaoY2 = 100;
         }
 
         public override Elemento Clonar()
@@ -2496,6 +2741,14 @@ namespace Araci.Models
             CopiarLinearPara(clone);
 
             CopiarBasePara(clone);
+
+            foreach (Point p in Vertices)
+            {
+                clone.Vertices.Add(p);
+            }
+
+            clone.PreviewPonto =
+                PreviewPonto;
 
             return clone;
         }
@@ -7414,7 +7667,6 @@ ARQUIVO: C:\Araci-Engine-Front\Araci Engine\ViewModels\CaboViewModel.cs
 
 ﻿using System.Collections;
 using System.Windows;
-
 using Araci.Core.SceneNodes;
 using Araci.Models;
 using Araci.Services;
@@ -7424,9 +7676,7 @@ namespace Araci.ViewModels
     public class CaboViewModel
         : ElementoViewModel
     {
-        // =========================
-        // CONSTRUTOR
-        // =========================
+        private bool _possuiPreview;
 
         public CaboViewModel(
             Cabo modelo,
@@ -7439,63 +7689,105 @@ namespace Araci.ViewModels
             SelecionarPrimeiroTipoDisponivel();
         }
 
-        // =========================
-        // MODELO
-        // =========================
-
         public Cabo Cabo =>
             (Cabo)Modelo;
 
         private CaboNode CaboNode =>
             (CaboNode)Node;
 
-        // =========================
-        // TIPOS
-        // =========================
-
         public override IEnumerable TiposDisponiveis =>
             Types.TiposCabos;
 
-        // =========================
-        // EXTREMIDADE FINAL
-        // =========================
-
-        public double X2
+        public void Iniciar(Point ponto)
         {
-            get => Cabo.PosicaoX2;
+            Cabo.Vertices.Clear();
 
-            set
-            {
-                if (Cabo.PosicaoX2 == value)
-                    return;
+            Cabo.Vertices.Add(ponto);
 
-                Cabo.PosicaoX2 = value;
+            Cabo.PreviewPonto = ponto;
 
-                CaboNode.AtualizarGeometria();
+            _possuiPreview = true;
 
-                NotificarGeometria();
-
-                OnPropertyChanged(nameof(X2));
-            }
+            AtualizarGeometria();
         }
 
-        public double Y2
+        public void ConfirmarSegmento(Point ponto)
         {
-            get => Cabo.PosicaoY2;
-
-            set
+            if (Cabo.Vertices.Count == 0)
             {
-                if (Cabo.PosicaoY2 == value)
-                    return;
-
-                Cabo.PosicaoY2 = value;
-
-                CaboNode.AtualizarGeometria();
-
-                NotificarGeometria();
-
-                OnPropertyChanged(nameof(Y2));
+                return;
             }
+
+            Cabo.Vertices.Add(ponto);
+
+            Cabo.PreviewPonto = ponto;
+
+            _possuiPreview = true;
+
+            AtualizarGeometria();
+        }
+
+        public void AtualizarPreview(Point ponto)
+        {
+            if (!_possuiPreview)
+            {
+                return;
+            }
+
+            Cabo.PreviewPonto = ponto;
+
+            AtualizarGeometria();
+        }
+
+        public void RemoverPreview()
+        {
+            _possuiPreview = false;
+
+            Cabo.PreviewPonto = null;
+
+            AtualizarGeometria();
+        }
+
+        private void AtualizarGeometria()
+        {
+            CaboNode.AtualizarGeometria();
+
+            // 🔥 GARANTIR atualização de posição
+            OnPropertyChanged(nameof(WorldX));
+            OnPropertyChanged(nameof(WorldY));
+            OnPropertyChanged(nameof(Bounds));
+
+            NotificarGeometria();
+        }
+
+        public override void Mover(
+            Vector delta)
+        {
+            CaboNode.Mover(delta);
+
+            AtualizarGeometria();
+        }
+
+        public override double WorldX =>
+            Bounds.X;
+
+        public override double WorldY =>
+            Bounds.Y;
+
+        public override ElementoEstado
+            CapturarEstado()
+        {
+            if (Cabo.Vertices.Count == 0)
+            {
+                return base.CapturarEstado();
+            }
+
+            Point p =
+                Cabo.Vertices[0];
+
+            return new ElementoEstado(
+                p.X,
+                p.Y);
         }
 
         public string Nome
@@ -7516,6 +7808,7 @@ namespace Araci.ViewModels
                 OnPropertyChanged();
             }
         }
+
 
         public string BarraOrigem
         {
@@ -7573,68 +7866,6 @@ namespace Araci.ViewModels
                 OnPropertyChanged();
             }
         }
-
-
-        // =========================
-        // PONTOS LOCAIS
-        // =========================
-
-        protected override Point
-            PontoLocalInicial =>
-            new(
-                Cabo.PosicaoX - Bounds.X,
-                Cabo.PosicaoY - Bounds.Y);
-
-        protected override Point
-            PontoLocalFinal =>
-            new(
-                Cabo.PosicaoX2 - Bounds.X,
-                Cabo.PosicaoY2 - Bounds.Y);
-
-        // =========================
-        // MOVIMENTAÇÃO
-        // =========================
-
-        public override void Mover(
-            Vector delta)
-        {
-            base.Mover(delta);
-
-            OnPropertyChanged(nameof(X2));
-            OnPropertyChanged(nameof(Y2));
-        }
-
-        // =========================
-        // ESTADO
-        // =========================
-
-        public override ElementoEstado
-            CapturarEstado()
-        {
-            return new ElementoEstado(
-                X,
-                Y,
-                X2,
-                Y2);
-        }
-
-        public override void AplicarEstado(
-            ElementoEstado estado)
-        {
-            Cabo.PosicaoX = estado.X;
-            Cabo.PosicaoY = estado.Y;
-
-            Cabo.PosicaoX2 = estado.X2;
-            Cabo.PosicaoY2 = estado.Y2;
-
-            CaboNode.AtualizarGeometria();
-
-            NotificarGeometria();
-
-            OnPropertyChanged(nameof(X2));
-            OnPropertyChanged(nameof(Y2));
-        }
-
 
     }
 }
@@ -8122,7 +8353,7 @@ namespace Araci.ViewModels
         }
 
         public virtual double WorldX =>
-            Node.X;
+           Node.X;
 
         public virtual double WorldY =>
             Node.Y;
@@ -9636,7 +9867,6 @@ ARQUIVO: C:\Araci-Engine-Front\Araci Engine\Views\ViewportView.xaml.cs
 
 using Araci.Services;
 using Araci.ViewModels;
-
 using System;
 using System.ComponentModel;
 using System.Windows;
@@ -9649,7 +9879,6 @@ namespace Araci.Views
     public partial class ViewportView : UserControl
     {
         private ViewportViewModel? _viewportViewModel;
-
         private EditorContext? _context;
 
         private readonly MatrixTransform
@@ -9737,7 +9966,6 @@ namespace Araci.Views
             RoutedEventArgs e)
         {
             Focus();
-
             Keyboard.Focus(this);
 
             AtualizarViewport();
@@ -9757,10 +9985,10 @@ namespace Araci.Views
             if (RootBorder != null)
             {
                 largura -= RootBorder.BorderThickness.Left
-                         + RootBorder.BorderThickness.Right;
+                    + RootBorder.BorderThickness.Right;
 
                 altura -= RootBorder.BorderThickness.Top
-                        + RootBorder.BorderThickness.Bottom;
+                    + RootBorder.BorderThickness.Bottom;
             }
 
             largura = Math.Max(0, largura);
@@ -9770,8 +9998,19 @@ namespace Araci.Views
                 new Size(largura, altura));
         }
 
-        private Point GetPos(MouseEventArgs e) =>
-            e.GetPosition(this);
+        private Point GetWorldPos(MouseEventArgs e)
+        {
+            Point screen =
+                e.GetPosition(this);
+
+            if (_context?.Viewport == null)
+            {
+                return screen;
+            }
+
+            return _context.Viewport
+                .ScreenToWorld(screen);
+        }
 
         private void OnPreviewMouseLeftButtonDown(
             object sender,
@@ -9781,7 +10020,6 @@ namespace Araci.Views
                 return;
 
             Focus();
-
             Keyboard.Focus(this);
 
             ElementoViewModel? vm = null;
@@ -9798,10 +10036,13 @@ namespace Araci.Views
                     break;
                 }
 
-                origem = VisualTreeHelper.GetParent(origem);
+                origem =
+                    VisualTreeHelper.GetParent(origem);
             }
 
-            _context.Input.MouseDown(vm, GetPos(e));
+            _context.Input.MouseDown(
+                vm,
+                GetWorldPos(e));
 
             CaptureMouse();
         }
@@ -9810,17 +10051,21 @@ namespace Araci.Views
             object sender,
             MouseEventArgs e)
         {
-            _context?.Input.MouseMove(GetPos(e));
+            _context?.Input.MouseMove(
+                GetWorldPos(e));
         }
 
         private void OnPreviewMouseLeftButtonUp(
             object sender,
             MouseButtonEventArgs e)
         {
-            _context?.Input.MouseUp(GetPos(e));
+            _context?.Input.MouseUp(
+                GetWorldPos(e));
 
             if (IsMouseCaptured)
+            {
                 ReleaseMouseCapture();
+            }
         }
 
         private void OnPreviewMouseWheel(
@@ -9833,17 +10078,22 @@ namespace Araci.Views
             var camera =
                 _context.Viewport.Camera;
 
-            Point cursor = GetPos(e);
+            Point cursor =
+                e.GetPosition(this);
 
             Point worldBefore =
                 camera.ScreenToWorld(cursor);
 
             double factor =
-                e.Delta > 0 ? 1.1 : 1 / 1.1;
+                e.Delta > 0
+                    ? 1.1
+                    : 1 / 1.1;
 
             camera.Zoom = Math.Max(
                 0.1,
-                Math.Min(8, camera.Zoom * factor));
+                Math.Min(
+                    8,
+                    camera.Zoom * factor));
 
             camera.Offset = new Point(
                 cursor.X - worldBefore.X * camera.Zoom,

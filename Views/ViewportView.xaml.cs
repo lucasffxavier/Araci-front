@@ -1,6 +1,5 @@
 using Araci.Services;
 using Araci.ViewModels;
-
 using System;
 using System.ComponentModel;
 using System.Windows;
@@ -13,7 +12,6 @@ namespace Araci.Views
     public partial class ViewportView : UserControl
     {
         private ViewportViewModel? _viewportViewModel;
-
         private EditorContext? _context;
 
         private readonly MatrixTransform
@@ -101,7 +99,6 @@ namespace Araci.Views
             RoutedEventArgs e)
         {
             Focus();
-
             Keyboard.Focus(this);
 
             AtualizarViewport();
@@ -121,10 +118,10 @@ namespace Araci.Views
             if (RootBorder != null)
             {
                 largura -= RootBorder.BorderThickness.Left
-                         + RootBorder.BorderThickness.Right;
+                    + RootBorder.BorderThickness.Right;
 
                 altura -= RootBorder.BorderThickness.Top
-                        + RootBorder.BorderThickness.Bottom;
+                    + RootBorder.BorderThickness.Bottom;
             }
 
             largura = Math.Max(0, largura);
@@ -134,8 +131,19 @@ namespace Araci.Views
                 new Size(largura, altura));
         }
 
-        private Point GetPos(MouseEventArgs e) =>
-            e.GetPosition(this);
+        private Point GetWorldPos(MouseEventArgs e)
+        {
+            Point screen =
+                e.GetPosition(this);
+
+            if (_context?.Viewport == null)
+            {
+                return screen;
+            }
+
+            return _context.Viewport
+                .ScreenToWorld(screen);
+        }
 
         private void OnPreviewMouseLeftButtonDown(
             object sender,
@@ -145,7 +153,6 @@ namespace Araci.Views
                 return;
 
             Focus();
-
             Keyboard.Focus(this);
 
             ElementoViewModel? vm = null;
@@ -162,10 +169,13 @@ namespace Araci.Views
                     break;
                 }
 
-                origem = VisualTreeHelper.GetParent(origem);
+                origem =
+                    VisualTreeHelper.GetParent(origem);
             }
 
-            _context.Input.MouseDown(vm, GetPos(e));
+            _context.Input.MouseDown(
+                vm,
+                GetWorldPos(e));
 
             CaptureMouse();
         }
@@ -174,17 +184,21 @@ namespace Araci.Views
             object sender,
             MouseEventArgs e)
         {
-            _context?.Input.MouseMove(GetPos(e));
+            _context?.Input.MouseMove(
+                GetWorldPos(e));
         }
 
         private void OnPreviewMouseLeftButtonUp(
             object sender,
             MouseButtonEventArgs e)
         {
-            _context?.Input.MouseUp(GetPos(e));
+            _context?.Input.MouseUp(
+                GetWorldPos(e));
 
             if (IsMouseCaptured)
+            {
                 ReleaseMouseCapture();
+            }
         }
 
         private void OnPreviewMouseWheel(
@@ -197,17 +211,22 @@ namespace Araci.Views
             var camera =
                 _context.Viewport.Camera;
 
-            Point cursor = GetPos(e);
+            Point cursor =
+                e.GetPosition(this);
 
             Point worldBefore =
                 camera.ScreenToWorld(cursor);
 
             double factor =
-                e.Delta > 0 ? 1.1 : 1 / 1.1;
+                e.Delta > 0
+                    ? 1.1
+                    : 1 / 1.1;
 
             camera.Zoom = Math.Max(
                 0.1,
-                Math.Min(8, camera.Zoom * factor));
+                Math.Min(
+                    8,
+                    camera.Zoom * factor));
 
             camera.Offset = new Point(
                 cursor.X - worldBefore.X * camera.Zoom,

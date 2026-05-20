@@ -1,6 +1,5 @@
 ﻿using System.Collections;
 using System.Windows;
-
 using Araci.Core.SceneNodes;
 using Araci.Models;
 using Araci.Services;
@@ -10,9 +9,7 @@ namespace Araci.ViewModels
     public class CaboViewModel
         : ElementoViewModel
     {
-        // =========================
-        // CONSTRUTOR
-        // =========================
+        private bool _possuiPreview;
 
         public CaboViewModel(
             Cabo modelo,
@@ -25,63 +22,105 @@ namespace Araci.ViewModels
             SelecionarPrimeiroTipoDisponivel();
         }
 
-        // =========================
-        // MODELO
-        // =========================
-
         public Cabo Cabo =>
             (Cabo)Modelo;
 
         private CaboNode CaboNode =>
             (CaboNode)Node;
 
-        // =========================
-        // TIPOS
-        // =========================
-
         public override IEnumerable TiposDisponiveis =>
             Types.TiposCabos;
 
-        // =========================
-        // EXTREMIDADE FINAL
-        // =========================
-
-        public double X2
+        public void Iniciar(Point ponto)
         {
-            get => Cabo.PosicaoX2;
+            Cabo.Vertices.Clear();
 
-            set
-            {
-                if (Cabo.PosicaoX2 == value)
-                    return;
+            Cabo.Vertices.Add(ponto);
 
-                Cabo.PosicaoX2 = value;
+            Cabo.PreviewPonto = ponto;
 
-                CaboNode.AtualizarGeometria();
+            _possuiPreview = true;
 
-                NotificarGeometria();
-
-                OnPropertyChanged(nameof(X2));
-            }
+            AtualizarGeometria();
         }
 
-        public double Y2
+        public void ConfirmarSegmento(Point ponto)
         {
-            get => Cabo.PosicaoY2;
-
-            set
+            if (Cabo.Vertices.Count == 0)
             {
-                if (Cabo.PosicaoY2 == value)
-                    return;
-
-                Cabo.PosicaoY2 = value;
-
-                CaboNode.AtualizarGeometria();
-
-                NotificarGeometria();
-
-                OnPropertyChanged(nameof(Y2));
+                return;
             }
+
+            Cabo.Vertices.Add(ponto);
+
+            Cabo.PreviewPonto = ponto;
+
+            _possuiPreview = true;
+
+            AtualizarGeometria();
+        }
+
+        public void AtualizarPreview(Point ponto)
+        {
+            if (!_possuiPreview)
+            {
+                return;
+            }
+
+            Cabo.PreviewPonto = ponto;
+
+            AtualizarGeometria();
+        }
+
+        public void RemoverPreview()
+        {
+            _possuiPreview = false;
+
+            Cabo.PreviewPonto = null;
+
+            AtualizarGeometria();
+        }
+
+        private void AtualizarGeometria()
+        {
+            CaboNode.AtualizarGeometria();
+
+            // 🔥 GARANTIR atualização de posição
+            OnPropertyChanged(nameof(WorldX));
+            OnPropertyChanged(nameof(WorldY));
+            OnPropertyChanged(nameof(Bounds));
+
+            NotificarGeometria();
+        }
+
+        public override void Mover(
+            Vector delta)
+        {
+            CaboNode.Mover(delta);
+
+            AtualizarGeometria();
+        }
+
+        public override double WorldX =>
+            Bounds.X;
+
+        public override double WorldY =>
+            Bounds.Y;
+
+        public override ElementoEstado
+            CapturarEstado()
+        {
+            if (Cabo.Vertices.Count == 0)
+            {
+                return base.CapturarEstado();
+            }
+
+            Point p =
+                Cabo.Vertices[0];
+
+            return new ElementoEstado(
+                p.X,
+                p.Y);
         }
 
         public string Nome
@@ -102,6 +141,7 @@ namespace Araci.ViewModels
                 OnPropertyChanged();
             }
         }
+
 
         public string BarraOrigem
         {
@@ -159,68 +199,6 @@ namespace Araci.ViewModels
                 OnPropertyChanged();
             }
         }
-
-
-        // =========================
-        // PONTOS LOCAIS
-        // =========================
-
-        protected override Point
-            PontoLocalInicial =>
-            new(
-                Cabo.PosicaoX - Bounds.X,
-                Cabo.PosicaoY - Bounds.Y);
-
-        protected override Point
-            PontoLocalFinal =>
-            new(
-                Cabo.PosicaoX2 - Bounds.X,
-                Cabo.PosicaoY2 - Bounds.Y);
-
-        // =========================
-        // MOVIMENTAÇÃO
-        // =========================
-
-        public override void Mover(
-            Vector delta)
-        {
-            base.Mover(delta);
-
-            OnPropertyChanged(nameof(X2));
-            OnPropertyChanged(nameof(Y2));
-        }
-
-        // =========================
-        // ESTADO
-        // =========================
-
-        public override ElementoEstado
-            CapturarEstado()
-        {
-            return new ElementoEstado(
-                X,
-                Y,
-                X2,
-                Y2);
-        }
-
-        public override void AplicarEstado(
-            ElementoEstado estado)
-        {
-            Cabo.PosicaoX = estado.X;
-            Cabo.PosicaoY = estado.Y;
-
-            Cabo.PosicaoX2 = estado.X2;
-            Cabo.PosicaoY2 = estado.Y2;
-
-            CaboNode.AtualizarGeometria();
-
-            NotificarGeometria();
-
-            OnPropertyChanged(nameof(X2));
-            OnPropertyChanged(nameof(Y2));
-        }
-
 
     }
 }
