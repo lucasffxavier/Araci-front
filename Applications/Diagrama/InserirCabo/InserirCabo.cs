@@ -28,8 +28,6 @@ namespace Araci.Applications.Diagrama.InserirCabo
         private readonly EditorContext _context;
         private CaboViewModel? _caboAtual;
         private bool _inserindo;
-        private bool _aguardandoPrimeiroMove;
-        private ElementoViewModel? _origem;
 
         public InserirCaboTool(EditorContext context)
         {
@@ -39,7 +37,9 @@ namespace Araci.Applications.Diagrama.InserirCabo
         public string Nome => "Inserir Cabo";
         public bool MantemBotaoAtivado => true;
 
-        public void Ativar() { }
+        public void Ativar()
+        {
+        }
 
         public void Desativar()
         {
@@ -48,24 +48,26 @@ namespace Araci.Applications.Diagrama.InserirCabo
 
         public void OnMouseDown(ElementoViewModel? vm, Point position, ToolInputState inputState)
         {
-            var p = _context.Snap.SnapFromElemento(vm, position, _context.Scene);
+            var pontoSnap = _context.Snap.SnapFromElemento(vm, position, _context.Scene);
 
             if (!_inserindo)
             {
                 _caboAtual = _context.ElementoFactory.CriarCaboVM();
-                _caboAtual.Iniciar(p);
+                _caboAtual.Iniciar(pontoSnap);
+
                 _context.Commands.Execute(new AddElementoCommand(_caboAtual, _context));
 
-                _origem = vm;
                 ConectarOrigem(vm);
-
                 _inserindo = true;
-                _aguardandoPrimeiroMove = true;
                 return;
             }
 
-            _caboAtual.ConfirmarSegmento(p);
+            if (_caboAtual == null)
+                return;
+
+            _caboAtual.FinalizarNoPonto(pontoSnap);
             ConectarDestino(vm);
+            Finalizar();
         }
 
         public void OnMouseMove(Point position)
@@ -73,18 +75,13 @@ namespace Araci.Applications.Diagrama.InserirCabo
             if (!_inserindo || _caboAtual == null)
                 return;
 
-            var p = _context.Snap.Snap(position, _context.Scene);
-
-            if (_aguardandoPrimeiroMove)
-            {
-                _aguardandoPrimeiroMove = false;
-                return;
-            }
-
-            _caboAtual.AtualizarPreview(p);
+            var pontoSnap = _context.Snap.Snap(position, _context.Scene);
+            _caboAtual.AtualizarPreview(pontoSnap);
         }
 
-        public void OnMouseUp(Point position) { }
+        public void OnMouseUp(Point position)
+        {
+        }
 
         public void OnKeyDown(Key key)
         {
@@ -100,18 +97,25 @@ namespace Araci.Applications.Diagrama.InserirCabo
 
         private void ConectarOrigem(ElementoViewModel? vm)
         {
-            if (_caboAtual == null || vm?.Modelo is not ElementoEquipamento equipamento)
+            if (_caboAtual == null)
+                return;
+
+            if (vm?.Modelo is not ElementoEquipamento equipamento)
                 return;
 
             _caboAtual.BarraOrigem = equipamento.Nome;
             equipamento.Barra = _caboAtual.Nome;
+
             _caboAtual.NotificarParametros();
             vm.NotificarParametros();
         }
 
         private void ConectarDestino(ElementoViewModel? vm)
         {
-            if (_caboAtual == null || vm?.Modelo is not ElementoEquipamento equipamento)
+            if (_caboAtual == null)
+                return;
+
+            if (vm?.Modelo is not ElementoEquipamento equipamento)
                 return;
 
             _caboAtual.BarraDestino = equipamento.Nome;
@@ -123,13 +127,10 @@ namespace Araci.Applications.Diagrama.InserirCabo
 
         private void Finalizar()
         {
-            if (_caboAtual == null)
-                return;
-
-            _caboAtual.RemoverPreview();
+            _caboAtual?.RemoverPreview();
             _caboAtual = null;
-            _origem = null;
             _inserindo = false;
+
             _context.Tools.VoltarParaSelecao();
         }
 
@@ -137,9 +138,7 @@ namespace Araci.Applications.Diagrama.InserirCabo
         {
             _caboAtual?.RemoverPreview();
             _caboAtual = null;
-            _origem = null;
             _inserindo = false;
-            _aguardandoPrimeiroMove = false;
         }
     }
 }

@@ -12,9 +12,10 @@ namespace Araci.Models
         public const string PARAM_COMPRIMENTO = "Comprimento";
 
         private readonly List<Terminal> _terminais = new();
-        public IReadOnlyList<Terminal> Terminais => _terminais;
 
+        public IReadOnlyList<Terminal> Terminais => _terminais;
         public ObservableCollection<Point> Vertices { get; } = new();
+
         public Point? PreviewPonto { get; set; }
 
         public TipoCabo TipoCabo => (TipoCabo)Tipo!;
@@ -43,9 +44,21 @@ namespace Araci.Models
         public Cabo()
         {
             Nome = "CB-01";
-            DefinirParametro(new Parameter<string>(PARAM_BARRA_ORIGEM, "BUS-01"));
-            DefinirParametro(new Parameter<string>(PARAM_BARRA_DESTINO, "BUS-02"));
-            DefinirParametro(new Parameter<double>(PARAM_COMPRIMENTO, 120));
+
+            DefinirParametro(
+                new Parameter<string>(
+                    PARAM_BARRA_ORIGEM,
+                    "BUS-01"));
+
+            DefinirParametro(
+                new Parameter<string>(
+                    PARAM_BARRA_DESTINO,
+                    "BUS-02"));
+
+            DefinirParametro(
+                new Parameter<double>(
+                    PARAM_COMPRIMENTO,
+                    120));
         }
 
         public void DefinirOrigem(Point p)
@@ -67,6 +80,7 @@ namespace Araci.Models
         public override Elemento Clonar()
         {
             var clone = new Cabo();
+
             CopiarLinearPara(clone);
             CopiarBasePara(clone);
 
@@ -76,8 +90,15 @@ namespace Araci.Models
             clone.PreviewPonto = PreviewPonto;
 
             clone._terminais.Clear();
+
             foreach (var t in _terminais)
-                clone._terminais.Add(new Terminal(clone, t.Posicao) { Barra = t.Barra });
+            {
+                clone._terminais.Add(
+                    new Terminal(clone, t.Posicao)
+                    {
+                        Barra = t.Barra
+                    });
+            }
 
             return clone;
         }

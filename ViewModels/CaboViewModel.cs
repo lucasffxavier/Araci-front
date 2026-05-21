@@ -25,21 +25,12 @@ namespace Araci.ViewModels
         {
             Cabo.Vertices.Clear();
             Cabo.Vertices.Add(p);
+
             Cabo.DefinirOrigem(p);
             Cabo.PreviewPonto = p;
-            _possuiPreview = true;
-            Atualizar();
-        }
 
-        public void ConfirmarSegmento(Point p)
-        {
-            if (Cabo.Vertices.Count == 0)
-                return;
-
-            Cabo.Vertices.Add(p);
-            Cabo.DefinirDestino(p);
-            Cabo.PreviewPonto = p;
             _possuiPreview = true;
+
             Atualizar();
         }
 
@@ -48,14 +39,38 @@ namespace Araci.ViewModels
             if (!_possuiPreview)
                 return;
 
+            if (Cabo.PreviewPonto.HasValue && Cabo.PreviewPonto.Value == p)
+                return;
+
             Cabo.PreviewPonto = p;
+            Atualizar();
+        }
+
+        public void FinalizarNoPonto(Point p)
+        {
+            if (Cabo.Vertices.Count == 0)
+                return;
+
+            Cabo.PreviewPonto = null;
+            _possuiPreview = false;
+
+            var ultimo = Cabo.Vertices[^1];
+
+            if (ultimo != p)
+                Cabo.Vertices.Add(p);
+
+            Cabo.DefinirDestino(p);
             Atualizar();
         }
 
         public void RemoverPreview()
         {
+            if (!_possuiPreview && Cabo.PreviewPonto == null)
+                return;
+
             _possuiPreview = false;
             Cabo.PreviewPonto = null;
+
             Atualizar();
         }
 
@@ -116,9 +131,11 @@ namespace Araci.ViewModels
         private void Atualizar()
         {
             CaboNode.AtualizarGeometria();
+
             OnPropertyChanged(nameof(WorldX));
             OnPropertyChanged(nameof(WorldY));
             OnPropertyChanged(nameof(Bounds));
+
             NotificarGeometria();
         }
 
@@ -127,7 +144,11 @@ namespace Araci.ViewModels
             CaboNode.Mover(delta);
 
             foreach (var t in Cabo.Terminais)
-                t.Posicao = new Point(t.Posicao.X + delta.X, t.Posicao.Y + delta.Y);
+            {
+                t.Posicao = new Point(
+                    t.Posicao.X + delta.X,
+                    t.Posicao.Y + delta.Y);
+            }
 
             Atualizar();
         }

@@ -9,7 +9,6 @@ namespace Araci.Core.SceneNodes
     public class CaboNode : ElementoNode
     {
         private readonly Cabo _cabo;
-
         private double _x;
         private double _y;
 
@@ -22,23 +21,10 @@ namespace Araci.Core.SceneNodes
             AtualizarGeometria();
         }
 
-        // =========================
-        // POSIÇÃO (ESTÁVEL)
-        // =========================
-
         public override double X => _x;
-
         public override double Y => _y;
-
-        public override double Largura =>
-            Bounds.Width;
-
-        public override double Altura =>
-            Bounds.Height;
-
-        // =========================
-        // INICIALIZAÇÃO
-        // =========================
+        public override double Largura => Bounds.Width;
+        public override double Altura => Bounds.Height;
 
         private void InicializarPosicao()
         {
@@ -55,10 +41,6 @@ namespace Araci.Core.SceneNodes
             _y = p.Y;
         }
 
-        // =========================
-        // MOVIMENTO
-        // =========================
-
         public override void Mover(Vector delta)
         {
             if (delta.X == 0 && delta.Y == 0)
@@ -71,28 +53,22 @@ namespace Araci.Core.SceneNodes
             {
                 var p = _cabo.Vertices[i];
 
-                _cabo.Vertices[i] =
-                    new Point(
-                        p.X + delta.X,
-                        p.Y + delta.Y);
+                _cabo.Vertices[i] = new Point(
+                    p.X + delta.X,
+                    p.Y + delta.Y);
             }
 
             if (_cabo.PreviewPonto.HasValue)
             {
                 var preview = _cabo.PreviewPonto.Value;
 
-                _cabo.PreviewPonto =
-                    new Point(
-                        preview.X + delta.X,
-                        preview.Y + delta.Y);
+                _cabo.PreviewPonto = new Point(
+                    preview.X + delta.X,
+                    preview.Y + delta.Y);
             }
 
             AtualizarGeometria();
         }
-
-        // =========================
-        // GEOMETRIA
-        // =========================
 
         public override void AtualizarGeometria()
         {
@@ -101,9 +77,7 @@ namespace Araci.Core.SceneNodes
             pontos.AddRange(_cabo.Vertices);
 
             if (_cabo.PreviewPonto.HasValue)
-            {
                 pontos.Add(_cabo.PreviewPonto.Value);
-            }
 
             if (pontos.Count == 0)
             {
@@ -124,7 +98,6 @@ namespace Araci.Core.SceneNodes
                 minY,
                 largura,
                 altura);
-
         }
     }
 }

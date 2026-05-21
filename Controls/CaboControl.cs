@@ -1,4 +1,5 @@
 ﻿using System.Collections.Specialized;
+using System.ComponentModel;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Media;
@@ -11,10 +12,7 @@ namespace Araci.Controls
     public class CaboControl : ElementoControlBase
     {
         private readonly Canvas _root;
-
         private readonly Polyline _polyline;
-
-        // Área de hit test
         private readonly Polyline _hitArea;
 
         private CaboViewModel? _vmAtual;
@@ -77,6 +75,7 @@ namespace Araci.Controls
 
             _vmAtual = vm;
 
+            vm.PropertyChanged += OnViewModelChanged;
             vm.Cabo.Vertices.CollectionChanged += OnVerticesChanged;
 
             AtualizarPolyline();
@@ -87,13 +86,26 @@ namespace Araci.Controls
             if (_vmAtual == null)
                 return;
 
+            _vmAtual.PropertyChanged -= OnViewModelChanged;
             _vmAtual.Cabo.Vertices.CollectionChanged -= OnVerticesChanged;
-
             _vmAtual = null;
         }
 
         private void OnVerticesChanged(object? sender, NotifyCollectionChangedEventArgs e)
         {
+            AtualizarPolyline();
+        }
+
+        private void OnViewModelChanged(object? sender, PropertyChangedEventArgs e)
+        {
+            if (e.PropertyName != nameof(ElementoViewModel.Bounds) &&
+                e.PropertyName != nameof(ElementoViewModel.WorldX) &&
+                e.PropertyName != nameof(ElementoViewModel.WorldY) &&
+                e.PropertyName != nameof(ElementoViewModel.RenderData))
+            {
+                return;
+            }
+
             AtualizarPolyline();
         }
 
@@ -110,30 +122,29 @@ namespace Araci.Controls
             double offsetX = _vmAtual.WorldX;
             double offsetY = _vmAtual.WorldY;
 
-            // 🔥 ORDEM CORRETA:
-            // 1. VÉRTICES
             foreach (var p in cabo.Vertices)
             {
-                var local = new Point(
-                    p.X - offsetX,
-                    p.Y - offsetY);
+                var local = new Point(p.X - offsetX, p.Y - offsetY);
 
                 _polyline.Points.Add(local);
                 _hitArea.Points.Add(local);
             }
 
-            // 2. PREVIEW (EXTENSÃO FINAL)
             if (cabo.PreviewPonto.HasValue)
             {
-                var p = cabo.PreviewPonto.Value;
+                var preview = cabo.PreviewPonto.Value;
+                var ultimo = cabo.Vertices.Count > 0 ? cabo.Vertices[^1] : preview;
 
-                var local = new Point(
-                    p.X - offsetX,
-                    p.Y - offsetY);
+                if (preview != ultimo)
+                {
+                    var local = new Point(preview.X - offsetX, preview.Y - offsetY);
 
-                _polyline.Points.Add(local);
-                _hitArea.Points.Add(local);
+                    _polyline.Points.Add(local);
+                    _hitArea.Points.Add(local);
+                }
             }
+
+            InvalidateVisual();
         }
 
         protected override void AplicarEstadoVisual(ElementoViewModel vm)

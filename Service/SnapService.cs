@@ -10,7 +10,6 @@ namespace Araci.Services
     public class SnapService
     {
         public bool Habilitado { get; set; } = true;
-
         public double TerminalTolerance { get; set; } = 15;
 
         public Point Snap(Point point, Scene scene)
@@ -33,9 +32,7 @@ namespace Araci.Services
 
             if (vm?.Modelo is ITerminalOwner owner)
             {
-                var terminal = ObterTerminalMaisProximo(
-                    owner,
-                    fallback);
+                var terminal = ObterTerminalMaisProximo(owner, fallback);
 
                 if (terminal != null)
                     return terminal.Posicao;
@@ -54,9 +51,7 @@ namespace Araci.Services
             return delta;
         }
 
-        private Point? SnapTerminal(
-            Point point,
-            Scene scene)
+        private Point? SnapTerminal(Point point, Scene scene)
         {
             var terminais = scene.Elementos
                 .SelectMany(e =>
@@ -64,7 +59,6 @@ namespace Araci.Services
                     ?? Enumerable.Empty<Terminal>());
 
             Terminal? melhor = null;
-
             double menorDist = double.MaxValue;
 
             foreach (var t in terminais)
@@ -91,19 +85,13 @@ namespace Araci.Services
             Point point)
         {
             Terminal? melhor = null;
-
             double menorDist = double.MaxValue;
 
             foreach (var terminal in owner.Terminais)
             {
-                double dx =
-                    terminal.Posicao.X - point.X;
-
-                double dy =
-                    terminal.Posicao.Y - point.Y;
-
-                double dist =
-                    dx * dx + dy * dy;
+                double dx = terminal.Posicao.X - point.X;
+                double dy = terminal.Posicao.Y - point.Y;
+                double dist = dx * dx + dy * dy;
 
                 if (dist >= menorDist)
                     continue;
