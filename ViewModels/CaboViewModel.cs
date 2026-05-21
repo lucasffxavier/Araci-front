@@ -17,48 +17,116 @@ namespace Araci.ViewModels
         }
 
         public Cabo Cabo => (Cabo)Modelo;
-
         private CaboNode CaboNode => (CaboNode)Node;
 
         public override IEnumerable TiposDisponiveis => Types.TiposCabos;
 
-        public void Iniciar(Point ponto)
+        public void Iniciar(Point p)
         {
             Cabo.Vertices.Clear();
-            Cabo.Vertices.Add(ponto);
-            Cabo.PreviewPonto = ponto;
+            Cabo.Vertices.Add(p);
+            Cabo.DefinirOrigem(p);
+            Cabo.PreviewPonto = p;
             _possuiPreview = true;
-            AtualizarGeometria();
+            Atualizar();
         }
 
-        public void ConfirmarSegmento(Point ponto)
+        public void ConfirmarSegmento(Point p)
         {
-            if (Cabo.Vertices.Count == 0)
-                return;
+            if (Cabo.Vertices.Count == 0) return;
 
-            Cabo.Vertices.Add(ponto);
-            Cabo.PreviewPonto = ponto;
+            Cabo.Vertices.Add(p);
+            Cabo.DefinirDestino(p);
+            Cabo.PreviewPonto = p;
             _possuiPreview = true;
-            AtualizarGeometria();
+
+            Atualizar();
         }
 
-        public void AtualizarPreview(Point ponto)
+        public void AtualizarPreview(Point p)
         {
-            if (!_possuiPreview)
-                return;
+            if (!_possuiPreview) return;
 
-            Cabo.PreviewPonto = ponto;
-            AtualizarGeometria();
+            Cabo.PreviewPonto = p;
+            Atualizar();
         }
 
         public void RemoverPreview()
         {
             _possuiPreview = false;
             Cabo.PreviewPonto = null;
-            AtualizarGeometria();
+            Atualizar();
         }
 
-        private void AtualizarGeometria()
+        public string Nome
+        {
+            get => Cabo.Nome;
+
+            set
+            {
+                if (Cabo.Nome == value)
+                {
+                    return;
+                }
+
+                Cabo.Nome = value;
+
+                OnPropertyChanged();
+            }
+        }
+
+        public string BarraOrigem
+        {
+            get => Cabo.BarraOrigem;
+
+            set
+            {
+                if (Cabo.BarraOrigem == value)
+                {
+                    return;
+                }
+
+                Cabo.BarraOrigem = value;
+
+                OnPropertyChanged();
+            }
+        }
+
+        public string BarraDestino
+        {
+            get => Cabo.BarraDestino;
+
+            set
+            {
+                if (Cabo.BarraDestino == value)
+                {
+                    return;
+                }
+
+                Cabo.BarraDestino = value;
+
+                OnPropertyChanged();
+            }
+        }
+
+        public double Comprimento
+        {
+            get => Cabo.Comprimento;
+
+            set
+            {
+                if (Cabo.Comprimento == value)
+                {
+                    return;
+                }
+
+                Cabo.Comprimento = value;
+
+                OnPropertyChanged();
+            }
+        }
+
+        private void Atualizar()
         {
             CaboNode.AtualizarGeometria();
             OnPropertyChanged(nameof(WorldX));
@@ -70,63 +138,14 @@ namespace Araci.ViewModels
         public override void Mover(Vector delta)
         {
             CaboNode.Mover(delta);
-            AtualizarGeometria();
+
+            foreach (var t in Cabo.Terminais)
+                t.Posicao = new Point(t.Posicao.X + delta.X, t.Posicao.Y + delta.Y);
+
+            Atualizar();
         }
 
         public override double WorldX => Bounds.X;
         public override double WorldY => Bounds.Y;
-
-        public override ElementoEstado CapturarEstado()
-        {
-            if (Cabo.Vertices.Count == 0)
-                return base.CapturarEstado();
-
-            Point p = Cabo.Vertices[0];
-            return new ElementoEstado(p.X, p.Y);
-        }
-
-        public string Nome
-        {
-            get => Cabo.Nome;
-            set
-            {
-                if (Cabo.Nome == value) return;
-                Cabo.Nome = value;
-                OnPropertyChanged();
-            }
-        }
-
-        public string BarraOrigem
-        {
-            get => Cabo.BarraOrigem;
-            set
-            {
-                if (Cabo.BarraOrigem == value) return;
-                Cabo.BarraOrigem = value;
-                OnPropertyChanged();
-            }
-        }
-
-        public string BarraDestino
-        {
-            get => Cabo.BarraDestino;
-            set
-            {
-                if (Cabo.BarraDestino == value) return;
-                Cabo.BarraDestino = value;
-                OnPropertyChanged();
-            }
-        }
-
-        public double Comprimento
-        {
-            get => Cabo.Comprimento;
-            set
-            {
-                if (Cabo.Comprimento == value) return;
-                Cabo.Comprimento = value;
-                OnPropertyChanged();
-            }
-        }
     }
 }
