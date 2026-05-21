@@ -8,26 +8,21 @@ namespace Araci.Core.Viewport
     public class Camera : INotifyPropertyChanged
     {
         private double _zoom = 1.0;
-
         private Point _offset;
 
-        public event PropertyChangedEventHandler?
-            PropertyChanged;
+        public event PropertyChangedEventHandler? PropertyChanged;
 
         public double Zoom
         {
             get => _zoom;
-
             set
             {
-                double zoom =
-                    Math.Max(double.Epsilon, value);
+                double zoom = Math.Max(double.Epsilon, value);
 
-                if (_zoom == zoom)
+                if (Math.Abs(_zoom - zoom) < 0.0001)
                     return;
 
                 _zoom = zoom;
-
                 OnPropertyChanged();
             }
         }
@@ -35,14 +30,12 @@ namespace Araci.Core.Viewport
         public Point Offset
         {
             get => _offset;
-
             set
             {
                 if (_offset == value)
                     return;
 
                 _offset = value;
-
                 OnPropertyChanged();
             }
         }
@@ -61,12 +54,9 @@ namespace Araci.Core.Viewport
                 (point.Y - Offset.Y) / Zoom);
         }
 
-        private void OnPropertyChanged(
-            [CallerMemberName] string? propertyName = null)
+        private void OnPropertyChanged([CallerMemberName] string? propertyName = null)
         {
-            PropertyChanged?.Invoke(
-                this,
-                new PropertyChangedEventArgs(propertyName));
+            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
         }
     }
 }

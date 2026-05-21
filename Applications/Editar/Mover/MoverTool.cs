@@ -1,6 +1,5 @@
 ﻿using System.Windows;
 using System.Windows.Input;
-
 using Araci.Applications.Editar.Base;
 using Araci.Applications.Editar.Selecionar;
 using Araci.Services;
@@ -10,89 +9,45 @@ namespace Araci.Applications.Editar.Mover
 {
     public class MoverTool : ITool
     {
-        // =========================
-        // TOOL INTERNA
-        // =========================
-
         private readonly SelecionarTool _selecionarTool;
-
-        // =========================
-        // INFO TOOL
-        // =========================
-
-        public string Nome => "Mover";
-
-        public bool MantemBotaoAtivado => true;
-
-        // =========================
-        // CONSTRUTOR
-        // =========================
 
         public MoverTool(EditorContext context)
         {
-            var editorContext = context
-                ?? throw new System.ArgumentNullException(nameof(context));
+            ArgumentNullException.ThrowIfNull(context);
 
             _selecionarTool = new SelecionarTool(
-                editorContext,
+                context,
                 modoSoMover: true,
                 mostrarHud: true);
         }
 
-        // =========================
-        // ATIVAR
-        // =========================
+        public string Nome => "Mover";
+        public bool MantemBotaoAtivado => true;
 
         public void Ativar()
         {
             _selecionarTool.Ativar();
         }
 
-        // =========================
-        // DESATIVAR
-        // =========================
-
         public void Desativar()
         {
             _selecionarTool.Desativar();
         }
 
-        // =========================
-        // MOUSE DOWN
-        // =========================
-
-        public void OnMouseDown(
-            ElementoViewModel? vm,
-            Point position,
-            ToolInputState inputState)
+        public void OnMouseDown(ElementoViewModel? vm, Point position, ToolInputState inputState)
         {
-            _selecionarTool.OnMouseDown(
-                vm,
-                position,
-                inputState);
+            _selecionarTool.OnMouseDown(vm, position, inputState);
         }
-
-        // =========================
-        // MOUSE MOVE
-        // =========================
 
         public void OnMouseMove(Point position)
         {
             _selecionarTool.OnMouseMove(position);
         }
 
-        // =========================
-        // MOUSE UP
-        // =========================
-
         public void OnMouseUp(Point position)
         {
             _selecionarTool.OnMouseUp(position);
         }
-
-        // =========================
-        // KEYBOARD
-        // =========================
 
         public void OnKeyDown(Key key)
         {

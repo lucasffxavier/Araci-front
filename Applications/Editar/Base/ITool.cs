@@ -7,19 +7,14 @@ namespace Araci.Applications.Editar.Base
     public interface ITool
     {
         string Nome { get; }
-
         bool MantemBotaoAtivado { get; }
-
-        void OnMouseDown(
-            ElementoViewModel? vm,
-            Point position,
-            ToolInputState inputState);
-        void OnMouseMove(Point position);
-        void OnMouseUp(Point position);
-
-        void OnKeyDown(Key key);
 
         void Ativar();
         void Desativar();
+
+        void OnMouseDown(ElementoViewModel? vm, Point position, ToolInputState inputState);
+        void OnMouseMove(Point position);
+        void OnMouseUp(Point position);
+        void OnKeyDown(Key key);
     }
 }

@@ -10,23 +10,29 @@ namespace Araci.ViewModels
     {
         private bool _possuiPreview;
 
-        public CaboViewModel(Cabo modelo, TypeLibraryService types)
+        public CaboViewModel(
+            Cabo modelo,
+            TypeLibraryService types)
             : base(modelo, new CaboNode(modelo), types)
         {
             SelecionarPrimeiroTipoDisponivel();
         }
 
         public Cabo Cabo => (Cabo)Modelo;
+
         private CaboNode CaboNode => (CaboNode)Node;
 
-        public override IEnumerable TiposDisponiveis => Types.TiposCabos;
+        public override IEnumerable TiposDisponiveis =>
+            Types.TiposCabos;
 
         public void Iniciar(Point p)
         {
             Cabo.Vertices.Clear();
+
             Cabo.Vertices.Add(p);
 
             Cabo.DefinirOrigem(p);
+
             Cabo.PreviewPonto = p;
 
             _possuiPreview = true;
@@ -39,10 +45,12 @@ namespace Araci.ViewModels
             if (!_possuiPreview)
                 return;
 
-            if (Cabo.PreviewPonto.HasValue && Cabo.PreviewPonto.Value == p)
+            if (Cabo.PreviewPonto.HasValue &&
+                Cabo.PreviewPonto.Value == p)
                 return;
 
             Cabo.PreviewPonto = p;
+
             Atualizar();
         }
 
@@ -60,15 +68,18 @@ namespace Araci.ViewModels
                 Cabo.Vertices.Add(p);
 
             Cabo.DefinirDestino(p);
+
             Atualizar();
         }
 
         public void RemoverPreview()
         {
-            if (!_possuiPreview && Cabo.PreviewPonto == null)
+            if (!_possuiPreview &&
+                Cabo.PreviewPonto == null)
                 return;
 
             _possuiPreview = false;
+
             Cabo.PreviewPonto = null;
 
             Atualizar();
@@ -83,6 +94,7 @@ namespace Araci.ViewModels
                     return;
 
                 Cabo.Nome = value;
+
                 OnPropertyChanged();
             }
         }
@@ -96,7 +108,9 @@ namespace Araci.ViewModels
                     return;
 
                 Cabo.BarraOrigem = value;
+
                 OnPropertyChanged();
+
                 NotificarParametros();
             }
         }
@@ -110,7 +124,9 @@ namespace Araci.ViewModels
                     return;
 
                 Cabo.BarraDestino = value;
+
                 OnPropertyChanged();
+
                 NotificarParametros();
             }
         }
@@ -124,6 +140,7 @@ namespace Araci.ViewModels
                     return;
 
                 Cabo.Comprimento = value;
+
                 OnPropertyChanged();
             }
         }
@@ -153,7 +170,32 @@ namespace Araci.ViewModels
             Atualizar();
         }
 
+        public override ElementoEstado CapturarEstado()
+        {
+            return new ElementoEstado(
+                WorldX,
+                WorldY,
+                vertices: Cabo.Vertices);
+        }
+
+        public override void AplicarEstado(ElementoEstado estado)
+        {
+            Cabo.Vertices.Clear();
+
+            foreach (var p in estado.Vertices)
+                Cabo.Vertices.Add(p);
+
+            if (Cabo.Vertices.Count > 0)
+            {
+                Cabo.DefinirOrigem(Cabo.Vertices[0]);
+                Cabo.DefinirDestino(Cabo.Vertices[^1]);
+            }
+
+            Atualizar();
+        }
+
         public override double WorldX => Bounds.X;
+
         public override double WorldY => Bounds.Y;
     }
 }

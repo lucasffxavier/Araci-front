@@ -1,52 +1,29 @@
-﻿using System;
-using Araci.Applications.Editar.Base;
+﻿using Araci.Applications.Editar.Base;
 using Araci.Applications.Editar.Selecionar;
 
 namespace Araci.Services
 {
     public class ToolService
     {
-        // =========================
-        // EVENTOS
-        // =========================
-
-        public event Action<ITool>?
-            FerramentaAlterada;
-
-        // =========================
-        // ESTADO
-        // =========================
-
-        private ITool _ferramentaAtual;
-
         private readonly EditorContext _context;
-
-        // =========================
-        // CONSTRUTOR
-        // =========================
+        private ITool _ferramentaAtual;
 
         public ToolService(EditorContext context)
         {
-            _context = context
-                ?? throw new ArgumentNullException(nameof(context));
+            _context = context ?? throw new ArgumentNullException(nameof(context));
 
-            _ferramentaAtual =
-                new SelecionarTool(_context);
-
+            _ferramentaAtual = new SelecionarTool(_context);
             _ferramentaAtual.Ativar();
         }
 
-        // =========================
-        // TOOL ATUAL
-        // =========================
+        public event Action<ITool>? FerramentaAlterada;
 
         public ITool FerramentaAtual
         {
             get => _ferramentaAtual;
-
             set
             {
-                if (_ferramentaAtual == value)
+                if (ReferenceEquals(_ferramentaAtual, value))
                     return;
 
                 _ferramentaAtual.Desativar();
@@ -55,32 +32,21 @@ namespace Araci.Services
 
                 _ferramentaAtual.Ativar();
 
-                FerramentaAlterada?.Invoke(
-                    _ferramentaAtual);
+                FerramentaAlterada?.Invoke(_ferramentaAtual);
             }
         }
-
-        // =========================
-        // ATIVAR
-        // =========================
 
         public void AtivarFerramenta(ITool ferramenta)
         {
             FerramentaAtual = ferramenta;
         }
 
-        // =========================
-        // VOLTAR SELEÇÃO
-        // =========================
-
         public void VoltarParaSelecao()
         {
             if (_ferramentaAtual is SelecionarTool)
                 return;
 
-            FerramentaAtual =
-                new SelecionarTool(_context);
+            FerramentaAtual = new SelecionarTool(_context);
         }
-
     }
 }

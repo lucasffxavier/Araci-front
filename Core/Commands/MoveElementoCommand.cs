@@ -2,13 +2,10 @@
 
 namespace Araci.Core.Commands
 {
-    public class MoveElementoCommand
-        : IUndoableCommand
+    public class MoveElementoCommand : IUndoableCommand
     {
         private readonly ElementoViewModel _vm;
-
         private readonly ElementoEstado _antes;
-
         private readonly ElementoEstado _depois;
 
         public MoveElementoCommand(
@@ -17,9 +14,7 @@ namespace Araci.Core.Commands
             ElementoEstado depois)
         {
             _vm = vm;
-
             _antes = antes;
-
             _depois = depois;
         }
 

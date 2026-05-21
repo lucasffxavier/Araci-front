@@ -19,10 +19,14 @@ namespace Araci.ViewModels
     public abstract class ElementoViewModel : ViewModelBase
     {
         private readonly ElementoNode _node;
+
         private ICommand? _abrirPropriedadesTipoCommand;
         private ObservableCollection<ParameterViewModel>? _parametros;
 
-        protected ElementoViewModel(Elemento modelo, ElementoNode node, TypeLibraryService types)
+        protected ElementoViewModel(
+            Elemento modelo,
+            ElementoNode node,
+            TypeLibraryService types)
         {
             Modelo = modelo ?? throw new ArgumentNullException(nameof(modelo));
             _node = node ?? throw new ArgumentNullException(nameof(node));
@@ -86,7 +90,7 @@ namespace Araci.ViewModels
 
         public ICommand AbrirPropriedadesTipoCommand =>
             _abrirPropriedadesTipoCommand ??=
-                new RelayCommand(AbrirPropriedadesTipo);
+            new RelayCommand(AbrirPropriedadesTipo);
 
         private void AbrirPropriedadesTipo()
         {
@@ -233,9 +237,9 @@ namespace Araci.ViewModels
 
         public ObservableCollection<ParameterViewModel> Parametros =>
             _parametros ??=
-                new ObservableCollection<ParameterViewModel>(
-                    Modelo.Parametros.Values.Select(
-                        p => new ParameterViewModel(p)));
+            new ObservableCollection<ParameterViewModel>(
+                Modelo.Parametros.Values.Select(
+                    p => new ParameterViewModel(p)));
 
         public virtual void NotificarParametros()
         {

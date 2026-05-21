@@ -9,9 +9,9 @@ namespace Araci.Applications.Editar.Selecionar
 {
     public class SelecionarTool : ITool
     {
+        private readonly EditorContext _context;
         private readonly bool _modoSoMover;
         private readonly bool _mostrarHud;
-        private readonly EditorContext _context;
 
         private bool _arrastandoElementos;
         private bool _selecionandoJanela;
@@ -20,22 +20,19 @@ namespace Araci.Applications.Editar.Selecionar
         private Point _ultimoPontoMouse;
         private Point _pontoInicialArrasto;
 
-        public string Nome => "Selecionar";
-        public bool MantemBotaoAtivado => true;
-
-        public SelecionarTool(
-            EditorContext context,
-            bool modoSoMover = false,
-            bool mostrarHud = false)
+        public SelecionarTool(EditorContext context, bool modoSoMover = false, bool mostrarHud = false)
         {
-            _context = context
-                ?? throw new System.ArgumentNullException(nameof(context));
-
+            _context = context ?? throw new ArgumentNullException(nameof(context));
             _modoSoMover = modoSoMover;
             _mostrarHud = mostrarHud;
         }
 
-        public void Ativar() { }
+        public string Nome => "Selecionar";
+        public bool MantemBotaoAtivado => true;
+
+        public void Ativar()
+        {
+        }
 
         public void Desativar()
         {
@@ -43,143 +40,148 @@ namespace Araci.Applications.Editar.Selecionar
             _selecionandoJanela = false;
 
             _context.SelectionBox.Visivel = false;
-
             _context.MoveHud.Visivel = false;
             _context.MoveHud.Reset();
         }
 
-        public void OnMouseDown(
-            ElementoViewModel? vm,
-            Point position,
-            ToolInputState inputState)
+        public void OnMouseDown(ElementoViewModel? vm, Point position, ToolInputState inputState)
         {
-            Point worldPosition = ScreenToWorld(position);
-
             bool ctrl = inputState.IsControlPressed;
 
             if (vm != null)
             {
-                if (!_modoSoMover)
-                {
-                    if (ctrl)
-                        _context.Selection.Toggle(vm);
-                    else if (!_context.Selection.Selecionados.Contains(vm))
-                        _context.Selection.Selecionar(vm);
-                }
-
-                _arrastandoElementos = true;
-
-                _ultimoPontoMouse = worldPosition;
-                _pontoInicialArrasto = worldPosition;
-
-                _context.Move.BeginMove(
-                    _context.Selection.Selecionados);
-
-                if (_mostrarHud)
-                {
-                    var hud = _context.MoveHud;
-
-                    hud.Reset();
-
-                    var bounds = CalcularBoundsSelecionados();
-
-                    hud.AtualizarPosicao(bounds);
-                    hud.Visivel = true;
-                }
-
+                IniciarSelecaoElemento(vm, ctrl);
+                IniciarMovimento(position);
                 return;
             }
 
             if (_modoSoMover)
                 return;
 
-            if (!ctrl)
-                _context.Selection.Limpar();
-
-            _inicioJanela = worldPosition;
-
-            _selecionandoJanela = true;
-
-            _context.SelectionBox.Visivel = true;
-
-            _context.SelectionBox.Atualizar(
-                worldPosition,
-                worldPosition);
+            IniciarJanelaSelecao(position, ctrl);
         }
 
         public void OnMouseMove(Point position)
         {
-            Point worldPosition = ScreenToWorld(position);
-
             if (_arrastandoElementos)
             {
-                Vector delta = worldPosition - _ultimoPontoMouse;
-
-                if (delta.X != 0 || delta.Y != 0)
-                {
-                    foreach (var item in _context.Selection.Selecionados.ToList())
-                        _context.Move.MoverVisual(item, delta);
-                }
-
-                if (_mostrarHud)
-                {
-                    var deltaTotal = worldPosition - _pontoInicialArrasto;
-
-                    var hud = _context.MoveHud;
-
-                    hud.DeltaX = deltaTotal.X;
-                    hud.DeltaY = deltaTotal.Y;
-
-                    var bounds = CalcularBoundsSelecionados();
-
-                    hud.AtualizarPosicao(bounds);
-                }
-
-                _ultimoPontoMouse = worldPosition;
-
+                AtualizarMovimento(position);
                 return;
             }
 
             if (_selecionandoJanela)
-            {
-                _context.SelectionBox.Atualizar(
-                    _inicioJanela,
-                    worldPosition);
-            }
+                _context.SelectionBox.Atualizar(_inicioJanela, position);
         }
 
         public void OnMouseUp(Point position)
         {
             if (_arrastandoElementos)
-            {
-                _context.Move.EndMove(
-                    _context.Selection.Selecionados.ToList());
-
-                _context.MoveHud.Visivel = false;
-                _context.MoveHud.Reset();
-            }
+                FinalizarMovimento();
 
             if (_selecionandoJanela)
-            {
-                var rect = _context.SelectionBox.Bounds;
-
-                if (_context.Viewport != null)
-                {
-                    foreach (var item in _context.Viewport.Elementos)
-                    {
-                        if (rect.IntersectsWith(item.Bounds))
-                            _context.Selection.Selecionar(item, true);
-                    }
-                }
-
-                _context.SelectionBox.Visivel = false;
-            }
+                FinalizarJanelaSelecao();
 
             _arrastandoElementos = false;
             _selecionandoJanela = false;
         }
 
-        public void OnKeyDown(Key key) { }
+        public void OnKeyDown(Key key)
+        {
+        }
+
+        private void IniciarSelecaoElemento(ElementoViewModel vm, bool ctrl)
+        {
+            if (_modoSoMover)
+                return;
+
+            if (ctrl)
+            {
+                _context.Selection.Toggle(vm);
+                return;
+            }
+
+            if (!_context.Selection.Selecionados.Contains(vm))
+                _context.Selection.Selecionar(vm);
+        }
+
+        private void IniciarMovimento(Point position)
+        {
+            _arrastandoElementos = true;
+            _ultimoPontoMouse = position;
+            _pontoInicialArrasto = position;
+
+            _context.Move.BeginMove(_context.Selection.Selecionados);
+
+            if (!_mostrarHud)
+                return;
+
+            var hud = _context.MoveHud;
+            hud.Reset();
+            hud.AtualizarPosicao(CalcularBoundsSelecionados());
+            hud.Visivel = true;
+        }
+
+        private void AtualizarMovimento(Point position)
+        {
+            Vector delta = position - _ultimoPontoMouse;
+
+            if (delta.X != 0 || delta.Y != 0)
+            {
+                foreach (var item in _context.Selection.Selecionados.ToList())
+                    _context.Move.MoverVisual(item, delta);
+            }
+
+            if (_mostrarHud)
+                AtualizarHud(position);
+
+            _ultimoPontoMouse = position;
+        }
+
+        private void AtualizarHud(Point position)
+        {
+            Vector delta = position - _pontoInicialArrasto;
+
+            var hud = _context.MoveHud;
+            hud.DeltaX = delta.X;
+            hud.DeltaY = delta.Y;
+            hud.AtualizarPosicao(CalcularBoundsSelecionados());
+        }
+
+        private void FinalizarMovimento()
+        {
+            _context.Move.EndMove(_context.Selection.Selecionados.ToList());
+
+            _context.MoveHud.Visivel = false;
+            _context.MoveHud.Reset();
+        }
+
+        private void IniciarJanelaSelecao(Point position, bool ctrl)
+        {
+            if (!ctrl)
+                _context.Selection.Limpar();
+
+            _inicioJanela = position;
+            _selecionandoJanela = true;
+
+            _context.SelectionBox.Visivel = true;
+            _context.SelectionBox.Atualizar(position, position);
+        }
+
+        private void FinalizarJanelaSelecao()
+        {
+            var rect = _context.SelectionBox.Bounds;
+
+            if (_context.Viewport != null)
+            {
+                foreach (var item in _context.Viewport.Elementos)
+                {
+                    if (rect.IntersectsWith(item.Bounds))
+                        _context.Selection.Selecionar(item, true);
+                }
+            }
+
+            _context.SelectionBox.Visivel = false;
+        }
 
         private Rect CalcularBoundsSelecionados()
         {
@@ -193,18 +195,7 @@ namespace Araci.Applications.Editar.Selecionar
             double maxX = items.Max(i => i.Bounds.Right);
             double maxY = items.Max(i => i.Bounds.Bottom);
 
-            return new Rect(
-                minX,
-                minY,
-                maxX - minX,
-                maxY - minY);
-        }
-
-        private Point ScreenToWorld(Point screenPosition)
-        {
-            return _context.Viewport
-                ?.ScreenToWorld(screenPosition)
-                ?? screenPosition;
+            return new Rect(minX, minY, maxX - minX, maxY - minY);
         }
     }
 }

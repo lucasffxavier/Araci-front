@@ -1,6 +1,5 @@
 using System.Windows;
 using System.Windows.Input;
-
 using Araci.Applications.Editar.Base;
 using Araci.ViewModels;
 
@@ -12,8 +11,7 @@ namespace Araci.Services
 
         public InputRouter(EditorContext context)
         {
-            _context = context
-                ?? throw new System.ArgumentNullException(nameof(context));
+            _context = context ?? throw new ArgumentNullException(nameof(context));
         }
 
         public ITool ToolAtual
@@ -22,73 +20,57 @@ namespace Araci.Services
             set => _context.Tools.AtivarFerramenta(value);
         }
 
-        public void MouseDown(
-            ElementoViewModel? vm,
-            Point position)
+        public void MouseDown(ElementoViewModel? vm, Point position)
         {
-            ToolAtual.OnMouseDown(
-                vm,
-                position,
-                CapturarEstadoAtual());
+            ToolAtual.OnMouseDown(vm, position, CapturarEstadoAtual());
         }
 
-        public void MouseMove(
-            Point position)
+        public void MouseMove(Point position)
         {
             ToolAtual.OnMouseMove(position);
         }
 
-        public void MouseUp(
-            Point position)
+        public void MouseUp(Point position)
         {
             ToolAtual.OnMouseUp(position);
         }
 
-        public bool KeyDown(
-            Key key)
+        public bool KeyDown(Key key)
         {
-            bool control =
-                Keyboard.Modifiers.HasFlag(ModifierKeys.Control);
+            bool control = Keyboard.Modifiers.HasFlag(ModifierKeys.Control);
 
             if (control && key == Key.Z)
             {
                 _context.Commands.Undo();
-
                 return true;
             }
 
             if (control && key == Key.Y)
             {
                 _context.Commands.Redo();
-
                 return true;
             }
 
             if (control && key == Key.C)
             {
                 ClipboardService.CopiarSelecionados(_context);
-
                 return true;
             }
 
             if (control && key == Key.V)
             {
                 ClipboardService.Colar(_context);
-
                 return true;
             }
 
             if (key == Key.Escape)
             {
                 _context.Tools.VoltarParaSelecao();
-
                 _context.Selection.Limpar();
-
                 return true;
             }
 
             ToolAtual.OnKeyDown(key);
-
             return false;
         }
 

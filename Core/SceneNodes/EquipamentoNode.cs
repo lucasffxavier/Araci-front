@@ -8,10 +8,7 @@ namespace Araci.Core.SceneNodes
         private readonly double _largura;
         private readonly double _altura;
 
-        public EquipamentoNode(
-            ElementoEquipamento modelo,
-            double largura = 70,
-            double altura = 70)
+        public EquipamentoNode(ElementoEquipamento modelo, double largura = 70, double altura = 70)
             : base(modelo)
         {
             _largura = largura;
@@ -22,11 +19,7 @@ namespace Araci.Core.SceneNodes
 
         public override void AtualizarGeometria()
         {
-            Bounds = new Rect(
-                Modelo.PosicaoX,
-                Modelo.PosicaoY,
-                _largura,
-                _altura);
+            Bounds = new Rect(Modelo.PosicaoX, Modelo.PosicaoY, _largura, _altura);
         }
     }
 }

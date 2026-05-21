@@ -1,64 +1,31 @@
-﻿using Araci.Core.Events;
-using Araci.ViewModels;
-
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Linq;
+using Araci.Core.Events;
+using Araci.ViewModels;
 
 namespace Araci.Services
 {
     public class SelectionService
     {
-        // =====================================================
-        // DEPENDÊNCIAS
-        // =====================================================
-
         private readonly EditorContext _context;
-
-        // =====================================================
-        // ESTADO
-        // =====================================================
-
-        private readonly ObservableCollection<ElementoViewModel>
-            _selecionados = new();
-
-        // =====================================================
-        // CONSTRUTOR
-        // =====================================================
+        private readonly ObservableCollection<ElementoViewModel> _selecionados = new();
 
         public SelectionService(EditorContext context)
         {
-            _context = context
-                ?? throw new System.ArgumentNullException(nameof(context));
+            _context = context ?? throw new ArgumentNullException(nameof(context));
         }
 
-        // =====================================================
-        // LEITURA
-        // =====================================================
+        public IReadOnlyList<ElementoViewModel> Selecionados => _selecionados;
 
-        public IReadOnlyList<ElementoViewModel>
-            Selecionados =>
-                _selecionados;
+        public ObservableCollection<ElementoViewModel> SelecionadosObservable => _selecionados;
 
-        public ObservableCollection<ElementoViewModel>
-            SelecionadosObservable =>
-                _selecionados;
+        public bool TemSelecionados => _selecionados.Count > 0;
 
-        public bool TemSelecionados =>
-            _selecionados.Count > 0;
-
-        // =====================================================
-        // SELECIONAR
-        // =====================================================
-
-        public void Selecionar(
-            ElementoViewModel vm,
-            bool adicionarAoExistente = false)
+        public void Selecionar(ElementoViewModel vm, bool adicionarAoExistente = false)
         {
             if (!adicionarAoExistente)
-            {
                 Limpar();
-            }
 
             if (_selecionados.Contains(vm))
             {
@@ -71,13 +38,8 @@ namespace Araci.Services
             _selecionados.Add(vm);
 
             AtualizarElementoSelecionado();
-
             PublicarAlteracao();
         }
-
-        // =====================================================
-        // TOGGLE
-        // =====================================================
 
         public void Toggle(ElementoViewModel vm)
         {
@@ -90,10 +52,6 @@ namespace Araci.Services
             Selecionar(vm, true);
         }
 
-        // =====================================================
-        // DESELECIONAR
-        // =====================================================
-
         public void Deselecionar(ElementoViewModel vm)
         {
             if (!_selecionados.Contains(vm))
@@ -104,13 +62,8 @@ namespace Araci.Services
             _selecionados.Remove(vm);
 
             AtualizarElementoSelecionado();
-
             PublicarAlteracao();
         }
-
-        // =====================================================
-        // LIMPAR
-        // =====================================================
 
         public void Limpar()
         {
@@ -118,32 +71,22 @@ namespace Araci.Services
                 return;
 
             foreach (var vm in _selecionados)
-            {
                 vm.IsSelecionado = false;
-            }
 
             _selecionados.Clear();
 
             AtualizarElementoSelecionado();
-
             PublicarAlteracao();
         }
 
-        // =====================================================
-        // AUXILIARES
-        // =====================================================
-
         private void AtualizarElementoSelecionado()
         {
-            _context.Editor.ElementoSelecionado =
-                _selecionados.LastOrDefault();
+            _context.Editor.ElementoSelecionado = _selecionados.LastOrDefault();
         }
 
         private void PublicarAlteracao()
         {
-            _context.Events.Publish(
-                new SelecaoAlteradaEvent(
-                    _selecionados.ToList()));
+            _context.Events.Publish(new SelecaoAlteradaEvent(_selecionados.ToList()));
         }
     }
 }

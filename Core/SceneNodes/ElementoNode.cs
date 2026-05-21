@@ -14,16 +14,12 @@ namespace Araci.Core.SceneNodes
 
         public Rect Bounds { get; protected set; }
 
-        public Point Centro =>
-            new(
-                Bounds.X + Bounds.Width / 2,
-                Bounds.Y + Bounds.Height / 2);
+        public Point Centro => new(
+            Bounds.X + Bounds.Width / 2,
+            Bounds.Y + Bounds.Height / 2);
 
-        public virtual double Largura =>
-            Bounds.Width;
-
-        public virtual double Altura =>
-            Bounds.Height;
+        public virtual double Largura => Bounds.Width;
+        public virtual double Altura => Bounds.Height;
 
         public virtual double X
         {

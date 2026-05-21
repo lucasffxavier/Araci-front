@@ -1,40 +1,35 @@
-using Araci.Services;
-using Araci.ViewModels;
 using System;
 using System.ComponentModel;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
 using System.Windows.Media;
+using Araci.Services;
+using Araci.ViewModels;
 
 namespace Araci.Views
 {
     public partial class ViewportView : UserControl
     {
+        private readonly MatrixTransform _cameraTransform = new();
+
         private ViewportViewModel? _viewportViewModel;
         private EditorContext? _context;
-
-        private readonly MatrixTransform
-            _cameraTransform = new();
 
         public ViewportView()
         {
             InitializeComponent();
         }
 
-        public void Inicializar(
-            EditorContext context)
+        public void Inicializar(EditorContext context)
         {
-            _context = context
-                ?? throw new ArgumentNullException(nameof(context));
+            _context = context ?? throw new ArgumentNullException(nameof(context));
 
-            _viewportViewModel =
-                new ViewportViewModel(_context);
+            _viewportViewModel = new ViewportViewModel(_context);
 
             DataContext = _viewportViewModel;
 
-            _context.InicializarViewport(
-                _viewportViewModel);
+            _context.InicializarViewport(_viewportViewModel);
 
             ConfigurarCamera();
 
@@ -46,34 +41,17 @@ namespace Araci.Views
             if (_context?.Viewport == null)
                 return;
 
-            WorldLayer.RenderTransform =
-                _cameraTransform;
+            WorldLayer.RenderTransform = _cameraTransform;
+            SelectionLayer.RenderTransform = _cameraTransform;
 
-            SelectionLayer.RenderTransform =
-                _cameraTransform;
-
-            _context.Viewport.Camera.PropertyChanged +=
-                OnCameraChanged;
+            _context.Viewport.Camera.PropertyChanged += OnCameraChanged;
 
             AtualizarCameraTransform();
         }
 
-        private void OnCameraChanged(
-            object? sender,
-            PropertyChangedEventArgs e)
+        private void OnCameraChanged(object? sender, PropertyChangedEventArgs e)
         {
             AtualizarCameraTransform();
-        }
-
-        private void OnUnloaded(
-            object sender,
-            RoutedEventArgs e)
-        {
-            if (_context?.Viewport != null)
-            {
-                _context.Viewport.Camera.PropertyChanged -=
-                    OnCameraChanged;
-            }
         }
 
         private void AtualizarCameraTransform()
@@ -81,30 +59,25 @@ namespace Araci.Views
             if (_context?.Viewport == null)
                 return;
 
-            var camera =
-                _context.Viewport.Camera;
+            var camera = _context.Viewport.Camera;
 
-            _cameraTransform.Matrix =
-                new Matrix(
-                    camera.Zoom,
-                    0,
-                    0,
-                    camera.Zoom,
-                    camera.Offset.X,
-                    camera.Offset.Y);
+            _cameraTransform.Matrix = new Matrix(
+                camera.Zoom,
+                0,
+                0,
+                camera.Zoom,
+                camera.Offset.X,
+                camera.Offset.Y);
         }
 
-        private void OnLoaded(
-            object sender,
-            RoutedEventArgs e)
+        private void OnLoaded(object sender, RoutedEventArgs e)
         {
             Focus();
             Keyboard.Focus(this);
 
             AtualizarViewport();
 
-            SizeChanged += (_, __) =>
-                AtualizarViewport();
+            SizeChanged += (_, _) => AtualizarViewport();
         }
 
         private void AtualizarViewport()
@@ -117,37 +90,24 @@ namespace Araci.Views
 
             if (RootBorder != null)
             {
-                largura -= RootBorder.BorderThickness.Left
-                    + RootBorder.BorderThickness.Right;
-
-                altura -= RootBorder.BorderThickness.Top
-                    + RootBorder.BorderThickness.Bottom;
+                largura -= RootBorder.BorderThickness.Left + RootBorder.BorderThickness.Right;
+                altura -= RootBorder.BorderThickness.Top + RootBorder.BorderThickness.Bottom;
             }
 
             largura = Math.Max(0, largura);
             altura = Math.Max(0, altura);
 
-            _context.Viewport.AtualizarTamanho(
-                new Size(largura, altura));
+            _context.Viewport.AtualizarTamanho(new Size(largura, altura));
         }
 
         private Point GetWorldPos(MouseEventArgs e)
         {
-            Point screen =
-                e.GetPosition(this);
+            Point screen = e.GetPosition(this);
 
-            if (_context?.Viewport == null)
-            {
-                return screen;
-            }
-
-            return _context.Viewport
-                .ScreenToWorld(screen);
+            return _context?.Viewport?.ScreenToWorld(screen) ?? screen;
         }
 
-        private void OnPreviewMouseLeftButtonDown(
-            object sender,
-            MouseButtonEventArgs e)
+        private void OnPreviewMouseLeftButtonDown(object sender, MouseButtonEventArgs e)
         {
             if (_context == null)
                 return;
@@ -155,78 +115,39 @@ namespace Araci.Views
             Focus();
             Keyboard.Focus(this);
 
-            ElementoViewModel? vm = null;
+            var vm = EncontrarElemento(e.OriginalSource as DependencyObject);
 
-            DependencyObject? origem =
-                e.OriginalSource as DependencyObject;
-
-            while (origem != null)
-            {
-                if (origem is FrameworkElement fe &&
-                    fe.DataContext is ElementoViewModel el)
-                {
-                    vm = el;
-                    break;
-                }
-
-                origem =
-                    VisualTreeHelper.GetParent(origem);
-            }
-
-            _context.Input.MouseDown(
-                vm,
-                GetWorldPos(e));
+            _context.Input.MouseDown(vm, GetWorldPos(e));
 
             CaptureMouse();
         }
 
-        private void OnPreviewMouseMove(
-            object sender,
-            MouseEventArgs e)
+        private void OnPreviewMouseMove(object sender, MouseEventArgs e)
         {
-            _context?.Input.MouseMove(
-                GetWorldPos(e));
+            _context?.Input.MouseMove(GetWorldPos(e));
         }
 
-        private void OnPreviewMouseLeftButtonUp(
-            object sender,
-            MouseButtonEventArgs e)
+        private void OnPreviewMouseLeftButtonUp(object sender, MouseButtonEventArgs e)
         {
-            _context?.Input.MouseUp(
-                GetWorldPos(e));
+            _context?.Input.MouseUp(GetWorldPos(e));
 
             if (IsMouseCaptured)
-            {
                 ReleaseMouseCapture();
-            }
         }
 
-        private void OnPreviewMouseWheel(
-            object sender,
-            MouseWheelEventArgs e)
+        private void OnPreviewMouseWheel(object sender, MouseWheelEventArgs e)
         {
             if (_context?.Viewport == null)
                 return;
 
-            var camera =
-                _context.Viewport.Camera;
+            var camera = _context.Viewport.Camera;
 
-            Point cursor =
-                e.GetPosition(this);
+            Point cursor = e.GetPosition(this);
+            Point worldBefore = camera.ScreenToWorld(cursor);
 
-            Point worldBefore =
-                camera.ScreenToWorld(cursor);
+            double factor = e.Delta > 0 ? 1.1 : 1 / 1.1;
 
-            double factor =
-                e.Delta > 0
-                    ? 1.1
-                    : 1 / 1.1;
-
-            camera.Zoom = Math.Max(
-                0.1,
-                Math.Min(
-                    8,
-                    camera.Zoom * factor));
+            camera.Zoom = Math.Max(0.1, Math.Min(8, camera.Zoom * factor));
 
             camera.Offset = new Point(
                 cursor.X - worldBefore.X * camera.Zoom,
@@ -235,15 +156,31 @@ namespace Araci.Views
             e.Handled = true;
         }
 
-        private void OnPreviewKeyDown(
-            object sender,
-            KeyEventArgs e)
+        private void OnPreviewKeyDown(object sender, KeyEventArgs e)
         {
-            if (_context != null)
+            if (_context == null)
+                return;
+
+            e.Handled = _context.Input.KeyDown(e.Key);
+        }
+
+        private void OnUnloaded(object sender, RoutedEventArgs e)
+        {
+            if (_context?.Viewport != null)
+                _context.Viewport.Camera.PropertyChanged -= OnCameraChanged;
+        }
+
+        private static ElementoViewModel? EncontrarElemento(DependencyObject? origem)
+        {
+            while (origem != null)
             {
-                e.Handled =
-                    _context.Input.KeyDown(e.Key);
+                if (origem is FrameworkElement fe && fe.DataContext is ElementoViewModel vm)
+                    return vm;
+
+                origem = VisualTreeHelper.GetParent(origem);
             }
+
+            return null;
         }
     }
 }

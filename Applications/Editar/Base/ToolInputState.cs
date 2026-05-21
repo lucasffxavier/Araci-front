@@ -2,16 +2,13 @@ namespace Araci.Applications.Editar.Base
 {
     public readonly struct ToolInputState
     {
-        public ToolInputState(
-            bool isControlPressed)
+        public ToolInputState(bool isControlPressed)
         {
             IsControlPressed = isControlPressed;
         }
 
-        public bool IsControlPressed
-        { get; }
+        public bool IsControlPressed { get; }
 
-        public static ToolInputState Empty =>
-            new(false);
+        public static ToolInputState Empty => new(false);
     }
 }

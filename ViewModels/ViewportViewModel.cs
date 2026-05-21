@@ -1,10 +1,9 @@
+using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Collections.Specialized;
 using System.ComponentModel;
 using System.Runtime.CompilerServices;
-using System;
-
 using Araci.Core.Documents;
 using Araci.Core.Scenes;
 using Araci.Models;
@@ -12,113 +11,55 @@ using Araci.Services;
 
 namespace Araci.ViewModels
 {
-    public class ViewportViewModel
-        : INotifyPropertyChanged
+    public class ViewportViewModel : INotifyPropertyChanged
     {
         private readonly EditorContext _context;
+        private readonly Dictionary<Elemento, ElementoViewModel> _viewModelsPorModelo = new();
 
-        private readonly Dictionary<Elemento, ElementoViewModel>
-            _viewModelsPorModelo = new();
-
-        // =========================
-        // DOCUMENTO
-        // =========================
-
-        public AraciDocument
-            Document
-        { get; }
-
-        // =========================
-        // SCENE
-        // =========================
-
-        public Scene Scene
-        { get; }
-
-        public SelectionBoxViewModel SelectionBox
-        { get; }
-
-        public MoveHudService MoveHud
-        { get; }
-
-        // =========================
-        // ELEMENTOS VISUAIS
-        // =========================
-
-        public ObservableCollection<ElementoViewModel>
-            Elementos
-            => Scene.Elementos;
-
-        // =========================
-        // CONSTRUTOR
-        // =========================
-
-        public ViewportViewModel(
-            EditorContext context)
+        public ViewportViewModel(EditorContext context)
         {
-            ArgumentNullException.ThrowIfNull(context);
+            _context = context ?? throw new ArgumentNullException(nameof(context));
 
-            _context =
-                context;
+            Document = context.Document;
+            Scene = context.Scene;
+            SelectionBox = context.SelectionBox;
+            MoveHud = context.MoveHud;
 
-            Document =
-                context.Document;
-
-            Scene =
-                context.Scene;
-
-            SelectionBox =
-                context.SelectionBox;
-
-            MoveHud =
-                context.MoveHud;
-
-            Document.Elementos.CollectionChanged +=
-                OnDocumentElementosChanged;
+            Document.Elementos.CollectionChanged += OnDocumentElementosChanged;
 
             SincronizarComDocumento();
         }
 
-        // =========================
-        // REGISTRO
-        // =========================
+        public AraciDocument Document { get; }
+        public Scene Scene { get; }
+        public SelectionBoxViewModel SelectionBox { get; }
+        public MoveHudService MoveHud { get; }
 
-        public void RegistrarViewModel(
-            ElementoViewModel vm)
+        public ObservableCollection<ElementoViewModel> Elementos => Scene.Elementos;
+
+        public void RegistrarViewModel(ElementoViewModel vm)
         {
-            _viewModelsPorModelo[vm.Modelo] =
-                vm;
+            _viewModelsPorModelo[vm.Modelo] = vm;
         }
 
-        // =========================
-        // SINCRONIZAÇÃO
-        // =========================
-
-        private void OnDocumentElementosChanged(
-            object? sender,
-            NotifyCollectionChangedEventArgs e)
+        private void OnDocumentElementosChanged(object? sender, NotifyCollectionChangedEventArgs e)
         {
             if (e.Action == NotifyCollectionChangedAction.Reset)
             {
                 Elementos.Clear();
-
                 return;
             }
 
             if (e.OldItems != null)
             {
                 foreach (Elemento modelo in e.OldItems)
-                {
                     RemoverViewModel(modelo);
-                }
             }
 
             if (e.NewItems != null)
             {
                 foreach (Elemento modelo in e.NewItems)
-                {
                     AdicionarViewModel(modelo);
-                }
             }
         }
 
@@ -127,76 +68,45 @@ namespace Araci.ViewModels
             Elementos.Clear();
 
             foreach (Elemento modelo in Document.Elementos)
-            {
                 AdicionarViewModel(modelo);
-            }
         }
 
-        private void AdicionarViewModel(
-            Elemento modelo)
+        private void AdicionarViewModel(Elemento modelo)
         {
-            ElementoViewModel? vm =
-                ObterOuCriarViewModel(modelo);
+            var vm = ObterOuCriarViewModel(modelo);
 
-            if (vm == null ||
-                Elementos.Contains(vm))
-            {
+            if (vm == null || Elementos.Contains(vm))
                 return;
-            }
 
             Elementos.Add(vm);
         }
 
-        private void RemoverViewModel(
-            Elemento modelo)
+        private void RemoverViewModel(Elemento modelo)
         {
-            if (!_viewModelsPorModelo.TryGetValue(
-                    modelo,
-                    out ElementoViewModel? vm))
-            {
+            if (!_viewModelsPorModelo.TryGetValue(modelo, out var vm))
                 return;
-            }
 
             Elementos.Remove(vm);
         }
 
-        private ElementoViewModel? ObterOuCriarViewModel(
-            Elemento modelo)
+        private ElementoViewModel? ObterOuCriarViewModel(Elemento modelo)
         {
-            if (_viewModelsPorModelo.TryGetValue(
-                    modelo,
-                    out ElementoViewModel? existente))
-            {
+            if (_viewModelsPorModelo.TryGetValue(modelo, out var existente))
                 return existente;
-            }
 
-            ElementoViewModel? vm =
-                _context.ElementoFactory
-                    .CriarViewModel(modelo);
+            var vm = _context.ElementoFactory.CriarViewModel(modelo);
 
             if (vm != null)
-            {
-                _viewModelsPorModelo[modelo] =
-                    vm;
-            }
+                _viewModelsPorModelo[modelo] = vm;
 
             return vm;
         }
 
-        // =========================
-        // PROPERTY CHANGED
-        // =========================
+        public event PropertyChangedEventHandler? PropertyChanged;
 
-        public event PropertyChangedEventHandler?
-            PropertyChanged;
-
-        protected virtual void OnPropertyChanged(
-            [CallerMemberName]
-            string? nome = null)
+        protected virtual void OnPropertyChanged([CallerMemberName] string? nome = null)
         {
-            PropertyChanged?.Invoke(
-                this,
-                new PropertyChangedEventArgs(nome));
+            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nome));
         }
     }
 }
