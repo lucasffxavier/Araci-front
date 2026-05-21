@@ -5,7 +5,6 @@ using System;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Data;
-using System.Windows.Input;
 using System.Windows.Media;
 
 namespace Araci.Controls
@@ -18,7 +17,7 @@ namespace Araci.Controls
 
         public GeradorControl()
         {
-            Cursor = Cursors.Hand;
+            Cursor = System.Windows.Input.Cursors.Hand;
 
             _svg = new SvgViewbox
             {
@@ -36,11 +35,9 @@ namespace Araci.Controls
             _root = new Grid();
             _root.Children.Add(_svg);
             _root.Children.Add(_overlay);
-
             Content = _root;
 
             Loaded += OnLoaded;
-
             ConfigurarBindings();
         }
 

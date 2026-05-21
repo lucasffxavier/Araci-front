@@ -5,7 +5,6 @@ using System;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Data;
-using System.Windows.Input;
 using System.Windows.Media;
 
 namespace Araci.Controls
@@ -18,7 +17,7 @@ namespace Araci.Controls
 
         public CargaControl()
         {
-            Cursor = Cursors.Hand;
+            Cursor = System.Windows.Input.Cursors.Hand;
 
             _svg = new SvgViewbox
             {
@@ -36,11 +35,9 @@ namespace Araci.Controls
             _root = new Grid();
             _root.Children.Add(_svg);
             _root.Children.Add(_overlay);
-
             Content = _root;
 
             Loaded += OnLoaded;
-
             ConfigurarBindings();
         }
 
@@ -48,7 +45,6 @@ namespace Araci.Controls
 
         private void OnLoaded(object sender, RoutedEventArgs e)
         {
-            // 🔥 aqui está o segredo
             _overlay.OpacityMask = new VisualBrush(_svg);
         }
 

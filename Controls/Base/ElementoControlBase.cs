@@ -2,36 +2,27 @@
 using System.ComponentModel;
 using System.Windows.Controls;
 using System.Windows.Input;
-
 using Araci.ViewModels;
 
 namespace Araci.Controls.Base
 {
-    public abstract class ElementoControlBase
-        : UserControl
+    public abstract class ElementoControlBase : UserControl
     {
-        private static readonly HashSet<string>
-            _propriedadesVisuais = new()
+        private static readonly HashSet<string> _propriedadesVisuais = new()
         {
             nameof(ElementoViewModel.Stroke),
             nameof(ElementoViewModel.StrokeThickness),
             nameof(ElementoViewModel.RenderData),
             nameof(ElementoViewModel.IsSelecionado),
-
+            nameof(ElementoViewModel.IsHover),
             nameof(ElementoViewModel.X),
             nameof(ElementoViewModel.Y),
-
             nameof(ElementoViewModel.WorldX),
             nameof(ElementoViewModel.WorldY),
-
             nameof(ElementoViewModel.Largura),
             nameof(ElementoViewModel.Altura),
-
             nameof(ElementoViewModel.Bounds),
             nameof(ElementoViewModel.Centro),
-
-            nameof(ElementoViewModel.IsHover),
-
             "X2",
             "Y2",
         };
@@ -39,10 +30,8 @@ namespace Araci.Controls.Base
         protected ElementoControlBase()
         {
             Cursor = Cursors.Hand;
-
             Loaded += OnLoaded;
             DataContextChanged += OnDataContextChanged;
-
             MouseEnter += OnMouseEnter;
             MouseLeave += OnMouseLeave;
         }
@@ -59,9 +48,7 @@ namespace Araci.Controls.Base
                 vm.IsHover = false;
         }
 
-        private void OnLoaded(
-            object sender,
-            System.Windows.RoutedEventArgs e)
+        private void OnLoaded(object sender, System.Windows.RoutedEventArgs e)
         {
             if (UsaBindings)
                 return;
@@ -69,36 +56,26 @@ namespace Araci.Controls.Base
             AtualizarVisual();
         }
 
-        private void OnDataContextChanged(
-            object sender,
-            System.Windows.DependencyPropertyChangedEventArgs e)
+        private void OnDataContextChanged(object sender, System.Windows.DependencyPropertyChangedEventArgs e)
         {
             if (e.OldValue is ElementoViewModel antigo)
-            {
-                antigo.PropertyChanged -=
-                    OnViewModelPropertyChanged;
-            }
+                antigo.PropertyChanged -= OnViewModelPropertyChanged;
 
             if (e.NewValue is ElementoViewModel novo)
             {
                 if (UsaBindings)
                     return;
 
-                novo.PropertyChanged +=
-                    OnViewModelPropertyChanged;
-
+                novo.PropertyChanged += OnViewModelPropertyChanged;
                 AtualizarVisual();
             }
         }
 
-        private void OnViewModelPropertyChanged(
-            object? sender,
-            PropertyChangedEventArgs e)
+        private void OnViewModelPropertyChanged(object? sender, PropertyChangedEventArgs e)
         {
             bool deveAtualizar =
                 string.IsNullOrEmpty(e.PropertyName) ||
-                _propriedadesVisuais.Contains(
-                    e.PropertyName ?? string.Empty);
+                _propriedadesVisuais.Contains(e.PropertyName ?? string.Empty);
 
             if (!deveAtualizar)
                 return;
@@ -114,14 +91,10 @@ namespace Araci.Controls.Base
             AplicarEstadoVisual(vm);
         }
 
-        protected virtual bool UsaBindings =>
-            false;
+        protected virtual bool UsaBindings => false;
 
-        protected virtual void AplicarEstadoVisual(
-            ElementoViewModel vm)
+        protected virtual void AplicarEstadoVisual(ElementoViewModel vm)
         {
         }
-
-
     }
 }
