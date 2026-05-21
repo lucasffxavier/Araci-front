@@ -1,6 +1,9 @@
 ﻿using System;
+using System.Windows;
+using System.Windows.Controls;
 using System.Windows.Data;
 using System.Windows.Input;
+using System.Windows.Media;
 using Araci.Controls.Base;
 using SharpVectors.Converters;
 
@@ -8,7 +11,9 @@ namespace Araci.Controls
 {
     public class GeradorControl : ElementoControlBase
     {
+        private readonly Grid _root;
         private readonly SvgViewbox _svg;
+        private readonly Border _overlay;
 
         public GeradorControl()
         {
@@ -16,15 +21,34 @@ namespace Araci.Controls
 
             _svg = new SvgViewbox
             {
-                Stretch = System.Windows.Media.Stretch.Fill,
-                Source = new Uri("pack://application:,,,/Araci;component/Assets/Svg/gerador.svg", UriKind.Absolute)
+                Stretch = Stretch.Fill,
+                Source = new Uri("pack://application:,,,/Assets/Svg/gerador.svg")
             };
 
-            Content = _svg;
+            _overlay = new Border
+            {
+                Background = Brushes.DeepSkyBlue,
+                Opacity = 0.6,
+                Visibility = Visibility.Collapsed
+            };
+
+            _root = new Grid();
+            _root.Children.Add(_svg);
+            _root.Children.Add(_overlay);
+
+            Content = _root;
+
+            Loaded += OnLoaded;
+
             ConfigurarBindings();
         }
 
         protected override bool UsaBindings => true;
+
+        private void OnLoaded(object sender, RoutedEventArgs e)
+        {
+            _overlay.OpacityMask = new VisualBrush(_svg);
+        }
 
         private void ConfigurarBindings()
         {
@@ -33,6 +57,11 @@ namespace Araci.Controls
 
             _svg.SetBinding(WidthProperty, new Binding("RenderData.Largura"));
             _svg.SetBinding(HeightProperty, new Binding("RenderData.Altura"));
+
+            _overlay.SetBinding(VisibilityProperty, new Binding("IsSelecionado")
+            {
+                Converter = new BooleanToVisibilityConverter()
+            });
         }
     }
 }
