@@ -2,6 +2,7 @@ using System.Windows;
 using System.Windows.Input;
 using Araci.Applications.Editar.Base;
 using Araci.Core.Commands;
+using Araci.Models;
 using Araci.Services;
 using Araci.ViewModels;
 
@@ -13,14 +14,12 @@ namespace Araci.Applications.Diagrama.InserirCabo
 
         public InserirCaboApplication(EditorContext context)
         {
-            _context = context
-                ?? throw new System.ArgumentNullException(nameof(context));
+            _context = context ?? throw new System.ArgumentNullException(nameof(context));
         }
 
         public void Executar()
         {
-            _context.Input.ToolAtual =
-                new InserirCaboTool(_context);
+            _context.Input.ToolAtual = new InserirCaboTool(_context);
         }
     }
 
@@ -30,6 +29,7 @@ namespace Araci.Applications.Diagrama.InserirCabo
         private CaboViewModel? _caboAtual;
         private bool _inserindo;
         private bool _aguardandoPrimeiroMove;
+        private ElementoViewModel? _origem;
 
         public InserirCaboTool(EditorContext context)
         {
@@ -46,37 +46,26 @@ namespace Araci.Applications.Diagrama.InserirCabo
             Cancelar();
         }
 
-        public void OnMouseDown(
-            ElementoViewModel? vm,
-            Point position,
-            ToolInputState inputState)
+        public void OnMouseDown(ElementoViewModel? vm, Point position, ToolInputState inputState)
         {
-            var p = _context.Snap.SnapFromElemento(
-                vm,
-                position,
-                _context.Scene);
+            var p = _context.Snap.SnapFromElemento(vm, position, _context.Scene);
 
             if (!_inserindo)
             {
-                _caboAtual =
-                    _context.ElementoFactory.CriarCaboVM();
-
-                // 🔥 inicia exatamente no terminal
+                _caboAtual = _context.ElementoFactory.CriarCaboVM();
                 _caboAtual.Iniciar(p);
+                _context.Commands.Execute(new AddElementoCommand(_caboAtual, _context));
 
-                _context.Commands.Execute(
-                    new AddElementoCommand(
-                        _caboAtual,
-                        _context));
+                _origem = vm;
+                ConectarOrigem(vm);
 
                 _inserindo = true;
-
-                // 🔥 bloqueia preview até primeiro movimento
                 _aguardandoPrimeiroMove = true;
                 return;
             }
 
-            _caboAtual?.ConfirmarSegmento(p);
+            _caboAtual.ConfirmarSegmento(p);
+            ConectarDestino(vm);
         }
 
         public void OnMouseMove(Point position)
@@ -84,11 +73,8 @@ namespace Araci.Applications.Diagrama.InserirCabo
             if (!_inserindo || _caboAtual == null)
                 return;
 
-            var p = _context.Snap.Snap(
-                position,
-                _context.Scene);
+            var p = _context.Snap.Snap(position, _context.Scene);
 
-            // 🔥 ignora primeiro move "fantasma"
             if (_aguardandoPrimeiroMove)
             {
                 _aguardandoPrimeiroMove = false;
@@ -109,9 +95,30 @@ namespace Araci.Applications.Diagrama.InserirCabo
             }
 
             if (key == Key.Escape)
-            {
                 Cancelar();
-            }
+        }
+
+        private void ConectarOrigem(ElementoViewModel? vm)
+        {
+            if (_caboAtual == null || vm?.Modelo is not ElementoEquipamento equipamento)
+                return;
+
+            _caboAtual.BarraOrigem = equipamento.Nome;
+            equipamento.Barra = _caboAtual.Nome;
+            _caboAtual.NotificarParametros();
+            vm.NotificarParametros();
+        }
+
+        private void ConectarDestino(ElementoViewModel? vm)
+        {
+            if (_caboAtual == null || vm?.Modelo is not ElementoEquipamento equipamento)
+                return;
+
+            _caboAtual.BarraDestino = equipamento.Nome;
+            equipamento.Barra = _caboAtual.Nome;
+
+            _caboAtual.NotificarParametros();
+            vm.NotificarParametros();
         }
 
         private void Finalizar()
@@ -121,17 +128,16 @@ namespace Araci.Applications.Diagrama.InserirCabo
 
             _caboAtual.RemoverPreview();
             _caboAtual = null;
+            _origem = null;
             _inserindo = false;
-
             _context.Tools.VoltarParaSelecao();
         }
 
         private void Cancelar()
         {
-            if (_caboAtual != null)
-                _caboAtual.RemoverPreview();
-
+            _caboAtual?.RemoverPreview();
             _caboAtual = null;
+            _origem = null;
             _inserindo = false;
             _aguardandoPrimeiroMove = false;
         }

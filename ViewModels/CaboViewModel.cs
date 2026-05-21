@@ -33,19 +33,20 @@ namespace Araci.ViewModels
 
         public void ConfirmarSegmento(Point p)
         {
-            if (Cabo.Vertices.Count == 0) return;
+            if (Cabo.Vertices.Count == 0)
+                return;
 
             Cabo.Vertices.Add(p);
             Cabo.DefinirDestino(p);
             Cabo.PreviewPonto = p;
             _possuiPreview = true;
-
             Atualizar();
         }
 
         public void AtualizarPreview(Point p)
         {
-            if (!_possuiPreview) return;
+            if (!_possuiPreview)
+                return;
 
             Cabo.PreviewPonto = p;
             Atualizar();
@@ -61,16 +62,12 @@ namespace Araci.ViewModels
         public string Nome
         {
             get => Cabo.Nome;
-
             set
             {
                 if (Cabo.Nome == value)
-                {
                     return;
-                }
 
                 Cabo.Nome = value;
-
                 OnPropertyChanged();
             }
         }
@@ -78,50 +75,40 @@ namespace Araci.ViewModels
         public string BarraOrigem
         {
             get => Cabo.BarraOrigem;
-
             set
             {
                 if (Cabo.BarraOrigem == value)
-                {
                     return;
-                }
 
                 Cabo.BarraOrigem = value;
-
                 OnPropertyChanged();
+                NotificarParametros();
             }
         }
 
         public string BarraDestino
         {
             get => Cabo.BarraDestino;
-
             set
             {
                 if (Cabo.BarraDestino == value)
-                {
                     return;
-                }
 
                 Cabo.BarraDestino = value;
-
                 OnPropertyChanged();
+                NotificarParametros();
             }
         }
 
         public double Comprimento
         {
             get => Cabo.Comprimento;
-
             set
             {
                 if (Cabo.Comprimento == value)
-                {
                     return;
-                }
 
                 Cabo.Comprimento = value;
-
                 OnPropertyChanged();
             }
         }

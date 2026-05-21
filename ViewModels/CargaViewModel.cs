@@ -7,13 +7,8 @@ namespace Araci.ViewModels
 {
     public class CargaViewModel : ElementoViewModel
     {
-        public CargaViewModel(
-            Carga modelo,
-            TypeLibraryService types)
-            : base(
-                modelo,
-                new EquipamentoNode(modelo),
-                types)
+        public CargaViewModel(Carga modelo, TypeLibraryService types)
+            : base(modelo, new EquipamentoNode(modelo), types)
         {
             SelecionarPrimeiroTipoDisponivel();
             AtualizarTerminais();
@@ -21,8 +16,7 @@ namespace Araci.ViewModels
 
         public Carga Carga => (Carga)Modelo;
 
-        public override IEnumerable TiposDisponiveis =>
-            Types.TiposCargas;
+        public override IEnumerable TiposDisponiveis => Types.TiposCargas;
 
         protected override void AtualizarNode()
         {
@@ -84,6 +78,7 @@ namespace Araci.ViewModels
 
                 Carga.Barra = value;
                 OnPropertyChanged();
+                NotificarParametros();
             }
         }
 

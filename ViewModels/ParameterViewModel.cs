@@ -3,19 +3,16 @@ using Araci.ViewModels.Base;
 
 namespace Araci.ViewModels
 {
-    public class ParameterViewModel
-        : ViewModelBase
+    public class ParameterViewModel : ViewModelBase
     {
         private readonly Parameter _parameter;
 
-        public ParameterViewModel(
-            Parameter parameter)
+        public ParameterViewModel(Parameter parameter)
         {
             _parameter = parameter;
         }
 
-        public string Nome =>
-            _parameter.Nome;
+        public string Nome => _parameter.Nome;
 
         public object? Valor
         {
@@ -23,21 +20,20 @@ namespace Araci.ViewModels
 
             set
             {
-                if (Equals(
-                        _parameter.ValorObjeto,
-                        value))
-                {
+                if (Equals(_parameter.ValorObjeto, value))
                     return;
-                }
 
-                _parameter.ValorObjeto =
-                    value;
+                _parameter.ValorObjeto = value;
 
                 OnPropertyChanged();
             }
         }
 
-        public System.Type Tipo =>
-            _parameter.Tipo;
+        public System.Type Tipo => _parameter.Tipo;
+
+        public void Atualizar()
+        {
+            OnPropertyChanged(nameof(Valor));
+        }
     }
 }

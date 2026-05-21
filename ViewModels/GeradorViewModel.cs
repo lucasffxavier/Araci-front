@@ -1,4 +1,5 @@
 using System.Collections;
+using System.Windows;
 using Araci.Core.SceneNodes;
 using Araci.Models;
 using Araci.Services;
@@ -7,23 +8,16 @@ namespace Araci.ViewModels
 {
     public class GeradorViewModel : ElementoViewModel
     {
-        public GeradorViewModel(
-            Gerador modelo,
-            TypeLibraryService types)
-            : base(
-                modelo,
-                new EquipamentoNode(modelo),
-                types)
+        public GeradorViewModel(Gerador modelo, TypeLibraryService types)
+            : base(modelo, new EquipamentoNode(modelo), types)
         {
             SelecionarPrimeiroTipoDisponivel();
             AtualizarTerminais();
         }
 
-        public Gerador Gerador =>
-            (Gerador)Modelo;
+        public Gerador Gerador => (Gerador)Modelo;
 
-        public override IEnumerable TiposDisponiveis =>
-            Types.TiposGeradores;
+        public override IEnumerable TiposDisponiveis => Types.TiposGeradores;
 
         protected override void AtualizarNode()
         {
@@ -31,7 +25,7 @@ namespace Araci.ViewModels
             AtualizarTerminais();
         }
 
-        public override void Mover(System.Windows.Vector delta)
+        public override void Mover(Vector delta)
         {
             base.Mover(delta);
             AtualizarTerminais();
@@ -39,9 +33,7 @@ namespace Araci.ViewModels
 
         private void AtualizarTerminais()
         {
-            Gerador.AtualizarTerminais(
-                Largura,
-                Altura);
+            Gerador.AtualizarTerminais(Largura, Altura);
         }
 
         public double PotenciaAtivaKW
@@ -53,7 +45,6 @@ namespace Araci.ViewModels
                     return;
 
                 Gerador.PotenciaAtivaKW = value;
-
                 OnPropertyChanged();
             }
         }
@@ -67,7 +58,6 @@ namespace Araci.ViewModels
                     return;
 
                 Gerador.FatorPotencia = value;
-
                 OnPropertyChanged();
             }
         }
@@ -81,7 +71,6 @@ namespace Araci.ViewModels
                     return;
 
                 Gerador.Alimentador = value;
-
                 OnPropertyChanged();
             }
         }
@@ -95,7 +84,6 @@ namespace Araci.ViewModels
                     return;
 
                 Gerador.Nome = value;
-
                 OnPropertyChanged();
             }
         }
@@ -109,8 +97,8 @@ namespace Araci.ViewModels
                     return;
 
                 Gerador.Barra = value;
-
                 OnPropertyChanged();
+                NotificarParametros();
             }
         }
     }
