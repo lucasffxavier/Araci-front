@@ -45,25 +45,30 @@ namespace Araci.Applications.Diagrama.InserirCabo
 
         public void OnMouseDown(ElementoViewModel? vm, Point position, ToolInputState inputState)
         {
+            var p = _context.Snap.Snap(position, _context.Scene);
+
             if (!_inserindo)
             {
                 _caboAtual = _context.ElementoFactory.CriarCaboVM();
-                _caboAtual.Iniciar(position);
+                _caboAtual.Iniciar(p);
 
-                _context.Commands.Execute(new AddElementoCommand(_caboAtual, _context));
+                _context.Commands.Execute(
+                    new AddElementoCommand(_caboAtual, _context));
 
                 _inserindo = true;
                 return;
             }
 
-            _caboAtual?.ConfirmarSegmento(position);
+            _caboAtual?.ConfirmarSegmento(p);
         }
 
         public void OnMouseMove(Point position)
         {
-            if (!_inserindo || _caboAtual == null) return;
+            if (!_inserindo || _caboAtual == null)
+                return;
 
-            _caboAtual.AtualizarPreview(position);
+            var p = _context.Snap.Snap(position, _context.Scene);
+            _caboAtual.AtualizarPreview(p);
         }
 
         public void OnMouseUp(Point position) { }
@@ -84,7 +89,8 @@ namespace Araci.Applications.Diagrama.InserirCabo
 
         private void Finalizar()
         {
-            if (_caboAtual == null) return;
+            if (_caboAtual == null)
+                return;
 
             _caboAtual.RemoverPreview();
             _caboAtual = null;
