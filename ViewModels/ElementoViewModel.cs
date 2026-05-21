@@ -355,6 +355,23 @@ namespace Araci.ViewModels
             AtualizarNode();
         }
 
+        public bool IsHover
+        {
+            get => VisualState.IsHover;
+            set
+            {
+                if (VisualState.IsHover == value)
+                    return;
+
+                VisualState.AtualizarHover(value);
+
+                OnPropertyChanged();
+                OnPropertyChanged(nameof(Stroke));
+                OnPropertyChanged(nameof(StrokeThickness));
+                OnPropertyChanged(nameof(RenderData));
+            }
+        }
+
         private ObservableCollection<ParameterViewModel>?
             _parametros;
 
@@ -366,4 +383,6 @@ namespace Araci.ViewModels
                         .Select(p =>
                             new ParameterViewModel(p)));
     }
+
+
 }

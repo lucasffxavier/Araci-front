@@ -1,11 +1,12 @@
-﻿using System;
+﻿using Araci.Controls.Base;
+using Araci.Controls.Converters;
+using SharpVectors.Converters;
+using System;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Data;
 using System.Windows.Input;
 using System.Windows.Media;
-using Araci.Controls.Base;
-using SharpVectors.Converters;
 
 namespace Araci.Controls
 {
@@ -58,10 +59,15 @@ namespace Araci.Controls
             _svg.SetBinding(WidthProperty, new Binding("RenderData.Largura"));
             _svg.SetBinding(HeightProperty, new Binding("RenderData.Altura"));
 
-            _overlay.SetBinding(VisibilityProperty, new Binding("IsSelecionado")
+            var multi = new MultiBinding
             {
-                Converter = new BooleanToVisibilityConverter()
-            });
+                Converter = new SelectionOrHoverToVisibilityConverter()
+            };
+
+            multi.Bindings.Add(new Binding("IsSelecionado"));
+            multi.Bindings.Add(new Binding("IsHover"));
+
+            _overlay.SetBinding(VisibilityProperty, multi);
         }
     }
 }

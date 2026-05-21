@@ -30,6 +30,8 @@ namespace Araci.Controls.Base
             nameof(ElementoViewModel.Bounds),
             nameof(ElementoViewModel.Centro),
 
+            nameof(ElementoViewModel.IsHover),
+
             "X2",
             "Y2",
         };
@@ -39,9 +41,22 @@ namespace Araci.Controls.Base
             Cursor = Cursors.Hand;
 
             Loaded += OnLoaded;
+            DataContextChanged += OnDataContextChanged;
 
-            DataContextChanged +=
-                OnDataContextChanged;
+            MouseEnter += OnMouseEnter;
+            MouseLeave += OnMouseLeave;
+        }
+
+        private void OnMouseEnter(object sender, MouseEventArgs e)
+        {
+            if (DataContext is ElementoViewModel vm)
+                vm.IsHover = true;
+        }
+
+        private void OnMouseLeave(object sender, MouseEventArgs e)
+        {
+            if (DataContext is ElementoViewModel vm)
+                vm.IsHover = false;
         }
 
         private void OnLoaded(
@@ -106,5 +121,7 @@ namespace Araci.Controls.Base
             ElementoViewModel vm)
         {
         }
+
+
     }
 }
