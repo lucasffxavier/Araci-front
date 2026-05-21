@@ -13,12 +13,14 @@ namespace Araci.Applications.Diagrama.InserirCabo
 
         public InserirCaboApplication(EditorContext context)
         {
-            _context = context ?? throw new System.ArgumentNullException(nameof(context));
+            _context = context
+                ?? throw new System.ArgumentNullException(nameof(context));
         }
 
         public void Executar()
         {
-            _context.Input.ToolAtual = new InserirCaboTool(_context);
+            _context.Input.ToolAtual =
+                new InserirCaboTool(_context);
         }
     }
 
@@ -27,6 +29,7 @@ namespace Araci.Applications.Diagrama.InserirCabo
         private readonly EditorContext _context;
         private CaboViewModel? _caboAtual;
         private bool _inserindo;
+        private bool _aguardandoPrimeiroMove;
 
         public InserirCaboTool(EditorContext context)
         {
@@ -43,19 +46,33 @@ namespace Araci.Applications.Diagrama.InserirCabo
             Cancelar();
         }
 
-        public void OnMouseDown(ElementoViewModel? vm, Point position, ToolInputState inputState)
+        public void OnMouseDown(
+            ElementoViewModel? vm,
+            Point position,
+            ToolInputState inputState)
         {
-            var p = _context.Snap.Snap(position, _context.Scene);
+            var p = _context.Snap.SnapFromElemento(
+                vm,
+                position,
+                _context.Scene);
 
             if (!_inserindo)
             {
-                _caboAtual = _context.ElementoFactory.CriarCaboVM();
+                _caboAtual =
+                    _context.ElementoFactory.CriarCaboVM();
+
+                // 🔥 inicia exatamente no terminal
                 _caboAtual.Iniciar(p);
 
                 _context.Commands.Execute(
-                    new AddElementoCommand(_caboAtual, _context));
+                    new AddElementoCommand(
+                        _caboAtual,
+                        _context));
 
                 _inserindo = true;
+
+                // 🔥 bloqueia preview até primeiro movimento
+                _aguardandoPrimeiroMove = true;
                 return;
             }
 
@@ -67,7 +84,17 @@ namespace Araci.Applications.Diagrama.InserirCabo
             if (!_inserindo || _caboAtual == null)
                 return;
 
-            var p = _context.Snap.Snap(position, _context.Scene);
+            var p = _context.Snap.Snap(
+                position,
+                _context.Scene);
+
+            // 🔥 ignora primeiro move "fantasma"
+            if (_aguardandoPrimeiroMove)
+            {
+                _aguardandoPrimeiroMove = false;
+                return;
+            }
+
             _caboAtual.AtualizarPreview(p);
         }
 
@@ -106,6 +133,7 @@ namespace Araci.Applications.Diagrama.InserirCabo
 
             _caboAtual = null;
             _inserindo = false;
+            _aguardandoPrimeiroMove = false;
         }
     }
 }

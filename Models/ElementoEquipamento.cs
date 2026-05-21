@@ -11,6 +11,7 @@ namespace Araci.Models
         public const string PARAM_POTENCIA_KW = "PotenciaAtivaKW";
 
         private readonly List<Terminal> _terminais = new();
+
         public IReadOnlyList<Terminal> Terminais => _terminais;
 
         protected ElementoEquipamento()
@@ -20,13 +21,19 @@ namespace Araci.Models
             DefinirParametro(new Parameter<string>(PARAM_ALIMENTADOR, string.Empty));
             DefinirParametro(new Parameter<double>(PARAM_POTENCIA_KW, 0));
 
-            CriarTerminal();
+            CriarTerminalInicial();
         }
 
-        private void CriarTerminal()
+        private void CriarTerminalInicial()
         {
             _terminais.Clear();
             _terminais.Add(new Terminal(this, new Point(PosicaoX, PosicaoY)));
+        }
+
+        // 🔥 NOVO: acesso controlado para classes derivadas
+        protected List<Terminal> ObterTerminaisInternos()
+        {
+            return _terminais;
         }
 
         public string Barra
@@ -52,8 +59,15 @@ namespace Araci.Models
             CopiarBasePara(destino);
 
             destino._terminais.Clear();
+
             foreach (var t in _terminais)
-                destino._terminais.Add(new Terminal(destino, t.Posicao) { Barra = t.Barra });
+            {
+                destino._terminais.Add(
+                    new Terminal(destino, t.Posicao)
+                    {
+                        Barra = t.Barra
+                    });
+            }
         }
     }
 }
