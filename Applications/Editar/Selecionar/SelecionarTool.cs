@@ -34,15 +34,12 @@ namespace Araci.Applications.Editar.Selecionar
         public string Nome => "Selecionar";
         public bool MantemBotaoAtivado => true;
 
-        public void Ativar()
-        {
-        }
+        public void Ativar() { }
 
         public void Desativar()
         {
             _arrastandoElementos = false;
             _selecionandoJanela = false;
-
             _context.SelectionBox.Visivel = false;
             _context.MoveHud.Visivel = false;
             _context.MoveHud.Reset();
@@ -52,9 +49,11 @@ namespace Araci.Applications.Editar.Selecionar
         {
             bool ctrl = inputState.IsControlPressed;
 
-            if (vm != null)
+            var hit = vm ?? _queries.HitTest(position)?.Elemento;
+
+            if (hit != null)
             {
-                IniciarSelecaoElemento(vm, ctrl);
+                IniciarSelecaoElemento(hit, ctrl);
                 IniciarMovimento(position);
                 return;
             }
@@ -89,9 +88,7 @@ namespace Araci.Applications.Editar.Selecionar
             _selecionandoJanela = false;
         }
 
-        public void OnKeyDown(Key key)
-        {
-        }
+        public void OnKeyDown(Key key) { }
 
         private void IniciarSelecaoElemento(ElementoViewModel vm, bool ctrl)
         {
@@ -120,7 +117,6 @@ namespace Araci.Applications.Editar.Selecionar
                 return;
 
             var hud = _context.MoveHud;
-
             hud.Reset();
             hud.AtualizarPosicao(CalcularBoundsSelecionados());
             hud.Visivel = true;
@@ -145,18 +141,16 @@ namespace Araci.Applications.Editar.Selecionar
         private void AtualizarHud(Point position)
         {
             Vector delta = position - _pontoInicialArrasto;
-            var hud = _context.MoveHud;
 
+            var hud = _context.MoveHud;
             hud.DeltaX = delta.X;
             hud.DeltaY = delta.Y;
-
             hud.AtualizarPosicao(CalcularBoundsSelecionados());
         }
 
         private void FinalizarMovimento()
         {
             _context.Move.EndMove(_context.Selection.Selecionados.ToList());
-
             _context.MoveHud.Visivel = false;
             _context.MoveHud.Reset();
         }

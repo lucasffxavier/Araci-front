@@ -59,6 +59,10 @@ Araci Engine
 │   │   ├── CaboNode.cs
 │   │   ├── ElementoNode.cs
 │   │   └── EquipamentoNode.cs
+│   ├── SceneQueries
+│   │   ├── ISceneQueryService.cs
+│   │   ├── SceneHitResult.cs
+│   │   └── SceneQueryService.cs
 │   ├── Scenes
 │   │   └── Scene.cs
 │   └── Viewport
@@ -191,247 +195,6 @@ Araci Engine
 
 
 ====================================================================================================
-ARQUIVO: C:\Araci-Engine-Front\Araci Engine\Applications\Commands\AddElementoCommand.cs
-====================================================================================================
-
-using System;
-using Araci.Core.Events;
-using Araci.Services;
-using Araci.ViewModels;
-namespace Araci.Core.Commands
-{
-public class AddElementoCommand : IUndoableCommand
-{
-private readonly ElementoViewModel _elemento;
-private readonly EditorContext _context;
-public AddElementoCommand(ElementoViewModel elemento, EditorContext context)
-{
-_elemento = elemento ?? throw new ArgumentNullException(nameof(elemento));
-_context = context ?? throw new ArgumentNullException(nameof(context));
-}
-public void Execute()
-{
-_context.Document.AdicionarElemento(_elemento.Modelo);
-_context.Events.Publish(new ElementoAdicionadoEvent(_elemento));
-}
-public void Undo()
-{
-_context.Selection.Deselecionar(_elemento);
-_context.Document.RemoverElemento(_elemento.Modelo);
-_context.Events.Publish(new ElementoRemovidoEvent(_elemento));
-}
-public void Redo()
-{
-Execute();
-}
-}
-}
-
-
-====================================================================================================
-ARQUIVO: C:\Araci-Engine-Front\Araci Engine\Applications\Diagrama\InserirCabo\InserirCabo.cs
-====================================================================================================
-
-using System.Windows;
-using System.Windows.Input;
-using Araci.Applications.Editar.Base;
-using Araci.Core.Commands;
-using Araci.Models;
-using Araci.Services;
-using Araci.ViewModels;
-namespace Araci.Applications.Diagrama.InserirCabo
-{
-public class InserirCaboApplication
-{
-private readonly EditorContext _context;
-public InserirCaboApplication(EditorContext context)
-{
-_context = context ?? throw new System.ArgumentNullException(nameof(context));
-}
-public void Executar()
-{
-_context.Input.ToolAtual = new InserirCaboTool(_context);
-}
-}
-public class InserirCaboTool : ITool
-{
-private readonly EditorContext _context;
-private CaboViewModel? _caboAtual;
-private bool _inserindo;
-public InserirCaboTool(EditorContext context)
-{
-_context = context;
-}
-public string Nome => "Inserir Cabo";
-public bool MantemBotaoAtivado => true;
-public void Ativar()
-{
-}
-public void Desativar()
-{
-LimparEstado();
-}
-public void OnMouseDown(ElementoViewModel? vm, Point position, ToolInputState inputState)
-{
-var pontoSnap = _context.Snap.SnapFromElemento(vm, position, _context.Scene);
-if (!_inserindo)
-{
-_caboAtual = _context.ElementoFactory.CriarCaboVM();
-_caboAtual.Iniciar(pontoSnap);
-_context.Commands.Execute(
-new AddElementoCommand(_caboAtual, _context));
-ConectarOrigem(vm);
-_inserindo = true;
-return;
-}
-if (_caboAtual == null)
-return;
-_caboAtual.FinalizarNoPonto(pontoSnap);
-ConectarDestino(vm);
-Finalizar();
-}
-public void OnMouseMove(Point position)
-{
-if (!_inserindo || _caboAtual == null)
-return;
-var pontoSnap = _context.Snap.Snap(position, _context.Scene);
-_caboAtual.AtualizarPreview(pontoSnap);
-}
-public void OnMouseUp(Point position)
-{
-}
-public void OnKeyDown(Key key)
-{
-if (key == Key.Enter)
-{
-Finalizar();
-return;
-}
-if (key == Key.Escape)
-Cancelar();
-}
-private void ConectarOrigem(ElementoViewModel? vm)
-{
-if (_caboAtual == null)
-return;
-if (vm?.Modelo is not ElementoEquipamento equipamento)
-return;
-_caboAtual.BarraOrigem = equipamento.Nome;
-equipamento.Barra = _caboAtual.Nome;
-_caboAtual.NotificarParametros();
-vm.NotificarParametros();
-}
-private void ConectarDestino(ElementoViewModel? vm)
-{
-if (_caboAtual == null)
-return;
-if (vm?.Modelo is not ElementoEquipamento equipamento)
-return;
-_caboAtual.BarraDestino = equipamento.Nome;
-equipamento.Barra = _caboAtual.Nome;
-_caboAtual.NotificarParametros();
-vm.NotificarParametros();
-}
-private void Finalizar()
-{
-LimparEstado();
-_context.Tools.VoltarParaSelecao();
-}
-private void Cancelar()
-{
-if (_caboAtual != null)
-_context.Commands.Undo();
-LimparEstado();
-_context.Tools.VoltarParaSelecao();
-}
-private void LimparEstado()
-{
-_caboAtual?.RemoverPreview();
-_caboAtual = null;
-_inserindo = false;
-}
-}
-}
-
-
-====================================================================================================
-ARQUIVO: C:\Araci-Engine-Front\Araci Engine\Applications\Diagrama\InserirCarga\InserirCarga.cs
-====================================================================================================
-
-using Araci.Core.Commands;
-using Araci.Services;
-using Araci.ViewModels;
-namespace Araci.Applications.Diagrama.InserirCarga
-{
-public class InserirCargaApplication
-{
-private readonly EditorContext _context;
-public InserirCargaApplication(EditorContext context)
-{
-_context = context ?? throw new System.ArgumentNullException(nameof(context));
-}
-public void Executar()
-{
-CargaViewModel vm = _context.ElementoFactory.CriarCargaVM();
-vm.X = 100;
-vm.Y = 100;
-_context.Commands.Execute(new AddElementoCommand(vm, _context));
-}
-}
-}
-
-
-====================================================================================================
-ARQUIVO: C:\Araci-Engine-Front\Araci Engine\Applications\Diagrama\InserirGerador\InserirGerador.cs
-====================================================================================================
-
-using Araci.Core.Commands;
-using Araci.Services;
-using Araci.ViewModels;
-namespace Araci.Applications.Diagrama.InserirGerador
-{
-public class InserirGeradorApplication
-{
-private readonly EditorContext _context;
-public InserirGeradorApplication(EditorContext context)
-{
-_context = context ?? throw new System.ArgumentNullException(nameof(context));
-}
-public void Executar()
-{
-GeradorViewModel vm = _context.ElementoFactory.CriarGeradorVM();
-vm.X = 150;
-vm.Y = 150;
-_context.Commands.Execute(new AddElementoCommand(vm, _context));
-}
-}
-}
-
-
-====================================================================================================
-ARQUIVO: C:\Araci-Engine-Front\Araci Engine\Applications\Editar\Base\ITool.cs
-====================================================================================================
-
-﻿using System.Windows;
-using System.Windows.Input;
-using Araci.ViewModels;
-namespace Araci.Applications.Editar.Base
-{
-public interface ITool
-{
-string Nome { get; }
-bool MantemBotaoAtivado { get; }
-void Ativar();
-void Desativar();
-void OnMouseDown(ElementoViewModel? vm, Point position, ToolInputState inputState);
-void OnMouseMove(Point position);
-void OnMouseUp(Point position);
-void OnKeyDown(Key key);
-}
-}
-
-
-====================================================================================================
 ARQUIVO: C:\Araci-Engine-Front\Araci Engine\Applications\Editar\Mover\MoverTool.cs
 ====================================================================================================
 
@@ -488,10 +251,12 @@ _selecionarTool.OnKeyDown(key);
 ARQUIVO: C:\Araci-Engine-Front\Araci Engine\Applications\Editar\Selecionar\SelecionarTool.cs
 ====================================================================================================
 
-﻿using System.Linq;
+﻿using System;
+using System.Linq;
 using System.Windows;
 using System.Windows.Input;
 using Araci.Applications.Editar.Base;
+using Araci.Core.SceneQueries;
 using Araci.Services;
 using Araci.ViewModels;
 namespace Araci.Applications.Editar.Selecionar
@@ -499,6 +264,7 @@ namespace Araci.Applications.Editar.Selecionar
 public class SelecionarTool : ITool
 {
 private readonly EditorContext _context;
+private readonly ISceneQueryService _queries;
 private readonly bool _modoSoMover;
 private readonly bool _mostrarHud;
 private bool _arrastandoElementos;
@@ -509,14 +275,13 @@ private Point _pontoInicialArrasto;
 public SelecionarTool(EditorContext context, bool modoSoMover = false, bool mostrarHud = false)
 {
 _context = context ?? throw new ArgumentNullException(nameof(context));
+_queries = context.SceneQueries;
 _modoSoMover = modoSoMover;
 _mostrarHud = mostrarHud;
 }
 public string Nome => "Selecionar";
 public bool MantemBotaoAtivado => true;
-public void Ativar()
-{
-}
+public void Ativar() { }
 public void Desativar()
 {
 _arrastandoElementos = false;
@@ -528,9 +293,10 @@ _context.MoveHud.Reset();
 public void OnMouseDown(ElementoViewModel? vm, Point position, ToolInputState inputState)
 {
 bool ctrl = inputState.IsControlPressed;
-if (vm != null)
+var hit = vm ?? _queries.HitTest(position)?.Elemento;
+if (hit != null)
 {
-IniciarSelecaoElemento(vm, ctrl);
+IniciarSelecaoElemento(hit, ctrl);
 IniciarMovimento(position);
 return;
 }
@@ -557,9 +323,7 @@ FinalizarJanelaSelecao();
 _arrastandoElementos = false;
 _selecionandoJanela = false;
 }
-public void OnKeyDown(Key key)
-{
-}
+public void OnKeyDown(Key key) { }
 private void IniciarSelecaoElemento(ElementoViewModel vm, bool ctrl)
 {
 if (_modoSoMover)
@@ -623,14 +387,8 @@ _context.SelectionBox.Atualizar(position, position);
 private void FinalizarJanelaSelecao()
 {
 var rect = _context.SelectionBox.Bounds;
-if (_context.Viewport != null)
-{
-foreach (var item in _context.Viewport.Elementos)
-{
-if (rect.IntersectsWith(item.Bounds))
+foreach (var item in _queries.Query(rect))
 _context.Selection.Selecionar(item, true);
-}
-}
 _context.SelectionBox.Visivel = false;
 }
 private Rect CalcularBoundsSelecionados()
@@ -649,76 +407,83 @@ return new Rect(minX, minY, maxX - minX, maxY - minY);
 
 
 ====================================================================================================
-ARQUIVO: C:\Araci-Engine-Front\Araci Engine\Core\Commands\MoveElementoCommand.cs
+ARQUIVO: C:\Araci-Engine-Front\Araci Engine\Core\SceneQueries\ISceneQueryService.cs
 ====================================================================================================
 
-﻿using Araci.ViewModels;
-namespace Araci.Core.Commands
+﻿using System.Collections.Generic;
+using System.Windows;
+using Araci.ViewModels;
+namespace Araci.Core.SceneQueries
 {
-public class MoveElementoCommand : IUndoableCommand
+public interface ISceneQueryService
 {
-private readonly ElementoViewModel _vm;
-private readonly ElementoEstado _antes;
-private readonly ElementoEstado _depois;
-public MoveElementoCommand(
-ElementoViewModel vm,
-ElementoEstado antes,
-ElementoEstado depois)
-{
-_vm = vm;
-_antes = antes;
-_depois = depois;
-}
-public void Execute()
-{
-_vm.AplicarEstado(_depois);
-}
-public void Undo()
-{
-_vm.AplicarEstado(_antes);
-}
-public void Redo()
-{
-_vm.AplicarEstado(_depois);
-}
+SceneHitResult? HitTest(Point point);
+SceneHitResult? HitTest(Point point, double tolerance);
+IEnumerable<ElementoViewModel> Query(Rect area);
+IEnumerable<ElementoViewModel> Nearby(Point point, double radius);
 }
 }
 
 
 ====================================================================================================
-ARQUIVO: C:\Araci-Engine-Front\Araci Engine\Core\Documents\AraciDocument.cs
+ARQUIVO: C:\Araci-Engine-Front\Araci Engine\Core\SceneQueries\SceneQueryService.cs
 ====================================================================================================
 
-using System.Collections.ObjectModel;
-using Araci.Models;
-namespace Araci.Core.Documents
+﻿using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Windows;
+using Araci.Core.Scenes;
+using Araci.ViewModels;
+namespace Araci.Core.SceneQueries
 {
-public class AraciDocument
+public class SceneQueryService : ISceneQueryService
 {
-public ObservableCollection<Elemento>
-Elementos
-{ get; }
-public AraciDocument()
+private readonly Scene _scene;
+public SceneQueryService(Scene scene)
 {
-Elementos =
-new ObservableCollection<Elemento>();
+_scene = scene ?? throw new ArgumentNullException(nameof(scene));
 }
-public void AdicionarElemento(
-Elemento elemento)
+public SceneHitResult? HitTest(Point point)
 {
-if (!Elementos.Contains(elemento))
+return HitTest(point, 0);
+}
+public SceneHitResult? HitTest(Point point, double tolerance)
 {
-Elementos.Add(elemento);
+double tol2 = tolerance * tolerance;
+for (int i = _scene.Elementos.Count - 1; i >= 0; i--)
+{
+var vm = _scene.Elementos[i];
+if (vm.Bounds.Contains(point))
+return new SceneHitResult(vm, point);
+if (tolerance > 0)
+{
+var centro = vm.Centro;
+double dx = centro.X - point.X;
+double dy = centro.Y - point.Y;
+double dist2 = dx * dx + dy * dy;
+if (dist2 <= tol2)
+return new SceneHitResult(vm, point);
 }
 }
-public void RemoverElemento(
-Elemento elemento)
-{
-Elementos.Remove(elemento);
+return null;
 }
-public void Limpar()
+public IEnumerable<ElementoViewModel> Query(Rect area)
 {
-Elementos.Clear();
+return _scene.Elementos.Where(e => area.IntersectsWith(e.Bounds));
+}
+public IEnumerable<ElementoViewModel> Nearby(Point point, double radius)
+{
+double radius2 = radius * radius;
+foreach (var vm in _scene.Elementos)
+{
+var centro = vm.Centro;
+double dx = centro.X - point.X;
+double dy = centro.Y - point.Y;
+double dist2 = dx * dx + dy * dy;
+if (dist2 <= radius2)
+yield return vm;
+}
 }
 }
 }
@@ -740,292 +505,59 @@ public ObservableCollection<ElementoViewModel> Elementos { get; } = new();
 
 
 ====================================================================================================
-ARQUIVO: C:\Araci-Engine-Front\Araci Engine\Core\Viewport\Camera.cs
+ARQUIVO: C:\Araci-Engine-Front\Araci Engine\Service\EditorContext.cs
 ====================================================================================================
 
-using System;
-using System.ComponentModel;
-using System.Runtime.CompilerServices;
-using System.Windows;
-namespace Araci.Core.Viewport
-{
-public class Camera : INotifyPropertyChanged
-{
-private double _zoom = 1.0;
-private Point _offset;
-public event PropertyChangedEventHandler? PropertyChanged;
-public double Zoom
-{
-get => _zoom;
-set
-{
-double zoom = Math.Max(double.Epsilon, value);
-if (Math.Abs(_zoom - zoom) < 0.0001)
-return;
-_zoom = zoom;
-OnPropertyChanged();
-}
-}
-public Point Offset
-{
-get => _offset;
-set
-{
-if (_offset == value)
-return;
-_offset = value;
-OnPropertyChanged();
-}
-}
-public Point WorldToScreen(Point point)
-{
-return new Point(
-point.X * Zoom + Offset.X,
-point.Y * Zoom + Offset.Y);
-}
-public Point ScreenToWorld(Point point)
-{
-return new Point(
-(point.X - Offset.X) / Zoom,
-(point.Y - Offset.Y) / Zoom);
-}
-private void OnPropertyChanged([CallerMemberName] string? propertyName = null)
-{
-PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
-}
-}
-}
-
-
-====================================================================================================
-ARQUIVO: C:\Araci-Engine-Front\Araci Engine\Service\ElementoFactory.cs
-====================================================================================================
-
-using System;
-using Araci.Models;
-using Araci.ViewModels;
-namespace Araci.Services
-{
-public class ElementoFactory
-{
-private readonly TypeLibraryService _types;
-public ElementoFactory(TypeLibraryService types)
-{
-_types = types
-?? throw new ArgumentNullException(nameof(types));
-}
-public ElementoViewModel? CriarViewModel(
-Elemento modelo)
-{
-return modelo switch
-{
-Cabo cabo => new CaboViewModel(
-cabo,
-_types),
-Carga carga => new CargaViewModel(
-carga,
-_types),
-Gerador gerador => new GeradorViewModel(
-gerador,
-_types),
-_ => null
-};
-}
-public Cabo CriarCabo()
-{
-return new Cabo
-{
-Tipo =
-_types.TipoCaboPadrao
-?? throw new InvalidOperationException(
-"Nenhum tipo de cabo cadastrado.")
-};
-}
-public CaboViewModel CriarCaboVM()
-{
-return new CaboViewModel(
-CriarCabo(),
-_types);
-}
-public Carga CriarCarga()
-{
-return new Carga
-{
-Tipo =
-_types.TipoCargaPadrao
-?? throw new InvalidOperationException(
-"Nenhum tipo de carga cadastrado.")
-};
-}
-public CargaViewModel CriarCargaVM()
-{
-return new CargaViewModel(
-CriarCarga(),
-_types);
-}
-public Gerador CriarGerador()
-{
-return new Gerador
-{
-Tipo =
-_types.TipoGeradorPadrao
-?? throw new InvalidOperationException(
-"Nenhum tipo de gerador cadastrado.")
-};
-}
-public GeradorViewModel CriarGeradorVM()
-{
-return new GeradorViewModel(
-CriarGerador(),
-_types);
-}
-}
-}
-
-
-====================================================================================================
-ARQUIVO: C:\Araci-Engine-Front\Araci Engine\Service\MoveService.cs
-====================================================================================================
-
-﻿using System.Collections.Generic;
-using System.Linq;
-using System.Windows;
 using Araci.Core.Commands;
-using Araci.ViewModels;
-namespace Araci.Services
-{
-public class MoveService
-{
-private readonly EditorContext _context;
-private readonly Dictionary<ElementoViewModel, ElementoEstado>
-_estadoInicial = new();
-private bool _movendo;
-public MoveService(EditorContext context)
-{
-_context = context ??
-throw new ArgumentNullException(nameof(context));
-}
-public void BeginMove(IEnumerable<ElementoViewModel> elementos)
-{
-_estadoInicial.Clear();
-foreach (var vm in elementos.Distinct())
-{
-_estadoInicial[vm] = vm.CapturarEstado();
-}
-_movendo = true;
-}
-public void MoverVisual(
-ElementoViewModel vm,
-Vector delta)
-{
-if (!_movendo)
-return;
-vm.Mover(delta);
-}
-public void EndMove(IEnumerable<ElementoViewModel> elementos)
-{
-if (!_movendo)
-return;
-using var transaction =
-_context.BeginTransaction();
-foreach (var vm in elementos.Distinct())
-{
-if (!_estadoInicial.TryGetValue(vm, out var antes))
-continue;
-var depois = vm.CapturarEstado();
-bool mudou =
-antes.X != depois.X ||
-antes.Y != depois.Y ||
-antes.X2 != depois.X2 ||
-antes.Y2 != depois.Y2 ||
-!antes.Vertices.SequenceEqual(depois.Vertices);
-if (!mudou)
-continue;
-transaction.Add(
-new MoveElementoCommand(
-vm,
-antes,
-depois));
-}
-transaction.Commit();
-_estadoInicial.Clear();
-_movendo = false;
-}
-}
-}
-
-
-====================================================================================================
-ARQUIVO: C:\Araci-Engine-Front\Araci Engine\Service\SelectionService.cs
-====================================================================================================
-
-﻿using System.Collections.Generic;
-using System.Collections.ObjectModel;
-using System.Linq;
+using Araci.Core.Documents;
 using Araci.Core.Events;
+using Araci.Core.SceneQueries;
+using Araci.Core.Scenes;
+using Araci.Core.Transactions;
 using Araci.ViewModels;
 namespace Araci.Services
 {
-public class SelectionService
+public class EditorContext
 {
-private readonly EditorContext _context;
-private readonly ObservableCollection<ElementoViewModel> _selecionados = new();
-public SelectionService(EditorContext context)
+public EditorContext()
+: this(new EventBus())
 {
-_context = context ?? throw new ArgumentNullException(nameof(context));
 }
-public IReadOnlyList<ElementoViewModel> Selecionados => _selecionados;
-public ObservableCollection<ElementoViewModel> SelecionadosObservable => _selecionados;
-public bool TemSelecionados => _selecionados.Count > 0;
-public void Selecionar(ElementoViewModel vm, bool adicionarAoExistente = false)
+public EditorContext(IEventBus eventBus)
 {
-if (!adicionarAoExistente)
-Limpar();
-if (_selecionados.Contains(vm))
-{
-AtualizarElementoSelecionado();
-return;
+Events = eventBus;
+SceneQueries = new SceneQueryService(Scene);
+Snap = new SnapService(SceneQueries);
+ElementoFactory = new ElementoFactory(Types);
+Selection = new SelectionService(this);
+MoveHud = new MoveHudService(this);
+Move = new MoveService(this);
+Tools = new ToolService(this);
+Input = new InputRouter(this);
 }
-vm.IsSelecionado = true;
-_selecionados.Add(vm);
-AtualizarElementoSelecionado();
-PublicarAlteracao();
-}
-public void Toggle(ElementoViewModel vm)
+public IEventBus Events { get; }
+public AraciDocument Document { get; set; } = new AraciDocument();
+public Scene Scene { get; } = new Scene();
+public ISceneQueryService SceneQueries { get; }
+public ToolService Tools { get; }
+public InputRouter Input { get; }
+public ViewportService? Viewport { get; private set; }
+public void InicializarViewport(ViewportViewModel viewportViewModel)
 {
-if (_selecionados.Contains(vm))
-{
-Deselecionar(vm);
-return;
+Viewport = new ViewportService(viewportViewModel);
 }
-Selecionar(vm, true);
-}
-public void Deselecionar(ElementoViewModel vm)
+public EditorState Editor { get; } = new EditorState();
+public MoveHudService MoveHud { get; }
+public SelectionBoxViewModel SelectionBox { get; } = new SelectionBoxViewModel();
+public CommandManager Commands { get; } = new CommandManager();
+public SelectionService Selection { get; }
+public MoveService Move { get; }
+public SnapService Snap { get; }
+public TypeLibraryService Types { get; } = new TypeLibraryService();
+public ElementoFactory ElementoFactory { get; }
+public TransactionScope BeginTransaction()
 {
-if (!_selecionados.Contains(vm))
-return;
-vm.IsSelecionado = false;
-_selecionados.Remove(vm);
-AtualizarElementoSelecionado();
-PublicarAlteracao();
-}
-public void Limpar()
-{
-if (_selecionados.Count == 0)
-return;
-foreach (var vm in _selecionados)
-vm.IsSelecionado = false;
-_selecionados.Clear();
-AtualizarElementoSelecionado();
-PublicarAlteracao();
-}
-private void AtualizarElementoSelecionado()
-{
-_context.Editor.ElementoSelecionado = _selecionados.LastOrDefault();
-}
-private void PublicarAlteracao()
-{
-_context.Events.Publish(new SelecaoAlteradaEvent(_selecionados.ToList()));
+return new TransactionScope(Commands);
 }
 }
 }
@@ -1036,28 +568,31 @@ ARQUIVO: C:\Araci-Engine-Front\Araci Engine\Service\SnapService.cs
 ====================================================================================================
 
 using System;
+using System.Collections.Generic;
 using System.Linq;
 using System.Windows;
-using Araci.Core.Scenes;
+using Araci.Core.SceneQueries;
 using Araci.Models;
 using Araci.ViewModels;
 namespace Araci.Services
 {
 public class SnapService
 {
+private readonly ISceneQueryService _queries;
+public SnapService(ISceneQueryService queries)
+{
+_queries = queries ?? throw new ArgumentNullException(nameof(queries));
+}
 public bool Habilitado { get; set; } = true;
 public double TerminalTolerance { get; set; } = 15;
-public Point Snap(Point point, Scene scene)
+public Point Snap(Point point)
 {
 if (!Habilitado)
 return point;
-var terminal = SnapTerminal(point, scene);
+var terminal = SnapTerminal(point);
 return terminal ?? point;
 }
-public Point SnapFromElemento(
-ElementoViewModel? vm,
-Point fallback,
-Scene scene)
+public Point SnapFromElemento(ElementoViewModel? vm, Point fallback)
 {
 if (!Habilitado)
 return fallback;
@@ -1067,7 +602,7 @@ var terminal = ObterTerminalMaisProximo(owner, fallback);
 if (terminal != null)
 return terminal.Posicao;
 }
-return Snap(fallback, scene);
+return Snap(fallback);
 }
 public Point SnapPoint(Point point)
 {
@@ -1077,31 +612,28 @@ public Vector SnapDelta(Vector delta)
 {
 return delta;
 }
-private Point? SnapTerminal(Point point, Scene scene)
+private Point? SnapTerminal(Point point)
 {
-var terminais = scene.Elementos
-.SelectMany(e =>
-(e.Modelo as ITerminalOwner)?.Terminais
-?? Enumerable.Empty<Terminal>());
 Terminal? melhor = null;
 double menorDist = double.MaxValue;
-foreach (var t in terminais)
+var elementos = _queries.Nearby(point, TerminalTolerance);
+foreach (var terminal in EnumerarTerminais(elementos))
 {
-double dx = t.Posicao.X - point.X;
-double dy = t.Posicao.Y - point.Y;
+double dx = terminal.Posicao.X - point.X;
+double dy = terminal.Posicao.Y - point.Y;
 double dist = dx * dx + dy * dy;
-if (dist > TerminalTolerance * TerminalTolerance)
-continue;
-if (dist >= menorDist)
+if (dist > TerminalTolerance * TerminalTolerance || dist >= menorDist)
 continue;
 menorDist = dist;
-melhor = t;
+melhor = terminal;
 }
 return melhor?.Posicao;
 }
-private static Terminal? ObterTerminalMaisProximo(
-ITerminalOwner owner,
-Point point)
+private static IEnumerable<Terminal> EnumerarTerminais(IEnumerable<ElementoViewModel> elementos)
+{
+return elementos.SelectMany(e => (e.Modelo as ITerminalOwner)?.Terminais ?? Enumerable.Empty<Terminal>());
+}
+private static Terminal? ObterTerminalMaisProximo(ITerminalOwner owner, Point point)
 {
 Terminal? melhor = null;
 double menorDist = double.MaxValue;
@@ -1116,295 +648,6 @@ menorDist = dist;
 melhor = terminal;
 }
 return melhor;
-}
-}
-}
-
-
-====================================================================================================
-ARQUIVO: C:\Araci-Engine-Front\Araci Engine\Service\ViewportService.cs
-====================================================================================================
-
-using System.Collections.ObjectModel;
-using System.Windows;
-using Araci.Core.Viewport;
-using Araci.ViewModels;
-namespace Araci.Services
-{
-public class ViewportService
-{
-private readonly ViewportViewModel _vm;
-public ViewportService(ViewportViewModel vm)
-{
-_vm = vm ?? throw new ArgumentNullException(nameof(vm));
-}
-public ObservableCollection<ElementoViewModel> Elementos => _vm.Elementos;
-public Camera Camera { get; } = new();
-public double Largura { get; private set; } = 1000;
-public double Altura { get; private set; } = 800;
-public Rect Bounds => new(0, 0, Largura, Altura);
-public Point WorldToScreen(Point point)
-{
-return Camera.WorldToScreen(point);
-}
-public Point ScreenToWorld(Point point)
-{
-return Camera.ScreenToWorld(point);
-}
-public void AtualizarTamanho(Size size)
-{
-Largura = Math.Max(0, size.Width);
-Altura = Math.Max(0, size.Height);
-}
-public void RegistrarViewModel(ElementoViewModel vm)
-{
-if (vm == null)
-return;
-_vm.RegistrarViewModel(vm);
-}
-}
-}
-
-
-====================================================================================================
-ARQUIVO: C:\Araci-Engine-Front\Araci Engine\ViewModels\CaboViewModel.cs
-====================================================================================================
-
-﻿using System.Collections;
-using System.Windows;
-using Araci.Core.SceneNodes;
-using Araci.Models;
-using Araci.Services;
-namespace Araci.ViewModels
-{
-public class CaboViewModel : ElementoViewModel
-{
-private bool _possuiPreview;
-public CaboViewModel(
-Cabo modelo,
-TypeLibraryService types)
-: base(modelo, new CaboNode(modelo), types)
-{
-SelecionarPrimeiroTipoDisponivel();
-}
-public Cabo Cabo => (Cabo)Modelo;
-private CaboNode CaboNode => (CaboNode)Node;
-public override IEnumerable TiposDisponiveis =>
-Types.TiposCabos;
-public void Iniciar(Point p)
-{
-Cabo.Vertices.Clear();
-Cabo.Vertices.Add(p);
-Cabo.DefinirOrigem(p);
-Cabo.PreviewPonto = p;
-_possuiPreview = true;
-Atualizar();
-}
-public void AtualizarPreview(Point p)
-{
-if (!_possuiPreview)
-return;
-if (Cabo.PreviewPonto.HasValue &&
-Cabo.PreviewPonto.Value == p)
-return;
-Cabo.PreviewPonto = p;
-Atualizar();
-}
-public void FinalizarNoPonto(Point p)
-{
-if (Cabo.Vertices.Count == 0)
-return;
-Cabo.PreviewPonto = null;
-_possuiPreview = false;
-var ultimo = Cabo.Vertices[^1];
-if (ultimo != p)
-Cabo.Vertices.Add(p);
-Cabo.DefinirDestino(p);
-Atualizar();
-}
-public void RemoverPreview()
-{
-if (!_possuiPreview &&
-Cabo.PreviewPonto == null)
-return;
-_possuiPreview = false;
-Cabo.PreviewPonto = null;
-Atualizar();
-}
-public string Nome
-{
-get => Cabo.Nome;
-set
-{
-if (Cabo.Nome == value)
-return;
-Cabo.Nome = value;
-OnPropertyChanged();
-}
-}
-public string BarraOrigem
-{
-get => Cabo.BarraOrigem;
-set
-{
-if (Cabo.BarraOrigem == value)
-return;
-Cabo.BarraOrigem = value;
-OnPropertyChanged();
-NotificarParametros();
-}
-}
-public string BarraDestino
-{
-get => Cabo.BarraDestino;
-set
-{
-if (Cabo.BarraDestino == value)
-return;
-Cabo.BarraDestino = value;
-OnPropertyChanged();
-NotificarParametros();
-}
-}
-public double Comprimento
-{
-get => Cabo.Comprimento;
-set
-{
-if (Cabo.Comprimento == value)
-return;
-Cabo.Comprimento = value;
-OnPropertyChanged();
-}
-}
-private void Atualizar()
-{
-CaboNode.AtualizarGeometria();
-OnPropertyChanged(nameof(WorldX));
-OnPropertyChanged(nameof(WorldY));
-OnPropertyChanged(nameof(Bounds));
-NotificarGeometria();
-}
-public override void Mover(Vector delta)
-{
-CaboNode.Mover(delta);
-foreach (var t in Cabo.Terminais)
-{
-t.Posicao = new Point(
-t.Posicao.X + delta.X,
-t.Posicao.Y + delta.Y);
-}
-Atualizar();
-}
-public override ElementoEstado CapturarEstado()
-{
-return new ElementoEstado(
-WorldX,
-WorldY,
-vertices: Cabo.Vertices);
-}
-public override void AplicarEstado(ElementoEstado estado)
-{
-Cabo.Vertices.Clear();
-foreach (var p in estado.Vertices)
-Cabo.Vertices.Add(p);
-if (Cabo.Vertices.Count > 0)
-{
-Cabo.DefinirOrigem(Cabo.Vertices[0]);
-Cabo.DefinirDestino(Cabo.Vertices[^1]);
-}
-Atualizar();
-}
-public override double WorldX => Bounds.X;
-public override double WorldY => Bounds.Y;
-}
-}
-
-
-====================================================================================================
-ARQUIVO: C:\Araci-Engine-Front\Araci Engine\ViewModels\CargaViewModel.cs
-====================================================================================================
-
-using System.Collections;
-using Araci.Core.SceneNodes;
-using Araci.Models;
-using Araci.Services;
-namespace Araci.ViewModels
-{
-public class CargaViewModel : ElementoViewModel
-{
-public CargaViewModel(Carga modelo, TypeLibraryService types)
-: base(modelo, new EquipamentoNode(modelo), types)
-{
-SelecionarPrimeiroTipoDisponivel();
-AtualizarTerminais();
-}
-public Carga Carga => (Carga)Modelo;
-public override IEnumerable TiposDisponiveis => Types.TiposCargas;
-protected override void AtualizarNode()
-{
-base.AtualizarNode();
-AtualizarTerminais();
-}
-private void AtualizarTerminais()
-{
-Carga.AtualizarTerminais(Largura);
-}
-public double PotenciaAtivaKW
-{
-get => Carga.PotenciaAtivaKW;
-set
-{
-if (Carga.PotenciaAtivaKW == value)
-return;
-Carga.PotenciaAtivaKW = value;
-OnPropertyChanged();
-}
-}
-public double PotenciaReativaKvar
-{
-get => Carga.PotenciaReativaKvar;
-set
-{
-if (Carga.PotenciaReativaKvar == value)
-return;
-Carga.PotenciaReativaKvar = value;
-OnPropertyChanged();
-}
-}
-public string Nome
-{
-get => Carga.Nome;
-set
-{
-if (Carga.Nome == value)
-return;
-Carga.Nome = value;
-OnPropertyChanged();
-}
-}
-public string Barra
-{
-get => Carga.Barra;
-set
-{
-if (Carga.Barra == value)
-return;
-Carga.Barra = value;
-OnPropertyChanged();
-NotificarParametros();
-}
-}
-public string Alimentador
-{
-get => Carga.Alimentador;
-set
-{
-if (Carga.Alimentador == value)
-return;
-Carga.Alimentador = value;
-OnPropertyChanged();
-}
 }
 }
 }
@@ -1612,101 +855,6 @@ OnPropertyChanged(nameof(Parametros));
 
 
 ====================================================================================================
-ARQUIVO: C:\Araci-Engine-Front\Araci Engine\ViewModels\GeradorViewModel.cs
-====================================================================================================
-
-using System.Collections;
-using System.Windows;
-using Araci.Core.SceneNodes;
-using Araci.Models;
-using Araci.Services;
-namespace Araci.ViewModels
-{
-public class GeradorViewModel : ElementoViewModel
-{
-public GeradorViewModel(Gerador modelo, TypeLibraryService types)
-: base(modelo, new EquipamentoNode(modelo), types)
-{
-SelecionarPrimeiroTipoDisponivel();
-AtualizarTerminais();
-}
-public Gerador Gerador => (Gerador)Modelo;
-public override IEnumerable TiposDisponiveis => Types.TiposGeradores;
-protected override void AtualizarNode()
-{
-base.AtualizarNode();
-AtualizarTerminais();
-}
-public override void Mover(Vector delta)
-{
-base.Mover(delta);
-AtualizarTerminais();
-}
-private void AtualizarTerminais()
-{
-Gerador.AtualizarTerminais(Largura, Altura);
-}
-public double PotenciaAtivaKW
-{
-get => Gerador.PotenciaAtivaKW;
-set
-{
-if (Gerador.PotenciaAtivaKW == value)
-return;
-Gerador.PotenciaAtivaKW = value;
-OnPropertyChanged();
-}
-}
-public double FatorPotencia
-{
-get => Gerador.FatorPotencia;
-set
-{
-if (Gerador.FatorPotencia == value)
-return;
-Gerador.FatorPotencia = value;
-OnPropertyChanged();
-}
-}
-public string Alimentador
-{
-get => Gerador.Alimentador;
-set
-{
-if (Gerador.Alimentador == value)
-return;
-Gerador.Alimentador = value;
-OnPropertyChanged();
-}
-}
-public string Nome
-{
-get => Gerador.Nome;
-set
-{
-if (Gerador.Nome == value)
-return;
-Gerador.Nome = value;
-OnPropertyChanged();
-}
-}
-public string Barra
-{
-get => Gerador.Barra;
-set
-{
-if (Gerador.Barra == value)
-return;
-Gerador.Barra = value;
-OnPropertyChanged();
-NotificarParametros();
-}
-}
-}
-}
-
-
-====================================================================================================
 ARQUIVO: C:\Araci-Engine-Front\Araci Engine\ViewModels\ViewportViewModel.cs
 ====================================================================================================
 
@@ -1795,265 +943,6 @@ public event PropertyChangedEventHandler? PropertyChanged;
 protected virtual void OnPropertyChanged([CallerMemberName] string? nome = null)
 {
 PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nome));
-}
-}
-}
-
-
-====================================================================================================
-ARQUIVO: C:\Araci-Engine-Front\Araci Engine\Views\ViewportView.xaml
-====================================================================================================
-
-﻿<UserControl x:Class="Araci.Views.ViewportView"
-xmlns="http:
-xmlns:x="http:
-xmlns:controls="clr-namespace:Araci.Controls"
-xmlns:viewModels="clr-namespace:Araci.ViewModels"
-Focusable="True"
-PreviewMouseLeftButtonDown="OnPreviewMouseLeftButtonDown"
-PreviewMouseMove="OnPreviewMouseMove"
-PreviewMouseLeftButtonUp="OnPreviewMouseLeftButtonUp"
-PreviewMouseWheel="OnPreviewMouseWheel"
-PreviewKeyDown="OnPreviewKeyDown"
-Loaded="OnLoaded">
-<UserControl.Resources>
-<BooleanToVisibilityConverter
-x:Key="BooleanToVisibilityConverter"/>
-</UserControl.Resources>
-<Border x:Name="RootBorder"
-BorderThickness="1"
-BorderBrush="#252526"
-Background="#F4F4F4"
-ClipToBounds="True"
-SnapsToDevicePixels="True"
-UseLayoutRounding="True">
-<Grid ClipToBounds="True">
-<!-- ========================= -->
-<!-- ELEMENTOS -->
-<!-- ========================= -->
-<ItemsControl x:Name="WorldLayer"
-ItemsSource="{Binding Elementos}"
-ClipToBounds="False"
-SnapsToDevicePixels="True"
-HorizontalContentAlignment="Left"
-VerticalContentAlignment="Top">
-<ItemsControl.ItemsPanel>
-<ItemsPanelTemplate>
-<Canvas x:Name="ViewportCanvas"
-Background="#F4F4F4"
-ClipToBounds="False"
-SnapsToDevicePixels="True"
-UseLayoutRounding="True"/>
-</ItemsPanelTemplate>
-</ItemsControl.ItemsPanel>
-<ItemsControl.ItemContainerStyle>
-<Style TargetType="ContentPresenter">
-<Setter Property="Canvas.Left"
-Value="{Binding WorldX}"/>
-<Setter Property="Canvas.Top"
-Value="{Binding WorldY}"/>
-</Style>
-</ItemsControl.ItemContainerStyle>
-<ItemsControl.Resources>
-<DataTemplate DataType="{x:Type viewModels:CaboViewModel}">
-<controls:CaboControl/>
-</DataTemplate>
-<DataTemplate DataType="{x:Type viewModels:CargaViewModel}">
-<controls:CargaControl/>
-</DataTemplate>
-<DataTemplate DataType="{x:Type viewModels:GeradorViewModel}">
-<controls:GeradorControl/>
-</DataTemplate>
-</ItemsControl.Resources>
-</ItemsControl>
-<!-- ========================= -->
-<!-- JANELA DE SELEÇÃO -->
-<!-- ========================= -->
-<Canvas x:Name="SelectionLayer"
-IsHitTestVisible="False">
-<Rectangle
-Stroke="#007ACC"
-StrokeThickness="1.5"
-Fill="#22007ACC"
-StrokeDashArray="3 2"
-Canvas.Left="{Binding SelectionBox.X}"
-Canvas.Top="{Binding SelectionBox.Y}"
-Width="{Binding SelectionBox.Largura}"
-Height="{Binding SelectionBox.Altura}"
-Visibility="{Binding SelectionBox.Visivel,
-Converter={StaticResource BooleanToVisibilityConverter}}"/>
-</Canvas>
-<!-- ========================= -->
-<!-- HUD -->
-<!-- ========================= -->
-<Canvas IsHitTestVisible="False"
-ClipToBounds="True">
-<Border
-Background="#AA1E1E1E"
-CornerRadius="6"
-Padding="8"
-Canvas.Left="{Binding MoveHud.X}"
-Canvas.Top="{Binding MoveHud.Y}"
-Visibility="{Binding MoveHud.Visivel,
-Converter={StaticResource BooleanToVisibilityConverter}}">
-<StackPanel>
-<TextBlock
-Foreground="White"
-FontSize="12"
-Text="{Binding MoveHud.DeltaX,
-StringFormat=ΔX: {0:F1}}"/>
-<TextBlock
-Foreground="White"
-FontSize="12"
-Text="{Binding MoveHud.DeltaY,
-StringFormat=ΔY: {0:F1}}"/>
-</StackPanel>
-</Border>
-</Canvas>
-</Grid>
-</Border>
-</UserControl>
-
-
-====================================================================================================
-ARQUIVO: C:\Araci-Engine-Front\Araci Engine\Views\ViewportView.xaml.cs
-====================================================================================================
-
-using System;
-using System.ComponentModel;
-using System.Windows;
-using System.Windows.Controls;
-using System.Windows.Input;
-using System.Windows.Media;
-using Araci.Services;
-using Araci.ViewModels;
-namespace Araci.Views
-{
-public partial class ViewportView : UserControl
-{
-private readonly MatrixTransform _cameraTransform = new();
-private ViewportViewModel? _viewportViewModel;
-private EditorContext? _context;
-public ViewportView()
-{
-InitializeComponent();
-}
-public void Inicializar(EditorContext context)
-{
-_context = context ?? throw new ArgumentNullException(nameof(context));
-_viewportViewModel = new ViewportViewModel(_context);
-DataContext = _viewportViewModel;
-_context.InicializarViewport(_viewportViewModel);
-ConfigurarCamera();
-Unloaded += OnUnloaded;
-}
-private void ConfigurarCamera()
-{
-if (_context?.Viewport == null)
-return;
-WorldLayer.RenderTransform = _cameraTransform;
-SelectionLayer.RenderTransform = _cameraTransform;
-_context.Viewport.Camera.PropertyChanged += OnCameraChanged;
-AtualizarCameraTransform();
-}
-private void OnCameraChanged(object? sender, PropertyChangedEventArgs e)
-{
-AtualizarCameraTransform();
-}
-private void AtualizarCameraTransform()
-{
-if (_context?.Viewport == null)
-return;
-var camera = _context.Viewport.Camera;
-_cameraTransform.Matrix = new Matrix(
-camera.Zoom,
-0,
-0,
-camera.Zoom,
-camera.Offset.X,
-camera.Offset.Y);
-}
-private void OnLoaded(object sender, RoutedEventArgs e)
-{
-Focus();
-Keyboard.Focus(this);
-AtualizarViewport();
-SizeChanged += (_, _) => AtualizarViewport();
-}
-private void AtualizarViewport()
-{
-if (_context?.Viewport == null)
-return;
-double largura = ActualWidth;
-double altura = ActualHeight;
-if (RootBorder != null)
-{
-largura -= RootBorder.BorderThickness.Left + RootBorder.BorderThickness.Right;
-altura -= RootBorder.BorderThickness.Top + RootBorder.BorderThickness.Bottom;
-}
-largura = Math.Max(0, largura);
-altura = Math.Max(0, altura);
-_context.Viewport.AtualizarTamanho(new Size(largura, altura));
-}
-private Point GetWorldPos(MouseEventArgs e)
-{
-Point screen = e.GetPosition(this);
-return _context?.Viewport?.ScreenToWorld(screen) ?? screen;
-}
-private void OnPreviewMouseLeftButtonDown(object sender, MouseButtonEventArgs e)
-{
-if (_context == null)
-return;
-Focus();
-Keyboard.Focus(this);
-var vm = EncontrarElemento(e.OriginalSource as DependencyObject);
-_context.Input.MouseDown(vm, GetWorldPos(e));
-CaptureMouse();
-}
-private void OnPreviewMouseMove(object sender, MouseEventArgs e)
-{
-_context?.Input.MouseMove(GetWorldPos(e));
-}
-private void OnPreviewMouseLeftButtonUp(object sender, MouseButtonEventArgs e)
-{
-_context?.Input.MouseUp(GetWorldPos(e));
-if (IsMouseCaptured)
-ReleaseMouseCapture();
-}
-private void OnPreviewMouseWheel(object sender, MouseWheelEventArgs e)
-{
-if (_context?.Viewport == null)
-return;
-var camera = _context.Viewport.Camera;
-Point cursor = e.GetPosition(this);
-Point worldBefore = camera.ScreenToWorld(cursor);
-double factor = e.Delta > 0 ? 1.1 : 1 / 1.1;
-camera.Zoom = Math.Max(0.1, Math.Min(8, camera.Zoom * factor));
-camera.Offset = new Point(
-cursor.X - worldBefore.X * camera.Zoom,
-cursor.Y - worldBefore.Y * camera.Zoom);
-e.Handled = true;
-}
-private void OnPreviewKeyDown(object sender, KeyEventArgs e)
-{
-if (_context == null)
-return;
-e.Handled = _context.Input.KeyDown(e.Key);
-}
-private void OnUnloaded(object sender, RoutedEventArgs e)
-{
-if (_context?.Viewport != null)
-_context.Viewport.Camera.PropertyChanged -= OnCameraChanged;
-}
-private static ElementoViewModel? EncontrarElemento(DependencyObject? origem)
-{
-while (origem != null)
-{
-if (origem is FrameworkElement fe && fe.DataContext is ElementoViewModel vm)
-return vm;
-origem = VisualTreeHelper.GetParent(origem);
-}
-return null;
 }
 }
 }

@@ -18,13 +18,30 @@ namespace Araci.Core.SceneQueries
 
         public SceneHitResult? HitTest(Point point)
         {
+            return HitTest(point, 0);
+        }
+
+        public SceneHitResult? HitTest(Point point, double tolerance)
+        {
+            double tol2 = tolerance * tolerance;
+
             for (int i = _scene.Elementos.Count - 1; i >= 0; i--)
             {
                 var vm = _scene.Elementos[i];
-                if (!vm.Bounds.Contains(point))
-                    continue;
 
-                return new SceneHitResult(vm, point);
+                if (vm.Bounds.Contains(point))
+                    return new SceneHitResult(vm, point);
+
+                if (tolerance > 0)
+                {
+                    var centro = vm.Centro;
+                    double dx = centro.X - point.X;
+                    double dy = centro.Y - point.Y;
+                    double dist2 = dx * dx + dy * dy;
+
+                    if (dist2 <= tol2)
+                        return new SceneHitResult(vm, point);
+                }
             }
 
             return null;

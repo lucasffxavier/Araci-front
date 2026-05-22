@@ -18,6 +18,7 @@ namespace Araci.Services
         }
 
         public bool Habilitado { get; set; } = true;
+
         public double TerminalTolerance { get; set; } = 15;
 
         public Point Snap(Point point)
@@ -26,6 +27,7 @@ namespace Araci.Services
                 return point;
 
             var terminal = SnapTerminal(point);
+
             return terminal ?? point;
         }
 
@@ -37,6 +39,7 @@ namespace Araci.Services
             if (vm?.Modelo is ITerminalOwner owner)
             {
                 var terminal = ObterTerminalMaisProximo(owner, fallback);
+
                 if (terminal != null)
                     return terminal.Posicao;
             }
@@ -58,6 +61,7 @@ namespace Araci.Services
         {
             Terminal? melhor = null;
             double menorDist = double.MaxValue;
+
             var elementos = _queries.Nearby(point, TerminalTolerance);
 
             foreach (var terminal in EnumerarTerminais(elementos))
