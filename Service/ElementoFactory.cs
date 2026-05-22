@@ -36,6 +36,8 @@ namespace Araci.Services
                     gerador,
                     _types),
 
+                Barra barra => new BarraViewModel(barra, _types),
+
                 _ => null
             };
         }
@@ -101,6 +103,22 @@ namespace Araci.Services
         {
             return new GeradorViewModel(
                 CriarGerador(),
+                _types);
+        }
+
+        public Barra CriarBarra()
+        {
+            return new Barra
+            {
+                Tipo = _types.TipoBarraPadrao
+                    ?? throw new InvalidOperationException("Nenhum tipo de barra cadastrado.")
+            };
+        }
+
+        public BarraViewModel CriarBarraVM()
+        {
+            return new BarraViewModel(
+                CriarBarra(),
                 _types);
         }
     }

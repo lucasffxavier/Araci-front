@@ -5,6 +5,7 @@ using System.Windows.Controls;
 using Araci.Applications.Diagrama.InserirCabo;
 using Araci.Applications.Diagrama.InserirCarga;
 using Araci.Applications.Diagrama.InserirGerador;
+using Araci.Applications.Diagrama.InserirBarra;
 
 using Araci.Services;
 
@@ -71,6 +72,22 @@ namespace Araci.Ribbon.Tabs
             if (Context == null) return;
 
             InserirCaboApplication app =
+                new(Context);
+
+            app.Executar();
+        }
+
+        // =========================
+        // BARRA
+        // =========================
+
+        private void BarraButton_Click(
+            object sender,
+            RoutedEventArgs e)
+        {
+            if (Context == null) return;
+
+            InserirBarraApplication app =
                 new(Context);
 
             app.Executar();

@@ -56,6 +56,7 @@ namespace Araci.Core.Documents
                 Cabo => "CABO",
                 Carga => "CARGA",
                 Gerador => "GERADOR",
+                Barra => "BARRA",
                 _ => "ELM"
             };
         }
