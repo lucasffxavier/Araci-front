@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Windows;
 using Araci.Core.Scenes;
+using Araci.Core.Spatial;
 using Araci.ViewModels;
 
 namespace Araci.Core.SceneQueries
@@ -10,10 +11,25 @@ namespace Araci.Core.SceneQueries
     public class SceneQueryService : ISceneQueryService
     {
         private readonly Scene _scene;
+        private readonly ISpatialIndex _index;
+        private bool _indexValido;
 
         public SceneQueryService(Scene scene)
         {
             _scene = scene ?? throw new ArgumentNullException(nameof(scene));
+            _index = new SpatialHashGrid();
+            _indexValido = false;
+
+            _scene.Elementos.CollectionChanged += (_, __) => _indexValido = false;
+        }
+
+        private void GarantirIndex()
+        {
+            if (_indexValido)
+                return;
+
+            _index.Build(_scene.Elementos);
+            _indexValido = true;
         }
 
         public SceneHitResult? HitTest(Point point)
@@ -23,25 +39,14 @@ namespace Araci.Core.SceneQueries
 
         public SceneHitResult? HitTest(Point point, double tolerance)
         {
-            double tol2 = tolerance * tolerance;
+            GarantirIndex();
 
-            for (int i = _scene.Elementos.Count - 1; i >= 0; i--)
+            var candidatos = _index.Nearby(point, Math.Max(5, tolerance));
+
+            foreach (var vm in candidatos.Reverse())
             {
-                var vm = _scene.Elementos[i];
-
                 if (vm.Bounds.Contains(point))
                     return new SceneHitResult(vm, point);
-
-                if (tolerance > 0)
-                {
-                    var centro = vm.Centro;
-                    double dx = centro.X - point.X;
-                    double dy = centro.Y - point.Y;
-                    double dist2 = dx * dx + dy * dy;
-
-                    if (dist2 <= tol2)
-                        return new SceneHitResult(vm, point);
-                }
             }
 
             return null;
@@ -49,23 +54,14 @@ namespace Araci.Core.SceneQueries
 
         public IEnumerable<ElementoViewModel> Query(Rect area)
         {
-            return _scene.Elementos.Where(e => area.IntersectsWith(e.Bounds));
+            GarantirIndex();
+            return _index.Query(area);
         }
 
         public IEnumerable<ElementoViewModel> Nearby(Point point, double radius)
         {
-            double radius2 = radius * radius;
-
-            foreach (var vm in _scene.Elementos)
-            {
-                var centro = vm.Centro;
-                double dx = centro.X - point.X;
-                double dy = centro.Y - point.Y;
-                double dist2 = dx * dx + dy * dy;
-
-                if (dist2 <= radius2)
-                    yield return vm;
-            }
+            GarantirIndex();
+            return _index.Nearby(point, radius);
         }
     }
 }

@@ -5,6 +5,11 @@ namespace Araci.Core.Scenes
 {
     public class Scene
     {
-        public ObservableCollection<ElementoViewModel> Elementos { get; } = new();
+        public ObservableCollection<ElementoViewModel> Elementos { get; }
+
+        public Scene()
+        {
+            Elementos = new ObservableCollection<ElementoViewModel>();
+        }
     }
 }

@@ -18,16 +18,14 @@ namespace Araci.Services
         public EditorContext(IEventBus eventBus)
         {
             Events = eventBus;
-
+            Scene = new Scene();
             SceneQueries = new SceneQueryService(Scene);
             Snap = new SnapService(SceneQueries);
 
             ElementoFactory = new ElementoFactory(Types);
-
             Selection = new SelectionService(this);
             MoveHud = new MoveHudService(this);
             Move = new MoveService(this);
-
             Tools = new ToolService(this);
             Input = new InputRouter(this);
         }
