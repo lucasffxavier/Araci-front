@@ -48,10 +48,8 @@ namespace Araci.Services
         {
             return new Cabo
             {
-                Tipo =
-                    _types.TipoCaboPadrao
-                    ?? throw new InvalidOperationException(
-                        "Nenhum tipo de cabo cadastrado.")
+                Tipo = _types.TipoCaboPadrao
+                    ?? throw new InvalidOperationException("Nenhum tipo de cabo cadastrado.")
             };
         }
 

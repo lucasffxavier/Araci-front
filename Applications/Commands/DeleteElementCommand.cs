@@ -26,11 +26,8 @@ namespace Araci.Core.Commands
         public void Execute()
         {
             _context.Selection.Deselecionar(_vm);
-
             _context.Document.RemoverElemento(_vm.Modelo);
-
-            _context.Events.Publish(
-                new ElementoRemovidoEvent(_vm));
+            _context.Events.Publish(new ElementoRemovidoEvent(_vm));
         }
 
         public void Undo()

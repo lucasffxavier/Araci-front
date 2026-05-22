@@ -104,10 +104,7 @@ namespace Araci.Applications.Diagrama.InserirCabo
                 return;
 
             _caboAtual.BarraOrigem = equipamento.Nome;
-            equipamento.Barra = _caboAtual.Nome;
-
             _caboAtual.NotificarParametros();
-            vm.NotificarParametros();
         }
 
         private void ConectarDestino(ElementoViewModel? vm)
@@ -119,10 +116,7 @@ namespace Araci.Applications.Diagrama.InserirCabo
                 return;
 
             _caboAtual.BarraDestino = equipamento.Nome;
-            equipamento.Barra = _caboAtual.Nome;
-
             _caboAtual.NotificarParametros();
-            vm.NotificarParametros();
         }
 
         private void Finalizar()

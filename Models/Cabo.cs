@@ -43,22 +43,9 @@ namespace Araci.Models
 
         public Cabo()
         {
-            Nome = "CB-01";
-
-            DefinirParametro(
-                new Parameter<string>(
-                    PARAM_BARRA_ORIGEM,
-                    "BUS-01"));
-
-            DefinirParametro(
-                new Parameter<string>(
-                    PARAM_BARRA_DESTINO,
-                    "BUS-02"));
-
-            DefinirParametro(
-                new Parameter<double>(
-                    PARAM_COMPRIMENTO,
-                    120));
+            DefinirParametro(new Parameter<string>(PARAM_BARRA_ORIGEM, "BUS-01"));
+            DefinirParametro(new Parameter<string>(PARAM_BARRA_DESTINO, "BUS-02"));
+            DefinirParametro(new Parameter<double>(PARAM_COMPRIMENTO, 120));
         }
 
         public void DefinirOrigem(Point p)
