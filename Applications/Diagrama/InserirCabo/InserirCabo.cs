@@ -1,6 +1,5 @@
 using System.Windows;
 using System.Windows.Input;
-
 using Araci.Applications.Editar.Base;
 using Araci.Core.Commands;
 using Araci.Models;
@@ -51,7 +50,7 @@ namespace Araci.Applications.Diagrama.InserirCabo
 
         public void OnMouseDown(ElementoViewModel? vm, Point position, ToolInputState inputState)
         {
-            var pontoSnap = _context.Snap.SnapFromElemento(vm, position, _context.Scene);
+            var pontoSnap = _context.Snap.SnapFromElemento(vm, position);
 
             if (!_inserindo)
             {
@@ -59,8 +58,7 @@ namespace Araci.Applications.Diagrama.InserirCabo
 
                 _caboAtual.Iniciar(pontoSnap);
 
-                _context.Commands.Execute(
-                    new AddElementoCommand(_caboAtual, _context));
+                _context.Commands.Execute(new AddElementoCommand(_caboAtual, _context));
 
                 ConectarOrigem(vm);
 
@@ -84,7 +82,7 @@ namespace Araci.Applications.Diagrama.InserirCabo
             if (!_inserindo || _caboAtual == null)
                 return;
 
-            var pontoSnap = _context.Snap.Snap(position, _context.Scene);
+            var pontoSnap = _context.Snap.Snap(position);
 
             _caboAtual.AtualizarPreview(pontoSnap);
         }

@@ -1,6 +1,7 @@
 using Araci.Core.Commands;
 using Araci.Core.Documents;
 using Araci.Core.Events;
+using Araci.Core.SceneQueries;
 using Araci.Core.Scenes;
 using Araci.Core.Transactions;
 using Araci.ViewModels;
@@ -9,155 +10,132 @@ namespace Araci.Services
 {
     public class EditorContext
     {
-        // =========================
-        // CONSTRUTOR
-        // =========================
-
         public EditorContext()
-            : this(new EventBus()) { }
+            : this(new EventBus())
+        {
+        }
 
         public EditorContext(IEventBus eventBus)
         {
             Events = eventBus;
 
-            ElementoFactory =
-                new ElementoFactory(Types);
+            SceneQueries = new SceneQueryService(Scene);
 
-            Selection =
-                new SelectionService(this);
+            Snap = new SnapService(SceneQueries);
 
-            MoveHud =
-                new MoveHudService(this);
+            ElementoFactory = new ElementoFactory(Types);
 
-            Move =
-                new MoveService(this);
+            Selection = new SelectionService(this);
 
-            Tools =
-                new ToolService(this);
+            MoveHud = new MoveHudService(this);
 
-            Input =
-                new InputRouter(this);
+            Move = new MoveService(this);
+
+            Tools = new ToolService(this);
+
+            Input = new InputRouter(this);
         }
 
         // =========================
-        // EVENTOS (novo)
+        // EVENTOS
         // =========================
 
-        public IEventBus Events
-        { get; }
+        public IEventBus Events { get; }
 
         // =========================
         // DOCUMENTO
         // =========================
 
-        public AraciDocument Document
-        { get; set; }
-            = new AraciDocument();
+        public AraciDocument Document { get; set; } = new AraciDocument();
 
         // =========================
         // SCENE
         // =========================
 
-        public Scene Scene
-        { get; }
-            = new Scene();
+        public Scene Scene { get; } = new Scene();
+
+        // =========================
+        // SCENE QUERIES
+        // =========================
+
+        public ISceneQueryService SceneQueries { get; }
 
         // =========================
         // TOOLS
         // =========================
 
-        public ToolService Tools
-        { get; }
+        public ToolService Tools { get; }
 
         // =========================
         // INPUT
         // =========================
 
-        public InputRouter Input
-        { get; }
+        public InputRouter Input { get; }
 
         // =========================
         // VIEWPORT
         // =========================
 
-        public ViewportService? Viewport
-        { get; private set; }
+        public ViewportService? Viewport { get; private set; }
 
-        public void InicializarViewport(
-            ViewportViewModel viewportViewModel)
+        public void InicializarViewport(ViewportViewModel viewportViewModel)
         {
-            Viewport =
-                new ViewportService(
-                    viewportViewModel);
+            Viewport = new ViewportService(viewportViewModel);
         }
 
         // =========================
         // EDITOR STATE
         // =========================
 
-        public EditorState Editor
-        { get; }
-            = new EditorState();
+        public EditorState Editor { get; } = new EditorState();
 
         // =========================
         // HUD
         // =========================
 
-        public MoveHudService MoveHud
-        { get; }
+        public MoveHudService MoveHud { get; }
 
         // =========================
         // SELECTION BOX
         // =========================
 
-        public SelectionBoxViewModel SelectionBox
-        { get; }
-            = new SelectionBoxViewModel();
+        public SelectionBoxViewModel SelectionBox { get; } = new SelectionBoxViewModel();
 
         // =========================
         // COMMANDS
         // =========================
 
-        public CommandManager Commands
-        { get; }
-            = new CommandManager();
+        public CommandManager Commands { get; } = new CommandManager();
 
         // =========================
         // SELECTION
         // =========================
 
-        public SelectionService Selection
-        { get; }
+        public SelectionService Selection { get; }
 
         // =========================
         // MOVE
         // =========================
 
-        public MoveService Move
-        { get; }
+        public MoveService Move { get; }
 
         // =========================
         // SNAP
         // =========================
 
-        public SnapService Snap
-        { get; }
-            = new SnapService();
+        public SnapService Snap { get; }
 
         // =========================
         // TYPES
         // =========================
 
-        public TypeLibraryService Types
-        { get; }
-            = new TypeLibraryService();
+        public TypeLibraryService Types { get; } = new TypeLibraryService();
 
         // =========================
         // FACTORY
         // =========================
 
-        public ElementoFactory ElementoFactory
-        { get; }
+        public ElementoFactory ElementoFactory { get; }
 
         // =========================
         // TRANSACTIONS

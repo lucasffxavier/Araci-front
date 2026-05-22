@@ -1,7 +1,9 @@
-﻿using System.Linq;
+﻿using System;
+using System.Linq;
 using System.Windows;
 using System.Windows.Input;
 using Araci.Applications.Editar.Base;
+using Araci.Core.SceneQueries;
 using Araci.Services;
 using Araci.ViewModels;
 
@@ -10,6 +12,7 @@ namespace Araci.Applications.Editar.Selecionar
     public class SelecionarTool : ITool
     {
         private readonly EditorContext _context;
+        private readonly ISceneQueryService _queries;
         private readonly bool _modoSoMover;
         private readonly bool _mostrarHud;
 
@@ -23,6 +26,7 @@ namespace Araci.Applications.Editar.Selecionar
         public SelecionarTool(EditorContext context, bool modoSoMover = false, bool mostrarHud = false)
         {
             _context = context ?? throw new ArgumentNullException(nameof(context));
+            _queries = context.SceneQueries;
             _modoSoMover = modoSoMover;
             _mostrarHud = mostrarHud;
         }
@@ -116,6 +120,7 @@ namespace Araci.Applications.Editar.Selecionar
                 return;
 
             var hud = _context.MoveHud;
+
             hud.Reset();
             hud.AtualizarPosicao(CalcularBoundsSelecionados());
             hud.Visivel = true;
@@ -140,10 +145,11 @@ namespace Araci.Applications.Editar.Selecionar
         private void AtualizarHud(Point position)
         {
             Vector delta = position - _pontoInicialArrasto;
-
             var hud = _context.MoveHud;
+
             hud.DeltaX = delta.X;
             hud.DeltaY = delta.Y;
+
             hud.AtualizarPosicao(CalcularBoundsSelecionados());
         }
 
@@ -171,14 +177,8 @@ namespace Araci.Applications.Editar.Selecionar
         {
             var rect = _context.SelectionBox.Bounds;
 
-            if (_context.Viewport != null)
-            {
-                foreach (var item in _context.Viewport.Elementos)
-                {
-                    if (rect.IntersectsWith(item.Bounds))
-                        _context.Selection.Selecionar(item, true);
-                }
-            }
+            foreach (var item in _queries.Query(rect))
+                _context.Selection.Selecionar(item, true);
 
             _context.SelectionBox.Visivel = false;
         }

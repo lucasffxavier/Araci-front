@@ -1,7 +1,8 @@
 using System;
+using System.Collections.Generic;
 using System.Linq;
 using System.Windows;
-using Araci.Core.Scenes;
+using Araci.Core.SceneQueries;
 using Araci.Models;
 using Araci.ViewModels;
 
@@ -9,23 +10,26 @@ namespace Araci.Services
 {
     public class SnapService
     {
+        private readonly ISceneQueryService _queries;
+
+        public SnapService(ISceneQueryService queries)
+        {
+            _queries = queries ?? throw new ArgumentNullException(nameof(queries));
+        }
+
         public bool Habilitado { get; set; } = true;
         public double TerminalTolerance { get; set; } = 15;
 
-        public Point Snap(Point point, Scene scene)
+        public Point Snap(Point point)
         {
             if (!Habilitado)
                 return point;
 
-            var terminal = SnapTerminal(point, scene);
-
+            var terminal = SnapTerminal(point);
             return terminal ?? point;
         }
 
-        public Point SnapFromElemento(
-            ElementoViewModel? vm,
-            Point fallback,
-            Scene scene)
+        public Point SnapFromElemento(ElementoViewModel? vm, Point fallback)
         {
             if (!Habilitado)
                 return fallback;
@@ -33,12 +37,11 @@ namespace Araci.Services
             if (vm?.Modelo is ITerminalOwner owner)
             {
                 var terminal = ObterTerminalMaisProximo(owner, fallback);
-
                 if (terminal != null)
                     return terminal.Posicao;
             }
 
-            return Snap(fallback, scene);
+            return Snap(fallback);
         }
 
         public Point SnapPoint(Point point)
@@ -51,38 +54,34 @@ namespace Araci.Services
             return delta;
         }
 
-        private Point? SnapTerminal(Point point, Scene scene)
+        private Point? SnapTerminal(Point point)
         {
-            var terminais = scene.Elementos
-                .SelectMany(e =>
-                    (e.Modelo as ITerminalOwner)?.Terminais
-                    ?? Enumerable.Empty<Terminal>());
-
             Terminal? melhor = null;
             double menorDist = double.MaxValue;
+            var elementos = _queries.Nearby(point, TerminalTolerance);
 
-            foreach (var t in terminais)
+            foreach (var terminal in EnumerarTerminais(elementos))
             {
-                double dx = t.Posicao.X - point.X;
-                double dy = t.Posicao.Y - point.Y;
+                double dx = terminal.Posicao.X - point.X;
+                double dy = terminal.Posicao.Y - point.Y;
                 double dist = dx * dx + dy * dy;
 
-                if (dist > TerminalTolerance * TerminalTolerance)
-                    continue;
-
-                if (dist >= menorDist)
+                if (dist > TerminalTolerance * TerminalTolerance || dist >= menorDist)
                     continue;
 
                 menorDist = dist;
-                melhor = t;
+                melhor = terminal;
             }
 
             return melhor?.Posicao;
         }
 
-        private static Terminal? ObterTerminalMaisProximo(
-            ITerminalOwner owner,
-            Point point)
+        private static IEnumerable<Terminal> EnumerarTerminais(IEnumerable<ElementoViewModel> elementos)
+        {
+            return elementos.SelectMany(e => (e.Modelo as ITerminalOwner)?.Terminais ?? Enumerable.Empty<Terminal>());
+        }
+
+        private static Terminal? ObterTerminalMaisProximo(ITerminalOwner owner, Point point)
         {
             Terminal? melhor = null;
             double menorDist = double.MaxValue;
