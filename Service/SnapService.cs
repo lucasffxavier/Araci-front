@@ -1,3 +1,5 @@
+// Service/SnapService.cs
+
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -14,7 +16,8 @@ namespace Araci.Services
 
         public SnapService(ISceneQueryService queries)
         {
-            _queries = queries ?? throw new ArgumentNullException(nameof(queries));
+            _queries = queries
+                ?? throw new ArgumentNullException(nameof(queries));
         }
 
         public bool Habilitado { get; set; } = true;
@@ -26,19 +29,25 @@ namespace Araci.Services
             if (!Habilitado)
                 return point;
 
-            var terminal = SnapTerminal(point);
+            Point? terminal =
+                SnapTerminal(point);
 
             return terminal ?? point;
         }
 
-        public Point SnapFromElemento(ElementoViewModel? vm, Point fallback)
+        public Point SnapFromElemento(
+            ElementoViewModel? vm,
+            Point fallback)
         {
             if (!Habilitado)
                 return fallback;
 
             if (vm?.Modelo is ITerminalOwner owner)
             {
-                var terminal = ObterTerminalMaisProximo(owner, fallback);
+                Terminal? terminal =
+                    ObterTerminalMaisProximo(
+                        owner,
+                        fallback);
 
                 if (terminal != null)
                     return terminal.Posicao;
@@ -60,46 +69,78 @@ namespace Araci.Services
         private Point? SnapTerminal(Point point)
         {
             Terminal? melhor = null;
+
             double menorDist = double.MaxValue;
 
-            var elementos = _queries.Nearby(point, TerminalTolerance);
+            var elementos =
+                _queries.Nearby(
+                    point,
+                    TerminalTolerance);
 
-            foreach (var terminal in EnumerarTerminais(elementos))
+            foreach (Terminal terminal
+                in EnumerarTerminais(elementos))
             {
-                double dx = terminal.Posicao.X - point.X;
-                double dy = terminal.Posicao.Y - point.Y;
-                double dist = dx * dx + dy * dy;
+                double dx =
+                    terminal.Posicao.X - point.X;
 
-                if (dist > TerminalTolerance * TerminalTolerance || dist >= menorDist)
+                double dy =
+                    terminal.Posicao.Y - point.Y;
+
+                double dist =
+                    dx * dx + dy * dy;
+
+                if (dist >
+                    TerminalTolerance * TerminalTolerance)
+                {
+                    continue;
+                }
+
+                if (dist >= menorDist)
                     continue;
 
                 menorDist = dist;
+
                 melhor = terminal;
             }
 
             return melhor?.Posicao;
         }
 
-        private static IEnumerable<Terminal> EnumerarTerminais(IEnumerable<ElementoViewModel> elementos)
+        private static IEnumerable<Terminal>
+            EnumerarTerminais(
+                IEnumerable<ElementoViewModel> elementos)
         {
-            return elementos.SelectMany(e => (e.Modelo as ITerminalOwner)?.Terminais ?? Enumerable.Empty<Terminal>());
+            return elementos.SelectMany(
+                e =>
+                    (e.Modelo as ITerminalOwner)?.Terminais
+                    ?? Enumerable.Empty<Terminal>());
         }
 
-        private static Terminal? ObterTerminalMaisProximo(ITerminalOwner owner, Point point)
+        private static Terminal?
+            ObterTerminalMaisProximo(
+                ITerminalOwner owner,
+                Point point)
         {
             Terminal? melhor = null;
+
             double menorDist = double.MaxValue;
 
-            foreach (var terminal in owner.Terminais)
+            foreach (Terminal terminal in owner.Terminais)
             {
-                double dx = terminal.Posicao.X - point.X;
-                double dy = terminal.Posicao.Y - point.Y;
-                double dist = dx * dx + dy * dy;
+                double dx =
+                    terminal.Posicao.X - point.X;
+
+                double dy =
+                    terminal.Posicao.Y - point.Y;
+
+                double dist =
+                    dx * dx + dy * dy;
 
                 if (dist >= menorDist)
                     continue;
 
                 menorDist = dist;
+
                 melhor = terminal;
             }
 
