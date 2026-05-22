@@ -209,212 +209,1059 @@ Araci Engine
 
 
 ====================================================================================================
-ARQUIVO: C:\Araci-Engine-Front\Araci Engine\App.xaml
+ARQUIVO: C:\Araci-Engine-Front\Araci Engine\Applications\Commands\AddElementoCommand.cs
 ====================================================================================================
 
-﻿<Application x:Class="Araci.App"
-xmlns="http:
-xmlns:x="http:
-StartupUri="MainWindow.xaml">
-<Application.Resources>
-<ResourceDictionary>
-<ResourceDictionary.MergedDictionaries>
-<ResourceDictionary Source="Resources/Styles/Styles.xaml"/>
-<ResourceDictionary Source="Resources/Styles/PropertyStyles.xaml"/>
-<ResourceDictionary Source="Resources/Styles/RibbonStyles.xaml"/>
-<ResourceDictionary Source="Resources/Styles/MenuStyles.xaml"/>
-<ResourceDictionary Source="Resources/Templates/DataTemplates.xaml"/>
-<ResourceDictionary Source="Resources/Templates/TypePropertiesTemplates.xaml"/>
-</ResourceDictionary.MergedDictionaries>
-</ResourceDictionary>
-</Application.Resources>
-</Application>
-
-
-====================================================================================================
-ARQUIVO: C:\Araci-Engine-Front\Araci Engine\Controls\BarraControl.cs
-====================================================================================================
-
-﻿using Araci.Controls.Base;
-using Araci.Controls.Converters;
-using SharpVectors.Converters;
 using System;
+using Araci.Core.Events;
+using Araci.Services;
+using Araci.ViewModels;
+namespace Araci.Core.Commands
+{
+public class AddElementoCommand : IUndoableCommand
+{
+private readonly ElementoViewModel _elemento;
+private readonly EditorContext _context;
+public AddElementoCommand(ElementoViewModel elemento, EditorContext context)
+{
+_elemento = elemento ?? throw new ArgumentNullException(nameof(elemento));
+_context = context ?? throw new ArgumentNullException(nameof(context));
+}
+public void Execute()
+{
+_context.Document.AdicionarElemento(_elemento.Modelo);
+_context.Events.Publish(new ElementoAdicionadoEvent(_elemento));
+}
+public void Undo()
+{
+_context.Selection.Deselecionar(_elemento);
+_context.Document.RemoverElemento(_elemento.Modelo);
+_context.Events.Publish(new ElementoRemovidoEvent(_elemento));
+}
+public void Redo()
+{
+Execute();
+}
+}
+}
+
+
+====================================================================================================
+ARQUIVO: C:\Araci-Engine-Front\Araci Engine\Applications\Diagrama\InserirBarra\InserirBarra.cs
+====================================================================================================
+
+﻿using Araci.Core.Commands;
+using Araci.Services;
+using Araci.ViewModels;
+namespace Araci.Applications.Diagrama.InserirBarra
+{
+public class InserirBarraApplication
+{
+private readonly EditorContext _context;
+public InserirBarraApplication(EditorContext context)
+{
+_context = context ?? throw new System.ArgumentNullException(nameof(context));
+}
+public void Executar()
+{
+BarraViewModel vm = _context.ElementoFactory.CriarBarraVM();
+vm.X = 200;
+vm.Y = 100;
+_context.Commands.Execute(new AddElementoCommand(vm, _context));
+}
+}
+}
+
+
+====================================================================================================
+ARQUIVO: C:\Araci-Engine-Front\Araci Engine\Applications\Diagrama\InserirCabo\InserirCabo.cs
+====================================================================================================
+
 using System.Windows;
-using System.Windows.Controls;
-using System.Windows.Data;
-using System.Windows.Media;
-namespace Araci.Controls
+using System.Windows.Input;
+using Araci.Applications.Editar.Base;
+using Araci.Core.Commands;
+using Araci.Models;
+using Araci.Services;
+using Araci.ViewModels;
+namespace Araci.Applications.Diagrama.InserirCabo
 {
-public class BarraControl : ElementoControlBase
+public class InserirCaboApplication
 {
-private readonly Grid _root;
-private readonly SvgViewbox _svg;
-private readonly Border _overlay;
-public BarraControl()
+private readonly EditorContext _context;
+public InserirCaboApplication(EditorContext context)
 {
-Cursor = System.Windows.Input.Cursors.Hand;
-_svg = new SvgViewbox
-{
-Stretch = Stretch.Fill,
-Source = new Uri("pack:
-};
-_overlay = new Border
-{
-Background = Brushes.DeepSkyBlue,
-Opacity = 0.6,
-Visibility = Visibility.Collapsed
-};
-_root = new Grid();
-_root.Children.Add(_svg);
-_root.Children.Add(_overlay);
-Content = _root;
-Loaded += OnLoaded;
-ConfigurarBindings();
+_context = context ?? throw new System.ArgumentNullException(nameof(context));
 }
-protected override bool UsaBindings => true;
-private void OnLoaded(object sender, RoutedEventArgs e)
+public void Executar()
 {
-_overlay.OpacityMask = new VisualBrush(_svg);
+_context.Input.ToolAtual = new InserirCaboTool(_context);
 }
-private void ConfigurarBindings()
+}
+public class InserirCaboTool : ITool
 {
-SetBinding(WidthProperty, new Binding("RenderData.Largura"));
-SetBinding(HeightProperty, new Binding("RenderData.Altura"));
-_svg.SetBinding(WidthProperty, new Binding("RenderData.Largura"));
-_svg.SetBinding(HeightProperty, new Binding("RenderData.Altura"));
-var multi = new MultiBinding
+private readonly EditorContext _context;
+private CaboViewModel? _caboAtual;
+private bool _inserindo;
+public InserirCaboTool(EditorContext context)
 {
-Converter = new SelectionOrHoverToVisibilityConverter()
-};
-multi.Bindings.Add(new Binding("IsSelecionado"));
-multi.Bindings.Add(new Binding("IsHover"));
-_overlay.SetBinding(VisibilityProperty, multi);
+_context = context;
+}
+public string Nome => "Inserir Cabo";
+public bool MantemBotaoAtivado => true;
+public void Ativar() { }
+public void Desativar()
+{
+LimparEstado();
+}
+public void OnMouseDown(ElementoViewModel? vm, Point position, ToolInputState inputState)
+{
+var pontoSnap = _context.Snap.SnapFromElemento(vm, position);
+if (!_inserindo)
+{
+_caboAtual = _context.ElementoFactory.CriarCaboVM();
+_caboAtual.Iniciar(pontoSnap);
+_context.Commands.Execute(new AddElementoCommand(_caboAtual, _context));
+ConectarOrigem(vm);
+_inserindo = true;
+return;
+}
+if (_caboAtual == null)
+return;
+_caboAtual.FinalizarNoPonto(pontoSnap);
+if (vm?.Modelo is ElementoEquipamento)
+ConectarDestino(vm);
+Finalizar();
+}
+public void OnMouseMove(Point position)
+{
+if (!_inserindo || _caboAtual == null)
+return;
+var pontoSnap = _context.Snap.Snap(position);
+_caboAtual.AtualizarPreview(pontoSnap);
+}
+public void OnMouseUp(Point position) { }
+public void OnKeyDown(Key key)
+{
+if (key == Key.Enter)
+{
+Finalizar();
+return;
+}
+if (key == Key.Escape)
+Cancelar();
+}
+private void ConectarOrigem(ElementoViewModel? vm)
+{
+if (_caboAtual == null) return;
+if (vm?.Modelo is not ElementoEquipamento equipamento) return;
+_caboAtual.BarraOrigem = equipamento.Barra;
+_caboAtual.NotificarParametros();
+}
+private void ConectarDestino(ElementoViewModel? vm)
+{
+if (_caboAtual == null) return;
+if (vm?.Modelo is not ElementoEquipamento equipamento) return;
+_caboAtual.BarraDestino = equipamento.Barra;
+_caboAtual.NotificarParametros();
+}
+private void Finalizar()
+{
+LimparEstado();
+_context.Tools.VoltarParaSelecao();
+}
+private void Cancelar()
+{
+if (_caboAtual != null)
+_context.Commands.Undo();
+LimparEstado();
+_context.Tools.VoltarParaSelecao();
+}
+private void LimparEstado()
+{
+_caboAtual?.RemoverPreview();
+_caboAtual = null;
+_inserindo = false;
 }
 }
 }
 
 
 ====================================================================================================
-ARQUIVO: C:\Araci-Engine-Front\Araci Engine\Controls\CargaControl.cs
+ARQUIVO: C:\Araci-Engine-Front\Araci Engine\Applications\Diagrama\InserirCarga\InserirCarga.cs
 ====================================================================================================
 
-﻿using Araci.Controls.Base;
-using Araci.Controls.Converters;
-using SharpVectors.Converters;
+using Araci.Core.Commands;
+using Araci.Services;
+using Araci.ViewModels;
+namespace Araci.Applications.Diagrama.InserirCarga
+{
+public class InserirCargaApplication
+{
+private readonly EditorContext _context;
+public InserirCargaApplication(EditorContext context)
+{
+_context = context ?? throw new System.ArgumentNullException(nameof(context));
+}
+public void Executar()
+{
+CargaViewModel vm = _context.ElementoFactory.CriarCargaVM();
+vm.X = 100;
+vm.Y = 100;
+_context.Commands.Execute(new AddElementoCommand(vm, _context));
+}
+}
+}
+
+
+====================================================================================================
+ARQUIVO: C:\Araci-Engine-Front\Araci Engine\Applications\Diagrama\InserirGerador\InserirGerador.cs
+====================================================================================================
+
+using Araci.Core.Commands;
+using Araci.Services;
+using Araci.ViewModels;
+namespace Araci.Applications.Diagrama.InserirGerador
+{
+public class InserirGeradorApplication
+{
+private readonly EditorContext _context;
+public InserirGeradorApplication(EditorContext context)
+{
+_context = context ?? throw new System.ArgumentNullException(nameof(context));
+}
+public void Executar()
+{
+GeradorViewModel vm = _context.ElementoFactory.CriarGeradorVM();
+vm.X = 150;
+vm.Y = 150;
+_context.Commands.Execute(new AddElementoCommand(vm, _context));
+}
+}
+}
+
+
+====================================================================================================
+ARQUIVO: C:\Araci-Engine-Front\Araci Engine\Core\Documents\AraciDocument.cs
+====================================================================================================
+
+using System.Collections.ObjectModel;
+using System.Linq;
+using Araci.Models;
+namespace Araci.Core.Documents
+{
+public class AraciDocument
+{
+public ObservableCollection<Elemento> Elementos { get; }
+public AraciDocument()
+{
+Elementos = new ObservableCollection<Elemento>();
+}
+public void AdicionarElemento(Elemento elemento)
+{
+if (Elementos.Contains(elemento))
+return;
+Elementos.Add(elemento);
+AtualizarNomes(elemento.GetType());
+}
+public void RemoverElemento(Elemento elemento)
+{
+if (!Elementos.Contains(elemento))
+return;
+Elementos.Remove(elemento);
+AtualizarNomes(elemento.GetType());
+}
+public void Limpar()
+{
+Elementos.Clear();
+}
+private void AtualizarNomes(System.Type tipo)
+{
+var lista = Elementos
+.Where(e => e.GetType() == tipo)
+.ToList();
+for (int i = 0; i < lista.Count; i++)
+{
+string prefixo = ObterPrefixo(lista[i]);
+lista[i].Nome = $"{prefixo}-{(i + 1).ToString("D3")}";
+}
+}
+private string ObterPrefixo(Elemento elemento)
+{
+return elemento switch
+{
+Cabo => "CABO",
+Carga => "CARGA",
+Gerador => "GERADOR",
+Barra => "BARRA",
+_ => "ELM"
+};
+}
+}
+}
+
+
+====================================================================================================
+ARQUIVO: C:\Araci-Engine-Front\Araci Engine\Models\Barra.cs
+====================================================================================================
+
+﻿using System.Collections.Generic;
+using System.Windows;
+using Araci.Models.Tipos;
+namespace Araci.Models
+{
+public class Barra : Elemento, ITerminalOwner
+{
+public const string PARAM_ALTURA = "Altura";
+private readonly List<Terminal> _terminais = new();
+public IReadOnlyList<Terminal> Terminais => _terminais;
+public TipoBarra TipoBarra => (TipoBarra)Tipo!;
+public double Altura
+{
+get => Obter<double>(PARAM_ALTURA);
+set => Definir(PARAM_ALTURA, value);
+}
+public Barra()
+{
+Nome = "BARRA-001";
+DefinirParametro(
+new Parameter<double>(PARAM_ALTURA, 120));
+CriarTerminais();
+AtualizarTerminais();
+}
+private void CriarTerminais()
+{
+_terminais.Clear();
+int quantidade = 6;
+for (int i = 0; i < quantidade; i++)
+{
+_terminais.Add(new Terminal(this, new Point()));
+}
+}
+public void AtualizarTerminais()
+{
+if (_terminais.Count == 0)
+return;
+double espacamento = Altura / (_terminais.Count - 1);
+for (int i = 0; i < _terminais.Count; i++)
+{
+_terminais[i].Posicao = new Point(
+PosicaoX,
+PosicaoY + i * espacamento);
+}
+}
+public override Elemento Clonar()
+{
+var clone = new Barra();
+CopiarBasePara(clone);
+clone.Altura = Altura;
+clone.AtualizarTerminais();
+return clone;
+}
+}
+}
+
+
+====================================================================================================
+ARQUIVO: C:\Araci-Engine-Front\Araci Engine\Models\Cabo.cs
+====================================================================================================
+
+﻿using System.Collections.Generic;
+using System.Collections.ObjectModel;
+using System.Windows;
+using Araci.Models.Tipos;
+namespace Araci.Models
+{
+public class Cabo : ElementoLinear, ITerminalOwner
+{
+public const string PARAM_BARRA_ORIGEM = "BarraOrigem";
+public const string PARAM_BARRA_DESTINO = "BarraDestino";
+public const string PARAM_COMPRIMENTO = "Comprimento";
+private readonly List<Terminal> _terminais = new();
+public IReadOnlyList<Terminal> Terminais => _terminais;
+public ObservableCollection<Point> Vertices { get; } = new();
+public Point? PreviewPonto { get; set; }
+public TipoCabo TipoCabo => (TipoCabo)Tipo!;
+public Terminal? Origem => _terminais.Count > 0 ? _terminais[0] : null;
+public Terminal? Destino => _terminais.Count > 1 ? _terminais[1] : null;
+public string BarraOrigem
+{
+get => Obter<string>(PARAM_BARRA_ORIGEM);
+set => Definir(PARAM_BARRA_ORIGEM, value);
+}
+public string BarraDestino
+{
+get => Obter<string>(PARAM_BARRA_DESTINO);
+set => Definir(PARAM_BARRA_DESTINO, value);
+}
+public new double Comprimento
+{
+get => Obter<double>(PARAM_COMPRIMENTO);
+set => Definir(PARAM_COMPRIMENTO, value);
+}
+public Cabo()
+{
+DefinirParametro(new Parameter<string>(PARAM_BARRA_ORIGEM, "BUS-01"));
+DefinirParametro(new Parameter<string>(PARAM_BARRA_DESTINO, "BUS-02"));
+DefinirParametro(new Parameter<double>(PARAM_COMPRIMENTO, 120));
+}
+public void DefinirOrigem(Point p)
+{
+if (_terminais.Count == 0)
+_terminais.Add(new Terminal(this, p));
+else
+_terminais[0].Posicao = p;
+}
+public void DefinirDestino(Point p)
+{
+if (_terminais.Count < 2)
+_terminais.Add(new Terminal(this, p));
+else
+_terminais[1].Posicao = p;
+}
+public override Elemento Clonar()
+{
+var clone = new Cabo();
+CopiarLinearPara(clone);
+CopiarBasePara(clone);
+foreach (var p in Vertices)
+clone.Vertices.Add(p);
+clone.PreviewPonto = PreviewPonto;
+clone._terminais.Clear();
+foreach (var t in _terminais)
+{
+clone._terminais.Add(
+new Terminal(clone, t.Posicao)
+{
+Barra = t.Barra
+});
+}
+return clone;
+}
+}
+}
+
+
+====================================================================================================
+ARQUIVO: C:\Araci-Engine-Front\Araci Engine\Models\ElementoEquipamento.cs
+====================================================================================================
+
+﻿using System.Collections.Generic;
+using System.Windows;
+using Araci.Models.Tipos;
+namespace Araci.Models
+{
+public abstract class ElementoEquipamento : Elemento, ITerminalOwner
+{
+public const string PARAM_BARRA = "Barra";
+public const string PARAM_ALIMENTADOR = "Alimentador";
+public const string PARAM_POTENCIA_KW = "PotenciaAtivaKW";
+private readonly List<Terminal> _terminais = new();
+public IReadOnlyList<Terminal> Terminais => _terminais;
+protected ElementoEquipamento()
+{
+DefinirParametro(new Parameter<string>(PARAM_NOME, string.Empty));
+DefinirParametro(new Parameter<string>(PARAM_BARRA, string.Empty));
+DefinirParametro(new Parameter<string>(PARAM_ALIMENTADOR, string.Empty));
+DefinirParametro(new Parameter<double>(PARAM_POTENCIA_KW, 0));
+CriarTerminalInicial();
+}
+private void CriarTerminalInicial()
+{
+_terminais.Clear();
+_terminais.Add(new Terminal(this, new Point(PosicaoX, PosicaoY)));
+}
+protected List<Terminal> ObterTerminaisInternos()
+{
+return _terminais;
+}
+public string Barra
+{
+get => Obter<string>(PARAM_BARRA);
+set => Definir(PARAM_BARRA, value);
+}
+public string Alimentador
+{
+get => Obter<string>(PARAM_ALIMENTADOR);
+set => Definir(PARAM_ALIMENTADOR, value);
+}
+public double PotenciaAtivaKW
+{
+get => Obter<double>(PARAM_POTENCIA_KW);
+set => Definir(PARAM_POTENCIA_KW, value);
+}
+protected void CopiarEquipamentoPara(ElementoEquipamento destino)
+{
+CopiarBasePara(destino);
+destino._terminais.Clear();
+foreach (var t in _terminais)
+{
+destino._terminais.Add(
+new Terminal(destino, t.Posicao)
+{
+Barra = t.Barra
+});
+}
+}
+}
+}
+
+
+====================================================================================================
+ARQUIVO: C:\Araci-Engine-Front\Araci Engine\Service\ElementoFactory.cs
+====================================================================================================
+
 using System;
-using System.Windows;
-using System.Windows.Controls;
-using System.Windows.Data;
-using System.Windows.Media;
-namespace Araci.Controls
+using Araci.Models;
+using Araci.ViewModels;
+namespace Araci.Services
 {
-public class CargaControl : ElementoControlBase
+public class ElementoFactory
 {
-private readonly Grid _root;
-private readonly SvgViewbox _svg;
-private readonly Border _overlay;
-public CargaControl()
+private readonly TypeLibraryService _types;
+public ElementoFactory(TypeLibraryService types)
 {
-Cursor = System.Windows.Input.Cursors.Hand;
-_svg = new SvgViewbox
-{
-Stretch = Stretch.Fill,
-Source = new Uri("pack:
-};
-_overlay = new Border
-{
-Background = Brushes.DeepSkyBlue,
-Opacity = 0.6,
-Visibility = Visibility.Collapsed
-};
-_root = new Grid();
-_root.Children.Add(_svg);
-_root.Children.Add(_overlay);
-Content = _root;
-Loaded += OnLoaded;
-ConfigurarBindings();
+_types = types
+?? throw new ArgumentNullException(nameof(types));
 }
-protected override bool UsaBindings => true;
-private void OnLoaded(object sender, RoutedEventArgs e)
+public ElementoViewModel? CriarViewModel(
+Elemento modelo)
 {
-_overlay.OpacityMask = new VisualBrush(_svg);
-}
-private void ConfigurarBindings()
+return modelo switch
 {
-SetBinding(WidthProperty, new Binding("RenderData.Largura"));
-SetBinding(HeightProperty, new Binding("RenderData.Altura"));
-_svg.SetBinding(WidthProperty, new Binding("RenderData.Largura"));
-_svg.SetBinding(HeightProperty, new Binding("RenderData.Altura"));
-var multi = new MultiBinding
-{
-Converter = new SelectionOrHoverToVisibilityConverter()
+Cabo cabo => new CaboViewModel(
+cabo,
+_types),
+Carga carga => new CargaViewModel(
+carga,
+_types),
+Gerador gerador => new GeradorViewModel(
+gerador,
+_types),
+Barra barra => new BarraViewModel(barra, _types),
+_ => null
 };
-multi.Bindings.Add(new Binding("IsSelecionado"));
-multi.Bindings.Add(new Binding("IsHover"));
-_overlay.SetBinding(VisibilityProperty, multi);
+}
+public Cabo CriarCabo()
+{
+return new Cabo
+{
+Tipo = _types.TipoCaboPadrao
+?? throw new InvalidOperationException("Nenhum tipo de cabo cadastrado.")
+};
+}
+public CaboViewModel CriarCaboVM()
+{
+return new CaboViewModel(
+CriarCabo(),
+_types);
+}
+public Carga CriarCarga()
+{
+var c = new Carga
+{
+Tipo = _types.TipoCargaPadrao
+?? throw new InvalidOperationException("Nenhum tipo de carga cadastrado.")
+};
+c.Barra = "BUS-01";
+return c;
+}
+public CargaViewModel CriarCargaVM()
+{
+return new CargaViewModel(
+CriarCarga(),
+_types);
+}
+public Gerador CriarGerador()
+{
+var g = new Gerador
+{
+Tipo = _types.TipoGeradorPadrao
+?? throw new InvalidOperationException("Nenhum tipo de gerador cadastrado.")
+};
+g.Barra = "Fonte-001";
+return g;
+}
+public GeradorViewModel CriarGeradorVM()
+{
+return new GeradorViewModel(
+CriarGerador(),
+_types);
+}
+public Barra CriarBarra()
+{
+return new Barra
+{
+Tipo = _types.TipoBarraPadrao
+?? throw new InvalidOperationException("Nenhum tipo de barra cadastrado.")
+};
+}
+public BarraViewModel CriarBarraVM()
+{
+return new BarraViewModel(
+CriarBarra(),
+_types);
 }
 }
 }
 
 
 ====================================================================================================
-ARQUIVO: C:\Araci-Engine-Front\Araci Engine\Controls\GeradorControl.cs
+ARQUIVO: C:\Araci-Engine-Front\Araci Engine\Service\SelectionService.cs
 ====================================================================================================
 
-﻿using Araci.Controls.Base;
-using Araci.Controls.Converters;
-using SharpVectors.Converters;
+﻿using System.Collections.Generic;
+using System.Collections.ObjectModel;
+using System.Linq;
+using Araci.Core.Events;
+using Araci.ViewModels;
+namespace Araci.Services
+{
+public class SelectionService
+{
+private readonly EditorContext _context;
+private readonly ObservableCollection<ElementoViewModel> _selecionados = new();
+public SelectionService(EditorContext context)
+{
+_context = context ?? throw new ArgumentNullException(nameof(context));
+}
+public IReadOnlyList<ElementoViewModel> Selecionados => _selecionados;
+public ObservableCollection<ElementoViewModel> SelecionadosObservable => _selecionados;
+public bool TemSelecionados => _selecionados.Count > 0;
+public void Selecionar(ElementoViewModel vm, bool adicionarAoExistente = false)
+{
+if (!adicionarAoExistente)
+Limpar();
+if (_selecionados.Contains(vm))
+{
+AtualizarElementoSelecionado();
+return;
+}
+vm.IsSelecionado = true;
+_selecionados.Add(vm);
+AtualizarElementoSelecionado();
+PublicarAlteracao();
+}
+public void Toggle(ElementoViewModel vm)
+{
+if (_selecionados.Contains(vm))
+{
+Deselecionar(vm);
+return;
+}
+Selecionar(vm, true);
+}
+public void Deselecionar(ElementoViewModel vm)
+{
+if (!_selecionados.Contains(vm))
+return;
+vm.IsSelecionado = false;
+_selecionados.Remove(vm);
+AtualizarElementoSelecionado();
+PublicarAlteracao();
+}
+public void Limpar()
+{
+if (_selecionados.Count == 0)
+return;
+foreach (var vm in _selecionados)
+vm.IsSelecionado = false;
+_selecionados.Clear();
+AtualizarElementoSelecionado();
+PublicarAlteracao();
+}
+private void AtualizarElementoSelecionado()
+{
+_context.Editor.ElementoSelecionado = _selecionados.LastOrDefault();
+}
+private void PublicarAlteracao()
+{
+_context.Events.Publish(new SelecaoAlteradaEvent(_selecionados.ToList()));
+}
+}
+}
+
+
+====================================================================================================
+ARQUIVO: C:\Araci-Engine-Front\Araci Engine\Service\SnapService.cs
+====================================================================================================
+
 using System;
+using System.Collections.Generic;
+using System.Linq;
 using System.Windows;
-using System.Windows.Controls;
-using System.Windows.Data;
+using Araci.Core.SceneQueries;
+using Araci.Models;
+using Araci.ViewModels;
+namespace Araci.Services
+{
+public class SnapService
+{
+private readonly ISceneQueryService _queries;
+public SnapService(ISceneQueryService queries)
+{
+_queries = queries ?? throw new ArgumentNullException(nameof(queries));
+}
+public bool Habilitado { get; set; } = true;
+public double TerminalTolerance { get; set; } = 15;
+public Point Snap(Point point)
+{
+if (!Habilitado)
+return point;
+var terminal = SnapTerminal(point);
+return terminal ?? point;
+}
+public Point SnapFromElemento(ElementoViewModel? vm, Point fallback)
+{
+if (!Habilitado)
+return fallback;
+if (vm?.Modelo is ITerminalOwner owner)
+{
+var terminal = ObterTerminalMaisProximo(owner, fallback);
+if (terminal != null)
+return terminal.Posicao;
+}
+return Snap(fallback);
+}
+public Point SnapPoint(Point point)
+{
+return point;
+}
+public Vector SnapDelta(Vector delta)
+{
+return delta;
+}
+private Point? SnapTerminal(Point point)
+{
+Terminal? melhor = null;
+double menorDist = double.MaxValue;
+var elementos = _queries.Nearby(point, TerminalTolerance);
+foreach (var terminal in EnumerarTerminais(elementos))
+{
+double dx = terminal.Posicao.X - point.X;
+double dy = terminal.Posicao.Y - point.Y;
+double dist = dx * dx + dy * dy;
+if (dist > TerminalTolerance * TerminalTolerance || dist >= menorDist)
+continue;
+menorDist = dist;
+melhor = terminal;
+}
+return melhor?.Posicao;
+}
+private static IEnumerable<Terminal> EnumerarTerminais(IEnumerable<ElementoViewModel> elementos)
+{
+return elementos.SelectMany(e => (e.Modelo as ITerminalOwner)?.Terminais ?? Enumerable.Empty<Terminal>());
+}
+private static Terminal? ObterTerminalMaisProximo(ITerminalOwner owner, Point point)
+{
+Terminal? melhor = null;
+double menorDist = double.MaxValue;
+foreach (var terminal in owner.Terminais)
+{
+double dx = terminal.Posicao.X - point.X;
+double dy = terminal.Posicao.Y - point.Y;
+double dist = dx * dx + dy * dy;
+if (dist >= menorDist)
+continue;
+menorDist = dist;
+melhor = terminal;
+}
+return melhor;
+}
+}
+}
+
+
+====================================================================================================
+ARQUIVO: C:\Araci-Engine-Front\Araci Engine\ViewModels\ElementoViewModel.cs
+====================================================================================================
+
+﻿using System;
+using System.Collections;
+using System.Collections.ObjectModel;
+using System.Linq;
+using System.Windows;
+using System.Windows.Input;
 using System.Windows.Media;
-namespace Araci.Controls
+using Araci.Core.Rendering;
+using Araci.Core.SceneNodes;
+using Araci.Models;
+using Araci.Models.Tipos;
+using Araci.Properties;
+using Araci.Services;
+using Araci.ViewModels.Base;
+using Araci.ViewModels.VisualStates;
+namespace Araci.ViewModels
 {
-public class GeradorControl : ElementoControlBase
+public abstract class ElementoViewModel : ViewModelBase
 {
-private readonly Grid _root;
-private readonly SvgViewbox _svg;
-private readonly Border _overlay;
-public GeradorControl()
+private readonly ElementoNode _node;
+private ICommand? _abrirPropriedadesTipoCommand;
+private ObservableCollection<ParameterViewModel>? _parametros;
+protected ElementoViewModel(
+Elemento modelo,
+ElementoNode node,
+TypeLibraryService types)
 {
-Cursor = System.Windows.Input.Cursors.Hand;
-_svg = new SvgViewbox
-{
-Stretch = Stretch.Fill,
-Source = new Uri("pack:
-};
-_overlay = new Border
-{
-Background = Brushes.DeepSkyBlue,
-Opacity = 0.6,
-Visibility = Visibility.Collapsed
-};
-_root = new Grid();
-_root.Children.Add(_svg);
-_root.Children.Add(_overlay);
-Content = _root;
-Loaded += OnLoaded;
-ConfigurarBindings();
+Modelo = modelo ?? throw new ArgumentNullException(nameof(modelo));
+_node = node ?? throw new ArgumentNullException(nameof(node));
+Types = types ?? throw new ArgumentNullException(nameof(types));
+VisualState = new ElementoVisualState();
+_node.AtualizarGeometria();
 }
-protected override bool UsaBindings => true;
-private void OnLoaded(object sender, RoutedEventArgs e)
+public Elemento Modelo { get; }
+public ElementoNode Node => _node;
+protected TypeLibraryService Types { get; }
+public TipoElemento Tipo
 {
-_overlay.OpacityMask = new VisualBrush(_svg);
+get => Modelo.Tipo!;
+set
+{
+if (ReferenceEquals(Modelo.Tipo, value))
+return;
+Modelo.Tipo = value;
+OnPropertyChanged();
+OnPropertyChanged(nameof(TipoViewModel));
 }
-private void ConfigurarBindings()
+}
+public abstract IEnumerable TiposDisponiveis { get; }
+protected void SelecionarPrimeiroTipoDisponivel()
 {
-SetBinding(WidthProperty, new Binding("RenderData.Largura"));
-SetBinding(HeightProperty, new Binding("RenderData.Altura"));
-_svg.SetBinding(WidthProperty, new Binding("RenderData.Largura"));
-_svg.SetBinding(HeightProperty, new Binding("RenderData.Altura"));
-var multi = new MultiBinding
+TipoElemento? primeiroTipo = null;
+bool tipoAtualExiste = false;
+foreach (object? item in TiposDisponiveis)
 {
-Converter = new SelectionOrHoverToVisibilityConverter()
+if (item is not TipoElemento tipo)
+continue;
+primeiroTipo ??= tipo;
+if (ReferenceEquals(tipo, Modelo.Tipo))
+{
+tipoAtualExiste = true;
+break;
+}
+}
+if (tipoAtualExiste || primeiroTipo == null)
+return;
+Tipo = primeiroTipo;
+}
+public virtual TipoElementoViewModel? TipoViewModel =>
+TipoElementoViewModelFactory.Criar(Tipo);
+public ICommand AbrirPropriedadesTipoCommand =>
+_abrirPropriedadesTipoCommand ??=
+new RelayCommand(AbrirPropriedadesTipo);
+private void AbrirPropriedadesTipo()
+{
+var janela = new TypePropertiesWindow
+{
+Owner = Application.Current.MainWindow,
+DataContext = TipoViewModel
 };
-multi.Bindings.Add(new Binding("IsSelecionado"));
-multi.Bindings.Add(new Binding("IsHover"));
-_overlay.SetBinding(VisibilityProperty, multi);
+janela.ShowDialog();
+}
+public ElementoVisualState VisualState { get; }
+public bool IsSelecionado
+{
+get => VisualState.IsSelecionado;
+set
+{
+if (VisualState.IsSelecionado == value)
+return;
+VisualState.AtualizarSelecao(value);
+OnPropertyChanged();
+OnPropertyChanged(nameof(Stroke));
+OnPropertyChanged(nameof(StrokeThickness));
+OnPropertyChanged(nameof(RenderData));
+}
+}
+public bool IsHover
+{
+get => VisualState.IsHover;
+set
+{
+if (VisualState.IsHover == value)
+return;
+VisualState.AtualizarHover(value);
+OnPropertyChanged();
+OnPropertyChanged(nameof(Stroke));
+OnPropertyChanged(nameof(StrokeThickness));
+OnPropertyChanged(nameof(RenderData));
+}
+}
+public Brush Stroke => VisualState.Stroke;
+public double StrokeThickness => VisualState.StrokeThickness;
+public virtual ElementoRenderData RenderData => new(
+Largura,
+Altura,
+PontoLocalInicial,
+PontoLocalFinal,
+Stroke,
+StrokeThickness);
+protected virtual Point PontoLocalInicial => new(0, 0);
+protected virtual Point PontoLocalFinal => new(Largura, Altura);
+public virtual double X
+{
+get => Node.X;
+set
+{
+if (Math.Abs(Node.X - value) < 0.0001)
+return;
+Node.X = value;
+AtualizarNode();
+}
+}
+public virtual double Y
+{
+get => Node.Y;
+set
+{
+if (Math.Abs(Node.Y - value) < 0.0001)
+return;
+Node.Y = value;
+AtualizarNode();
+}
+}
+public virtual double WorldX => Node.X;
+public virtual double WorldY => Node.Y;
+public virtual double Largura => Node.Largura;
+public virtual double Altura => Node.Altura;
+public virtual Rect Bounds => Node.Bounds;
+public virtual Point Centro => Node.Centro;
+protected virtual void AtualizarNode()
+{
+Node.AtualizarGeometria();
+NotificarGeometria();
+}
+protected virtual void NotificarGeometria()
+{
+OnPropertyChanged(nameof(X));
+OnPropertyChanged(nameof(Y));
+OnPropertyChanged(nameof(WorldX));
+OnPropertyChanged(nameof(WorldY));
+OnPropertyChanged(nameof(Largura));
+OnPropertyChanged(nameof(Altura));
+OnPropertyChanged(nameof(Bounds));
+OnPropertyChanged(nameof(Centro));
+OnPropertyChanged(nameof(RenderData));
+}
+public virtual void Mover(Vector delta)
+{
+Node.Mover(delta);
+NotificarGeometria();
+}
+public virtual ElementoEstado CapturarEstado()
+{
+return new ElementoEstado(X, Y);
+}
+public virtual void AplicarEstado(ElementoEstado estado)
+{
+Node.X = estado.X;
+Node.Y = estado.Y;
+AtualizarNode();
+}
+public ObservableCollection<ParameterViewModel> Parametros =>
+_parametros ??=
+new ObservableCollection<ParameterViewModel>(
+Modelo.Parametros.Values.Select(
+p => new ParameterViewModel(p)));
+public virtual void NotificarParametros()
+{
+foreach (var parametro in Parametros)
+parametro.Atualizar();
+OnPropertyChanged(nameof(Parametros));
+}
+}
+}
+
+
+====================================================================================================
+ARQUIVO: C:\Araci-Engine-Front\Araci Engine\ViewModels\ViewportViewModel.cs
+====================================================================================================
+
+using System;
+using System.Collections.Generic;
+using System.Collections.ObjectModel;
+using System.Collections.Specialized;
+using System.ComponentModel;
+using System.Runtime.CompilerServices;
+using Araci.Core.Documents;
+using Araci.Core.Scenes;
+using Araci.Models;
+using Araci.Services;
+namespace Araci.ViewModels
+{
+public class ViewportViewModel : INotifyPropertyChanged
+{
+private readonly EditorContext _context;
+private readonly Dictionary<Elemento, ElementoViewModel> _viewModelsPorModelo = new();
+public ViewportViewModel(EditorContext context)
+{
+_context = context ?? throw new ArgumentNullException(nameof(context));
+Document = context.Document;
+Scene = context.Scene;
+SelectionBox = context.SelectionBox;
+MoveHud = context.MoveHud;
+Document.Elementos.CollectionChanged += OnDocumentElementosChanged;
+SincronizarComDocumento();
+}
+public AraciDocument Document { get; }
+public Scene Scene { get; }
+public SelectionBoxViewModel SelectionBox { get; }
+public MoveHudService MoveHud { get; }
+public ObservableCollection<ElementoViewModel> Elementos => Scene.Elementos;
+public void RegistrarViewModel(ElementoViewModel vm)
+{
+_viewModelsPorModelo[vm.Modelo] = vm;
+}
+private void OnDocumentElementosChanged(object? sender, NotifyCollectionChangedEventArgs e)
+{
+if (e.Action == NotifyCollectionChangedAction.Reset)
+{
+Elementos.Clear();
+return;
+}
+if (e.OldItems != null)
+{
+foreach (Elemento modelo in e.OldItems)
+RemoverViewModel(modelo);
+}
+if (e.NewItems != null)
+{
+foreach (Elemento modelo in e.NewItems)
+AdicionarViewModel(modelo);
+}
+}
+private void SincronizarComDocumento()
+{
+Elementos.Clear();
+foreach (Elemento modelo in Document.Elementos)
+AdicionarViewModel(modelo);
+}
+private void AdicionarViewModel(Elemento modelo)
+{
+var vm = ObterOuCriarViewModel(modelo);
+if (vm == null || Elementos.Contains(vm))
+return;
+Elementos.Add(vm);
+}
+private void RemoverViewModel(Elemento modelo)
+{
+if (!_viewModelsPorModelo.TryGetValue(modelo, out var vm))
+return;
+Elementos.Remove(vm);
+}
+private ElementoViewModel? ObterOuCriarViewModel(Elemento modelo)
+{
+if (_viewModelsPorModelo.TryGetValue(modelo, out var existente))
+return existente;
+var vm = _context.ElementoFactory.CriarViewModel(modelo);
+if (vm != null)
+_viewModelsPorModelo[modelo] = vm;
+return vm;
+}
+public event PropertyChangedEventHandler? PropertyChanged;
+protected virtual void OnPropertyChanged([CallerMemberName] string? nome = null)
+{
+PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nome));
 }
 }
 }

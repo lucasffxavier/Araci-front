@@ -1,3 +1,5 @@
+// Applications/Diagrama/InserirCabo/InserirCabo.cs
+
 using System.Windows;
 using System.Windows.Input;
 using Araci.Applications.Editar.Base;
@@ -14,7 +16,8 @@ namespace Araci.Applications.Diagrama.InserirCabo
 
         public InserirCaboApplication(EditorContext context)
         {
-            _context = context ?? throw new System.ArgumentNullException(nameof(context));
+            _context = context
+                ?? throw new System.ArgumentNullException(nameof(context));
         }
 
         public void Executar()
@@ -26,7 +29,9 @@ namespace Araci.Applications.Diagrama.InserirCabo
     public class InserirCaboTool : ITool
     {
         private readonly EditorContext _context;
+
         private CaboViewModel? _caboAtual;
+
         private bool _inserindo;
 
         public InserirCaboTool(EditorContext context)
@@ -35,28 +40,42 @@ namespace Araci.Applications.Diagrama.InserirCabo
         }
 
         public string Nome => "Inserir Cabo";
+
         public bool MantemBotaoAtivado => true;
 
-        public void Ativar() { }
+        public void Ativar()
+        {
+        }
 
         public void Desativar()
         {
             LimparEstado();
         }
 
-        public void OnMouseDown(ElementoViewModel? vm, Point position, ToolInputState inputState)
+        public void OnMouseDown(
+            ElementoViewModel? vm,
+            Point position,
+            ToolInputState inputState)
         {
-            var pontoSnap = _context.Snap.SnapFromElemento(vm, position);
+            Point pontoSnap =
+                _context.Snap.SnapFromElemento(vm, position);
 
             if (!_inserindo)
             {
-                _caboAtual = _context.ElementoFactory.CriarCaboVM();
+                _caboAtual =
+                    _context.ElementoFactory.CriarCaboVM();
+
                 _caboAtual.Iniciar(pontoSnap);
 
-                _context.Commands.Execute(new AddElementoCommand(_caboAtual, _context));
+                _context.Commands.Execute(
+                    new AddElementoCommand(
+                        _caboAtual,
+                        _context));
 
                 ConectarOrigem(vm);
+
                 _inserindo = true;
+
                 return;
             }
 
@@ -65,8 +84,7 @@ namespace Araci.Applications.Diagrama.InserirCabo
 
             _caboAtual.FinalizarNoPonto(pontoSnap);
 
-            // só conecta se for equipamento
-            if (vm?.Modelo is ElementoEquipamento)
+            if (EhElementoConectavel(vm))
                 ConectarDestino(vm);
 
             Finalizar();
@@ -77,11 +95,15 @@ namespace Araci.Applications.Diagrama.InserirCabo
             if (!_inserindo || _caboAtual == null)
                 return;
 
-            var pontoSnap = _context.Snap.Snap(position);
+            Point pontoSnap =
+                _context.Snap.Snap(position);
+
             _caboAtual.AtualizarPreview(pontoSnap);
         }
 
-        public void OnMouseUp(Point position) { }
+        public void OnMouseUp(Point position)
+        {
+        }
 
         public void OnKeyDown(Key key)
         {
@@ -95,33 +117,75 @@ namespace Araci.Applications.Diagrama.InserirCabo
                 Cancelar();
         }
 
-        private void ConectarOrigem(ElementoViewModel? vm)
+        private static bool EhElementoConectavel(
+            ElementoViewModel? vm)
         {
-            if (_caboAtual == null)
+            return vm?.Modelo is ElementoEquipamento
+                || vm?.Modelo is Barra;
+        }
+
+        private void ConectarOrigem(
+            ElementoViewModel? vm)
+        {
+            if (_caboAtual == null || vm?.Modelo == null)
                 return;
 
-            if (vm?.Modelo is not ElementoEquipamento equipamento)
-                return;
+            switch (vm.Modelo)
+            {
+                case ElementoEquipamento equipamento:
 
-            _caboAtual.BarraOrigem = equipamento.Nome;
+                    _caboAtual.BarraOrigem =
+                        equipamento.Barra;
+
+                    break;
+
+                case Barra barra:
+
+                    _caboAtual.BarraOrigem =
+                        barra.Nome;
+
+                    break;
+
+                default:
+                    return;
+            }
+
             _caboAtual.NotificarParametros();
         }
 
-        private void ConectarDestino(ElementoViewModel? vm)
+        private void ConectarDestino(
+            ElementoViewModel? vm)
         {
-            if (_caboAtual == null)
+            if (_caboAtual == null || vm?.Modelo == null)
                 return;
 
-            if (vm?.Modelo is not ElementoEquipamento equipamento)
-                return;
+            switch (vm.Modelo)
+            {
+                case ElementoEquipamento equipamento:
 
-            _caboAtual.BarraDestino = equipamento.Nome;
+                    _caboAtual.BarraDestino =
+                        equipamento.Barra;
+
+                    break;
+
+                case Barra barra:
+
+                    _caboAtual.BarraDestino =
+                        barra.Nome;
+
+                    break;
+
+                default:
+                    return;
+            }
+
             _caboAtual.NotificarParametros();
         }
 
         private void Finalizar()
         {
             LimparEstado();
+
             _context.Tools.VoltarParaSelecao();
         }
 
@@ -131,13 +195,16 @@ namespace Araci.Applications.Diagrama.InserirCabo
                 _context.Commands.Undo();
 
             LimparEstado();
+
             _context.Tools.VoltarParaSelecao();
         }
 
         private void LimparEstado()
         {
             _caboAtual?.RemoverPreview();
+
             _caboAtual = null;
+
             _inserindo = false;
         }
     }

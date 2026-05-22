@@ -68,13 +68,14 @@ namespace Araci.Services
 
         public Carga CriarCarga()
         {
-            return new Carga
+            var c = new Carga
             {
-                Tipo =
-                    _types.TipoCargaPadrao
-                    ?? throw new InvalidOperationException(
-                        "Nenhum tipo de carga cadastrado.")
+                Tipo = _types.TipoCargaPadrao
+                    ?? throw new InvalidOperationException("Nenhum tipo de carga cadastrado.")
             };
+
+            c.Barra = "BUS-01";
+            return c;
         }
 
         public CargaViewModel CriarCargaVM()
@@ -90,13 +91,14 @@ namespace Araci.Services
 
         public Gerador CriarGerador()
         {
-            return new Gerador
+            var g = new Gerador
             {
-                Tipo =
-                    _types.TipoGeradorPadrao
-                    ?? throw new InvalidOperationException(
-                        "Nenhum tipo de gerador cadastrado.")
+                Tipo = _types.TipoGeradorPadrao
+                    ?? throw new InvalidOperationException("Nenhum tipo de gerador cadastrado.")
             };
+
+            g.Barra = "Fonte-001";
+            return g;
         }
 
         public GeradorViewModel CriarGeradorVM()

@@ -19,15 +19,12 @@ namespace Araci.Models
 
         public Gerador()
         {
-            Nome = "GER-01";
-            Barra = "BUS-01";
+            Nome = "GERADOR-001";
+            Barra = "Fonte-001";
             Alimentador = "AL-01";
             PotenciaAtivaKW = 5000;
 
-            DefinirParametro(
-                new Parameter<double>(
-                    PARAM_FATOR_POTENCIA,
-                    0.98));
+            DefinirParametro(new Parameter<double>(PARAM_FATOR_POTENCIA, 0.98));
 
             PosicaoX = 300;
             PosicaoY = 200;

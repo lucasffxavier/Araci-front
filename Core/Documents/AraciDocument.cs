@@ -40,7 +40,7 @@ namespace Araci.Core.Documents
         {
             var lista = Elementos
                 .Where(e => e.GetType() == tipo)
-                .ToList(); // mantém ordem de inserção
+                .ToList();
 
             for (int i = 0; i < lista.Count; i++)
             {

@@ -17,8 +17,8 @@ namespace Araci.Models
 
         public Carga()
         {
-            Nome = "LOAD-01";
-            Barra = "BUS-03";
+            Nome = "CARGA-01";
+            Barra = "BUS-01";
             Alimentador = "AL-01";
             PotenciaAtivaKW = 1500;
 

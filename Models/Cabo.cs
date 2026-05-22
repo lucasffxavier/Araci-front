@@ -1,4 +1,6 @@
-﻿using System.Collections.Generic;
+﻿// Models/Cabo.cs
+
+using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Windows;
 using Araci.Models.Tipos;
@@ -7,21 +9,37 @@ namespace Araci.Models
 {
     public class Cabo : ElementoLinear, ITerminalOwner
     {
-        public const string PARAM_BARRA_ORIGEM = "BarraOrigem";
-        public const string PARAM_BARRA_DESTINO = "BarraDestino";
-        public const string PARAM_COMPRIMENTO = "Comprimento";
+        public const string PARAM_BARRA_ORIGEM =
+            "BarraOrigem";
+
+        public const string PARAM_BARRA_DESTINO =
+            "BarraDestino";
+
+        public const string PARAM_COMPRIMENTO =
+            "Comprimento";
 
         private readonly List<Terminal> _terminais = new();
 
-        public IReadOnlyList<Terminal> Terminais => _terminais;
-        public ObservableCollection<Point> Vertices { get; } = new();
+        public IReadOnlyList<Terminal> Terminais =>
+            _terminais;
+
+        public ObservableCollection<Point> Vertices { get; } =
+            new();
 
         public Point? PreviewPonto { get; set; }
 
-        public TipoCabo TipoCabo => (TipoCabo)Tipo!;
+        public TipoCabo TipoCabo =>
+            (TipoCabo)Tipo!;
 
-        public Terminal? Origem => _terminais.Count > 0 ? _terminais[0] : null;
-        public Terminal? Destino => _terminais.Count > 1 ? _terminais[1] : null;
+        public Terminal? Origem =>
+            _terminais.Count > 0
+                ? _terminais[0]
+                : null;
+
+        public Terminal? Destino =>
+            _terminais.Count > 1
+                ? _terminais[1]
+                : null;
 
         public string BarraOrigem
         {
@@ -43,15 +61,27 @@ namespace Araci.Models
 
         public Cabo()
         {
-            DefinirParametro(new Parameter<string>(PARAM_BARRA_ORIGEM, "BUS-01"));
-            DefinirParametro(new Parameter<string>(PARAM_BARRA_DESTINO, "BUS-02"));
-            DefinirParametro(new Parameter<double>(PARAM_COMPRIMENTO, 120));
+            DefinirParametro(
+                new Parameter<string>(
+                    PARAM_BARRA_ORIGEM,
+                    string.Empty));
+
+            DefinirParametro(
+                new Parameter<string>(
+                    PARAM_BARRA_DESTINO,
+                    string.Empty));
+
+            DefinirParametro(
+                new Parameter<double>(
+                    PARAM_COMPRIMENTO,
+                    120));
         }
 
         public void DefinirOrigem(Point p)
         {
             if (_terminais.Count == 0)
-                _terminais.Add(new Terminal(this, p));
+                _terminais.Add(
+                    new Terminal(this, p));
             else
                 _terminais[0].Posicao = p;
         }
@@ -59,7 +89,8 @@ namespace Araci.Models
         public void DefinirDestino(Point p)
         {
             if (_terminais.Count < 2)
-                _terminais.Add(new Terminal(this, p));
+                _terminais.Add(
+                    new Terminal(this, p));
             else
                 _terminais[1].Posicao = p;
         }
@@ -69,16 +100,17 @@ namespace Araci.Models
             var clone = new Cabo();
 
             CopiarLinearPara(clone);
+
             CopiarBasePara(clone);
 
-            foreach (var p in Vertices)
+            foreach (Point p in Vertices)
                 clone.Vertices.Add(p);
 
             clone.PreviewPonto = PreviewPonto;
 
             clone._terminais.Clear();
 
-            foreach (var t in _terminais)
+            foreach (Terminal t in _terminais)
             {
                 clone._terminais.Add(
                     new Terminal(clone, t.Posicao)
