@@ -31,9 +31,7 @@ namespace Araci.Applications.Analisar.FluxoDeCorrente
             CircuitBuilder builder = new(reader);
             CircuitDto dto = builder.Build();
             SimulationApiClient client = new();
-
             Resultado = await client.SimularTipadoAsync(dto);
-
             AplicarResultado(api, Resultado);
         }
 
@@ -45,7 +43,14 @@ namespace Araci.Applications.Analisar.FluxoDeCorrente
                     .FirstOrDefault(c => string.Equals(c.Id.ToString(), lineResult.Id, StringComparison.OrdinalIgnoreCase));
 
                 if (cabo != null)
-                    cabo.CorrenteLinha = FormatCurrent(lineResult.Corrente);
+                {
+                    double mag = lineResult.Corrente;
+
+                    cabo.CorrenteLinha = FormatPolar(mag, 0);
+                    cabo.CorrenteFaseA = FormatPolar(mag, 0);
+                    cabo.CorrenteFaseB = FormatPolar(mag, -120);
+                    cabo.CorrenteFaseC = FormatPolar(mag, 120);
+                }
             }
 
             foreach (LoadResultDto loadResult in resultado.Loads)
@@ -54,13 +59,20 @@ namespace Araci.Applications.Analisar.FluxoDeCorrente
                     .FirstOrDefault(c => string.Equals(c.Id.ToString(), loadResult.Id, StringComparison.OrdinalIgnoreCase));
 
                 if (carga != null)
-                    carga.CorrenteLinha = FormatCurrent(loadResult.Corrente);
+                {
+                    double mag = loadResult.Corrente;
+
+                    carga.CorrenteLinha = FormatPolar(mag, 0);
+                    carga.CorrenteFaseA = FormatPolar(mag, 0);
+                    carga.CorrenteFaseB = FormatPolar(mag, -120);
+                    carga.CorrenteFaseC = FormatPolar(mag, 120);
+                }
             }
         }
 
-        private static string FormatCurrent(double corrente)
+        private static string FormatPolar(double magnitude, double angle)
         {
-            return $"{corrente:0.###} A";
+            return $"{magnitude:0.##}∠{angle}°";
         }
     }
 }
