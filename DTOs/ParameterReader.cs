@@ -38,6 +38,8 @@ namespace Araci.DTOs
                     Fases = ReadInt(carga, "Fases"),
                     R = ReadDouble(carga, "Carga resistência", "Carga resistencia"),
                     X = ReadDouble(carga, "Carga reatância", "Carga reatancia"),
+                    PotenciaAtiva = ReadDouble(carga, "PotenciaAtiva"),
+                    PotenciaReativa = ReadDouble(carga, "PotenciaReativa"),
                     Conexao = ReadString(carga, "Carga conexao", "Conexao"),
                     Modelo = ReadInt(carga, "Carga modelo", "ModeloCarga")
                 })
@@ -51,8 +53,8 @@ namespace Araci.DTOs
                 {
                     Id = cabo.Id.ToString(),
                     Nome = ReadString(cabo, "Nome"),
-                    Barra1 = ReadString(cabo, "Barra 1", "BarraOrigem"),
-                    Barra2 = ReadString(cabo, "Barra 2", "BarraDestino"),
+                    Barra1 = ReadBarra(cabo, "Barra 1", "BarraOrigem"),
+                    Barra2 = ReadBarra(cabo, "Barra 2", "BarraDestino"),
                     Fases = ReadInt(cabo, "Fases"),
                     Comprimento = ReadDouble(cabo, "Comprimento"),
                     R1 = ReadDouble(cabo, "R1"),
@@ -97,7 +99,12 @@ namespace Araci.DTOs
             Elemento? slack = GetElementsByTypeName("Slack").FirstOrDefault();
 
             if (slack == null)
-                throw new InvalidOperationException("Elemento slack nao encontrado no modelo.");
+            {
+                slack = _api.ObterElementos<Barra>().FirstOrDefault();
+            }
+
+            if (slack == null)
+                throw new InvalidOperationException("Nenhuma barra disponível para fallback de slack.");
 
             return new SlackData
             {
@@ -105,7 +112,7 @@ namespace Araci.DTOs
                 Nome = ReadString(slack, "Nome"),
                 Tensao = ReadDouble(slack, "Tensao"),
                 Fases = ReadInt(slack, "Fases"),
-                Barra = ReadString(slack, "Barra", "Nome")
+                Barra = ReadBarra(slack, "Barra", "Nome")
             };
         }
 
@@ -120,7 +127,15 @@ namespace Araci.DTOs
 
         private static string ReadBarra(Elemento elemento, params string[] names)
         {
-            return ReadString(elemento, names);
+            string valor = ReadString(elemento, names);
+
+            if (!string.IsNullOrWhiteSpace(valor))
+                return valor;
+
+            if (elemento is ITerminalOwner owner)
+                return owner.Terminais.FirstOrDefault()?.Barra ?? string.Empty;
+
+            return string.Empty;
         }
 
         private static string ReadString(Elemento elemento, params string[] names)
@@ -171,6 +186,10 @@ namespace Araci.DTOs
             public double R { get; set; }
 
             public double X { get; set; }
+
+            public double PotenciaAtiva { get; set; }
+
+            public double PotenciaReativa { get; set; }
 
             public string Conexao { get; set; } = string.Empty;
 

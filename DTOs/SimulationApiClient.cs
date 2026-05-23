@@ -8,7 +8,7 @@ namespace Araci.DTOs
 {
     public class SimulationApiClient
     {
-        private const string SimulationUrl = "http://localhost:5000/simular";
+        private const string SimulationUrl = "http://localhost:8000/simular";
 
         private readonly HttpClient _httpClient;
 

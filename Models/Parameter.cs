@@ -40,19 +40,27 @@ namespace Araci.Models
             get => _valor;
             set
             {
-                if (value is T typed)
-                {
-                    _valor = typed;
-                    return;
-                }
-
                 if (value == null)
                 {
                     _valor = default!;
                     return;
                 }
 
-                _valor = (T)Convert.ChangeType(value, typeof(T));
+                if (value is T typed)
+                {
+                    _valor = typed;
+                    return;
+                }
+
+                try
+                {
+                    _valor = (T)Convert.ChangeType(value, typeof(T));
+                }
+                catch
+                {
+                    throw new InvalidCastException(
+                        $"Valor inválido para parâmetro '{Nome}'. Esperado: {typeof(T).Name}");
+                }
             }
         }
 

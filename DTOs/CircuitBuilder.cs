@@ -15,7 +15,7 @@ namespace Araci.DTOs
 
         public CircuitDto Build()
         {
-            return new CircuitDto
+            var dto = new CircuitDto
             {
                 Loads = BuildLoads(),
                 Lines = BuildLines(),
@@ -23,6 +23,10 @@ namespace Araci.DTOs
                 Generators = BuildGenerators(),
                 Slack = BuildSlack()
             };
+
+            Validar(dto);
+
+            return dto;
         }
 
         private IList<LoadDto> BuildLoads()
@@ -36,6 +40,8 @@ namespace Araci.DTOs
                     Fases = load.Fases,
                     R = load.R,
                     X = load.X,
+                    PotenciaAtiva = load.PotenciaAtiva,
+                    PotenciaReativa = load.PotenciaReativa,
                     Conexao = load.Conexao,
                     Modelo = load.Modelo
                 })
@@ -102,6 +108,18 @@ namespace Araci.DTOs
                 Fases = slack.Fases,
                 Barra = slack.Barra
             };
+        }
+
+        private void Validar(CircuitDto dto)
+        {
+            if (dto.Slack == null || string.IsNullOrWhiteSpace(dto.Slack.Barra))
+                throw new InvalidOperationException("Slack inválido.");
+
+            if (dto.Lines.Any(l => string.IsNullOrWhiteSpace(l.Barra1) || string.IsNullOrWhiteSpace(l.Barra2)))
+                throw new InvalidOperationException("Linha sem barras definidas.");
+
+            if (!dto.Loads.Any() && !dto.Generators.Any())
+                throw new InvalidOperationException("Circuito sem carga ou geração.");
         }
     }
 }
