@@ -1,121 +1,38 @@
-﻿namespace Araci.Models.Tipos
+namespace Araci.Models.Tipos
 {
-    public class TipoGerador
-        : TipoElemento
+    public class TipoGerador : TipoElemento
     {
+        public const string PARAM_FASES = "Fases";
+        public const string PARAM_MODELO_FONTE = "ModeloFonte";
+        public const string PARAM_FATOR_POTENCIA = "FatorPotencia";
 
-        public const string PARAM_FABRICANTE =
-            "Fabricante";
-
-        public const string PARAM_MODELO =
-            "Modelo";
-
-        public const string PARAM_POTENCIA =
-            "PotenciaNominalKW";
-
-        public const string PARAM_TENSAO =
-            "TensaoKV";
-
-        public const string PARAM_FASES =
-            "Fases";
-
-        public string CategoriaGerador
+        public TipoGerador()
         {
-            get => Obter<string>(
-                PARAM_CATEGORIA);
+            NomeTipo = "Gerador Eolico";
+            Familia = "Geradores";
+            Categoria = "Geradores";
 
-            set => Definir(
-                PARAM_CATEGORIA,
-                value);
-        }
-
-        public string Fabricante
-        {
-            get => Obter<string>(
-                PARAM_FABRICANTE);
-
-            set => Definir(
-                PARAM_FABRICANTE,
-                value);
-        }
-
-        public string Modelo
-        {
-            get => Obter<string>(
-                PARAM_MODELO);
-
-            set => Definir(
-                PARAM_MODELO,
-                value);
-        }
-
-        public double PotenciaNominalKW
-        {
-            get => Obter<double>(
-                PARAM_POTENCIA);
-
-            set => Definir(
-                PARAM_POTENCIA,
-                value);
-        }
-
-        public double TensaoKV
-        {
-            get => Obter<double>(
-                PARAM_TENSAO);
-
-            set => Definir(
-                PARAM_TENSAO,
-                value);
+            DefinirParametro(new Parameter<int>(PARAM_FASES, 3));
+            DefinirParametro(new Parameter<int>(PARAM_MODELO_FONTE, 1));
+            DefinirParametro(new Parameter<double>(PARAM_FATOR_POTENCIA, 0.98));
         }
 
         public int Fases
         {
-            get => Obter<int>(
-                PARAM_FASES);
-
-            set => Definir(
-                PARAM_FASES,
-                value);
+            get => Obter<int>(PARAM_FASES);
+            set => Definir(PARAM_FASES, value);
         }
 
-        public TipoGerador()
+        public int ModeloFonte
         {
-            NomeTipo = "Gerador Eólico";
+            get => Obter<int>(PARAM_MODELO_FONTE);
+            set => Definir(PARAM_MODELO_FONTE, value);
+        }
 
-            Familia = "Geradores";
-
-            Categoria = "Geradores";
-
-            DefinirParametro(
-                new Parameter<string>(
-                    PARAM_CATEGORIA,
-                    "Eólico"));
-
-            DefinirParametro(
-                new Parameter<string>(
-                    PARAM_FABRICANTE,
-                    "WEG"));
-
-            DefinirParametro(
-                new Parameter<string>(
-                    PARAM_MODELO,
-                    "WTG-5MW"));
-
-            DefinirParametro(
-                new Parameter<double>(
-                    PARAM_POTENCIA,
-                    5000));
-
-            DefinirParametro(
-                new Parameter<double>(
-                    PARAM_TENSAO,
-                    34.5));
-
-            DefinirParametro(
-                new Parameter<int>(
-                    PARAM_FASES,
-                    3));
+        public double FatorPotencia
+        {
+            get => Obter<double>(PARAM_FATOR_POTENCIA);
+            set => Definir(PARAM_FATOR_POTENCIA, value);
         }
     }
 }

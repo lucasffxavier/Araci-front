@@ -7,77 +7,54 @@ namespace Araci.ViewModels
 {
     public class CargaViewModel : ElementoViewModel
     {
-        public CargaViewModel(
-            Carga modelo,
-            TypeLibraryService types)
-            : base(
-                modelo,
-                new EquipamentoNode(modelo),
-                types)
+        public CargaViewModel(Carga modelo, TypeLibraryService types)
+            : base(modelo, new EquipamentoNode(modelo), types)
         {
             SelecionarPrimeiroTipoDisponivel();
-
             AtualizarTerminais();
         }
 
         public Carga Carga => (Carga)Modelo;
 
-        public override IEnumerable TiposDisponiveis =>
-            Types.TiposCargas;
-
-        protected override void AtualizarNode()
-        {
-            base.AtualizarNode();
-
-            AtualizarTerminais();
-        }
-
-        private void AtualizarTerminais()
-        {
-            Carga.AtualizarTerminais(Largura);
-        }
-
-        public double PotenciaAtivaKW
-        {
-            get => Carga.PotenciaAtivaKW;
-
-            set
-            {
-                if (Carga.PotenciaAtivaKW == value)
-                    return;
-
-                Carga.PotenciaAtivaKW = value;
-
-                OnPropertyChanged();
-            }
-        }
-
-        public double PotenciaReativaKvar
-        {
-            get => Carga.PotenciaReativaKvar;
-
-            set
-            {
-                if (Carga.PotenciaReativaKvar == value)
-                    return;
-
-                Carga.PotenciaReativaKvar = value;
-
-                OnPropertyChanged();
-            }
-        }
+        public override IEnumerable TiposDisponiveis => Types.TiposCargas;
 
         public string Nome
         {
             get => Carga.Nome;
-
             set
             {
                 if (Carga.Nome == value)
                     return;
 
                 Carga.Nome = value;
+                OnPropertyChanged();
+                NotificarParametros();
+            }
+        }
 
+        public double PotenciaAtivaKW
+        {
+            get => Carga.PotenciaAtivaKW;
+            set
+            {
+                if (Carga.PotenciaAtivaKW == value)
+                    return;
+
+                Carga.PotenciaAtivaKW = value;
+                OnPropertyChanged();
+                NotificarParametros();
+            }
+        }
+
+        public double PotenciaReativaKvar
+        {
+            get => Carga.PotenciaReativaKvar;
+            set
+            {
+                if (Carga.PotenciaReativaKvar == value)
+                    return;
+
+                Carga.PotenciaReativaKvar = value;
                 OnPropertyChanged();
                 NotificarParametros();
             }
@@ -86,16 +63,138 @@ namespace Araci.ViewModels
         public string Alimentador
         {
             get => Carga.Alimentador;
-
             set
             {
                 if (Carga.Alimentador == value)
                     return;
 
                 Carga.Alimentador = value;
-
                 OnPropertyChanged();
+                NotificarParametros();
             }
+        }
+
+        public string CorrenteLinha
+        {
+            get => Carga.CorrenteLinha;
+            set
+            {
+                if (Carga.CorrenteLinha == value)
+                    return;
+
+                Carga.CorrenteLinha = value;
+                OnPropertyChanged();
+                NotificarParametros();
+            }
+        }
+
+        public string CorrenteFaseA
+        {
+            get => Carga.CorrenteFaseA;
+            set
+            {
+                if (Carga.CorrenteFaseA == value)
+                    return;
+
+                Carga.CorrenteFaseA = value;
+                OnPropertyChanged();
+                NotificarParametros();
+            }
+        }
+
+        public string CorrenteFaseB
+        {
+            get => Carga.CorrenteFaseB;
+            set
+            {
+                if (Carga.CorrenteFaseB == value)
+                    return;
+
+                Carga.CorrenteFaseB = value;
+                OnPropertyChanged();
+                NotificarParametros();
+            }
+        }
+
+        public string CorrenteFaseC
+        {
+            get => Carga.CorrenteFaseC;
+            set
+            {
+                if (Carga.CorrenteFaseC == value)
+                    return;
+
+                Carga.CorrenteFaseC = value;
+                OnPropertyChanged();
+                NotificarParametros();
+            }
+        }
+
+        public string TensaoLinha
+        {
+            get => Carga.TensaoLinha;
+            set
+            {
+                if (Carga.TensaoLinha == value)
+                    return;
+
+                Carga.TensaoLinha = value;
+                OnPropertyChanged();
+                NotificarParametros();
+            }
+        }
+
+        public string TensaoFaseA
+        {
+            get => Carga.TensaoFaseA;
+            set
+            {
+                if (Carga.TensaoFaseA == value)
+                    return;
+
+                Carga.TensaoFaseA = value;
+                OnPropertyChanged();
+                NotificarParametros();
+            }
+        }
+
+        public string TensaoFaseB
+        {
+            get => Carga.TensaoFaseB;
+            set
+            {
+                if (Carga.TensaoFaseB == value)
+                    return;
+
+                Carga.TensaoFaseB = value;
+                OnPropertyChanged();
+                NotificarParametros();
+            }
+        }
+
+        public string TensaoFaseC
+        {
+            get => Carga.TensaoFaseC;
+            set
+            {
+                if (Carga.TensaoFaseC == value)
+                    return;
+
+                Carga.TensaoFaseC = value;
+                OnPropertyChanged();
+                NotificarParametros();
+            }
+        }
+
+        protected override void AtualizarNode()
+        {
+            base.AtualizarNode();
+            AtualizarTerminais();
+        }
+
+        private void AtualizarTerminais()
+        {
+            Carga.AtualizarTerminais(Largura);
         }
     }
 }

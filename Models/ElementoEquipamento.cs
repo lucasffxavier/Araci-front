@@ -1,4 +1,4 @@
-﻿using System.Collections.Generic;
+using System.Collections.Generic;
 using System.Windows;
 
 namespace Araci.Models
@@ -6,46 +6,38 @@ namespace Araci.Models
     public abstract class ElementoEquipamento : Elemento, ITerminalOwner
     {
         public const string PARAM_ALIMENTADOR = "Alimentador";
-        public const string PARAM_POTENCIA_KW = "PotenciaAtivaKW";
+        public const string PARAM_POTENCIA_ATIVA_KW = "PotenciaAtivaKW";
+        public const string PARAM_POTENCIA_REATIVA_KVAR = "PotenciaReativaKvar";
+        public const string PARAM_TENSAO_LINHA = "TensaoLinha";
+        public const string PARAM_TENSAO_FASE_A = "TensaoFaseA";
+        public const string PARAM_TENSAO_FASE_B = "TensaoFaseB";
+        public const string PARAM_TENSAO_FASE_C = "TensaoFaseC";
+        public const string PARAM_CORRENTE_LINHA = "CorrenteLinha";
+        public const string PARAM_CORRENTE_FASE_A = "CorrenteFaseA";
+        public const string PARAM_CORRENTE_FASE_B = "CorrenteFaseB";
+        public const string PARAM_CORRENTE_FASE_C = "CorrenteFaseC";
 
         private readonly List<Terminal> _terminais = new();
 
-        public IReadOnlyList<Terminal> Terminais => _terminais;
-
         protected ElementoEquipamento()
         {
-            DefinirParametro(
-                new Parameter<string>(
-                    PARAM_NOME,
-                    string.Empty));
-
-            DefinirParametro(
-                new Parameter<string>(
-                    PARAM_ALIMENTADOR,
-                    string.Empty));
-
-            DefinirParametro(
-                new Parameter<double>(
-                    PARAM_POTENCIA_KW,
-                    0));
+            DefinirParametro(new Parameter<string>(PARAM_NOME, string.Empty));
+            DefinirParametro(new Parameter<string>(PARAM_ALIMENTADOR, string.Empty));
+            DefinirParametro(new Parameter<double>(PARAM_POTENCIA_ATIVA_KW, 0));
+            DefinirParametro(new Parameter<double>(PARAM_POTENCIA_REATIVA_KVAR, 0));
+            DefinirParametro(new Parameter<string>(PARAM_TENSAO_LINHA, string.Empty));
+            DefinirParametro(new Parameter<string>(PARAM_TENSAO_FASE_A, string.Empty));
+            DefinirParametro(new Parameter<string>(PARAM_TENSAO_FASE_B, string.Empty));
+            DefinirParametro(new Parameter<string>(PARAM_TENSAO_FASE_C, string.Empty));
+            DefinirParametro(new Parameter<string>(PARAM_CORRENTE_LINHA, string.Empty));
+            DefinirParametro(new Parameter<string>(PARAM_CORRENTE_FASE_A, string.Empty));
+            DefinirParametro(new Parameter<string>(PARAM_CORRENTE_FASE_B, string.Empty));
+            DefinirParametro(new Parameter<string>(PARAM_CORRENTE_FASE_C, string.Empty));
 
             CriarTerminalInicial();
         }
 
-        private void CriarTerminalInicial()
-        {
-            _terminais.Clear();
-
-            _terminais.Add(
-                new Terminal(
-                    this,
-                    new Point(PosicaoX, PosicaoY)));
-        }
-
-        protected List<Terminal> ObterTerminaisInternos()
-        {
-            return _terminais;
-        }
+        public IReadOnlyList<Terminal> Terminais => _terminais;
 
         public string Alimentador
         {
@@ -55,12 +47,70 @@ namespace Araci.Models
 
         public double PotenciaAtivaKW
         {
-            get => Obter<double>(PARAM_POTENCIA_KW);
-            set => Definir(PARAM_POTENCIA_KW, value);
+            get => Obter<double>(PARAM_POTENCIA_ATIVA_KW);
+            set => Definir(PARAM_POTENCIA_ATIVA_KW, value);
         }
 
-        protected void CopiarEquipamentoPara(
-            ElementoEquipamento destino)
+        public double PotenciaReativaKvar
+        {
+            get => Obter<double>(PARAM_POTENCIA_REATIVA_KVAR);
+            set => Definir(PARAM_POTENCIA_REATIVA_KVAR, value);
+        }
+
+        public string TensaoLinha
+        {
+            get => Obter<string>(PARAM_TENSAO_LINHA);
+            set => Definir(PARAM_TENSAO_LINHA, value);
+        }
+
+        public string TensaoFaseA
+        {
+            get => Obter<string>(PARAM_TENSAO_FASE_A);
+            set => Definir(PARAM_TENSAO_FASE_A, value);
+        }
+
+        public string TensaoFaseB
+        {
+            get => Obter<string>(PARAM_TENSAO_FASE_B);
+            set => Definir(PARAM_TENSAO_FASE_B, value);
+        }
+
+        public string TensaoFaseC
+        {
+            get => Obter<string>(PARAM_TENSAO_FASE_C);
+            set => Definir(PARAM_TENSAO_FASE_C, value);
+        }
+
+        public string CorrenteLinha
+        {
+            get => Obter<string>(PARAM_CORRENTE_LINHA);
+            set => Definir(PARAM_CORRENTE_LINHA, value);
+        }
+
+        public string CorrenteFaseA
+        {
+            get => Obter<string>(PARAM_CORRENTE_FASE_A);
+            set => Definir(PARAM_CORRENTE_FASE_A, value);
+        }
+
+        public string CorrenteFaseB
+        {
+            get => Obter<string>(PARAM_CORRENTE_FASE_B);
+            set => Definir(PARAM_CORRENTE_FASE_B, value);
+        }
+
+        public string CorrenteFaseC
+        {
+            get => Obter<string>(PARAM_CORRENTE_FASE_C);
+            set => Definir(PARAM_CORRENTE_FASE_C, value);
+        }
+
+        protected List<Terminal> ObterTerminaisInternos()
+        {
+            return _terminais;
+        }
+
+        protected void CopiarEquipamentoPara(ElementoEquipamento destino)
         {
             CopiarBasePara(destino);
 
@@ -74,6 +124,12 @@ namespace Araci.Models
                         Barra = t.Barra
                     });
             }
+        }
+
+        private void CriarTerminalInicial()
+        {
+            _terminais.Clear();
+            _terminais.Add(new Terminal(this, new Point(PosicaoX, PosicaoY)));
         }
     }
 }

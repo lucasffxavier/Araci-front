@@ -1,32 +1,26 @@
-﻿using System.Windows;
+using System.Windows;
 using Araci.Models.Tipos;
 
 namespace Araci.Models
 {
     public class Carga : ElementoEquipamento
     {
-        public const string PARAM_POTENCIA_REATIVA =
-            "PotenciaReativaKvar";
-
-        public TipoCarga TipoCarga =>
-            (TipoCarga)Tipo!;
-
-        public double PotenciaReativaKvar
-        {
-            get => Obter<double>(PARAM_POTENCIA_REATIVA);
-            set => Definir(PARAM_POTENCIA_REATIVA, value);
-        }
+        public TipoCarga TipoCarga => (TipoCarga)Tipo!;
 
         public Carga()
         {
             Nome = "CARGA-01";
             Alimentador = "AL-01";
             PotenciaAtivaKW = 1500;
-
-            DefinirParametro(
-                new Parameter<double>(
-                    PARAM_POTENCIA_REATIVA,
-                    450));
+            PotenciaReativaKvar = 450;
+            CorrenteLinha = "0 A";
+            CorrenteFaseA = "0 A";
+            CorrenteFaseB = "0 A";
+            CorrenteFaseC = "0 A";
+            TensaoLinha = "13.8 kV";
+            TensaoFaseA = "7.97 kV";
+            TensaoFaseB = "7.97 kV";
+            TensaoFaseC = "7.97 kV";
 
             PosicaoX = 500;
             PosicaoY = 250;
@@ -39,9 +33,7 @@ namespace Araci.Models
             if (terminais.Count == 0)
                 return;
 
-            terminais[0].Posicao = new Point(
-                PosicaoX + largura / 2,
-                PosicaoY);
+            terminais[0].Posicao = new Point(PosicaoX + largura / 2, PosicaoY);
         }
 
         public override Elemento Clonar()

@@ -2,41 +2,24 @@ using Araci.Models.Tipos;
 
 namespace Araci.ViewModels
 {
-    public class TipoCargaViewModel
-        : TipoElementoViewModel
+    public class TipoCargaViewModel : TipoElementoViewModel
     {
-        // =========================
-        // TIPO FORTE
-        // =========================
-
-        protected TipoCarga TipoCarga =>
-            (TipoCarga)_tipo;
-
-        // =========================
-        // CONSTRUTOR
-        // =========================
-
-        public TipoCargaViewModel(
-            TipoCarga tipo)
+        public TipoCargaViewModel(TipoCarga tipo)
             : base(tipo)
         {
         }
 
-        // =========================
-        // PROPRIEDADES
-        // =========================
+        protected TipoCarga TipoCarga => (TipoCarga)_tipo;
 
         public string ModeloCarga
         {
             get => TipoCarga.ModeloCarga;
-
             set
             {
                 if (TipoCarga.ModeloCarga == value)
                     return;
 
                 TipoCarga.ModeloCarga = value;
-
                 OnPropertyChanged();
             }
         }
@@ -44,29 +27,25 @@ namespace Araci.ViewModels
         public string Conexao
         {
             get => TipoCarga.Conexao;
-
             set
             {
                 if (TipoCarga.Conexao == value)
                     return;
 
                 TipoCarga.Conexao = value;
-
                 OnPropertyChanged();
             }
         }
 
-        public double TensaoKV
+        public string Tensao
         {
-            get => TipoCarga.TensaoKV;
-
+            get => TipoCarga.Tensao;
             set
             {
-                if (TipoCarga.TensaoKV == value)
+                if (TipoCarga.Tensao == value)
                     return;
 
-                TipoCarga.TensaoKV = value;
-
+                TipoCarga.Tensao = value;
                 OnPropertyChanged();
             }
         }
@@ -74,14 +53,12 @@ namespace Araci.ViewModels
         public int Fases
         {
             get => TipoCarga.Fases;
-
             set
             {
                 if (TipoCarga.Fases == value)
                     return;
 
                 TipoCarga.Fases = value;
-
                 OnPropertyChanged();
             }
         }
@@ -89,14 +66,12 @@ namespace Araci.ViewModels
         public double FatorPotencia
         {
             get => TipoCarga.FatorPotencia;
-
             set
             {
                 if (TipoCarga.FatorPotencia == value)
                     return;
 
                 TipoCarga.FatorPotencia = value;
-
                 OnPropertyChanged();
             }
         }
