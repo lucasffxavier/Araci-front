@@ -1,7 +1,8 @@
-using System.Collections.Generic;
+using System;
 using System.Linq;
+using System.Threading.Tasks;
 using Araci.API;
-using Araci.Maestro;
+using Araci.DTOs;
 using Araci.Models;
 using Araci.Services;
 
@@ -13,27 +14,53 @@ namespace Araci.Applications.Analisar.FluxoDeCorrente
 
         public FluxoDeCorrenteApplication(EditorContext context)
         {
-            _context = context ?? throw new System.ArgumentNullException(nameof(context));
+            _context = context ?? throw new ArgumentNullException(nameof(context));
         }
+
+        public SimulationResultDto Resultado { get; private set; } = new();
 
         public void Executar()
         {
+            ExecutarAsync().GetAwaiter().GetResult();
+        }
+
+        public async Task ExecutarAsync()
+        {
             CoreApi api = new(_context);
-            CoreMaestro maestro = new(api);
+            ParameterReader reader = new(api);
+            CircuitBuilder builder = new(reader);
+            CircuitDto dto = builder.Build();
+            SimulationApiClient client = new();
 
-            IList<Elemento> elementos = maestro.ObterElementos()
-                .Where(elemento => elemento.PossuiParametro(Elemento.PARAM_NOME))
-                .ToList();
+            Resultado = await client.SimularTipadoAsync(dto);
 
-            IList<string> nomes = maestro.ObterValoresParametroTexto(
-                elementos,
-                Elemento.PARAM_NOME);
+            AplicarResultado(api, Resultado);
+        }
 
-            string mensagem = nomes.Count == 0
-                ? "Nenhum elemento encontrado no projeto."
-                : string.Join(System.Environment.NewLine, nomes);
+        private static void AplicarResultado(CoreApi api, SimulationResultDto resultado)
+        {
+            foreach (LineResultDto lineResult in resultado.Lines)
+            {
+                Cabo? cabo = api.ObterElementos<Cabo>()
+                    .FirstOrDefault(c => string.Equals(c.Id.ToString(), lineResult.Id, StringComparison.OrdinalIgnoreCase));
 
-            maestro.JanelaMensagem("Fluxo de corrente", mensagem);
+                if (cabo != null)
+                    cabo.CorrenteLinha = FormatCurrent(lineResult.Corrente);
+            }
+
+            foreach (LoadResultDto loadResult in resultado.Loads)
+            {
+                Carga? carga = api.ObterElementos<Carga>()
+                    .FirstOrDefault(c => string.Equals(c.Id.ToString(), loadResult.Id, StringComparison.OrdinalIgnoreCase));
+
+                if (carga != null)
+                    carga.CorrenteLinha = FormatCurrent(loadResult.Corrente);
+            }
+        }
+
+        private static string FormatCurrent(double corrente)
+        {
+            return $"{corrente:0.###} A";
         }
     }
 }

@@ -15,13 +15,13 @@ namespace Araci.Ribbon.Tabs
         private EditorContext? Context =>
             DataContext as EditorContext;
 
-        private void FluxoButton_Click(object sender, RoutedEventArgs e)
+        private async void FluxoButton_Click(object sender, RoutedEventArgs e)
         {
             if (Context == null) return;
 
             FluxoDeCorrenteApplication app = new(Context);
 
-            app.Executar();
+            await app.ExecutarAsync();
         }
     }
 }
