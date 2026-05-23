@@ -1,5 +1,3 @@
-// Applications/Diagrama/InserirCabo/InserirCabo.cs
-
 using System.Windows;
 using System.Windows.Input;
 using Araci.Applications.Editar.Base;
@@ -22,7 +20,8 @@ namespace Araci.Applications.Diagrama.InserirCabo
 
         public void Executar()
         {
-            _context.Input.ToolAtual = new InserirCaboTool(_context);
+            _context.Input.ToolAtual =
+                new InserirCaboTool(_context);
         }
     }
 
@@ -31,7 +30,6 @@ namespace Araci.Applications.Diagrama.InserirCabo
         private readonly EditorContext _context;
 
         private CaboViewModel? _caboAtual;
-
         private bool _inserindo;
 
         public InserirCaboTool(EditorContext context)
@@ -135,7 +133,7 @@ namespace Araci.Applications.Diagrama.InserirCabo
                 case ElementoEquipamento equipamento:
 
                     _caboAtual.BarraOrigem =
-                        equipamento.Barra;
+                        equipamento.Nome;
 
                     break;
 
@@ -164,7 +162,7 @@ namespace Araci.Applications.Diagrama.InserirCabo
                 case ElementoEquipamento equipamento:
 
                     _caboAtual.BarraDestino =
-                        equipamento.Barra;
+                        equipamento.Nome;
 
                     break;
 
@@ -204,7 +202,6 @@ namespace Araci.Applications.Diagrama.InserirCabo
             _caboAtual?.RemoverPreview();
 
             _caboAtual = null;
-
             _inserindo = false;
         }
     }

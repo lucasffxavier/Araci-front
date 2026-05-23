@@ -7,20 +7,28 @@ namespace Araci.ViewModels
 {
     public class CargaViewModel : ElementoViewModel
     {
-        public CargaViewModel(Carga modelo, TypeLibraryService types)
-            : base(modelo, new EquipamentoNode(modelo), types)
+        public CargaViewModel(
+            Carga modelo,
+            TypeLibraryService types)
+            : base(
+                modelo,
+                new EquipamentoNode(modelo),
+                types)
         {
             SelecionarPrimeiroTipoDisponivel();
+
             AtualizarTerminais();
         }
 
         public Carga Carga => (Carga)Modelo;
 
-        public override IEnumerable TiposDisponiveis => Types.TiposCargas;
+        public override IEnumerable TiposDisponiveis =>
+            Types.TiposCargas;
 
         protected override void AtualizarNode()
         {
             base.AtualizarNode();
+
             AtualizarTerminais();
         }
 
@@ -32,12 +40,14 @@ namespace Araci.ViewModels
         public double PotenciaAtivaKW
         {
             get => Carga.PotenciaAtivaKW;
+
             set
             {
                 if (Carga.PotenciaAtivaKW == value)
                     return;
 
                 Carga.PotenciaAtivaKW = value;
+
                 OnPropertyChanged();
             }
         }
@@ -45,12 +55,14 @@ namespace Araci.ViewModels
         public double PotenciaReativaKvar
         {
             get => Carga.PotenciaReativaKvar;
+
             set
             {
                 if (Carga.PotenciaReativaKvar == value)
                     return;
 
                 Carga.PotenciaReativaKvar = value;
+
                 OnPropertyChanged();
             }
         }
@@ -58,25 +70,14 @@ namespace Araci.ViewModels
         public string Nome
         {
             get => Carga.Nome;
+
             set
             {
                 if (Carga.Nome == value)
                     return;
 
                 Carga.Nome = value;
-                OnPropertyChanged();
-            }
-        }
 
-        public string Barra
-        {
-            get => Carga.Barra;
-            set
-            {
-                if (Carga.Barra == value)
-                    return;
-
-                Carga.Barra = value;
                 OnPropertyChanged();
                 NotificarParametros();
             }
@@ -85,12 +86,14 @@ namespace Araci.ViewModels
         public string Alimentador
         {
             get => Carga.Alimentador;
+
             set
             {
                 if (Carga.Alimentador == value)
                     return;
 
                 Carga.Alimentador = value;
+
                 OnPropertyChanged();
             }
         }

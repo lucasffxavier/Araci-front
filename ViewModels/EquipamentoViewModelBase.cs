@@ -35,19 +35,19 @@ namespace Araci.ViewModels
             }
         }
 
-        public string Barra
-        {
-            get => _equipamento.Barra;
-            set
-            {
-                if (_equipamento.Barra == value)
-                    return;
+        //public string Barra
+        //{
+        //    get => _equipamento.Barra;
+        //    set
+        //    {
+        //        if (_equipamento.Barra == value)
+        //            return;
 
-                _equipamento.Barra = value;
+        //        _equipamento.Barra = value;
 
-                OnPropertyChanged();
-            }
-        }
+        //        OnPropertyChanged();
+        //    }
+        //}
 
         public string Alimentador
         {

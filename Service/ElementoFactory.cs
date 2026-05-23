@@ -1,5 +1,4 @@
 using System;
-
 using Araci.Models;
 using Araci.ViewModels;
 
@@ -14,10 +13,6 @@ namespace Araci.Services
             _types = types
                 ?? throw new ArgumentNullException(nameof(types));
         }
-
-        // =========================
-        // VIEWMODEL
-        // =========================
 
         public ElementoViewModel? CriarViewModel(
             Elemento modelo)
@@ -36,22 +31,21 @@ namespace Araci.Services
                     gerador,
                     _types),
 
-                Barra barra => new BarraViewModel(barra, _types),
+                Barra barra => new BarraViewModel(
+                    barra,
+                    _types),
 
                 _ => null
             };
         }
-
-        // =========================
-        // CABO
-        // =========================
 
         public Cabo CriarCabo()
         {
             return new Cabo
             {
                 Tipo = _types.TipoCaboPadrao
-                    ?? throw new InvalidOperationException("Nenhum tipo de cabo cadastrado.")
+                    ?? throw new InvalidOperationException(
+                        "Nenhum tipo de cabo cadastrado.")
             };
         }
 
@@ -62,20 +56,14 @@ namespace Araci.Services
                 _types);
         }
 
-        // =========================
-        // CARGA
-        // =========================
-
         public Carga CriarCarga()
         {
-            var c = new Carga
+            return new Carga
             {
                 Tipo = _types.TipoCargaPadrao
-                    ?? throw new InvalidOperationException("Nenhum tipo de carga cadastrado.")
+                    ?? throw new InvalidOperationException(
+                        "Nenhum tipo de carga cadastrado.")
             };
-
-            c.Barra = "BUS-01";
-            return c;
         }
 
         public CargaViewModel CriarCargaVM()
@@ -85,20 +73,14 @@ namespace Araci.Services
                 _types);
         }
 
-        // =========================
-        // GERADOR
-        // =========================
-
         public Gerador CriarGerador()
         {
-            var g = new Gerador
+            return new Gerador
             {
                 Tipo = _types.TipoGeradorPadrao
-                    ?? throw new InvalidOperationException("Nenhum tipo de gerador cadastrado.")
+                    ?? throw new InvalidOperationException(
+                        "Nenhum tipo de gerador cadastrado.")
             };
-
-            g.Barra = "Fonte-001";
-            return g;
         }
 
         public GeradorViewModel CriarGeradorVM()
@@ -113,7 +95,8 @@ namespace Araci.Services
             return new Barra
             {
                 Tipo = _types.TipoBarraPadrao
-                    ?? throw new InvalidOperationException("Nenhum tipo de barra cadastrado.")
+                    ?? throw new InvalidOperationException(
+                        "Nenhum tipo de barra cadastrado.")
             };
         }
 

@@ -1,12 +1,10 @@
 ﻿using System.Collections.Generic;
 using System.Windows;
-using Araci.Models.Tipos;
 
 namespace Araci.Models
 {
     public abstract class ElementoEquipamento : Elemento, ITerminalOwner
     {
-        public const string PARAM_BARRA = "Barra";
         public const string PARAM_ALIMENTADOR = "Alimentador";
         public const string PARAM_POTENCIA_KW = "PotenciaAtivaKW";
 
@@ -16,10 +14,20 @@ namespace Araci.Models
 
         protected ElementoEquipamento()
         {
-            DefinirParametro(new Parameter<string>(PARAM_NOME, string.Empty));
-            DefinirParametro(new Parameter<string>(PARAM_BARRA, string.Empty));
-            DefinirParametro(new Parameter<string>(PARAM_ALIMENTADOR, string.Empty));
-            DefinirParametro(new Parameter<double>(PARAM_POTENCIA_KW, 0));
+            DefinirParametro(
+                new Parameter<string>(
+                    PARAM_NOME,
+                    string.Empty));
+
+            DefinirParametro(
+                new Parameter<string>(
+                    PARAM_ALIMENTADOR,
+                    string.Empty));
+
+            DefinirParametro(
+                new Parameter<double>(
+                    PARAM_POTENCIA_KW,
+                    0));
 
             CriarTerminalInicial();
         }
@@ -27,19 +35,16 @@ namespace Araci.Models
         private void CriarTerminalInicial()
         {
             _terminais.Clear();
-            _terminais.Add(new Terminal(this, new Point(PosicaoX, PosicaoY)));
+
+            _terminais.Add(
+                new Terminal(
+                    this,
+                    new Point(PosicaoX, PosicaoY)));
         }
 
-        // 🔥 NOVO: acesso controlado para classes derivadas
         protected List<Terminal> ObterTerminaisInternos()
         {
             return _terminais;
-        }
-
-        public string Barra
-        {
-            get => Obter<string>(PARAM_BARRA);
-            set => Definir(PARAM_BARRA, value);
         }
 
         public string Alimentador
@@ -54,7 +59,8 @@ namespace Araci.Models
             set => Definir(PARAM_POTENCIA_KW, value);
         }
 
-        protected void CopiarEquipamentoPara(ElementoEquipamento destino)
+        protected void CopiarEquipamentoPara(
+            ElementoEquipamento destino)
         {
             CopiarBasePara(destino);
 
