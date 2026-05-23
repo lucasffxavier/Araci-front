@@ -1,4 +1,3 @@
-﻿
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -78,6 +77,11 @@ namespace Araci.API
             ValidarElemento(elemento);
 
             return elemento.Obter<T>(nomeParametro);
+        }
+
+        public int ObterValorParametroInteiro(Elemento elemento, string nomeParametro)
+        {
+            return ObterValorParametro<int>(elemento, nomeParametro);
         }
 
         public string ObterValorParametroTexto(Elemento elemento, string nomeParametro)

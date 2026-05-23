@@ -11,7 +11,7 @@ namespace Araci.ViewModels
 
         protected TipoCarga TipoCarga => (TipoCarga)_tipo;
 
-        public string ModeloCarga
+        public int ModeloCarga
         {
             get => TipoCarga.ModeloCarga;
             set

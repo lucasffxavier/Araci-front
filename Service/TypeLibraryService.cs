@@ -57,7 +57,7 @@ namespace Araci.Services
                     NomeTipo = "Carga MT",
                     Familia = "Cargas",
                     Categoria = "Cargas",
-                    ModeloCarga = "Potencia Constante",
+                    ModeloCarga = 1,
                     Conexao = "Wye",
                     Tensao = "13.8",
                     Fases = 3,

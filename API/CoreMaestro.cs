@@ -1,4 +1,3 @@
-﻿
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -81,6 +80,16 @@ namespace Araci.Maestro
 
             return elementos
                 .Select(elemento => _api.ObterValorParametro(elemento, nomeParametro))
+                .ToList();
+        }
+
+        public IList<int> ObterValoresParametroInteiro(IList<Elemento> elementos, string nomeParametro)
+        {
+            if (elementos == null)
+                throw new ArgumentNullException(nameof(elementos));
+
+            return elementos
+                .Select(elemento => _api.ObterValorParametroInteiro(elemento, nomeParametro))
                 .ToList();
         }
 

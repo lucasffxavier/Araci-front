@@ -14,16 +14,16 @@ namespace Araci.Models.Tipos
             Familia = "Cargas";
             Categoria = "Cargas";
 
-            DefinirParametro(new Parameter<string>(PARAM_MODELO_CARGA, "Potencia Constante"));
+            DefinirParametro(new Parameter<int>(PARAM_MODELO_CARGA, 1));
             DefinirParametro(new Parameter<string>(PARAM_CONEXAO, "Wye"));
             DefinirParametro(new Parameter<string>(PARAM_TENSAO, "13.8"));
             DefinirParametro(new Parameter<int>(PARAM_FASES, 3));
             DefinirParametro(new Parameter<double>(PARAM_FATOR_POTENCIA, 0.96));
         }
 
-        public string ModeloCarga
+        public int ModeloCarga
         {
-            get => Obter<string>(PARAM_MODELO_CARGA);
+            get => Obter<int>(PARAM_MODELO_CARGA);
             set => Definir(PARAM_MODELO_CARGA, value);
         }
 
