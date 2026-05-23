@@ -19,7 +19,8 @@ namespace Araci.Applications.Analisar.FluxoPotencia
 
         public async Task ExecutarAsync()
         {
-            CircuitBuilder builder = new(_context);
+            ParameterReader reader = new(_context);
+            CircuitBuilder builder = new(reader);
             CircuitDto dto = builder.Build();
 
             SimulationApiClient client = new();
