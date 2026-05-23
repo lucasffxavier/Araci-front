@@ -73,6 +73,16 @@ namespace Araci.Maestro
                 .ToList();
         }
 
+        public object? ObterValorParametro(Elemento elemento, string nomeParametro)
+        {
+            return _api.ObterValorParametro(elemento, nomeParametro);
+        }
+
+        public int ObterValorParametroInteiro(Elemento elemento, string nomeParametro)
+        {
+            return _api.ObterValorParametroInteiro(elemento, nomeParametro);
+        }
+
         public IList<object?> ObterValoresParametro(IList<Elemento> elementos, string nomeParametro)
         {
             if (elementos == null)
@@ -86,7 +96,7 @@ namespace Araci.Maestro
         public IList<int> ObterValoresParametroInteiro(IList<Elemento> elementos, string nomeParametro)
         {
             if (elementos == null)
-                throw new ArgumentNullException(nameof(elementos));
+                return new List<int>();
 
             return elementos
                 .Select(elemento => _api.ObterValorParametroInteiro(elemento, nomeParametro))

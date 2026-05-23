@@ -20,7 +20,7 @@ namespace Araci.Models
             DefinirParametro(new Parameter<double>(PARAM_POTENCIA_APARENTE, 0));
 
             Nome = "GERADOR-001";
-            Alimentador = "AL-01";
+            Alimentador = 1;
             PotenciaAparente = 5100;
             PotenciaAtiva = 5000;
             PotenciaReativa = 995;

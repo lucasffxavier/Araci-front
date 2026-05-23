@@ -81,7 +81,25 @@ namespace Araci.API
 
         public int ObterValorParametroInteiro(Elemento elemento, string nomeParametro)
         {
-            return ObterValorParametro<int>(elemento, nomeParametro);
+            if (elemento == null || string.IsNullOrWhiteSpace(nomeParametro))
+                return 0;
+
+            if (!elemento.Parametros.TryGetValue(nomeParametro, out var parametro))
+                return 0;
+
+            try
+            {
+                if (parametro is Parameter<int> inteiro)
+                    return inteiro.Valor;
+
+                return parametro.ValorObjeto is int valor
+                    ? valor
+                    : 0;
+            }
+            catch
+            {
+                return 0;
+            }
         }
 
         public string ObterValorParametroTexto(Elemento elemento, string nomeParametro)

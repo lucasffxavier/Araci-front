@@ -60,7 +60,7 @@ namespace Araci.ViewModels
             }
         }
 
-        public string Alimentador
+        public int Alimentador
         {
             get => Carga.Alimentador;
             set

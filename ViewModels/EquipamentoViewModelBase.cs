@@ -29,7 +29,7 @@ namespace Araci.ViewModels
             }
         }
 
-        public string Alimentador
+        public int Alimentador
         {
             get => _equipamento.Alimentador;
             set

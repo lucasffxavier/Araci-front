@@ -22,7 +22,7 @@ namespace Araci.Models
         protected ElementoEquipamento()
         {
             DefinirParametro(new Parameter<string>(PARAM_NOME, string.Empty));
-            DefinirParametro(new Parameter<string>(PARAM_ALIMENTADOR, string.Empty));
+            DefinirParametro(new Parameter<int>(PARAM_ALIMENTADOR, 0));
             DefinirParametro(new Parameter<double>(PARAM_POTENCIA_ATIVA, 0));
             DefinirParametro(new Parameter<double>(PARAM_POTENCIA_REATIVA, 0));
             DefinirParametro(new Parameter<string>(PARAM_TENSAO_LINHA, string.Empty));
@@ -39,10 +39,10 @@ namespace Araci.Models
 
         public IReadOnlyList<Terminal> Terminais => _terminais;
 
-        public string Alimentador
+        public int Alimentador
         {
-            get => Obter<string>(PARAM_ALIMENTADOR);
-            set => Definir(PARAM_ALIMENTADOR, value);
+            get => Obter<int>(PARAM_ALIMENTADOR);
+            set => Definir(PARAM_ALIMENTADOR, value < 0 ? 0 : value);
         }
 
         public double PotenciaAtiva

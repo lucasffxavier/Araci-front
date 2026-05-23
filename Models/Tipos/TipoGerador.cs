@@ -20,13 +20,13 @@ namespace Araci.Models.Tipos
         public int Fases
         {
             get => Obter<int>(PARAM_FASES);
-            set => Definir(PARAM_FASES, value);
+            set => Definir(PARAM_FASES, value <= 0 ? 1 : value);
         }
 
         public int ModeloFonte
         {
             get => Obter<int>(PARAM_MODELO_FONTE);
-            set => Definir(PARAM_MODELO_FONTE, value);
+            set => Definir(PARAM_MODELO_FONTE, value < 0 ? 0 : value);
         }
 
         public double FatorPotencia

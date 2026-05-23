@@ -5,6 +5,8 @@ namespace Araci.Models.Tipos
         public const string PARAM_CLASSE_TENSAO = "ClasseTensao";
         public const string PARAM_FASES = "Fases";
 
+        private int _numeroConexoes = 6;
+
         public TipoBarra()
         {
             NomeTipo = "Barra Vertical";
@@ -24,11 +26,15 @@ namespace Araci.Models.Tipos
         public int Fases
         {
             get => Obter<int>(PARAM_FASES);
-            set => Definir(PARAM_FASES, value);
+            set => Definir(PARAM_FASES, value <= 0 ? 1 : value);
         }
 
         public double AlturaPadrao { get; set; } = 120;
 
-        public int NumeroConexoes { get; set; } = 6;
+        public int NumeroConexoes
+        {
+            get => _numeroConexoes;
+            set => _numeroConexoes = value <= 0 ? 1 : value;
+        }
     }
 }

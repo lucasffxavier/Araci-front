@@ -30,7 +30,7 @@ namespace Araci.Models.Tipos
         public int Fases
         {
             get => Obter<int>(PARAM_FASES);
-            set => Definir(PARAM_FASES, value);
+            set => Definir(PARAM_FASES, value <= 0 ? 1 : value);
         }
 
         public double R1

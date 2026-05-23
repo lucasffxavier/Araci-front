@@ -10,7 +10,7 @@ namespace Araci.Models
         public Carga()
         {
             Nome = "CARGA-01";
-            Alimentador = "AL-01";
+            Alimentador = 1;
             PotenciaAtiva = 1500;
             PotenciaReativa = 450;
             CorrenteLinha = "0∠0°";

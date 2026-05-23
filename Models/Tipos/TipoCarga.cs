@@ -24,7 +24,7 @@ namespace Araci.Models.Tipos
         public int ModeloCarga
         {
             get => Obter<int>(PARAM_MODELO_CARGA);
-            set => Definir(PARAM_MODELO_CARGA, value);
+            set => Definir(PARAM_MODELO_CARGA, value < 0 ? 0 : value);
         }
 
         public string Conexao
@@ -42,7 +42,7 @@ namespace Araci.Models.Tipos
         public int Fases
         {
             get => Obter<int>(PARAM_FASES);
-            set => Definir(PARAM_FASES, value);
+            set => Definir(PARAM_FASES, value <= 0 ? 1 : value);
         }
 
         public double FatorPotencia
