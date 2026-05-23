@@ -10,31 +10,17 @@ namespace Araci.Services
 
         public ElementoFactory(TypeLibraryService types)
         {
-            _types = types
-                ?? throw new ArgumentNullException(nameof(types));
+            _types = types ?? throw new ArgumentNullException(nameof(types));
         }
 
-        public ElementoViewModel? CriarViewModel(
-            Elemento modelo)
+        public ElementoViewModel? CriarViewModel(Elemento modelo)
         {
             return modelo switch
             {
-                Cabo cabo => new CaboViewModel(
-                    cabo,
-                    _types),
-
-                Carga carga => new CargaViewModel(
-                    carga,
-                    _types),
-
-                Gerador gerador => new GeradorViewModel(
-                    gerador,
-                    _types),
-
-                Barra barra => new BarraViewModel(
-                    barra,
-                    _types),
-
+                Cabo cabo => new CaboViewModel(cabo, _types),
+                Carga carga => new CargaViewModel(carga, _types),
+                Gerador gerador => new GeradorViewModel(gerador, _types),
+                Barra barra => new BarraViewModel(barra, _types),
                 _ => null
             };
         }
@@ -44,16 +30,13 @@ namespace Araci.Services
             return new Cabo
             {
                 Tipo = _types.TipoCaboPadrao
-                    ?? throw new InvalidOperationException(
-                        "Nenhum tipo de cabo cadastrado.")
+                    ?? throw new InvalidOperationException("Nenhum tipo de cabo cadastrado.")
             };
         }
 
         public CaboViewModel CriarCaboVM()
         {
-            return new CaboViewModel(
-                CriarCabo(),
-                _types);
+            return new CaboViewModel(CriarCabo(), _types);
         }
 
         public Carga CriarCarga()
@@ -61,16 +44,13 @@ namespace Araci.Services
             return new Carga
             {
                 Tipo = _types.TipoCargaPadrao
-                    ?? throw new InvalidOperationException(
-                        "Nenhum tipo de carga cadastrado.")
+                    ?? throw new InvalidOperationException("Nenhum tipo de carga cadastrado.")
             };
         }
 
         public CargaViewModel CriarCargaVM()
         {
-            return new CargaViewModel(
-                CriarCarga(),
-                _types);
+            return new CargaViewModel(CriarCarga(), _types);
         }
 
         public Gerador CriarGerador()
@@ -78,16 +58,13 @@ namespace Araci.Services
             return new Gerador
             {
                 Tipo = _types.TipoGeradorPadrao
-                    ?? throw new InvalidOperationException(
-                        "Nenhum tipo de gerador cadastrado.")
+                    ?? throw new InvalidOperationException("Nenhum tipo de gerador cadastrado.")
             };
         }
 
         public GeradorViewModel CriarGeradorVM()
         {
-            return new GeradorViewModel(
-                CriarGerador(),
-                _types);
+            return new GeradorViewModel(CriarGerador(), _types);
         }
 
         public Barra CriarBarra()
@@ -95,16 +72,13 @@ namespace Araci.Services
             return new Barra
             {
                 Tipo = _types.TipoBarraPadrao
-                    ?? throw new InvalidOperationException(
-                        "Nenhum tipo de barra cadastrado.")
+                    ?? throw new InvalidOperationException("Nenhum tipo de barra cadastrado.")
             };
         }
 
         public BarraViewModel CriarBarraVM()
         {
-            return new BarraViewModel(
-                CriarBarra(),
-                _types);
+            return new BarraViewModel(CriarBarra(), _types);
         }
     }
 }

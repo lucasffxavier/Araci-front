@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections;
 using System.Collections.ObjectModel;
 using System.Linq;
@@ -19,21 +19,15 @@ namespace Araci.ViewModels
     public abstract class ElementoViewModel : ViewModelBase
     {
         private readonly ElementoNode _node;
-
         private ICommand? _abrirPropriedadesTipoCommand;
         private ObservableCollection<ParameterViewModel>? _parametros;
 
-        protected ElementoViewModel(
-            Elemento modelo,
-            ElementoNode node,
-            TypeLibraryService types)
+        protected ElementoViewModel(Elemento modelo, ElementoNode node, TypeLibraryService types)
         {
             Modelo = modelo ?? throw new ArgumentNullException(nameof(modelo));
             _node = node ?? throw new ArgumentNullException(nameof(node));
             Types = types ?? throw new ArgumentNullException(nameof(types));
-
             VisualState = new ElementoVisualState();
-
             _node.AtualizarGeometria();
         }
 
@@ -52,13 +46,115 @@ namespace Araci.ViewModels
                     return;
 
                 Modelo.Tipo = value;
-
                 OnPropertyChanged();
                 OnPropertyChanged(nameof(TipoViewModel));
             }
         }
 
         public abstract IEnumerable TiposDisponiveis { get; }
+
+        public virtual TipoElementoViewModel? TipoViewModel =>
+            TipoElementoViewModelFactory.Criar(Tipo);
+
+        public ICommand AbrirPropriedadesTipoCommand =>
+            _abrirPropriedadesTipoCommand ??= new RelayCommand(AbrirPropriedadesTipo);
+
+        public ElementoVisualState VisualState { get; }
+
+        public bool IsSelecionado
+        {
+            get => VisualState.IsSelecionado;
+            set
+            {
+                if (VisualState.IsSelecionado == value)
+                    return;
+
+                VisualState.AtualizarSelecao(value);
+                OnPropertyChanged();
+                OnPropertyChanged(nameof(Stroke));
+                OnPropertyChanged(nameof(StrokeThickness));
+                OnPropertyChanged(nameof(RenderData));
+            }
+        }
+
+        public bool IsHover
+        {
+            get => VisualState.IsHover;
+            set
+            {
+                if (VisualState.IsHover == value)
+                    return;
+
+                VisualState.AtualizarHover(value);
+                OnPropertyChanged();
+                OnPropertyChanged(nameof(Stroke));
+                OnPropertyChanged(nameof(StrokeThickness));
+                OnPropertyChanged(nameof(RenderData));
+            }
+        }
+
+        public Brush Stroke => VisualState.Stroke;
+
+        public double StrokeThickness => VisualState.StrokeThickness;
+
+        public virtual ElementoRenderData RenderData => new(
+            Largura,
+            Altura,
+            PontoLocalInicial,
+            PontoLocalFinal,
+            Stroke,
+            StrokeThickness);
+
+        public virtual double X
+        {
+            get => Node.X;
+            set
+            {
+                if (Math.Abs(Node.X - value) < 0.0001)
+                    return;
+
+                Node.X = value;
+                AtualizarNode();
+            }
+        }
+
+        public virtual double Y
+        {
+            get => Node.Y;
+            set
+            {
+                if (Math.Abs(Node.Y - value) < 0.0001)
+                    return;
+
+                Node.Y = value;
+                AtualizarNode();
+            }
+        }
+
+        public virtual double WorldX => Node.X;
+
+        public virtual double WorldY => Node.Y;
+
+        public virtual double Largura => Node.Largura;
+
+        public virtual double Altura
+        {
+            get => Node.Altura;
+            set { }
+        }
+
+        public virtual Rect Bounds => Node.Bounds;
+
+        public virtual Point Centro => Node.Centro;
+
+        public ObservableCollection<ParameterViewModel> Parametros =>
+            _parametros ??=
+            new ObservableCollection<ParameterViewModel>(
+                Modelo.Parametros.Values.Select(p => new ParameterViewModel(p)));
+
+        protected virtual Point PontoLocalInicial => new(0, 0);
+
+        protected virtual Point PontoLocalFinal => new(Largura, Altura);
 
         protected void SelecionarPrimeiroTipoDisponivel()
         {
@@ -85,120 +181,35 @@ namespace Araci.ViewModels
             Tipo = primeiroTipo;
         }
 
-        public virtual TipoElementoViewModel? TipoViewModel =>
-            TipoElementoViewModelFactory.Criar(Tipo);
-
-        public ICommand AbrirPropriedadesTipoCommand =>
-            _abrirPropriedadesTipoCommand ??=
-            new RelayCommand(AbrirPropriedadesTipo);
-
-        private void AbrirPropriedadesTipo()
+        public virtual void Mover(Vector delta)
         {
-            var janela = new TypePropertiesWindow
-            {
-                Owner = Application.Current.MainWindow,
-                DataContext = TipoViewModel
-            };
-
-            janela.ShowDialog();
+            Node.Mover(delta);
+            NotificarGeometria();
         }
 
-        public ElementoVisualState VisualState { get; }
-
-        public bool IsSelecionado
+        public virtual ElementoEstado CapturarEstado()
         {
-            get => VisualState.IsSelecionado;
-            set
-            {
-                if (VisualState.IsSelecionado == value)
-                    return;
-
-                VisualState.AtualizarSelecao(value);
-
-                OnPropertyChanged();
-                OnPropertyChanged(nameof(Stroke));
-                OnPropertyChanged(nameof(StrokeThickness));
-                OnPropertyChanged(nameof(RenderData));
-            }
+            return new ElementoEstado(X, Y);
         }
 
-        public bool IsHover
+        public virtual void AplicarEstado(ElementoEstado estado)
         {
-            get => VisualState.IsHover;
-            set
-            {
-                if (VisualState.IsHover == value)
-                    return;
-
-                VisualState.AtualizarHover(value);
-
-                OnPropertyChanged();
-                OnPropertyChanged(nameof(Stroke));
-                OnPropertyChanged(nameof(StrokeThickness));
-                OnPropertyChanged(nameof(RenderData));
-            }
+            Node.X = estado.X;
+            Node.Y = estado.Y;
+            AtualizarNode();
         }
 
-        public Brush Stroke => VisualState.Stroke;
-
-        public double StrokeThickness => VisualState.StrokeThickness;
-
-        public virtual ElementoRenderData RenderData => new(
-            Largura,
-            Altura,
-            PontoLocalInicial,
-            PontoLocalFinal,
-            Stroke,
-            StrokeThickness);
-
-        protected virtual Point PontoLocalInicial => new(0, 0);
-
-        protected virtual Point PontoLocalFinal => new(Largura, Altura);
-
-        public virtual double X
+        public virtual void NotificarParametros()
         {
-            get => Node.X;
-            set
-            {
-                if (Math.Abs(Node.X - value) < 0.0001)
-                    return;
+            foreach (var parametro in Parametros)
+                parametro.Atualizar();
 
-                Node.X = value;
-
-                AtualizarNode();
-            }
+            OnPropertyChanged(nameof(Parametros));
         }
-
-        public virtual double Y
-        {
-            get => Node.Y;
-            set
-            {
-                if (Math.Abs(Node.Y - value) < 0.0001)
-                    return;
-
-                Node.Y = value;
-
-                AtualizarNode();
-            }
-        }
-
-        public virtual double WorldX => Node.X;
-
-        public virtual double WorldY => Node.Y;
-
-        public virtual double Largura => Node.Largura;
-
-        public virtual double Altura => Node.Altura;
-
-        public virtual Rect Bounds => Node.Bounds;
-
-        public virtual Point Centro => Node.Centro;
 
         protected virtual void AtualizarNode()
         {
             Node.AtualizarGeometria();
-
             NotificarGeometria();
         }
 
@@ -215,38 +226,15 @@ namespace Araci.ViewModels
             OnPropertyChanged(nameof(RenderData));
         }
 
-        public virtual void Mover(Vector delta)
+        private void AbrirPropriedadesTipo()
         {
-            Node.Mover(delta);
+            var janela = new TypePropertiesWindow
+            {
+                Owner = Application.Current.MainWindow,
+                DataContext = TipoViewModel
+            };
 
-            NotificarGeometria();
-        }
-
-        public virtual ElementoEstado CapturarEstado()
-        {
-            return new ElementoEstado(X, Y);
-        }
-
-        public virtual void AplicarEstado(ElementoEstado estado)
-        {
-            Node.X = estado.X;
-            Node.Y = estado.Y;
-
-            AtualizarNode();
-        }
-
-        public ObservableCollection<ParameterViewModel> Parametros =>
-            _parametros ??=
-            new ObservableCollection<ParameterViewModel>(
-                Modelo.Parametros.Values.Select(
-                    p => new ParameterViewModel(p)));
-
-        public virtual void NotificarParametros()
-        {
-            foreach (var parametro in Parametros)
-                parametro.Atualizar();
-
-            OnPropertyChanged(nameof(Parametros));
+            janela.ShowDialog();
         }
     }
 }

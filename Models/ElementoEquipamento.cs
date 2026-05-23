@@ -6,8 +6,8 @@ namespace Araci.Models
     public abstract class ElementoEquipamento : Elemento, ITerminalOwner
     {
         public const string PARAM_ALIMENTADOR = "Alimentador";
-        public const string PARAM_POTENCIA_ATIVA_KW = "PotenciaAtivaKW";
-        public const string PARAM_POTENCIA_REATIVA_KVAR = "PotenciaReativaKvar";
+        public const string PARAM_POTENCIA_ATIVA = "PotenciaAtiva";
+        public const string PARAM_POTENCIA_REATIVA = "PotenciaReativa";
         public const string PARAM_TENSAO_LINHA = "TensaoLinha";
         public const string PARAM_TENSAO_FASE_A = "TensaoFaseA";
         public const string PARAM_TENSAO_FASE_B = "TensaoFaseB";
@@ -23,8 +23,8 @@ namespace Araci.Models
         {
             DefinirParametro(new Parameter<string>(PARAM_NOME, string.Empty));
             DefinirParametro(new Parameter<string>(PARAM_ALIMENTADOR, string.Empty));
-            DefinirParametro(new Parameter<double>(PARAM_POTENCIA_ATIVA_KW, 0));
-            DefinirParametro(new Parameter<double>(PARAM_POTENCIA_REATIVA_KVAR, 0));
+            DefinirParametro(new Parameter<double>(PARAM_POTENCIA_ATIVA, 0));
+            DefinirParametro(new Parameter<double>(PARAM_POTENCIA_REATIVA, 0));
             DefinirParametro(new Parameter<string>(PARAM_TENSAO_LINHA, string.Empty));
             DefinirParametro(new Parameter<string>(PARAM_TENSAO_FASE_A, string.Empty));
             DefinirParametro(new Parameter<string>(PARAM_TENSAO_FASE_B, string.Empty));
@@ -45,16 +45,16 @@ namespace Araci.Models
             set => Definir(PARAM_ALIMENTADOR, value);
         }
 
-        public double PotenciaAtivaKW
+        public double PotenciaAtiva
         {
-            get => Obter<double>(PARAM_POTENCIA_ATIVA_KW);
-            set => Definir(PARAM_POTENCIA_ATIVA_KW, value);
+            get => Obter<double>(PARAM_POTENCIA_ATIVA);
+            set => Definir(PARAM_POTENCIA_ATIVA, value);
         }
 
-        public double PotenciaReativaKvar
+        public double PotenciaReativa
         {
-            get => Obter<double>(PARAM_POTENCIA_REATIVA_KVAR);
-            set => Definir(PARAM_POTENCIA_REATIVA_KVAR, value);
+            get => Obter<double>(PARAM_POTENCIA_REATIVA);
+            set => Definir(PARAM_POTENCIA_REATIVA, value);
         }
 
         public string TensaoLinha

@@ -33,43 +33,43 @@ namespace Araci.ViewModels
             }
         }
 
-        public double PotenciaAparenteKVA
+        public double PotenciaAparente
         {
-            get => Gerador.PotenciaAparenteKVA;
+            get => Gerador.PotenciaAparente;
             set
             {
-                if (Gerador.PotenciaAparenteKVA == value)
+                if (Gerador.PotenciaAparente == value)
                     return;
 
-                Gerador.PotenciaAparenteKVA = value;
+                Gerador.PotenciaAparente = value;
                 OnPropertyChanged();
                 NotificarParametros();
             }
         }
 
-        public double PotenciaAtivaKW
+        public double PotenciaAtiva
         {
-            get => Gerador.PotenciaAtivaKW;
+            get => Gerador.PotenciaAtiva;
             set
             {
-                if (Gerador.PotenciaAtivaKW == value)
+                if (Gerador.PotenciaAtiva == value)
                     return;
 
-                Gerador.PotenciaAtivaKW = value;
+                Gerador.PotenciaAtiva = value;
                 OnPropertyChanged();
                 NotificarParametros();
             }
         }
 
-        public double PotenciaReativaKvar
+        public double PotenciaReativa
         {
-            get => Gerador.PotenciaReativaKvar;
+            get => Gerador.PotenciaReativa;
             set
             {
-                if (Gerador.PotenciaReativaKvar == value)
+                if (Gerador.PotenciaReativa == value)
                     return;
 
-                Gerador.PotenciaReativaKvar = value;
+                Gerador.PotenciaReativa = value;
                 OnPropertyChanged();
                 NotificarParametros();
             }

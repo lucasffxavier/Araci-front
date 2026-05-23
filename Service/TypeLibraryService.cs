@@ -59,7 +59,7 @@ namespace Araci.Services
                     Categoria = "Cargas",
                     ModeloCarga = "Potencia Constante",
                     Conexao = "Wye",
-                    Tensao = "13.8 kV",
+                    Tensao = "13.8",
                     Fases = 3,
                     FatorPotencia = 0.96
                 });
@@ -85,6 +85,10 @@ namespace Araci.Services
                 new TipoBarra
                 {
                     NomeTipo = "Barra Vertical",
+                    Familia = "Barras",
+                    Categoria = "Barras",
+                    ClasseTensao = "13.8",
+                    Fases = 3,
                     AlturaPadrao = 120,
                     NumeroConexoes = 6
                 });

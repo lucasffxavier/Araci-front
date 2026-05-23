@@ -5,33 +5,33 @@ namespace Araci.Models
 {
     public class Gerador : ElementoEquipamento
     {
-        public const string PARAM_POTENCIA_APARENTE_KVA = "PotenciaAparenteKVA";
+        public const string PARAM_POTENCIA_APARENTE = "PotenciaAparente";
 
         public TipoGerador TipoGerador => (TipoGerador)Tipo!;
 
-        public double PotenciaAparenteKVA
+        public double PotenciaAparente
         {
-            get => Obter<double>(PARAM_POTENCIA_APARENTE_KVA);
-            set => Definir(PARAM_POTENCIA_APARENTE_KVA, value);
+            get => Obter<double>(PARAM_POTENCIA_APARENTE);
+            set => Definir(PARAM_POTENCIA_APARENTE, value);
         }
 
         public Gerador()
         {
-            DefinirParametro(new Parameter<double>(PARAM_POTENCIA_APARENTE_KVA, 0));
+            DefinirParametro(new Parameter<double>(PARAM_POTENCIA_APARENTE, 0));
 
             Nome = "GERADOR-001";
             Alimentador = "AL-01";
-            PotenciaAparenteKVA = 5100;
-            PotenciaAtivaKW = 5000;
-            PotenciaReativaKvar = 995;
-            TensaoLinha = "34.5 kV";
-            TensaoFaseA = "19.92 kV";
-            TensaoFaseB = "19.92 kV";
-            TensaoFaseC = "19.92 kV";
-            CorrenteLinha = "0 A";
-            CorrenteFaseA = "0 A";
-            CorrenteFaseB = "0 A";
-            CorrenteFaseC = "0 A";
+            PotenciaAparente = 5100;
+            PotenciaAtiva = 5000;
+            PotenciaReativa = 995;
+            TensaoLinha = "34.5∠0°";
+            TensaoFaseA = "19.92∠0°";
+            TensaoFaseB = "19.92∠-120°";
+            TensaoFaseC = "19.92∠120°";
+            CorrenteLinha = "0∠0°";
+            CorrenteFaseA = "0∠0°";
+            CorrenteFaseB = "0∠-120°";
+            CorrenteFaseC = "0∠120°";
 
             PosicaoX = 300;
             PosicaoY = 200;

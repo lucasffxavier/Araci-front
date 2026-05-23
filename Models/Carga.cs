@@ -11,16 +11,16 @@ namespace Araci.Models
         {
             Nome = "CARGA-01";
             Alimentador = "AL-01";
-            PotenciaAtivaKW = 1500;
-            PotenciaReativaKvar = 450;
-            CorrenteLinha = "0 A";
-            CorrenteFaseA = "0 A";
-            CorrenteFaseB = "0 A";
-            CorrenteFaseC = "0 A";
-            TensaoLinha = "13.8 kV";
-            TensaoFaseA = "7.97 kV";
-            TensaoFaseB = "7.97 kV";
-            TensaoFaseC = "7.97 kV";
+            PotenciaAtiva = 1500;
+            PotenciaReativa = 450;
+            CorrenteLinha = "0∠0°";
+            CorrenteFaseA = "0∠0°";
+            CorrenteFaseB = "0∠-120°";
+            CorrenteFaseC = "0∠120°";
+            TensaoLinha = "13.8∠0°";
+            TensaoFaseA = "7.97∠0°";
+            TensaoFaseB = "7.97∠-120°";
+            TensaoFaseC = "7.97∠120°";
 
             PosicaoX = 500;
             PosicaoY = 250;

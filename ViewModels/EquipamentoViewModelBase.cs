@@ -1,22 +1,16 @@
-﻿using Araci.Core.SceneNodes;
+using Araci.Core.SceneNodes;
 using Araci.Models;
 using Araci.Services;
 
 namespace Araci.ViewModels
 {
-    public abstract class EquipamentoViewModelBase<T>
-        : ElementoViewModel
+    public abstract class EquipamentoViewModelBase<T> : ElementoViewModel
         where T : ElementoEquipamento
     {
         protected readonly T _equipamento;
 
-        protected EquipamentoViewModelBase(
-            T equipamento,
-            TypeLibraryService types)
-            : base(
-                equipamento,
-                new EquipamentoNode(equipamento),
-                types)
+        protected EquipamentoViewModelBase(T equipamento, TypeLibraryService types)
+            : base(equipamento, new EquipamentoNode(equipamento), types)
         {
             _equipamento = equipamento;
         }
@@ -30,24 +24,10 @@ namespace Araci.ViewModels
                     return;
 
                 _equipamento.Nome = value;
-
                 OnPropertyChanged();
+                NotificarParametros();
             }
         }
-
-        //public string Barra
-        //{
-        //    get => _equipamento.Barra;
-        //    set
-        //    {
-        //        if (_equipamento.Barra == value)
-        //            return;
-
-        //        _equipamento.Barra = value;
-
-        //        OnPropertyChanged();
-        //    }
-        //}
 
         public string Alimentador
         {
@@ -58,22 +38,22 @@ namespace Araci.ViewModels
                     return;
 
                 _equipamento.Alimentador = value;
-
                 OnPropertyChanged();
+                NotificarParametros();
             }
         }
 
-        public double PotenciaAtivaKW
+        public double PotenciaAtiva
         {
-            get => _equipamento.PotenciaAtivaKW;
+            get => _equipamento.PotenciaAtiva;
             set
             {
-                if (_equipamento.PotenciaAtivaKW == value)
+                if (_equipamento.PotenciaAtiva == value)
                     return;
 
-                _equipamento.PotenciaAtivaKW = value;
-
+                _equipamento.PotenciaAtiva = value;
                 OnPropertyChanged();
+                NotificarParametros();
             }
         }
     }

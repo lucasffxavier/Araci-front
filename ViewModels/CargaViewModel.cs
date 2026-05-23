@@ -32,29 +32,29 @@ namespace Araci.ViewModels
             }
         }
 
-        public double PotenciaAtivaKW
+        public double PotenciaAtiva
         {
-            get => Carga.PotenciaAtivaKW;
+            get => Carga.PotenciaAtiva;
             set
             {
-                if (Carga.PotenciaAtivaKW == value)
+                if (Carga.PotenciaAtiva == value)
                     return;
 
-                Carga.PotenciaAtivaKW = value;
+                Carga.PotenciaAtiva = value;
                 OnPropertyChanged();
                 NotificarParametros();
             }
         }
 
-        public double PotenciaReativaKvar
+        public double PotenciaReativa
         {
-            get => Carga.PotenciaReativaKvar;
+            get => Carga.PotenciaReativa;
             set
             {
-                if (Carga.PotenciaReativaKvar == value)
+                if (Carga.PotenciaReativa == value)
                     return;
 
-                Carga.PotenciaReativaKvar = value;
+                Carga.PotenciaReativa = value;
                 OnPropertyChanged();
                 NotificarParametros();
             }
