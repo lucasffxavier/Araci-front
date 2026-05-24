@@ -1,7 +1,9 @@
 using System;
 using System.Globalization;
+using System.IO;
 using System.Linq;
 using System.Text;
+using System.Text.Json;
 using System.Threading.Tasks;
 using System.Windows;
 using Araci.API;
@@ -28,8 +30,20 @@ namespace Araci.Applications.Analisar.FluxoDeCorrente
             ExecutarAsync().GetAwaiter().GetResult();
         }
 
-        public async Task ExecutarAsync()
+        public Task ExecutarAsync()
         {
+            return ExecuteCoreAsync(null);
+        }
+
+        public async Task ExecutarAsync(FluxoDeCorrenteOptions options)
+        {
+            await ExecuteCoreAsync(options);
+        }
+
+        private async Task ExecuteCoreAsync(FluxoDeCorrenteOptions? options)
+        {
+            string? dssPath = null;
+
             try
             {
                 CoreApi api = new(_context);
@@ -42,7 +56,11 @@ namespace Araci.Applications.Analisar.FluxoDeCorrente
 
                 AplicarResultado(api, Resultado);
                 NotificarViewModels();
-                MostrarResultado(Resultado);
+
+                if (options != null)
+                    dssPath = SalvarArquivos(options, Resultado);
+
+                MostrarResultado(Resultado, dssPath);
             }
             catch (Exception ex)
             {
@@ -122,7 +140,72 @@ namespace Araci.Applications.Analisar.FluxoDeCorrente
                 angle);
         }
 
-        private static void MostrarResultado(SimulationResultDto resultado)
+        private static string? SalvarArquivos(FluxoDeCorrenteOptions options, SimulationResultDto resultado)
+        {
+            try
+            {
+                Directory.CreateDirectory(options.PastaSaida);
+
+                string baseName = SanitizarNomeArquivo(options.NomeArquivo);
+                string dssFileName = baseName.EndsWith(".dss", StringComparison.OrdinalIgnoreCase)
+                    ? baseName
+                    : $"{baseName}.dss";
+
+                string jsonBaseName = Path.GetFileNameWithoutExtension(dssFileName);
+                string dssPath = Path.Combine(options.PastaSaida, dssFileName);
+                string jsonPath = Path.Combine(options.PastaSaida, $"{jsonBaseName}_resultado.json");
+
+                if ((File.Exists(dssPath) || File.Exists(jsonPath)) && !ConfirmarSubstituicao())
+                    return null;
+
+                File.WriteAllText(dssPath, resultado.Script, Encoding.UTF8);
+
+                var jsonOptions = new JsonSerializerOptions
+                {
+                    WriteIndented = true
+                };
+
+                string json = JsonSerializer.Serialize(resultado, jsonOptions);
+                File.WriteAllText(jsonPath, json, Encoding.UTF8);
+
+                return dssPath;
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show(
+                    $"A simulação foi aplicada, mas não foi possível salvar os arquivos.\n\n{ex.Message}",
+                    "Fluxo de corrente",
+                    MessageBoxButton.OK,
+                    MessageBoxImage.Warning);
+
+                return null;
+            }
+        }
+
+        private static bool ConfirmarSubstituicao()
+        {
+            MessageBoxResult result = MessageBox.Show(
+                "Um ou mais arquivos de saída já existem. Deseja substituir?",
+                "Fluxo de corrente",
+                MessageBoxButton.YesNo,
+                MessageBoxImage.Question);
+
+            return result == MessageBoxResult.Yes;
+        }
+
+        private static string SanitizarNomeArquivo(string nomeArquivo)
+        {
+            string nome = string.IsNullOrWhiteSpace(nomeArquivo)
+                ? "circuito"
+                : nomeArquivo.Trim();
+
+            foreach (char invalid in Path.GetInvalidFileNameChars())
+                nome = nome.Replace(invalid.ToString(), string.Empty);
+
+            return string.IsNullOrWhiteSpace(nome) ? "circuito" : nome;
+        }
+
+        private static void MostrarResultado(SimulationResultDto resultado, string? dssPath)
         {
             var message = new StringBuilder();
 
@@ -130,6 +213,13 @@ namespace Araci.Applications.Analisar.FluxoDeCorrente
 
             if (!string.IsNullOrWhiteSpace(resultado.Mensagem))
                 message.AppendLine(resultado.Mensagem);
+
+            if (!string.IsNullOrWhiteSpace(dssPath))
+            {
+                message.AppendLine();
+                message.AppendLine("Arquivo DSS salvo em:");
+                message.AppendLine(dssPath);
+            }
 
             if (resultado.Avisos.Count > 0)
             {

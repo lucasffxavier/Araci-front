@@ -320,23 +320,23 @@ private static void AplicarCorrentes(Cabo cabo, LineResultDto resultado)
 {
 double corrente = resultado.Corrente;
 cabo.CorrenteLinha = FormatPolar(resultado.CorrenteLinha ?? corrente, 0);
-cabo.CorrenteFaseA = FormatPolar(resultado.CorrenteFaseA ?? corrente, 0);
-cabo.CorrenteFaseB = FormatPolar(resultado.CorrenteFaseB ?? corrente, -120);
-cabo.CorrenteFaseC = FormatPolar(resultado.CorrenteFaseC ?? corrente, 120);
+cabo.CorrenteFaseA = FormatPolar(resultado.CorrenteFaseA ?? corrente, resultado.AnguloFaseA ?? 0);
+cabo.CorrenteFaseB = FormatPolar(resultado.CorrenteFaseB ?? corrente, resultado.AnguloFaseB ?? -120);
+cabo.CorrenteFaseC = FormatPolar(resultado.CorrenteFaseC ?? corrente, resultado.AnguloFaseC ?? 120);
 }
 private static void AplicarCorrentes(Carga carga, LoadResultDto resultado)
 {
 double corrente = resultado.Corrente;
 carga.CorrenteLinha = FormatPolar(resultado.CorrenteLinha ?? corrente, 0);
-carga.CorrenteFaseA = FormatPolar(resultado.CorrenteFaseA ?? corrente, 0);
-carga.CorrenteFaseB = FormatPolar(resultado.CorrenteFaseB ?? corrente, -120);
-carga.CorrenteFaseC = FormatPolar(resultado.CorrenteFaseC ?? corrente, 120);
+carga.CorrenteFaseA = FormatPolar(resultado.CorrenteFaseA ?? corrente, resultado.AnguloFaseA ?? 0);
+carga.CorrenteFaseB = FormatPolar(resultado.CorrenteFaseB ?? corrente, resultado.AnguloFaseB ?? -120);
+carga.CorrenteFaseC = FormatPolar(resultado.CorrenteFaseC ?? corrente, resultado.AnguloFaseC ?? 120);
 }
 private static string FormatPolar(double magnitude, double angle)
 {
 return string.Format(
 CultureInfo.InvariantCulture,
-"{0:0.##}∠{1}°",
+"{0:0.##}∠{1:0.##}°",
 magnitude,
 angle);
 }
@@ -364,76 +364,6 @@ message.ToString(),
 "Fluxo de corrente",
 MessageBoxButton.OK,
 resultado.Sucesso ? MessageBoxImage.Information : MessageBoxImage.Warning);
-}
-}
-}
-
-
-====================================================================================================
-ARQUIVO: C:\Araci-Engine-Front\Araci Engine\Applications\Analisar\FluxoPotencia\FluxoPotenciaApplication.cs
-====================================================================================================
-
-using System;
-using System.Diagnostics;
-using System.Threading.Tasks;
-using Araci.DTOs;
-using Araci.Services;
-namespace Araci.Applications.Analisar.FluxoPotencia
-{
-public class FluxoPotenciaApplication
-{
-private readonly EditorContext _context;
-public FluxoPotenciaApplication(EditorContext context)
-{
-_context = context ?? throw new ArgumentNullException(nameof(context));
-}
-public string Resultado { get; private set; } = string.Empty;
-public async Task ExecutarAsync()
-{
-ParameterReader reader = new(_context);
-CircuitBuilder builder = new(reader);
-CircuitDto dto = builder.Build();
-SimulationApiClient client = new();
-Resultado = await client.SimularAsync(dto);
-Debug.WriteLine(Resultado);
-}
-}
-}
-
-
-====================================================================================================
-ARQUIVO: C:\Araci-Engine-Front\Araci Engine\Applications\Commands\AddElementoCommand.cs
-====================================================================================================
-
-using System;
-using Araci.Core.Events;
-using Araci.Services;
-using Araci.ViewModels;
-namespace Araci.Core.Commands
-{
-public class AddElementoCommand : IUndoableCommand
-{
-private readonly ElementoViewModel _elemento;
-private readonly EditorContext _context;
-public AddElementoCommand(ElementoViewModel elemento, EditorContext context)
-{
-_elemento = elemento ?? throw new ArgumentNullException(nameof(elemento));
-_context = context ?? throw new ArgumentNullException(nameof(context));
-}
-public void Execute()
-{
-_context.Document.AdicionarElemento(_elemento.Modelo);
-_context.Events.Publish(new ElementoAdicionadoEvent(_elemento));
-}
-public void Undo()
-{
-_context.Selection.Deselecionar(_elemento);
-_context.Document.RemoverElemento(_elemento.Modelo);
-_context.Events.Publish(new ElementoRemovidoEvent(_elemento));
-}
-public void Redo()
-{
-Execute();
 }
 }
 }
@@ -500,6 +430,156 @@ _ => "ELM"
 
 
 ====================================================================================================
+ARQUIVO: C:\Araci-Engine-Front\Araci Engine\DTOs\CircuitBuilder.cs
+====================================================================================================
+
+using System;
+using System.Collections.Generic;
+using System.Linq;
+namespace Araci.DTOs
+{
+public class CircuitBuilder
+{
+private const double DefaultBaseKv = 12.47;
+private readonly ParameterReader _reader;
+public CircuitBuilder(ParameterReader reader)
+{
+_reader = reader ?? throw new ArgumentNullException(nameof(reader));
+}
+public CircuitDto Build()
+{
+IList<ParameterReader.GeneratorData> generators = _reader.GetGenerators();
+ParameterReader.GeneratorData slackGenerator = generators.FirstOrDefault()
+?? throw new InvalidOperationException("Nenhum gerador encontrado para definir a fonte slack.");
+var dto = new CircuitDto
+{
+Loads = BuildLoads(),
+Lines = BuildLines(),
+Transformers = BuildTransformers(),
+Generators = BuildGenerators(generators.Skip(1)),
+Slack = BuildSlack(slackGenerator)
+};
+Validar(dto);
+return dto;
+}
+private IList<LoadDto> BuildLoads()
+{
+return _reader.GetLoads()
+.Select(load => new LoadDto
+{
+Id = load.Id,
+Nome = SafeName(load.Nome, "Carga"),
+Barra = SafeBus(load.Barra, load.Nome),
+Fases = SafePhases(load.Fases),
+R = load.R,
+X = load.X,
+PotenciaAtiva = load.PotenciaAtiva > 0 ? load.PotenciaAtiva : 800,
+PotenciaReativa = load.PotenciaReativa >= 0 ? load.PotenciaReativa : 300,
+Tensao = SafeKv(load.Tensao),
+Conexao = string.IsNullOrWhiteSpace(load.Conexao) ? "Wye" : load.Conexao,
+Modelo = load.Modelo > 0 ? load.Modelo : 1
+})
+.ToList();
+}
+private IList<LineDto> BuildLines()
+{
+return _reader.GetLines()
+.Select(line =>
+{
+double r1 = line.R1 > 0 ? line.R1 : 0.1;
+double x1 = line.X1 > 0 ? line.X1 : 0.2;
+return new LineDto
+{
+Id = line.Id,
+Nome = SafeName(line.Nome, "L1"),
+Barra1 = line.Barra1?.Trim() ?? string.Empty,
+Barra2 = line.Barra2?.Trim() ?? string.Empty,
+Fases = SafePhases(line.Fases),
+Comprimento = line.Comprimento > 0 ? line.Comprimento : 1,
+R1 = r1,
+X1 = x1,
+R0 = line.R0 > 0 ? line.R0 : 3 * r1,
+X0 = line.X0 > 0 ? line.X0 : 3 * x1,
+C1 = line.C1 > 0 ? line.C1 : 3.4,
+C0 = line.C0 > 0 ? line.C0 : 1.6
+};
+})
+.ToList();
+}
+private IList<TransformerDto> BuildTransformers()
+{
+return _reader.GetTransformers()
+.Select(transformer => new TransformerDto
+{
+Id = transformer.Id,
+Nome = transformer.Nome,
+Fases = SafePhases(transformer.Fases),
+Enrolamentos = transformer.Enrolamentos
+})
+.ToList();
+}
+private static IList<GeneratorDto> BuildGenerators(IEnumerable<ParameterReader.GeneratorData> generators)
+{
+return generators
+.Select(generator => new GeneratorDto
+{
+Id = generator.Id,
+Nome = SafeName(generator.Nome, "Gerador"),
+Barra = SafeBus(generator.Barra, generator.Nome),
+Fases = SafePhases(generator.Fases),
+Tensao = SafeKv(generator.Tensao),
+Potencia = generator.Potencia > 0 ? generator.Potencia : 1000,
+FP = generator.FP > 0 ? generator.FP : 0.98
+})
+.ToList();
+}
+private static SlackDto BuildSlack(ParameterReader.GeneratorData generator)
+{
+string nome = SafeName(generator.Nome, "GERADOR-001");
+return new SlackDto
+{
+Id = generator.Id,
+Nome = nome,
+Tensao = SafeKv(generator.Tensao),
+Fases = SafePhases(generator.Fases),
+Barra = SafeBus(generator.Barra, nome)
+};
+}
+private static void Validar(CircuitDto dto)
+{
+if (dto.Slack == null || string.IsNullOrWhiteSpace(dto.Slack.Barra))
+throw new InvalidOperationException("Nenhum gerador encontrado para definir a fonte slack.");
+foreach (LineDto line in dto.Lines)
+{
+if (string.IsNullOrWhiteSpace(line.Barra1) || string.IsNullOrWhiteSpace(line.Barra2))
+throw new InvalidOperationException($"Cabo '{line.Nome}' sem barra origem/destino definida.");
+}
+if (!dto.Loads.Any())
+throw new InvalidOperationException("Nenhuma carga encontrada para simular o fluxo.");
+}
+private static string SafeName(string value, string fallback)
+{
+return string.IsNullOrWhiteSpace(value) ? fallback : value.Trim();
+}
+private static string SafeBus(string value, string fallback)
+{
+return string.IsNullOrWhiteSpace(value)
+? SafeName(fallback, "BARRA-001")
+: value.Trim();
+}
+private static int SafePhases(int value)
+{
+return value > 0 ? value : 3;
+}
+private static double SafeKv(double value)
+{
+return value > 0 ? value : DefaultBaseKv;
+}
+}
+}
+
+
+====================================================================================================
 ARQUIVO: C:\Araci-Engine-Front\Araci Engine\DTOs\CircuitDto.cs
 ====================================================================================================
 
@@ -513,318 +593,6 @@ public IList<LineDto> Lines { get; set; } = new List<LineDto>();
 public IList<TransformerDto> Transformers { get; set; } = new List<TransformerDto>();
 public IList<GeneratorDto> Generators { get; set; } = new List<GeneratorDto>();
 public SlackDto Slack { get; set; } = new SlackDto();
-}
-}
-
-
-====================================================================================================
-ARQUIVO: C:\Araci-Engine-Front\Araci Engine\DTOs\ElectricalValueParser.cs
-====================================================================================================
-
-using System.Globalization;
-using System.Text.RegularExpressions;
-namespace Araci.DTOs
-{
-public static class ElectricalValueParser
-{
-private const double DefaultKv = 12.47;
-public static double ToNumber(double value)
-{
-return value;
-}
-public static double ToNumber(string? value, double fallback = 0)
-{
-if (string.IsNullOrWhiteSpace(value))
-return fallback;
-string text = NormalizeNumericText(value);
-Match match = Regex.Match(text, @"[-+]?\d+(\.\d+)?");
-if (match.Success &&
-double.TryParse(match.Value, NumberStyles.Float, CultureInfo.InvariantCulture, out double parsed))
-{
-return parsed;
-}
-return fallback;
-}
-public static double ToVoltageKv(double value)
-{
-return value > 100 ? value / 1000 : value;
-}
-public static double ToVoltageKv(string? value, double fallback = DefaultKv)
-{
-double parsed = ToNumber(value, fallback);
-return ToVoltageKv(parsed);
-}
-private static string NormalizeNumericText(string value)
-{
-string text = value.Trim()
-.Replace(',', '.')
-.Replace("âˆ ", "∠")
-.Replace("Â°", string.Empty)
-.Replace("°", string.Empty);
-int polarIndex = text.IndexOf('∠');
-if (polarIndex >= 0)
-text = text[..polarIndex];
-return text;
-}
-}
-}
-
-
-====================================================================================================
-ARQUIVO: C:\Araci-Engine-Front\Araci Engine\DTOs\LineDto.cs
-====================================================================================================
-
-namespace Araci.DTOs
-{
-public class LineDto
-{
-public string Id { get; set; } = string.Empty;
-public string Nome { get; set; } = string.Empty;
-public string Barra1 { get; set; } = string.Empty;
-public string Barra2 { get; set; } = string.Empty;
-public int Fases { get; set; }
-public double Comprimento { get; set; }
-public double R1 { get; set; }
-public double X1 { get; set; }
-public double R0 { get; set; }
-public double X0 { get; set; }
-public double C1 { get; set; }
-public double C0 { get; set; }
-}
-}
-
-
-====================================================================================================
-ARQUIVO: C:\Araci-Engine-Front\Araci Engine\DTOs\LoadDto.cs
-====================================================================================================
-
-namespace Araci.DTOs
-{
-public class LoadDto
-{
-public string Id { get; set; } = string.Empty;
-public string Nome { get; set; } = string.Empty;
-public string Barra { get; set; } = string.Empty;
-public int Fases { get; set; }
-public double R { get; set; }
-public double X { get; set; }
-public double PotenciaAtiva { get; set; }
-public double PotenciaReativa { get; set; }
-public double Tensao { get; set; }
-public string Conexao { get; set; } = string.Empty;
-public int Modelo { get; set; }
-}
-}
-
-
-====================================================================================================
-ARQUIVO: C:\Araci-Engine-Front\Araci Engine\DTOs\ParameterReader.cs
-====================================================================================================
-
-using System;
-using System.Collections.Generic;
-using System.Globalization;
-using System.Linq;
-using Araci.API;
-using Araci.Core.Documents;
-using Araci.Models;
-using Araci.Services;
-namespace Araci.DTOs
-{
-public class ParameterReader
-{
-private readonly CoreApi _api;
-public ParameterReader(CoreApi api)
-{
-_api = api ?? throw new ArgumentNullException(nameof(api));
-}
-public ParameterReader(EditorContext context)
-: this(new CoreApi(context))
-{
-}
-public ParameterReader(AraciDocument document)
-: this(new CoreApi(document))
-{
-}
-public IList<LoadData> GetLoads()
-{
-return _api.ObterElementos<Carga>()
-.Select(carga => new LoadData
-{
-Id = carga.Id.ToString(),
-Nome = ReadString(carga, "Nome"),
-Barra = ReadBarra(carga, "Barra", "Barra 1"),
-Fases = ReadInt(carga, "Fases"),
-R = ReadDouble(carga, "Carga resistencia", "Carga resistÃªncia"),
-X = ReadDouble(carga, "Carga reatancia", "Carga reatÃ¢ncia"),
-PotenciaAtiva = ReadDouble(carga, "PotenciaAtiva"),
-PotenciaReativa = ReadDouble(carga, "PotenciaReativa"),
-Tensao = ReadVoltage(carga, "TensaoKV", "Tensao", "TensaoLinha"),
-Conexao = ReadString(carga, "Carga conexao", "Conexao"),
-Modelo = ReadInt(carga, "Carga modelo", "ModeloCarga")
-})
-.ToList();
-}
-public IList<LineData> GetLines()
-{
-return _api.ObterElementos<Cabo>()
-.Select(cabo => new LineData
-{
-Id = cabo.Id.ToString(),
-Nome = ReadString(cabo, "Nome"),
-Barra1 = ReadBarra(cabo, "BarraOrigem", "Barra 1"),
-Barra2 = ReadBarra(cabo, "BarraDestino", "Barra 2"),
-Fases = ReadInt(cabo, "Fases"),
-Comprimento = ReadDouble(cabo, "Comprimento"),
-R1 = ReadDouble(cabo, "R1", "Resistencia"),
-X1 = ReadDouble(cabo, "X1", "Reatancia"),
-R0 = ReadDouble(cabo, "R0"),
-X0 = ReadDouble(cabo, "X0"),
-C1 = ReadDouble(cabo, "C1"),
-C0 = ReadDouble(cabo, "C0")
-})
-.ToList();
-}
-public IList<TransformerData> GetTransformers()
-{
-return GetElementsByTypeName("Transformador", "Transformer")
-.Select(transformador => new TransformerData
-{
-Id = transformador.Id.ToString(),
-Nome = ReadString(transformador, "Nome"),
-Fases = ReadInt(transformador, "Fases"),
-Enrolamentos = ReadInt(transformador, "Enrolamentos")
-})
-.ToList();
-}
-public IList<GeneratorData> GetGenerators()
-{
-return _api.ObterElementos<Gerador>()
-.Select(gerador => new GeneratorData
-{
-Id = gerador.Id.ToString(),
-Nome = ReadString(gerador, "Nome"),
-Barra = ReadBarra(gerador, "Barra", "Barra 1"),
-Fases = ReadInt(gerador, "Fases"),
-Tensao = ReadVoltage(gerador, "TensaoKV", "Tensao", "TensaoLinha"),
-Potencia = ReadDouble(gerador, "PotenciaAtiva", "Potencia", "PotenciaAparente"),
-FP = ReadDouble(gerador, "FP", "FatorPotencia")
-})
-.ToList();
-}
-private IList<Elemento> GetElementsByTypeName(params string[] typeNames)
-{
-return _api.ObterElementos()
-.Where(elemento => typeNames.Any(typeName =>
-string.Equals(elemento.GetType().Name, typeName, StringComparison.OrdinalIgnoreCase) ||
-string.Equals(elemento.Tipo?.NomeTipo, typeName, StringComparison.OrdinalIgnoreCase)))
-.ToList();
-}
-private static string ReadBarra(Elemento elemento, params string[] names)
-{
-string valor = ReadString(elemento, names);
-if (!string.IsNullOrWhiteSpace(valor))
-return valor;
-if (elemento is ITerminalOwner owner)
-return owner.Terminais.FirstOrDefault()?.Barra ?? string.Empty;
-return string.Empty;
-}
-private static string ReadString(Elemento elemento, params string[] names)
-{
-return ReadValueAsString(elemento, names) ?? string.Empty;
-}
-private static int ReadInt(Elemento elemento, params string[] names)
-{
-return (int)ReadDouble(elemento, names);
-}
-private static double ReadDouble(Elemento elemento, params string[] names)
-{
-object? value = ReadValueObject(elemento, names);
-if (value is double doubleValue)
-return ElectricalValueParser.ToNumber(doubleValue);
-if (value is int intValue)
-return intValue;
-if (value is string text)
-return ElectricalValueParser.ToNumber(text);
-return 0;
-}
-private static double ReadVoltage(Elemento elemento, params string[] names)
-{
-object? value = ReadValueObject(elemento, names);
-if (value is double doubleValue)
-return ElectricalValueParser.ToVoltageKv(doubleValue);
-if (value is int intValue)
-return ElectricalValueParser.ToVoltageKv(intValue);
-if (value is string text)
-return ElectricalValueParser.ToVoltageKv(text);
-return 0;
-}
-private static string? ReadValueAsString(Elemento elemento, params string[] names)
-{
-object? value = ReadValueObject(elemento, names);
-return value switch
-{
-IFormattable formattable => formattable.ToString(null, CultureInfo.InvariantCulture),
-_ => value?.ToString()
-};
-}
-private static object? ReadValueObject(Elemento elemento, params string[] names)
-{
-foreach (string name in names)
-{
-if (elemento.Parametros.TryGetValue(name, out Parameter? parametro))
-return parametro.ValorObjeto;
-if (elemento.Tipo?.Parametros.TryGetValue(name, out parametro) == true)
-return parametro.ValorObjeto;
-}
-return null;
-}
-public class LoadData
-{
-public string Id { get; set; } = string.Empty;
-public string Nome { get; set; } = string.Empty;
-public string Barra { get; set; } = string.Empty;
-public int Fases { get; set; }
-public double R { get; set; }
-public double X { get; set; }
-public double PotenciaAtiva { get; set; }
-public double PotenciaReativa { get; set; }
-public double Tensao { get; set; }
-public string Conexao { get; set; } = string.Empty;
-public int Modelo { get; set; }
-}
-public class LineData
-{
-public string Id { get; set; } = string.Empty;
-public string Nome { get; set; } = string.Empty;
-public string Barra1 { get; set; } = string.Empty;
-public string Barra2 { get; set; } = string.Empty;
-public int Fases { get; set; }
-public double Comprimento { get; set; }
-public double R1 { get; set; }
-public double X1 { get; set; }
-public double R0 { get; set; }
-public double X0 { get; set; }
-public double C1 { get; set; }
-public double C0 { get; set; }
-}
-public class TransformerData
-{
-public string Id { get; set; } = string.Empty;
-public string Nome { get; set; } = string.Empty;
-public int Fases { get; set; }
-public int Enrolamentos { get; set; }
-}
-public class GeneratorData
-{
-public string Id { get; set; } = string.Empty;
-public string Nome { get; set; } = string.Empty;
-public string Barra { get; set; } = string.Empty;
-public int Fases { get; set; }
-public double Tensao { get; set; }
-public double Potencia { get; set; }
-public double FP { get; set; }
-}
 }
 }
 
@@ -940,9 +708,14 @@ foreach (string aviso in ReadStringArray(resultado, "avisos", "warnings", "mensa
 result.Avisos.Add(aviso);
 resultRoot = resultado;
 }
-ReadLineResults(resultRoot, dto, result);
-ReadLoadResults(resultRoot, dto, result);
-ReadElementResults(resultRoot, dto, result);
+bool hasLines = ReadLineResults(root, dto, result);
+bool hasLoads = ReadLoadResults(root, dto, result);
+if (!hasLines && resultRoot.ValueKind != JsonValueKind.Undefined)
+hasLines = ReadLineResults(resultRoot, dto, result);
+if (!hasLoads && resultRoot.ValueKind != JsonValueKind.Undefined)
+hasLoads = ReadLoadResults(resultRoot, dto, result);
+if (!hasLines || !hasLoads)
+ReadElementResults(resultRoot, dto, result, includeLines: !hasLines, includeLoads: !hasLoads);
 return result;
 }
 private static void WriteScriptDebug(string script)
@@ -965,57 +738,66 @@ return success.GetBoolean();
 }
 return false;
 }
-private static void ReadLineResults(JsonElement root, CircuitDto dto, SimulationResultDto result)
+private static bool ReadLineResults(JsonElement root, CircuitDto dto, SimulationResultDto result)
 {
 if (!TryGetProperty(root, out JsonElement linhas, "lines", "linhas", "lineResults", "line_results") ||
 linhas.ValueKind != JsonValueKind.Array)
 {
-return;
+return false;
 }
 foreach (JsonElement line in linhas.EnumerateArray())
 {
 string key = ReadString(line, "id", "lineId", "line_id", "linha", "cabo", "nome", "name");
 double corrente = ReadDouble(line, "corrente", "current", "i");
-double[] correntes = ReadNumbers(line, "correntes", "currents");
-if (corrente == 0 && correntes.Length > 0)
-corrente = correntes[0];
 result.Lines.Add(new LineResultDto
 {
 Id = ResolveLineId(dto, key),
+Nome = ReadString(line, "nome", "name"),
 Corrente = corrente,
-CorrenteLinha = ReadCorrente(line, correntes, 0, "correnteLinha", "corrente_linha", "lineCurrent", "line_current"),
-CorrenteFaseA = ReadCorrente(line, correntes, 0, "correnteFaseA", "corrente_fase_a", "phaseACurrent", "phase_a_current"),
-CorrenteFaseB = ReadCorrente(line, correntes, 1, "correnteFaseB", "corrente_fase_b", "phaseBCurrent", "phase_b_current"),
-CorrenteFaseC = ReadCorrente(line, correntes, 2, "correnteFaseC", "corrente_fase_c", "phaseCCurrent", "phase_c_current")
+CorrenteLinha = ReadNullableDouble(line, "correnteLinha", "corrente_linha", "lineCurrent", "line_current") ?? corrente,
+CorrenteFaseA = ReadNullableDouble(line, "correnteFaseA", "corrente_fase_a", "phaseACurrent", "phase_a_current"),
+AnguloFaseA = ReadNullableDouble(line, "anguloFaseA", "angulo_fase_a", "phaseAAngle", "phase_a_angle"),
+CorrenteFaseB = ReadNullableDouble(line, "correnteFaseB", "corrente_fase_b", "phaseBCurrent", "phase_b_current"),
+AnguloFaseB = ReadNullableDouble(line, "anguloFaseB", "angulo_fase_b", "phaseBAngle", "phase_b_angle"),
+CorrenteFaseC = ReadNullableDouble(line, "correnteFaseC", "corrente_fase_c", "phaseCCurrent", "phase_c_current"),
+AnguloFaseC = ReadNullableDouble(line, "anguloFaseC", "angulo_fase_c", "phaseCAngle", "phase_c_angle")
 });
 }
+return true;
 }
-private static void ReadLoadResults(JsonElement root, CircuitDto dto, SimulationResultDto result)
+private static bool ReadLoadResults(JsonElement root, CircuitDto dto, SimulationResultDto result)
 {
 if (!TryGetProperty(root, out JsonElement cargas, "loads", "cargas", "loadResults", "load_results") ||
 cargas.ValueKind != JsonValueKind.Array)
 {
-return;
+return false;
 }
 foreach (JsonElement load in cargas.EnumerateArray())
 {
 string key = ReadString(load, "id", "loadId", "load_id", "carga", "nome", "name");
 double corrente = ReadDouble(load, "corrente", "current", "i");
-double[] correntes = ReadNumbers(load, "correntes", "currents");
-if (corrente == 0 && correntes.Length > 0)
-corrente = correntes[0];
 result.Loads.Add(new LoadResultDto
 {
 Id = ResolveLoadId(dto, key),
+Nome = ReadString(load, "nome", "name"),
 Corrente = corrente,
-CorrenteLinha = ReadCorrente(load, correntes, 0, "correnteLinha", "corrente_linha", "lineCurrent", "line_current"),
-CorrenteFaseA = ReadCorrente(load, correntes, 0, "correnteFaseA", "corrente_fase_a", "phaseACurrent", "phase_a_current"),
-CorrenteFaseB = ReadCorrente(load, correntes, 1, "correnteFaseB", "corrente_fase_b", "phaseBCurrent", "phase_b_current"),
-CorrenteFaseC = ReadCorrente(load, correntes, 2, "correnteFaseC", "corrente_fase_c", "phaseCCurrent", "phase_c_current")
+CorrenteLinha = ReadNullableDouble(load, "correnteLinha", "corrente_linha", "lineCurrent", "line_current") ?? corrente,
+CorrenteFaseA = ReadNullableDouble(load, "correnteFaseA", "corrente_fase_a", "phaseACurrent", "phase_a_current"),
+AnguloFaseA = ReadNullableDouble(load, "anguloFaseA", "angulo_fase_a", "phaseAAngle", "phase_a_angle"),
+CorrenteFaseB = ReadNullableDouble(load, "correnteFaseB", "corrente_fase_b", "phaseBCurrent", "phase_b_current"),
+AnguloFaseB = ReadNullableDouble(load, "anguloFaseB", "angulo_fase_b", "phaseBAngle", "phase_b_angle"),
+CorrenteFaseC = ReadNullableDouble(load, "correnteFaseC", "corrente_fase_c", "phaseCCurrent", "phase_c_current"),
+AnguloFaseC = ReadNullableDouble(load, "anguloFaseC", "angulo_fase_c", "phaseCAngle", "phase_c_angle")
 });
 }
+return true;
 }
-private static void ReadElementResults(JsonElement root, CircuitDto dto, SimulationResultDto result)
+private static void ReadElementResults(
+JsonElement root,
+CircuitDto dto,
+SimulationResultDto result,
+bool includeLines,
+bool includeLoads)
 {
 if (!TryGetProperty(root, out JsonElement elementos, "elementos", "elements") ||
 elementos.ValueKind != JsonValueKind.Object)
@@ -1029,7 +811,7 @@ double[] correntes = ReadPolarMagnitudes(item.Value, "correntes", "currents");
 if (correntes.Length == 0)
 continue;
 double corrente = correntes[0];
-if (TryResolveLineId(dto, key, out string lineId))
+if (includeLines && TryResolveLineId(dto, key, out string lineId))
 {
 result.Lines.Add(new LineResultDto
 {
@@ -1037,11 +819,14 @@ Id = lineId,
 Corrente = corrente,
 CorrenteLinha = corrente,
 CorrenteFaseA = ReadArrayValue(correntes, 0),
+AnguloFaseA = 0,
 CorrenteFaseB = ReadArrayValue(correntes, 1),
-CorrenteFaseC = ReadArrayValue(correntes, 2)
+AnguloFaseB = -120,
+CorrenteFaseC = ReadArrayValue(correntes, 2),
+AnguloFaseC = 120
 });
 }
-else if (TryResolveLoadId(dto, key, out string loadId))
+else if (includeLoads && TryResolveLoadId(dto, key, out string loadId))
 {
 result.Loads.Add(new LoadResultDto
 {
@@ -1049,8 +834,11 @@ Id = loadId,
 Corrente = corrente,
 CorrenteLinha = corrente,
 CorrenteFaseA = ReadArrayValue(correntes, 0),
+AnguloFaseA = 0,
 CorrenteFaseB = ReadArrayValue(correntes, 1),
-CorrenteFaseC = ReadArrayValue(correntes, 2)
+AnguloFaseB = -120,
+CorrenteFaseC = ReadArrayValue(correntes, 2),
+AnguloFaseC = 120
 });
 }
 }
@@ -1142,23 +930,6 @@ return result;
 }
 return null;
 }
-private static double? ReadCorrente(JsonElement element, double[] correntes, int index, params string[] names)
-{
-return ReadNullableDouble(element, names) ?? ReadArrayValue(correntes, index);
-}
-private static double[] ReadNumbers(JsonElement element, params string[] names)
-{
-if (!TryGetProperty(element, out JsonElement array, names) ||
-array.ValueKind != JsonValueKind.Array)
-{
-return Array.Empty<double>();
-}
-return array.EnumerateArray()
-.Select(item => item.TryGetDouble(out double value) ? (double?)value : null)
-.Where(value => value.HasValue)
-.Select(value => value!.Value)
-.ToArray();
-}
 private static double[] ReadPolarMagnitudes(JsonElement element, params string[] names)
 {
 if (!TryGetProperty(element, out JsonElement array, names) ||
@@ -1218,795 +989,248 @@ public IList<LoadResultDto> Loads { get; set; } = new List<LoadResultDto>();
 public class LineResultDto
 {
 public string Id { get; set; } = string.Empty;
+public string Nome { get; set; } = string.Empty;
 public double Corrente { get; set; }
 public double? CorrenteLinha { get; set; }
 public double? CorrenteFaseA { get; set; }
+public double? AnguloFaseA { get; set; }
 public double? CorrenteFaseB { get; set; }
+public double? AnguloFaseB { get; set; }
 public double? CorrenteFaseC { get; set; }
+public double? AnguloFaseC { get; set; }
 }
 public class LoadResultDto
 {
 public string Id { get; set; } = string.Empty;
+public string Nome { get; set; } = string.Empty;
 public double Corrente { get; set; }
 public double? CorrenteLinha { get; set; }
 public double? CorrenteFaseA { get; set; }
+public double? AnguloFaseA { get; set; }
 public double? CorrenteFaseB { get; set; }
+public double? AnguloFaseB { get; set; }
 public double? CorrenteFaseC { get; set; }
+public double? AnguloFaseC { get; set; }
 }
 }
 
 
 ====================================================================================================
-ARQUIVO: C:\Araci-Engine-Front\Araci Engine\DTOs\SlackDto.cs
+ARQUIVO: C:\Araci-Engine-Front\Araci Engine\MainWindow.xaml
 ====================================================================================================
 
-namespace Araci.DTOs
-{
-public class SlackDto
-{
-public string Id { get; set; } = string.Empty;
-public string Nome { get; set; } = string.Empty;
-public double Tensao { get; set; }
-public int Fases { get; set; }
-public string Barra { get; set; } = string.Empty;
-}
-}
+﻿<Window x:Class="Araci.MainWindow"
+xmlns="http:
+xmlns:x="http:
+xmlns:views="clr-namespace:Araci.Views"
+xmlns:ribbon="clr-namespace:Araci.Ribbon"
+xmlns:properties="clr-namespace:Araci.Properties"
+xmlns:tabs="clr-namespace:Araci.Ribbon.Tabs"
+Title="ARACI ENGINE"
+Width="1400"
+Height="900"
+WindowStartupLocation="CenterScreen"
+Background="#D0D0D0">
+<Grid>
+<DockPanel>
+<ribbon:RibbonView x:Name="Ribbon"
+DockPanel.Dock="Top"
+Height="160"/>
+<Grid>
+<Grid.ColumnDefinitions>
+<ColumnDefinition Width="*"/>
+<ColumnDefinition Width="320"/>
+</Grid.ColumnDefinitions>
+<views:ViewportView x:Name="Viewport"
+Grid.Column="0"
+Margin="10,10,0,10"/>
+<properties:PropertiesHostView Grid.Column="1"/>
+</Grid>
+</DockPanel>
+<Popup x:Name="ArquivoPopup"
+Placement="Bottom"
+AllowsTransparency="True"
+StaysOpen="False"
+PopupAnimation="Fade">
+<tabs:ArquivoMenuView/>
+</Popup>
+</Grid>
+</Window>
 
 
 ====================================================================================================
-ARQUIVO: C:\Araci-Engine-Front\Araci Engine\Models\Cabo.cs
+ARQUIVO: C:\Araci-Engine-Front\Araci Engine\MainWindow.xaml.cs
 ====================================================================================================
 
-using System.Collections.Generic;
-using System.Collections.ObjectModel;
+﻿using Araci.Services;
 using System.Windows;
-using Araci.Models.Tipos;
-namespace Araci.Models
+using System.Windows.Controls.Primitives;
+namespace Araci
 {
-public class Cabo : ElementoLinear, ITerminalOwner
+public partial class MainWindow : Window
 {
-public const string PARAM_BARRA_ORIGEM = "BarraOrigem";
-public const string PARAM_BARRA_DESTINO = "BarraDestino";
-public const string PARAM_COMPRIMENTO = "Comprimento";
-public const string PARAM_AMPACIDADE = "Ampacidade";
-public const string PARAM_TENSAO_LINHA = "TensaoLinha";
-public const string PARAM_TENSAO_FASE_A = "TensaoFaseA";
-public const string PARAM_TENSAO_FASE_B = "TensaoFaseB";
-public const string PARAM_TENSAO_FASE_C = "TensaoFaseC";
-public const string PARAM_CORRENTE_LINHA = "CorrenteLinha";
-public const string PARAM_CORRENTE_FASE_A = "CorrenteFaseA";
-public const string PARAM_CORRENTE_FASE_B = "CorrenteFaseB";
-public const string PARAM_CORRENTE_FASE_C = "CorrenteFaseC";
-private readonly List<Terminal> _terminais = new();
-public Cabo()
+private readonly EditorContext _context;
+public MainWindow()
 {
-DefinirParametro(new Parameter<string>(PARAM_BARRA_ORIGEM, "GERADOR-001"));
-DefinirParametro(new Parameter<string>(PARAM_BARRA_DESTINO, "CARGA-001"));
-DefinirParametro(new Parameter<double>(PARAM_COMPRIMENTO, 1));
-DefinirParametro(new Parameter<double>(PARAM_AMPACIDADE, 520));
-DefinirParametro(new Parameter<string>(PARAM_TENSAO_LINHA, "12.47∠0°"));
-DefinirParametro(new Parameter<string>(PARAM_TENSAO_FASE_A, "7.2∠0°"));
-DefinirParametro(new Parameter<string>(PARAM_TENSAO_FASE_B, "7.2∠-120°"));
-DefinirParametro(new Parameter<string>(PARAM_TENSAO_FASE_C, "7.2∠120°"));
-DefinirParametro(new Parameter<string>(PARAM_CORRENTE_LINHA, "0∠0°"));
-DefinirParametro(new Parameter<string>(PARAM_CORRENTE_FASE_A, "0∠0°"));
-DefinirParametro(new Parameter<string>(PARAM_CORRENTE_FASE_B, "0∠-120°"));
-DefinirParametro(new Parameter<string>(PARAM_CORRENTE_FASE_C, "0∠120°"));
-Nome = "L1";
+InitializeComponent();
+_context = new EditorContext();
+Viewport.Inicializar(_context);
+InicializarRibbon();
 }
-public IReadOnlyList<Terminal> Terminais => _terminais;
-public ObservableCollection<Point> Vertices { get; } = new();
-public Point? PreviewPonto { get; set; }
-public TipoCabo TipoCabo => (TipoCabo)Tipo!;
-public Terminal? Origem => _terminais.Count > 0 ? _terminais[0] : null;
-public Terminal? Destino => _terminais.Count > 1 ? _terminais[1] : null;
-public string BarraOrigem
+private void InicializarRibbon()
 {
-get => Obter<string>(PARAM_BARRA_ORIGEM);
-set => Definir(PARAM_BARRA_ORIGEM, value);
+DataContext = _context;
 }
-public string BarraDestino
+public void ToggleArquivoMenu(
+UIElement referencia)
 {
-get => Obter<string>(PARAM_BARRA_DESTINO);
-set => Definir(PARAM_BARRA_DESTINO, value);
+if (ArquivoPopup.IsOpen)
+{
+ArquivoPopup.IsOpen = false;
+return;
 }
-public new double Comprimento
-{
-get => Obter<double>(PARAM_COMPRIMENTO);
-set => Definir(PARAM_COMPRIMENTO, value);
-}
-public double Ampacidade
-{
-get => Obter<double>(PARAM_AMPACIDADE);
-set => Definir(PARAM_AMPACIDADE, value);
-}
-public string TensaoLinha
-{
-get => Obter<string>(PARAM_TENSAO_LINHA);
-set => Definir(PARAM_TENSAO_LINHA, value);
-}
-public string TensaoFaseA
-{
-get => Obter<string>(PARAM_TENSAO_FASE_A);
-set => Definir(PARAM_TENSAO_FASE_A, value);
-}
-public string TensaoFaseB
-{
-get => Obter<string>(PARAM_TENSAO_FASE_B);
-set => Definir(PARAM_TENSAO_FASE_B, value);
-}
-public string TensaoFaseC
-{
-get => Obter<string>(PARAM_TENSAO_FASE_C);
-set => Definir(PARAM_TENSAO_FASE_C, value);
-}
-public string CorrenteLinha
-{
-get => Obter<string>(PARAM_CORRENTE_LINHA);
-set => Definir(PARAM_CORRENTE_LINHA, value);
-}
-public string CorrenteFaseA
-{
-get => Obter<string>(PARAM_CORRENTE_FASE_A);
-set => Definir(PARAM_CORRENTE_FASE_A, value);
-}
-public string CorrenteFaseB
-{
-get => Obter<string>(PARAM_CORRENTE_FASE_B);
-set => Definir(PARAM_CORRENTE_FASE_B, value);
-}
-public string CorrenteFaseC
-{
-get => Obter<string>(PARAM_CORRENTE_FASE_C);
-set => Definir(PARAM_CORRENTE_FASE_C, value);
-}
-public void DefinirOrigem(Point p)
-{
-if (_terminais.Count == 0)
-_terminais.Add(new Terminal(this, p) { Barra = BarraOrigem });
-else
-_terminais[0].Posicao = p;
-}
-public void DefinirDestino(Point p)
-{
-if (_terminais.Count < 2)
-_terminais.Add(new Terminal(this, p) { Barra = BarraDestino });
-else
-_terminais[1].Posicao = p;
-}
-public override Elemento Clonar()
-{
-var clone = new Cabo();
-CopiarLinearPara(clone);
-foreach (Point p in Vertices)
-clone.Vertices.Add(p);
-clone.PreviewPonto = PreviewPonto;
-clone._terminais.Clear();
-foreach (Terminal t in _terminais)
-{
-clone._terminais.Add(
-new Terminal(clone, t.Posicao)
-{
-Barra = t.Barra
-});
-}
-return clone;
+ArquivoPopup.PlacementTarget =
+referencia;
+ArquivoPopup.Placement =
+PlacementMode.Bottom;
+ArquivoPopup.IsOpen = true;
 }
 }
 }
 
 
 ====================================================================================================
-ARQUIVO: C:\Araci-Engine-Front\Araci Engine\Models\Tipos\TipoCabo.cs
+ARQUIVO: C:\Araci-Engine-Front\Araci Engine\Ribbon\Tabs\AnaliseTab.xaml
 ====================================================================================================
 
-namespace Araci.Models.Tipos
-{
-public class TipoCabo : TipoElemento
-{
-public const string PARAM_FASES = "Fases";
-public const string PARAM_R1 = "R1";
-public const string PARAM_X1 = "X1";
-public const string PARAM_R0 = "R0";
-public const string PARAM_X0 = "X0";
-public const string PARAM_C1 = "C1";
-public const string PARAM_C0 = "C0";
-public const string PARAM_SECAO = "Secao";
-public TipoCabo()
-{
-NomeTipo = "LC-500MCM";
-Familia = "Cabos";
-Categoria = "Cabos";
-DefinirParametro(new Parameter<int>(PARAM_FASES, 3));
-DefinirParametro(new Parameter<double>(PARAM_R1, 0.1));
-DefinirParametro(new Parameter<double>(PARAM_X1, 0.2));
-DefinirParametro(new Parameter<double>(PARAM_R0, 0.3));
-DefinirParametro(new Parameter<double>(PARAM_X0, 0.6));
-DefinirParametro(new Parameter<double>(PARAM_C1, 3.4));
-DefinirParametro(new Parameter<double>(PARAM_C0, 1.6));
-DefinirParametro(new Parameter<double>(PARAM_SECAO, 253));
-}
-public int Fases
-{
-get => Obter<int>(PARAM_FASES);
-set => Definir(PARAM_FASES, value <= 0 ? 1 : value);
-}
-public double R1
-{
-get => Obter<double>(PARAM_R1);
-set => Definir(PARAM_R1, value);
-}
-public double X1
-{
-get => Obter<double>(PARAM_X1);
-set => Definir(PARAM_X1, value);
-}
-public double R0
-{
-get => Obter<double>(PARAM_R0);
-set => Definir(PARAM_R0, value);
-}
-public double X0
-{
-get => Obter<double>(PARAM_X0);
-set => Definir(PARAM_X0, value);
-}
-public double C1
-{
-get => Obter<double>(PARAM_C1);
-set => Definir(PARAM_C1, value);
-}
-public double C0
-{
-get => Obter<double>(PARAM_C0);
-set => Definir(PARAM_C0, value);
-}
-public double Secao
-{
-get => Obter<double>(PARAM_SECAO);
-set => Definir(PARAM_SECAO, value);
-}
-}
-}
+﻿<UserControl x:Class="Araci.Ribbon.Tabs.AnaliseTab"
+xmlns="http:
+xmlns:x="http:
+Background="#F4F4F4"
+Height="130">
+<Grid Margin="8">
+<!-- 🔑 ESSENCIAL: StackPanel horizontal -->
+<StackPanel Orientation="Horizontal">
+<Border Background="#F4F4F4"
+BorderBrush="#D0D0D0"
+BorderThickness="1"
+Padding="6">
+<DockPanel>
+<!-- TÍTULO -->
+<TextBlock Text="Simulação"
+DockPanel.Dock="Bottom"
+HorizontalAlignment="Center"
+FontSize="12"
+FontWeight="SemiBold"
+Margin="0,8,0,0"/>
+<!-- BOTÕES -->
+<WrapPanel>
+<Button Width="80" Height="70"
+Background="Transparent"
+BorderThickness="0"
+Click="FluxoButton_Click">
+<StackPanel HorizontalAlignment="Center">
+<Image Source="pack:
+Width="50"
+Height="50"/>
+<TextBlock Text="Fluxo"
+Width="80"
+TextAlignment="Center"
+FontSize="11"
+Foreground="Black"/>
+</StackPanel>
+</Button>
+</WrapPanel>
+</DockPanel>
+</Border>
+</StackPanel>
+</Grid>
+</UserControl>
 
 
 ====================================================================================================
-ARQUIVO: C:\Araci-Engine-Front\Araci Engine\Service\ElementoFactory.cs
+ARQUIVO: C:\Araci-Engine-Front\Araci Engine\Ribbon\Tabs\AnaliseTab.xaml.cs
 ====================================================================================================
 
-using System;
-using Araci.Models;
+using System.Windows;
+using System.Windows.Controls;
+using Araci.Applications.Analisar.FluxoDeCorrente;
+using Araci.Services;
+namespace Araci.Ribbon.Tabs
+{
+public partial class AnaliseTab : UserControl
+{
+public AnaliseTab()
+{
+InitializeComponent();
+}
+private EditorContext? Context =>
+DataContext as EditorContext;
+private async void FluxoButton_Click(object sender, RoutedEventArgs e)
+{
+if (Context == null) return;
+FluxoDeCorrenteApplication app = new(Context);
+await app.ExecutarAsync();
+}
+}
+}
+
+
+====================================================================================================
+ARQUIVO: C:\Araci-Engine-Front\Araci Engine\Service\EditorContext.cs
+====================================================================================================
+
+using Araci.Core.Commands;
+using Araci.Core.Documents;
+using Araci.Core.Events;
+using Araci.Core.SceneQueries;
+using Araci.Core.Scenes;
+using Araci.Core.Transactions;
 using Araci.ViewModels;
 namespace Araci.Services
 {
-public class ElementoFactory
-{
-private readonly TypeLibraryService _types;
-public ElementoFactory(TypeLibraryService types)
-{
-_types = types ?? throw new ArgumentNullException(nameof(types));
-}
-public ElementoViewModel? CriarViewModel(Elemento modelo)
-{
-return modelo switch
-{
-Cabo cabo => new CaboViewModel(cabo, _types),
-Carga carga => new CargaViewModel(carga, _types),
-Gerador gerador => new GeradorViewModel(gerador, _types),
-Barra barra => new BarraViewModel(barra, _types),
-_ => null
-};
-}
-public Cabo CriarCabo()
-{
-return new Cabo
-{
-Tipo = _types.TipoCaboPadrao
-?? throw new InvalidOperationException("Nenhum tipo de cabo cadastrado.")
-};
-}
-public CaboViewModel CriarCaboVM()
-{
-return new CaboViewModel(CriarCabo(), _types);
-}
-public Carga CriarCarga()
-{
-return new Carga
-{
-Tipo = _types.TipoCargaPadrao
-?? throw new InvalidOperationException("Nenhum tipo de carga cadastrado.")
-};
-}
-public CargaViewModel CriarCargaVM()
-{
-return new CargaViewModel(CriarCarga(), _types);
-}
-public Gerador CriarGerador()
-{
-return new Gerador
-{
-Tipo = _types.TipoGeradorPadrao
-?? throw new InvalidOperationException("Nenhum tipo de gerador cadastrado.")
-};
-}
-public GeradorViewModel CriarGeradorVM()
-{
-return new GeradorViewModel(CriarGerador(), _types);
-}
-public Barra CriarBarra()
-{
-return new Barra
-{
-Tipo = _types.TipoBarraPadrao
-?? throw new InvalidOperationException("Nenhum tipo de barra cadastrado.")
-};
-}
-public BarraViewModel CriarBarraVM()
-{
-return new BarraViewModel(CriarBarra(), _types);
-}
-}
-}
-
-
-====================================================================================================
-ARQUIVO: C:\Araci-Engine-Front\Araci Engine\ViewModels\CaboViewModel.cs
-====================================================================================================
-
-using System.Collections;
-using System.Windows;
-using Araci.Core.SceneNodes;
-using Araci.Models;
-using Araci.Services;
-namespace Araci.ViewModels
-{
-public class CaboViewModel : ElementoViewModel
-{
-private bool _possuiPreview;
-public CaboViewModel(Cabo modelo, TypeLibraryService types)
-: base(modelo, new CaboNode(modelo), types)
-{
-SelecionarPrimeiroTipoDisponivel();
-}
-public Cabo Cabo => (Cabo)Modelo;
-public override IEnumerable TiposDisponiveis => Types.TiposCabos;
-public string Nome
-{
-get => Cabo.Nome;
-set
-{
-if (Cabo.Nome == value)
-return;
-Cabo.Nome = value;
-OnPropertyChanged();
-NotificarParametros();
-}
-}
-public string BarraOrigem
-{
-get => Cabo.BarraOrigem;
-set
-{
-if (Cabo.BarraOrigem == value)
-return;
-Cabo.BarraOrigem = value;
-OnPropertyChanged();
-NotificarParametros();
-}
-}
-public string BarraDestino
-{
-get => Cabo.BarraDestino;
-set
-{
-if (Cabo.BarraDestino == value)
-return;
-Cabo.BarraDestino = value;
-OnPropertyChanged();
-NotificarParametros();
-}
-}
-public double Comprimento
-{
-get => Cabo.Comprimento;
-set
-{
-if (Cabo.Comprimento == value)
-return;
-Cabo.Comprimento = value;
-OnPropertyChanged();
-NotificarParametros();
-}
-}
-public double Ampacidade
-{
-get => Cabo.Ampacidade;
-set
-{
-if (Cabo.Ampacidade == value)
-return;
-Cabo.Ampacidade = value;
-OnPropertyChanged();
-NotificarParametros();
-}
-}
-public string TensaoLinha
-{
-get => Cabo.TensaoLinha;
-set
-{
-if (Cabo.TensaoLinha == value)
-return;
-Cabo.TensaoLinha = value;
-OnPropertyChanged();
-NotificarParametros();
-}
-}
-public string TensaoFaseA
-{
-get => Cabo.TensaoFaseA;
-set
-{
-if (Cabo.TensaoFaseA == value)
-return;
-Cabo.TensaoFaseA = value;
-OnPropertyChanged();
-NotificarParametros();
-}
-}
-public string TensaoFaseB
-{
-get => Cabo.TensaoFaseB;
-set
-{
-if (Cabo.TensaoFaseB == value)
-return;
-Cabo.TensaoFaseB = value;
-OnPropertyChanged();
-NotificarParametros();
-}
-}
-public string TensaoFaseC
-{
-get => Cabo.TensaoFaseC;
-set
-{
-if (Cabo.TensaoFaseC == value)
-return;
-Cabo.TensaoFaseC = value;
-OnPropertyChanged();
-NotificarParametros();
-}
-}
-public string CorrenteLinha
-{
-get => Cabo.CorrenteLinha;
-set
-{
-if (Cabo.CorrenteLinha == value)
-return;
-Cabo.CorrenteLinha = value;
-OnPropertyChanged();
-NotificarParametros();
-}
-}
-public string CorrenteFaseA
-{
-get => Cabo.CorrenteFaseA;
-set
-{
-if (Cabo.CorrenteFaseA == value)
-return;
-Cabo.CorrenteFaseA = value;
-OnPropertyChanged();
-NotificarParametros();
-}
-}
-public string CorrenteFaseB
-{
-get => Cabo.CorrenteFaseB;
-set
-{
-if (Cabo.CorrenteFaseB == value)
-return;
-Cabo.CorrenteFaseB = value;
-OnPropertyChanged();
-NotificarParametros();
-}
-}
-public string CorrenteFaseC
-{
-get => Cabo.CorrenteFaseC;
-set
-{
-if (Cabo.CorrenteFaseC == value)
-return;
-Cabo.CorrenteFaseC = value;
-OnPropertyChanged();
-NotificarParametros();
-}
-}
-public override double WorldX => Bounds.X;
-public override double WorldY => Bounds.Y;
-public void Iniciar(Point p)
-{
-Cabo.Vertices.Clear();
-Cabo.Vertices.Add(p);
-Cabo.DefinirOrigem(p);
-Cabo.PreviewPonto = p;
-_possuiPreview = true;
-Atualizar();
-}
-public void AtualizarPreview(Point p)
-{
-if (!_possuiPreview)
-return;
-if (Cabo.PreviewPonto.HasValue && Cabo.PreviewPonto.Value == p)
-return;
-Cabo.PreviewPonto = p;
-Atualizar();
-}
-public void FinalizarNoPonto(Point p)
-{
-if (Cabo.Vertices.Count == 0)
-return;
-Cabo.PreviewPonto = null;
-_possuiPreview = false;
-var ultimo = Cabo.Vertices[^1];
-if (ultimo != p)
-Cabo.Vertices.Add(p);
-Cabo.DefinirDestino(p);
-Atualizar();
-}
-public void RemoverPreview()
-{
-if (!_possuiPreview && Cabo.PreviewPonto == null)
-return;
-_possuiPreview = false;
-Cabo.PreviewPonto = null;
-Atualizar();
-}
-public override void Mover(Vector delta)
-{
-CaboNode.Mover(delta);
-foreach (var t in Cabo.Terminais)
-{
-t.Posicao = new Point(
-t.Posicao.X + delta.X,
-t.Posicao.Y + delta.Y);
-}
-Atualizar();
-}
-public override ElementoEstado CapturarEstado()
-{
-return new ElementoEstado(WorldX, WorldY, vertices: Cabo.Vertices);
-}
-public override void AplicarEstado(ElementoEstado estado)
-{
-Cabo.Vertices.Clear();
-foreach (var p in estado.Vertices)
-Cabo.Vertices.Add(p);
-if (Cabo.Vertices.Count > 0)
-{
-Cabo.DefinirOrigem(Cabo.Vertices[0]);
-Cabo.DefinirDestino(Cabo.Vertices[^1]);
-}
-Atualizar();
-}
-private CaboNode CaboNode => (CaboNode)Node;
-private void Atualizar()
-{
-CaboNode.AtualizarGeometria();
-OnPropertyChanged(nameof(WorldX));
-OnPropertyChanged(nameof(WorldY));
-OnPropertyChanged(nameof(Bounds));
-NotificarGeometria();
-}
-}
-}
-
-
-====================================================================================================
-ARQUIVO: C:\Araci-Engine-Front\Araci Engine\ViewModels\ElementoViewModel.cs
-====================================================================================================
-
-using System;
-using System.Collections;
-using System.Collections.ObjectModel;
-using System.Linq;
-using System.Windows;
-using System.Windows.Input;
-using System.Windows.Media;
-using Araci.Core.Rendering;
-using Araci.Core.SceneNodes;
-using Araci.Models;
-using Araci.Models.Tipos;
-using Araci.Properties;
-using Araci.Services;
-using Araci.ViewModels.Base;
-using Araci.ViewModels.VisualStates;
-namespace Araci.ViewModels
-{
-public abstract class ElementoViewModel : ViewModelBase
-{
-private readonly ElementoNode _node;
-private ICommand? _abrirPropriedadesTipoCommand;
-private ObservableCollection<ParameterViewModel>? _parametros;
-protected ElementoViewModel(Elemento modelo, ElementoNode node, TypeLibraryService types)
-{
-Modelo = modelo ?? throw new ArgumentNullException(nameof(modelo));
-_node = node ?? throw new ArgumentNullException(nameof(node));
-Types = types ?? throw new ArgumentNullException(nameof(types));
-VisualState = new ElementoVisualState();
-_node.AtualizarGeometria();
-}
-public Elemento Modelo { get; }
-public ElementoNode Node => _node;
-protected TypeLibraryService Types { get; }
-public TipoElemento Tipo
-{
-get => Modelo.Tipo!;
-set
-{
-if (ReferenceEquals(Modelo.Tipo, value))
-return;
-Modelo.Tipo = value;
-OnPropertyChanged();
-OnPropertyChanged(nameof(TipoViewModel));
-}
-}
-public abstract IEnumerable TiposDisponiveis { get; }
-public virtual TipoElementoViewModel? TipoViewModel =>
-TipoElementoViewModelFactory.Criar(Tipo);
-public ICommand AbrirPropriedadesTipoCommand =>
-_abrirPropriedadesTipoCommand ??= new RelayCommand(AbrirPropriedadesTipo);
-public ElementoVisualState VisualState { get; }
-public bool IsSelecionado
-{
-get => VisualState.IsSelecionado;
-set
-{
-if (VisualState.IsSelecionado == value)
-return;
-VisualState.AtualizarSelecao(value);
-OnPropertyChanged();
-OnPropertyChanged(nameof(Stroke));
-OnPropertyChanged(nameof(StrokeThickness));
-OnPropertyChanged(nameof(RenderData));
-}
-}
-public bool IsHover
-{
-get => VisualState.IsHover;
-set
-{
-if (VisualState.IsHover == value)
-return;
-VisualState.AtualizarHover(value);
-OnPropertyChanged();
-OnPropertyChanged(nameof(Stroke));
-OnPropertyChanged(nameof(StrokeThickness));
-OnPropertyChanged(nameof(RenderData));
-}
-}
-public Brush Stroke => VisualState.Stroke;
-public double StrokeThickness => VisualState.StrokeThickness;
-public virtual ElementoRenderData RenderData => new(
-Largura,
-Altura,
-PontoLocalInicial,
-PontoLocalFinal,
-Stroke,
-StrokeThickness);
-public virtual double X
-{
-get => Node.X;
-set
-{
-if (Math.Abs(Node.X - value) < 0.0001)
-return;
-Node.X = value;
-AtualizarNode();
-}
-}
-public virtual double Y
-{
-get => Node.Y;
-set
-{
-if (Math.Abs(Node.Y - value) < 0.0001)
-return;
-Node.Y = value;
-AtualizarNode();
-}
-}
-public virtual double WorldX => Node.X;
-public virtual double WorldY => Node.Y;
-public virtual double Largura => Node.Largura;
-public virtual double Altura
-{
-get => Node.Altura;
-set { }
-}
-public virtual Rect Bounds => Node.Bounds;
-public virtual Point Centro => Node.Centro;
-public ObservableCollection<ParameterViewModel> Parametros =>
-_parametros ??=
-new ObservableCollection<ParameterViewModel>(
-Modelo.Parametros.Values.Select(p => new ParameterViewModel(p)));
-protected virtual Point PontoLocalInicial => new(0, 0);
-protected virtual Point PontoLocalFinal => new(Largura, Altura);
-protected void SelecionarPrimeiroTipoDisponivel()
-{
-TipoElemento? primeiroTipo = null;
-bool tipoAtualExiste = false;
-foreach (object? item in TiposDisponiveis)
-{
-if (item is not TipoElemento tipo)
-continue;
-primeiroTipo ??= tipo;
-if (ReferenceEquals(tipo, Modelo.Tipo))
-{
-tipoAtualExiste = true;
-break;
-}
-}
-if (tipoAtualExiste || primeiroTipo == null)
-return;
-Tipo = primeiroTipo;
-}
-public virtual void Mover(Vector delta)
-{
-Node.Mover(delta);
-NotificarGeometria();
-}
-public virtual ElementoEstado CapturarEstado()
-{
-return new ElementoEstado(X, Y);
-}
-public virtual void AplicarEstado(ElementoEstado estado)
-{
-Node.X = estado.X;
-Node.Y = estado.Y;
-AtualizarNode();
-}
-public virtual void NotificarParametros()
-{
-foreach (var parametro in Parametros)
-parametro.Atualizar();
-OnPropertyChanged(nameof(Parametros));
-}
-public void NotificarPropriedades(params string[] nomes)
-{
-foreach (string nome in nomes)
-OnPropertyChanged(nome);
-NotificarParametros();
-}
-protected virtual void AtualizarNode()
-{
-Node.AtualizarGeometria();
-NotificarGeometria();
-}
-protected virtual void NotificarGeometria()
-{
-OnPropertyChanged(nameof(X));
-OnPropertyChanged(nameof(Y));
-OnPropertyChanged(nameof(WorldX));
-OnPropertyChanged(nameof(WorldY));
-OnPropertyChanged(nameof(Largura));
-OnPropertyChanged(nameof(Altura));
-OnPropertyChanged(nameof(Bounds));
-OnPropertyChanged(nameof(Centro));
-OnPropertyChanged(nameof(RenderData));
-}
-private void AbrirPropriedadesTipo()
-{
-var janela = new TypePropertiesWindow
-{
-Owner = Application.Current.MainWindow,
-DataContext = TipoViewModel
-};
-janela.ShowDialog();
+public class EditorContext
+{
+public EditorContext()
+: this(new EventBus())
+{
+}
+public EditorContext(IEventBus eventBus)
+{
+Events = eventBus;
+Scene = new Scene();
+SceneQueries = new SceneQueryService(Scene);
+Snap = new SnapService(SceneQueries);
+ElementoFactory = new ElementoFactory(Types);
+Selection = new SelectionService(this);
+MoveHud = new MoveHudService(this);
+Move = new MoveService(this);
+Tools = new ToolService(this);
+Input = new InputRouter(this);
+}
+public IEventBus Events { get; }
+public AraciDocument Document { get; set; } = new AraciDocument();
+public Scene Scene { get; } = new Scene();
+public ISceneQueryService SceneQueries { get; }
+public ToolService Tools { get; }
+public InputRouter Input { get; }
+public ViewportService? Viewport { get; private set; }
+public void InicializarViewport(ViewportViewModel viewportViewModel)
+{
+Viewport = new ViewportService(viewportViewModel);
+}
+public EditorState Editor { get; } = new EditorState();
+public MoveHudService MoveHud { get; }
+public SelectionBoxViewModel SelectionBox { get; } = new SelectionBoxViewModel();
+public CommandManager Commands { get; } = new CommandManager();
+public SelectionService Selection { get; }
+public MoveService Move { get; }
+public SnapService Snap { get; }
+public TypeLibraryService Types { get; } = new TypeLibraryService();
+public ElementoFactory ElementoFactory { get; }
+public TransactionScope BeginTransaction()
+{
+return new TransactionScope(Commands);
 }
 }
 }

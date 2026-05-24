@@ -17,11 +17,22 @@ namespace Araci.Ribbon.Tabs
 
         private async void FluxoButton_Click(object sender, RoutedEventArgs e)
         {
-            if (Context == null) return;
+            if (Context == null)
+                return;
+
+            FluxoDeCorrenteWindow window = new()
+            {
+                Owner = Window.GetWindow(this)
+            };
+
+            bool? result = window.ShowDialog();
+
+            if (result != true)
+                return;
 
             FluxoDeCorrenteApplication app = new(Context);
 
-            await app.ExecutarAsync();
+            await app.ExecutarAsync(window.Options);
         }
     }
 }
