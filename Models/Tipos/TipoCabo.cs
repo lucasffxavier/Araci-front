@@ -18,12 +18,12 @@ namespace Araci.Models.Tipos
             Categoria = "Cabos";
 
             DefinirParametro(new Parameter<int>(PARAM_FASES, 3));
-            DefinirParametro(new Parameter<double>(PARAM_R1, 0.12));
-            DefinirParametro(new Parameter<double>(PARAM_X1, 0.09));
-            DefinirParametro(new Parameter<double>(PARAM_R0, 0.36));
-            DefinirParametro(new Parameter<double>(PARAM_X0, 0.27));
-            DefinirParametro(new Parameter<double>(PARAM_C1, 0.001));
-            DefinirParametro(new Parameter<double>(PARAM_C0, 0.0007));
+            DefinirParametro(new Parameter<double>(PARAM_R1, 0.1));
+            DefinirParametro(new Parameter<double>(PARAM_X1, 0.2));
+            DefinirParametro(new Parameter<double>(PARAM_R0, 0.3));
+            DefinirParametro(new Parameter<double>(PARAM_X0, 0.6));
+            DefinirParametro(new Parameter<double>(PARAM_C1, 3.4));
+            DefinirParametro(new Parameter<double>(PARAM_C0, 1.6));
             DefinirParametro(new Parameter<double>(PARAM_SECAO, 253));
         }
 

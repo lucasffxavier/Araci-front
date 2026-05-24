@@ -24,20 +24,20 @@ namespace Araci.Models
 
         public Cabo()
         {
-            DefinirParametro(new Parameter<string>(PARAM_BARRA_ORIGEM, string.Empty));
-            DefinirParametro(new Parameter<string>(PARAM_BARRA_DESTINO, string.Empty));
-            DefinirParametro(new Parameter<double>(PARAM_COMPRIMENTO, 120));
+            DefinirParametro(new Parameter<string>(PARAM_BARRA_ORIGEM, "GERADOR-001"));
+            DefinirParametro(new Parameter<string>(PARAM_BARRA_DESTINO, "CARGA-001"));
+            DefinirParametro(new Parameter<double>(PARAM_COMPRIMENTO, 1));
             DefinirParametro(new Parameter<double>(PARAM_AMPACIDADE, 520));
-            DefinirParametro(new Parameter<string>(PARAM_TENSAO_LINHA, "13.8∠0°"));
-            DefinirParametro(new Parameter<string>(PARAM_TENSAO_FASE_A, "7.97∠0°"));
-            DefinirParametro(new Parameter<string>(PARAM_TENSAO_FASE_B, "7.97∠-120°"));
-            DefinirParametro(new Parameter<string>(PARAM_TENSAO_FASE_C, "7.97∠120°"));
+            DefinirParametro(new Parameter<string>(PARAM_TENSAO_LINHA, "12.47∠0°"));
+            DefinirParametro(new Parameter<string>(PARAM_TENSAO_FASE_A, "7.2∠0°"));
+            DefinirParametro(new Parameter<string>(PARAM_TENSAO_FASE_B, "7.2∠-120°"));
+            DefinirParametro(new Parameter<string>(PARAM_TENSAO_FASE_C, "7.2∠120°"));
             DefinirParametro(new Parameter<string>(PARAM_CORRENTE_LINHA, "0∠0°"));
             DefinirParametro(new Parameter<string>(PARAM_CORRENTE_FASE_A, "0∠0°"));
             DefinirParametro(new Parameter<string>(PARAM_CORRENTE_FASE_B, "0∠-120°"));
             DefinirParametro(new Parameter<string>(PARAM_CORRENTE_FASE_C, "0∠120°"));
 
-            Nome = "CABO-01";
+            Nome = "L1";
         }
 
         public IReadOnlyList<Terminal> Terminais => _terminais;
@@ -127,7 +127,7 @@ namespace Araci.Models
         public void DefinirOrigem(Point p)
         {
             if (_terminais.Count == 0)
-                _terminais.Add(new Terminal(this, p));
+                _terminais.Add(new Terminal(this, p) { Barra = BarraOrigem });
             else
                 _terminais[0].Posicao = p;
         }
@@ -135,7 +135,7 @@ namespace Araci.Models
         public void DefinirDestino(Point p)
         {
             if (_terminais.Count < 2)
-                _terminais.Add(new Terminal(this, p));
+                _terminais.Add(new Terminal(this, p) { Barra = BarraDestino });
             else
                 _terminais[1].Posicao = p;
         }

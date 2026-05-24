@@ -9,18 +9,19 @@ namespace Araci.Models
 
         public Carga()
         {
-            Nome = "CARGA-01";
+            Nome = "CARGA-001";
+            Barra = "CARGA-001";
             Alimentador = 1;
-            PotenciaAtiva = 1500;
-            PotenciaReativa = 450;
+            PotenciaAtiva = 800;
+            PotenciaReativa = 300;
             CorrenteLinha = "0∠0°";
             CorrenteFaseA = "0∠0°";
             CorrenteFaseB = "0∠-120°";
             CorrenteFaseC = "0∠120°";
-            TensaoLinha = "13.8∠0°";
-            TensaoFaseA = "7.97∠0°";
-            TensaoFaseB = "7.97∠-120°";
-            TensaoFaseC = "7.97∠120°";
+            TensaoLinha = "12.47∠0°";
+            TensaoFaseA = "7.2∠0°";
+            TensaoFaseB = "7.2∠-120°";
+            TensaoFaseC = "7.2∠120°";
 
             PosicaoX = 500;
             PosicaoY = 250;
@@ -33,6 +34,7 @@ namespace Araci.Models
             if (terminais.Count == 0)
                 return;
 
+            terminais[0].Barra = Barra;
             terminais[0].Posicao = new Point(PosicaoX + largura / 2, PosicaoY);
         }
 

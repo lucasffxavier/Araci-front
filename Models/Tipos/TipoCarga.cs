@@ -16,7 +16,7 @@ namespace Araci.Models.Tipos
 
             DefinirParametro(new Parameter<int>(PARAM_MODELO_CARGA, 1));
             DefinirParametro(new Parameter<string>(PARAM_CONEXAO, "Wye"));
-            DefinirParametro(new Parameter<string>(PARAM_TENSAO, "13.8"));
+            DefinirParametro(new Parameter<string>(PARAM_TENSAO, "12.47"));
             DefinirParametro(new Parameter<int>(PARAM_FASES, 3));
             DefinirParametro(new Parameter<double>(PARAM_FATOR_POTENCIA, 0.96));
         }

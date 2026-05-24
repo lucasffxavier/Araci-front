@@ -20,14 +20,15 @@ namespace Araci.Models
             DefinirParametro(new Parameter<double>(PARAM_POTENCIA_APARENTE, 0));
 
             Nome = "GERADOR-001";
+            Barra = "GERADOR-001";
             Alimentador = 1;
-            PotenciaAparente = 5100;
-            PotenciaAtiva = 5000;
-            PotenciaReativa = 995;
-            TensaoLinha = "34.5∠0°";
-            TensaoFaseA = "19.92∠0°";
-            TensaoFaseB = "19.92∠-120°";
-            TensaoFaseC = "19.92∠120°";
+            PotenciaAparente = 1020;
+            PotenciaAtiva = 1000;
+            PotenciaReativa = 203;
+            TensaoLinha = "12.47∠0°";
+            TensaoFaseA = "7.2∠0°";
+            TensaoFaseB = "7.2∠-120°";
+            TensaoFaseC = "7.2∠120°";
             CorrenteLinha = "0∠0°";
             CorrenteFaseA = "0∠0°";
             CorrenteFaseB = "0∠-120°";
@@ -46,9 +47,10 @@ namespace Araci.Models
                 terminais.Clear();
 
                 for (int i = 0; i < 4; i++)
-                    terminais.Add(new Terminal(this, new Point()));
+                    terminais.Add(new Terminal(this, new Point()) { Barra = Barra });
             }
 
+            terminais[0].Barra = Barra;
             terminais[0].Posicao = new Point(PosicaoX + largura / 2, PosicaoY);
             terminais[1].Posicao = new Point(PosicaoX + largura / 2, PosicaoY + altura);
             terminais[2].Posicao = new Point(PosicaoX, PosicaoY + altura / 2);

@@ -21,5 +21,9 @@ namespace Araci.DTOs
         public double R0 { get; set; }
 
         public double X0 { get; set; }
+
+        public double C1 { get; set; }
+
+        public double C0 { get; set; }
     }
 }

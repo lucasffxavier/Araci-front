@@ -207,6 +207,14 @@ namespace Araci.ViewModels
             OnPropertyChanged(nameof(Parametros));
         }
 
+        public void NotificarPropriedades(params string[] nomes)
+        {
+            foreach (string nome in nomes)
+                OnPropertyChanged(nome);
+
+            NotificarParametros();
+        }
+
         protected virtual void AtualizarNode()
         {
             Node.AtualizarGeometria();

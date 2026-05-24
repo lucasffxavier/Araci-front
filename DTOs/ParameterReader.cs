@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Globalization;
 using System.Linq;
 using Araci.API;
 using Araci.Core.Documents;
@@ -34,12 +35,13 @@ namespace Araci.DTOs
                 {
                     Id = carga.Id.ToString(),
                     Nome = ReadString(carga, "Nome"),
-                    Barra = ReadBarra(carga, "Barra 1"),
+                    Barra = ReadBarra(carga, "Barra", "Barra 1"),
                     Fases = ReadInt(carga, "Fases"),
-                    R = ReadDouble(carga, "Carga resistência", "Carga resistencia"),
-                    X = ReadDouble(carga, "Carga reatância", "Carga reatancia"),
+                    R = ReadDouble(carga, "Carga resistencia", "Carga resistÃªncia"),
+                    X = ReadDouble(carga, "Carga reatancia", "Carga reatÃ¢ncia"),
                     PotenciaAtiva = ReadDouble(carga, "PotenciaAtiva"),
                     PotenciaReativa = ReadDouble(carga, "PotenciaReativa"),
+                    Tensao = ReadVoltage(carga, "TensaoKV", "Tensao", "TensaoLinha"),
                     Conexao = ReadString(carga, "Carga conexao", "Conexao"),
                     Modelo = ReadInt(carga, "Carga modelo", "ModeloCarga")
                 })
@@ -53,14 +55,16 @@ namespace Araci.DTOs
                 {
                     Id = cabo.Id.ToString(),
                     Nome = ReadString(cabo, "Nome"),
-                    Barra1 = ReadBarra(cabo, "Barra 1", "BarraOrigem"),
-                    Barra2 = ReadBarra(cabo, "Barra 2", "BarraDestino"),
+                    Barra1 = ReadBarra(cabo, "BarraOrigem", "Barra 1"),
+                    Barra2 = ReadBarra(cabo, "BarraDestino", "Barra 2"),
                     Fases = ReadInt(cabo, "Fases"),
                     Comprimento = ReadDouble(cabo, "Comprimento"),
-                    R1 = ReadDouble(cabo, "R1"),
-                    X1 = ReadDouble(cabo, "X1"),
+                    R1 = ReadDouble(cabo, "R1", "Resistencia"),
+                    X1 = ReadDouble(cabo, "X1", "Reatancia"),
                     R0 = ReadDouble(cabo, "R0"),
-                    X0 = ReadDouble(cabo, "X0")
+                    X0 = ReadDouble(cabo, "X0"),
+                    C1 = ReadDouble(cabo, "C1"),
+                    C0 = ReadDouble(cabo, "C0")
                 })
                 .ToList();
         }
@@ -85,35 +89,13 @@ namespace Araci.DTOs
                 {
                     Id = gerador.Id.ToString(),
                     Nome = ReadString(gerador, "Nome"),
-                    Barra = ReadBarra(gerador, "Barra 1"),
+                    Barra = ReadBarra(gerador, "Barra", "Barra 1"),
                     Fases = ReadInt(gerador, "Fases"),
-                    Tensao = ReadDouble(gerador, "Tensao", "TensaoLinha"),
-                    Potencia = ReadDouble(gerador, "Potencia", "PotenciaAparente"),
+                    Tensao = ReadVoltage(gerador, "TensaoKV", "Tensao", "TensaoLinha"),
+                    Potencia = ReadDouble(gerador, "PotenciaAtiva", "Potencia", "PotenciaAparente"),
                     FP = ReadDouble(gerador, "FP", "FatorPotencia")
                 })
                 .ToList();
-        }
-
-        public SlackData GetSlack()
-        {
-            Elemento? slack = GetElementsByTypeName("Slack").FirstOrDefault();
-
-            if (slack == null)
-            {
-                slack = _api.ObterElementos<Barra>().FirstOrDefault();
-            }
-
-            if (slack == null)
-                throw new InvalidOperationException("Nenhuma barra disponível para fallback de slack.");
-
-            return new SlackData
-            {
-                Id = slack.Id.ToString(),
-                Nome = ReadString(slack, "Nome"),
-                Tensao = ReadDouble(slack, "Tensao"),
-                Fases = ReadInt(slack, "Fases"),
-                Barra = ReadBarra(slack, "Barra", "Nome")
-            };
         }
 
         private IList<Elemento> GetElementsByTypeName(params string[] typeNames)
@@ -140,37 +122,69 @@ namespace Araci.DTOs
 
         private static string ReadString(Elemento elemento, params string[] names)
         {
-            return ReadValue<string>(elemento, names) ?? string.Empty;
+            return ReadValueAsString(elemento, names) ?? string.Empty;
         }
 
         private static int ReadInt(Elemento elemento, params string[] names)
         {
-            return ReadValue<int>(elemento, names);
+            return (int)ReadDouble(elemento, names);
         }
 
         private static double ReadDouble(Elemento elemento, params string[] names)
         {
-            return ReadValue<double>(elemento, names);
+            object? value = ReadValueObject(elemento, names);
+
+            if (value is double doubleValue)
+                return ElectricalValueParser.ToNumber(doubleValue);
+
+            if (value is int intValue)
+                return intValue;
+
+            if (value is string text)
+                return ElectricalValueParser.ToNumber(text);
+
+            return 0;
         }
 
-        private static T? ReadValue<T>(Elemento elemento, params string[] names)
+        private static double ReadVoltage(Elemento elemento, params string[] names)
+        {
+            object? value = ReadValueObject(elemento, names);
+
+            if (value is double doubleValue)
+                return ElectricalValueParser.ToVoltageKv(doubleValue);
+
+            if (value is int intValue)
+                return ElectricalValueParser.ToVoltageKv(intValue);
+
+            if (value is string text)
+                return ElectricalValueParser.ToVoltageKv(text);
+
+            return 0;
+        }
+
+        private static string? ReadValueAsString(Elemento elemento, params string[] names)
+        {
+            object? value = ReadValueObject(elemento, names);
+
+            return value switch
+            {
+                IFormattable formattable => formattable.ToString(null, CultureInfo.InvariantCulture),
+                _ => value?.ToString()
+            };
+        }
+
+        private static object? ReadValueObject(Elemento elemento, params string[] names)
         {
             foreach (string name in names)
             {
-                if (elemento.Parametros.TryGetValue(name, out Parameter? parametro) &&
-                    parametro is Parameter<T> typed)
-                {
-                    return typed.Valor;
-                }
+                if (elemento.Parametros.TryGetValue(name, out Parameter? parametro))
+                    return parametro.ValorObjeto;
 
-                if (elemento.Tipo?.Parametros.TryGetValue(name, out parametro) == true &&
-                    parametro is Parameter<T> typedTipo)
-                {
-                    return typedTipo.Valor;
-                }
+                if (elemento.Tipo?.Parametros.TryGetValue(name, out parametro) == true)
+                    return parametro.ValorObjeto;
             }
 
-            return default;
+            return null;
         }
 
         public class LoadData
@@ -190,6 +204,8 @@ namespace Araci.DTOs
             public double PotenciaAtiva { get; set; }
 
             public double PotenciaReativa { get; set; }
+
+            public double Tensao { get; set; }
 
             public string Conexao { get; set; } = string.Empty;
 
@@ -217,6 +233,10 @@ namespace Araci.DTOs
             public double R0 { get; set; }
 
             public double X0 { get; set; }
+
+            public double C1 { get; set; }
+
+            public double C0 { get; set; }
         }
 
         public class TransformerData
@@ -245,19 +265,6 @@ namespace Araci.DTOs
             public double Potencia { get; set; }
 
             public double FP { get; set; }
-        }
-
-        public class SlackData
-        {
-            public string Id { get; set; } = string.Empty;
-
-            public string Nome { get; set; } = string.Empty;
-
-            public double Tensao { get; set; }
-
-            public int Fases { get; set; }
-
-            public string Barra { get; set; } = string.Empty;
         }
     }
 }

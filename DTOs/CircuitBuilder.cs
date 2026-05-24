@@ -6,6 +6,8 @@ namespace Araci.DTOs
 {
     public class CircuitBuilder
     {
+        private const double DefaultBaseKv = 12.47;
+
         private readonly ParameterReader _reader;
 
         public CircuitBuilder(ParameterReader reader)
@@ -15,13 +17,17 @@ namespace Araci.DTOs
 
         public CircuitDto Build()
         {
+            IList<ParameterReader.GeneratorData> generators = _reader.GetGenerators();
+            ParameterReader.GeneratorData slackGenerator = generators.FirstOrDefault()
+                ?? throw new InvalidOperationException("Nenhum gerador encontrado para definir a fonte slack.");
+
             var dto = new CircuitDto
             {
                 Loads = BuildLoads(),
                 Lines = BuildLines(),
                 Transformers = BuildTransformers(),
-                Generators = BuildGenerators(),
-                Slack = BuildSlack()
+                Generators = BuildGenerators(generators.Skip(1)),
+                Slack = BuildSlack(slackGenerator)
             };
 
             Validar(dto);
@@ -35,15 +41,16 @@ namespace Araci.DTOs
                 .Select(load => new LoadDto
                 {
                     Id = load.Id,
-                    Nome = load.Nome,
-                    Barra = load.Barra,
-                    Fases = load.Fases,
+                    Nome = SafeName(load.Nome, "Carga"),
+                    Barra = SafeBus(load.Barra, load.Nome),
+                    Fases = SafePhases(load.Fases),
                     R = load.R,
                     X = load.X,
-                    PotenciaAtiva = load.PotenciaAtiva,
-                    PotenciaReativa = load.PotenciaReativa,
-                    Conexao = load.Conexao,
-                    Modelo = load.Modelo
+                    PotenciaAtiva = load.PotenciaAtiva > 0 ? load.PotenciaAtiva : 800,
+                    PotenciaReativa = load.PotenciaReativa >= 0 ? load.PotenciaReativa : 300,
+                    Tensao = SafeKv(load.Tensao),
+                    Conexao = string.IsNullOrWhiteSpace(load.Conexao) ? "Wye" : load.Conexao,
+                    Modelo = load.Modelo > 0 ? load.Modelo : 1
                 })
                 .ToList();
         }
@@ -51,18 +58,26 @@ namespace Araci.DTOs
         private IList<LineDto> BuildLines()
         {
             return _reader.GetLines()
-                .Select(line => new LineDto
+                .Select(line =>
                 {
-                    Id = line.Id,
-                    Nome = line.Nome,
-                    Barra1 = line.Barra1,
-                    Barra2 = line.Barra2,
-                    Fases = line.Fases,
-                    Comprimento = line.Comprimento,
-                    R1 = line.R1,
-                    X1 = line.X1,
-                    R0 = line.R0,
-                    X0 = line.X0
+                    double r1 = line.R1 > 0 ? line.R1 : 0.1;
+                    double x1 = line.X1 > 0 ? line.X1 : 0.2;
+
+                    return new LineDto
+                    {
+                        Id = line.Id,
+                        Nome = SafeName(line.Nome, "L1"),
+                        Barra1 = line.Barra1?.Trim() ?? string.Empty,
+                        Barra2 = line.Barra2?.Trim() ?? string.Empty,
+                        Fases = SafePhases(line.Fases),
+                        Comprimento = line.Comprimento > 0 ? line.Comprimento : 1,
+                        R1 = r1,
+                        X1 = x1,
+                        R0 = line.R0 > 0 ? line.R0 : 3 * r1,
+                        X0 = line.X0 > 0 ? line.X0 : 3 * x1,
+                        C1 = line.C1 > 0 ? line.C1 : 3.4,
+                        C0 = line.C0 > 0 ? line.C0 : 1.6
+                    };
                 })
                 .ToList();
         }
@@ -74,52 +89,77 @@ namespace Araci.DTOs
                 {
                     Id = transformer.Id,
                     Nome = transformer.Nome,
-                    Fases = transformer.Fases,
+                    Fases = SafePhases(transformer.Fases),
                     Enrolamentos = transformer.Enrolamentos
                 })
                 .ToList();
         }
 
-        private IList<GeneratorDto> BuildGenerators()
+        private static IList<GeneratorDto> BuildGenerators(IEnumerable<ParameterReader.GeneratorData> generators)
         {
-            return _reader.GetGenerators()
+            return generators
                 .Select(generator => new GeneratorDto
                 {
                     Id = generator.Id,
-                    Nome = generator.Nome,
-                    Barra = generator.Barra,
-                    Fases = generator.Fases,
-                    Tensao = generator.Tensao,
-                    Potencia = generator.Potencia,
-                    FP = generator.FP
+                    Nome = SafeName(generator.Nome, "Gerador"),
+                    Barra = SafeBus(generator.Barra, generator.Nome),
+                    Fases = SafePhases(generator.Fases),
+                    Tensao = SafeKv(generator.Tensao),
+                    Potencia = generator.Potencia > 0 ? generator.Potencia : 1000,
+                    FP = generator.FP > 0 ? generator.FP : 0.98
                 })
                 .ToList();
         }
 
-        private SlackDto BuildSlack()
+        private static SlackDto BuildSlack(ParameterReader.GeneratorData generator)
         {
-            ParameterReader.SlackData slack = _reader.GetSlack();
+            string nome = SafeName(generator.Nome, "GERADOR-001");
 
             return new SlackDto
             {
-                Id = slack.Id,
-                Nome = slack.Nome,
-                Tensao = slack.Tensao,
-                Fases = slack.Fases,
-                Barra = slack.Barra
+                Id = generator.Id,
+                Nome = nome,
+                Tensao = SafeKv(generator.Tensao),
+                Fases = SafePhases(generator.Fases),
+                Barra = SafeBus(generator.Barra, nome)
             };
         }
 
-        private void Validar(CircuitDto dto)
+        private static void Validar(CircuitDto dto)
         {
             if (dto.Slack == null || string.IsNullOrWhiteSpace(dto.Slack.Barra))
-                throw new InvalidOperationException("Slack inválido.");
+                throw new InvalidOperationException("Nenhum gerador encontrado para definir a fonte slack.");
 
-            if (dto.Lines.Any(l => string.IsNullOrWhiteSpace(l.Barra1) || string.IsNullOrWhiteSpace(l.Barra2)))
-                throw new InvalidOperationException("Linha sem barras definidas.");
+            foreach (LineDto line in dto.Lines)
+            {
+                if (string.IsNullOrWhiteSpace(line.Barra1) || string.IsNullOrWhiteSpace(line.Barra2))
+                    throw new InvalidOperationException($"Cabo '{line.Nome}' sem barra origem/destino definida.");
+            }
 
-            if (!dto.Loads.Any() && !dto.Generators.Any())
-                throw new InvalidOperationException("Circuito sem carga ou geração.");
+            if (!dto.Loads.Any())
+                throw new InvalidOperationException("Nenhuma carga encontrada para simular o fluxo.");
+        }
+
+        private static string SafeName(string value, string fallback)
+        {
+            return string.IsNullOrWhiteSpace(value) ? fallback : value.Trim();
+        }
+
+        private static string SafeBus(string value, string fallback)
+        {
+            return string.IsNullOrWhiteSpace(value)
+                ? SafeName(fallback, "BARRA-001")
+                : value.Trim();
+        }
+
+        private static int SafePhases(int value)
+        {
+            return value > 0 ? value : 3;
+        }
+
+        private static double SafeKv(double value)
+        {
+            return value > 0 ? value : DefaultBaseKv;
         }
     }
 }

@@ -18,6 +18,8 @@ namespace Araci.DTOs
 
         public double PotenciaReativa { get; set; }
 
+        public double Tensao { get; set; }
+
         public string Conexao { get; set; } = string.Empty;
 
         public int Modelo { get; set; }

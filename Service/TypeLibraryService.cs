@@ -39,12 +39,12 @@ namespace Araci.Services
                     Familia = "Cabos",
                     Categoria = "Cabos",
                     Fases = 3,
-                    R1 = 0.12,
-                    X1 = 0.09,
-                    R0 = 0.36,
-                    X0 = 0.27,
-                    C1 = 0.001,
-                    C0 = 0.0007,
+                    R1 = 0.1,
+                    X1 = 0.2,
+                    R0 = 0.3,
+                    X0 = 0.6,
+                    C1 = 3.4,
+                    C0 = 1.6,
                     Secao = 253
                 });
         }
@@ -59,7 +59,7 @@ namespace Araci.Services
                     Categoria = "Cargas",
                     ModeloCarga = 1,
                     Conexao = "Wye",
-                    Tensao = "13.8",
+                    Tensao = "12.47",
                     Fases = 3,
                     FatorPotencia = 0.96
                 });
@@ -74,6 +74,7 @@ namespace Araci.Services
                     Familia = "Geradores",
                     Categoria = "Geradores",
                     Fases = 3,
+                    TensaoKV = 12.47,
                     ModeloFonte = 1,
                     FatorPotencia = 0.98
                 });
@@ -87,7 +88,7 @@ namespace Araci.Services
                     NomeTipo = "Barra Vertical",
                     Familia = "Barras",
                     Categoria = "Barras",
-                    ClasseTensao = "13.8",
+                    ClasseTensao = "12.47",
                     Fases = 3,
                     AlturaPadrao = 120,
                     NumeroConexoes = 6
