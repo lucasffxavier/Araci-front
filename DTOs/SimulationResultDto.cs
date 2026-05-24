@@ -21,29 +21,45 @@ namespace Araci.DTOs
     {
         public string Id { get; set; } = string.Empty;
 
+        public string Nome { get; set; } = string.Empty;
+
         public double Corrente { get; set; }
 
         public double? CorrenteLinha { get; set; }
 
         public double? CorrenteFaseA { get; set; }
 
+        public double? AnguloFaseA { get; set; }
+
         public double? CorrenteFaseB { get; set; }
 
+        public double? AnguloFaseB { get; set; }
+
         public double? CorrenteFaseC { get; set; }
+
+        public double? AnguloFaseC { get; set; }
     }
 
     public class LoadResultDto
     {
         public string Id { get; set; } = string.Empty;
 
+        public string Nome { get; set; } = string.Empty;
+
         public double Corrente { get; set; }
 
         public double? CorrenteLinha { get; set; }
 
         public double? CorrenteFaseA { get; set; }
 
+        public double? AnguloFaseA { get; set; }
+
         public double? CorrenteFaseB { get; set; }
 
+        public double? AnguloFaseB { get; set; }
+
         public double? CorrenteFaseC { get; set; }
+
+        public double? AnguloFaseC { get; set; }
     }
 }

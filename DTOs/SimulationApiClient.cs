@@ -128,9 +128,17 @@ namespace Araci.DTOs
                 resultRoot = resultado;
             }
 
-            ReadLineResults(resultRoot, dto, result);
-            ReadLoadResults(resultRoot, dto, result);
-            ReadElementResults(resultRoot, dto, result);
+            bool hasLines = ReadLineResults(root, dto, result);
+            bool hasLoads = ReadLoadResults(root, dto, result);
+
+            if (!hasLines && resultRoot.ValueKind != JsonValueKind.Undefined)
+                hasLines = ReadLineResults(resultRoot, dto, result);
+
+            if (!hasLoads && resultRoot.ValueKind != JsonValueKind.Undefined)
+                hasLoads = ReadLoadResults(resultRoot, dto, result);
+
+            if (!hasLines || !hasLoads)
+                ReadElementResults(resultRoot, dto, result, includeLines: !hasLines, includeLoads: !hasLoads);
 
             return result;
         }
@@ -162,65 +170,74 @@ namespace Araci.DTOs
             return false;
         }
 
-        private static void ReadLineResults(JsonElement root, CircuitDto dto, SimulationResultDto result)
+        private static bool ReadLineResults(JsonElement root, CircuitDto dto, SimulationResultDto result)
         {
             if (!TryGetProperty(root, out JsonElement linhas, "lines", "linhas", "lineResults", "line_results") ||
                 linhas.ValueKind != JsonValueKind.Array)
             {
-                return;
+                return false;
             }
 
             foreach (JsonElement line in linhas.EnumerateArray())
             {
                 string key = ReadString(line, "id", "lineId", "line_id", "linha", "cabo", "nome", "name");
                 double corrente = ReadDouble(line, "corrente", "current", "i");
-                double[] correntes = ReadNumbers(line, "correntes", "currents");
-
-                if (corrente == 0 && correntes.Length > 0)
-                    corrente = correntes[0];
 
                 result.Lines.Add(new LineResultDto
                 {
                     Id = ResolveLineId(dto, key),
+                    Nome = ReadString(line, "nome", "name"),
                     Corrente = corrente,
-                    CorrenteLinha = ReadCorrente(line, correntes, 0, "correnteLinha", "corrente_linha", "lineCurrent", "line_current"),
-                    CorrenteFaseA = ReadCorrente(line, correntes, 0, "correnteFaseA", "corrente_fase_a", "phaseACurrent", "phase_a_current"),
-                    CorrenteFaseB = ReadCorrente(line, correntes, 1, "correnteFaseB", "corrente_fase_b", "phaseBCurrent", "phase_b_current"),
-                    CorrenteFaseC = ReadCorrente(line, correntes, 2, "correnteFaseC", "corrente_fase_c", "phaseCCurrent", "phase_c_current")
+                    CorrenteLinha = ReadNullableDouble(line, "correnteLinha", "corrente_linha", "lineCurrent", "line_current") ?? corrente,
+                    CorrenteFaseA = ReadNullableDouble(line, "correnteFaseA", "corrente_fase_a", "phaseACurrent", "phase_a_current"),
+                    AnguloFaseA = ReadNullableDouble(line, "anguloFaseA", "angulo_fase_a", "phaseAAngle", "phase_a_angle"),
+                    CorrenteFaseB = ReadNullableDouble(line, "correnteFaseB", "corrente_fase_b", "phaseBCurrent", "phase_b_current"),
+                    AnguloFaseB = ReadNullableDouble(line, "anguloFaseB", "angulo_fase_b", "phaseBAngle", "phase_b_angle"),
+                    CorrenteFaseC = ReadNullableDouble(line, "correnteFaseC", "corrente_fase_c", "phaseCCurrent", "phase_c_current"),
+                    AnguloFaseC = ReadNullableDouble(line, "anguloFaseC", "angulo_fase_c", "phaseCAngle", "phase_c_angle")
                 });
             }
+
+            return true;
         }
 
-        private static void ReadLoadResults(JsonElement root, CircuitDto dto, SimulationResultDto result)
+        private static bool ReadLoadResults(JsonElement root, CircuitDto dto, SimulationResultDto result)
         {
             if (!TryGetProperty(root, out JsonElement cargas, "loads", "cargas", "loadResults", "load_results") ||
                 cargas.ValueKind != JsonValueKind.Array)
             {
-                return;
+                return false;
             }
 
             foreach (JsonElement load in cargas.EnumerateArray())
             {
                 string key = ReadString(load, "id", "loadId", "load_id", "carga", "nome", "name");
                 double corrente = ReadDouble(load, "corrente", "current", "i");
-                double[] correntes = ReadNumbers(load, "correntes", "currents");
-
-                if (corrente == 0 && correntes.Length > 0)
-                    corrente = correntes[0];
 
                 result.Loads.Add(new LoadResultDto
                 {
                     Id = ResolveLoadId(dto, key),
+                    Nome = ReadString(load, "nome", "name"),
                     Corrente = corrente,
-                    CorrenteLinha = ReadCorrente(load, correntes, 0, "correnteLinha", "corrente_linha", "lineCurrent", "line_current"),
-                    CorrenteFaseA = ReadCorrente(load, correntes, 0, "correnteFaseA", "corrente_fase_a", "phaseACurrent", "phase_a_current"),
-                    CorrenteFaseB = ReadCorrente(load, correntes, 1, "correnteFaseB", "corrente_fase_b", "phaseBCurrent", "phase_b_current"),
-                    CorrenteFaseC = ReadCorrente(load, correntes, 2, "correnteFaseC", "corrente_fase_c", "phaseCCurrent", "phase_c_current")
+                    CorrenteLinha = ReadNullableDouble(load, "correnteLinha", "corrente_linha", "lineCurrent", "line_current") ?? corrente,
+                    CorrenteFaseA = ReadNullableDouble(load, "correnteFaseA", "corrente_fase_a", "phaseACurrent", "phase_a_current"),
+                    AnguloFaseA = ReadNullableDouble(load, "anguloFaseA", "angulo_fase_a", "phaseAAngle", "phase_a_angle"),
+                    CorrenteFaseB = ReadNullableDouble(load, "correnteFaseB", "corrente_fase_b", "phaseBCurrent", "phase_b_current"),
+                    AnguloFaseB = ReadNullableDouble(load, "anguloFaseB", "angulo_fase_b", "phaseBAngle", "phase_b_angle"),
+                    CorrenteFaseC = ReadNullableDouble(load, "correnteFaseC", "corrente_fase_c", "phaseCCurrent", "phase_c_current"),
+                    AnguloFaseC = ReadNullableDouble(load, "anguloFaseC", "angulo_fase_c", "phaseCAngle", "phase_c_angle")
                 });
             }
+
+            return true;
         }
 
-        private static void ReadElementResults(JsonElement root, CircuitDto dto, SimulationResultDto result)
+        private static void ReadElementResults(
+            JsonElement root,
+            CircuitDto dto,
+            SimulationResultDto result,
+            bool includeLines,
+            bool includeLoads)
         {
             if (!TryGetProperty(root, out JsonElement elementos, "elementos", "elements") ||
                 elementos.ValueKind != JsonValueKind.Object)
@@ -238,7 +255,7 @@ namespace Araci.DTOs
 
                 double corrente = correntes[0];
 
-                if (TryResolveLineId(dto, key, out string lineId))
+                if (includeLines && TryResolveLineId(dto, key, out string lineId))
                 {
                     result.Lines.Add(new LineResultDto
                     {
@@ -246,11 +263,14 @@ namespace Araci.DTOs
                         Corrente = corrente,
                         CorrenteLinha = corrente,
                         CorrenteFaseA = ReadArrayValue(correntes, 0),
+                        AnguloFaseA = 0,
                         CorrenteFaseB = ReadArrayValue(correntes, 1),
-                        CorrenteFaseC = ReadArrayValue(correntes, 2)
+                        AnguloFaseB = -120,
+                        CorrenteFaseC = ReadArrayValue(correntes, 2),
+                        AnguloFaseC = 120
                     });
                 }
-                else if (TryResolveLoadId(dto, key, out string loadId))
+                else if (includeLoads && TryResolveLoadId(dto, key, out string loadId))
                 {
                     result.Loads.Add(new LoadResultDto
                     {
@@ -258,8 +278,11 @@ namespace Araci.DTOs
                         Corrente = corrente,
                         CorrenteLinha = corrente,
                         CorrenteFaseA = ReadArrayValue(correntes, 0),
+                        AnguloFaseA = 0,
                         CorrenteFaseB = ReadArrayValue(correntes, 1),
-                        CorrenteFaseC = ReadArrayValue(correntes, 2)
+                        AnguloFaseB = -120,
+                        CorrenteFaseC = ReadArrayValue(correntes, 2),
+                        AnguloFaseC = 120
                     });
                 }
             }
@@ -370,26 +393,6 @@ namespace Araci.DTOs
             }
 
             return null;
-        }
-
-        private static double? ReadCorrente(JsonElement element, double[] correntes, int index, params string[] names)
-        {
-            return ReadNullableDouble(element, names) ?? ReadArrayValue(correntes, index);
-        }
-
-        private static double[] ReadNumbers(JsonElement element, params string[] names)
-        {
-            if (!TryGetProperty(element, out JsonElement array, names) ||
-                array.ValueKind != JsonValueKind.Array)
-            {
-                return Array.Empty<double>();
-            }
-
-            return array.EnumerateArray()
-                .Select(item => item.TryGetDouble(out double value) ? (double?)value : null)
-                .Where(value => value.HasValue)
-                .Select(value => value!.Value)
-                .ToArray();
         }
 
         private static double[] ReadPolarMagnitudes(JsonElement element, params string[] names)
