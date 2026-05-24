@@ -7,6 +7,9 @@ namespace Araci.Core.Viewport
 {
     public class Camera : INotifyPropertyChanged
     {
+        public const double MinZoom = 0.1;
+        public const double MaxZoom = 8.0;
+
         private double _zoom = 1.0;
         private Point _offset;
 
@@ -17,7 +20,7 @@ namespace Araci.Core.Viewport
             get => _zoom;
             set
             {
-                double zoom = Math.Max(double.Epsilon, value);
+                double zoom = Math.Max(MinZoom, Math.Min(MaxZoom, value));
 
                 if (Math.Abs(_zoom - zoom) < 0.0001)
                     return;
@@ -38,6 +41,22 @@ namespace Araci.Core.Viewport
                 _offset = value;
                 OnPropertyChanged();
             }
+        }
+
+        public void Pan(Vector delta)
+        {
+            Offset = new Point(Offset.X + delta.X, Offset.Y + delta.Y);
+        }
+
+        public void ZoomAt(Point screenPoint, double factor)
+        {
+            Point worldBefore = ScreenToWorld(screenPoint);
+
+            Zoom *= factor;
+
+            Offset = new Point(
+                screenPoint.X - worldBefore.X * Zoom,
+                screenPoint.Y - worldBefore.Y * Zoom);
         }
 
         public Point WorldToScreen(Point point)

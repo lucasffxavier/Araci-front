@@ -15,6 +15,8 @@ namespace Araci.Views
 
         private ViewportViewModel? _viewportViewModel;
         private EditorContext? _context;
+        private bool _isPanning;
+        private Point _lastPanPoint;
 
         public ViewportView()
         {
@@ -107,9 +109,24 @@ namespace Araci.Views
             return _context?.Viewport?.ScreenToWorld(screen) ?? screen;
         }
 
+        private void OnPreviewMouseDown(object sender, MouseButtonEventArgs e)
+        {
+            if (_context?.Viewport == null || e.ChangedButton != MouseButton.Middle)
+                return;
+
+            Focus();
+            Keyboard.Focus(this);
+
+            _isPanning = true;
+            _lastPanPoint = e.GetPosition(this);
+            Cursor = Cursors.ScrollAll;
+            CaptureMouse();
+            e.Handled = true;
+        }
+
         private void OnPreviewMouseLeftButtonDown(object sender, MouseButtonEventArgs e)
         {
-            if (_context == null)
+            if (_context == null || _isPanning)
                 return;
 
             Focus();
@@ -124,11 +141,30 @@ namespace Araci.Views
 
         private void OnPreviewMouseMove(object sender, MouseEventArgs e)
         {
+            if (_isPanning)
+            {
+                AtualizarPan(e.GetPosition(this));
+                e.Handled = true;
+                return;
+            }
+
             _context?.Input.MouseMove(GetWorldPos(e));
+        }
+
+        private void OnPreviewMouseUp(object sender, MouseButtonEventArgs e)
+        {
+            if (e.ChangedButton != MouseButton.Middle || !_isPanning)
+                return;
+
+            CancelarPan();
+            e.Handled = true;
         }
 
         private void OnPreviewMouseLeftButtonUp(object sender, MouseButtonEventArgs e)
         {
+            if (_isPanning)
+                return;
+
             _context?.Input.MouseUp(GetWorldPos(e));
 
             if (IsMouseCaptured)
@@ -140,18 +176,9 @@ namespace Araci.Views
             if (_context?.Viewport == null)
                 return;
 
-            var camera = _context.Viewport.Camera;
-
-            Point cursor = e.GetPosition(this);
-            Point worldBefore = camera.ScreenToWorld(cursor);
-
             double factor = e.Delta > 0 ? 1.1 : 1 / 1.1;
 
-            camera.Zoom = Math.Max(0.1, Math.Min(8, camera.Zoom * factor));
-
-            camera.Offset = new Point(
-                cursor.X - worldBefore.X * camera.Zoom,
-                cursor.Y - worldBefore.Y * camera.Zoom);
+            _context.Viewport.Camera.ZoomAt(e.GetPosition(this), factor);
 
             e.Handled = true;
         }
@@ -164,10 +191,43 @@ namespace Araci.Views
             e.Handled = _context.Input.KeyDown(e.Key);
         }
 
+        private void OnMouseLeave(object sender, MouseEventArgs e)
+        {
+            if (_isPanning)
+                CancelarPan();
+        }
+
         private void OnUnloaded(object sender, RoutedEventArgs e)
         {
+            if (_isPanning)
+                CancelarPan();
+
+            if (IsMouseCaptured)
+                ReleaseMouseCapture();
+
             if (_context?.Viewport != null)
                 _context.Viewport.Camera.PropertyChanged -= OnCameraChanged;
+        }
+
+        private void AtualizarPan(Point current)
+        {
+            if (_context?.Viewport == null)
+                return;
+
+            Vector delta = current - _lastPanPoint;
+
+            _context.Viewport.Camera.Pan(delta);
+
+            _lastPanPoint = current;
+        }
+
+        private void CancelarPan()
+        {
+            _isPanning = false;
+            Cursor = Cursors.Arrow;
+
+            if (IsMouseCaptured)
+                ReleaseMouseCapture();
         }
 
         private static ElementoViewModel? EncontrarElemento(DependencyObject? origem)
