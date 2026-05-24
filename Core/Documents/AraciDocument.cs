@@ -1,3 +1,4 @@
+using System;
 using System.Collections.ObjectModel;
 using System.Linq;
 using Araci.Models;
@@ -36,7 +37,7 @@ namespace Araci.Core.Documents
             Elementos.Clear();
         }
 
-        private void AtualizarNomes(System.Type tipo)
+        private void AtualizarNomes(Type tipo)
         {
             var lista = Elementos
                 .Where(e => e.GetType() == tipo)
@@ -44,8 +45,25 @@ namespace Araci.Core.Documents
 
             for (int i = 0; i < lista.Count; i++)
             {
-                string prefixo = ObterPrefixo(lista[i]);
-                lista[i].Nome = $"{prefixo}-{(i + 1).ToString("D3")}";
+                Elemento elemento = lista[i];
+                string nomeAntigo = elemento.Nome;
+                string prefixo = ObterPrefixo(elemento);
+                string nomeNovo = $"{prefixo}-{(i + 1).ToString("D3")}";
+
+                elemento.Nome = nomeNovo;
+                SincronizarBarraAutomatica(elemento, nomeAntigo, nomeNovo);
+            }
+        }
+
+        private static void SincronizarBarraAutomatica(Elemento elemento, string nomeAntigo, string nomeNovo)
+        {
+            if (elemento is not ElementoEquipamento equipamento)
+                return;
+
+            if (string.IsNullOrWhiteSpace(equipamento.Barra) ||
+                string.Equals(equipamento.Barra, nomeAntigo, StringComparison.OrdinalIgnoreCase))
+            {
+                equipamento.Barra = nomeNovo;
             }
         }
 

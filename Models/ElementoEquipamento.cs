@@ -48,8 +48,8 @@ namespace Araci.Models
             {
                 Definir(PARAM_BARRA, value);
 
-                if (_terminais.Count > 0)
-                    _terminais[0].Barra = value;
+                foreach (Terminal terminal in _terminais)
+                    terminal.Barra = value;
             }
         }
 
