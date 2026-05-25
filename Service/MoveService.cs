@@ -1,4 +1,4 @@
-﻿using System.Collections.Generic;
+using System.Collections.Generic;
 using System.Linq;
 using System.Windows;
 using Araci.Core.Commands;
@@ -41,6 +41,7 @@ namespace Araci.Services
                 return;
 
             vm.Mover(delta);
+            _context.SceneQueries.Invalidate();
         }
 
         public void EndMove(IEnumerable<ElementoViewModel> elementos)
@@ -76,6 +77,7 @@ namespace Araci.Services
             }
 
             transaction.Commit();
+            _context.SceneQueries.Invalidate();
 
             _estadoInicial.Clear();
 
