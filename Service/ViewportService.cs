@@ -43,14 +43,29 @@ namespace Araci.Services
             Altura = Math.Max(0, size.Height);
         }
 
+        public void Pan(Vector delta)
+        {
+            Camera.Pan(delta);
+        }
+
+        public void ZoomInAt(Point screenPoint)
+        {
+            Camera.ZoomInAt(screenPoint);
+        }
+
+        public void ZoomOutAt(Point screenPoint)
+        {
+            Camera.ZoomOutAt(screenPoint);
+        }
+
         public void ZoomInAtCenter()
         {
-            Camera.ZoomAt(CentroTela, 1.1);
+            Camera.ZoomInAt(CentroTela);
         }
 
         public void ZoomOutAtCenter()
         {
-            Camera.ZoomAt(CentroTela, 1 / 1.1);
+            Camera.ZoomOutAt(CentroTela);
         }
 
         public void ResetCamera()
@@ -60,7 +75,7 @@ namespace Araci.Services
 
         public void Zoom100AtCenter()
         {
-            Camera.SetZoomAt(CentroTela, 1.0);
+            Camera.Zoom100At(CentroTela);
         }
 
         public void ZoomExtents(double margem = 40)

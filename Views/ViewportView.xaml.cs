@@ -202,9 +202,12 @@ namespace Araci.Views
             if (_context?.Viewport == null)
                 return;
 
-            double factor = e.Delta > 0 ? 1.1 : 1 / 1.1;
+            Point cursor = e.GetPosition(this);
 
-            _context.Viewport.Camera.ZoomAt(e.GetPosition(this), factor);
+            if (e.Delta > 0)
+                _context.Viewport.ZoomInAt(cursor);
+            else
+                _context.Viewport.ZoomOutAt(cursor);
 
             e.Handled = true;
         }
@@ -327,7 +330,7 @@ namespace Araci.Views
 
             Vector delta = current - _lastPanPoint;
 
-            _context.Viewport.Camera.Pan(delta);
+            _context.Viewport.Pan(delta);
 
             _lastPanPoint = current;
         }
