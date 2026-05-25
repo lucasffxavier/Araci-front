@@ -65,7 +65,18 @@ namespace Araci.Services
 
             if (key == Key.Escape)
             {
-                _context.Tools.VoltarParaSelecao();
+                if (ToolAtual.IsBusy)
+                {
+                    ToolAtual.Cancelar();
+                    return true;
+                }
+
+                if (ToolAtual is not Araci.Applications.Editar.Selecionar.SelecionarTool)
+                {
+                    _context.Tools.VoltarParaSelecao();
+                    return true;
+                }
+
                 _context.Selection.Limpar();
                 return true;
             }

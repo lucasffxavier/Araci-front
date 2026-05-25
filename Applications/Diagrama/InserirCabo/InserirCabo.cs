@@ -40,6 +40,7 @@ namespace Araci.Applications.Diagrama.InserirCabo
         public string Nome => "Inserir Cabo";
 
         public bool MantemBotaoAtivado => true;
+        public bool IsBusy => _inserindo;
 
         public void Ativar()
         {
@@ -47,6 +48,14 @@ namespace Araci.Applications.Diagrama.InserirCabo
 
         public void Desativar()
         {
+            Cancelar();
+        }
+
+        public void Cancelar()
+        {
+            if (_caboAtual != null)
+                _context.Commands.Undo();
+
             LimparEstado();
         }
 
@@ -194,16 +203,6 @@ namespace Araci.Applications.Diagrama.InserirCabo
 
         private void Finalizar()
         {
-            LimparEstado();
-
-            _context.Tools.VoltarParaSelecao();
-        }
-
-        private void Cancelar()
-        {
-            if (_caboAtual != null)
-                _context.Commands.Undo();
-
             LimparEstado();
 
             _context.Tools.VoltarParaSelecao();

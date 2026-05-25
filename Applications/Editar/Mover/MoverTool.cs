@@ -23,6 +23,7 @@ namespace Araci.Applications.Editar.Mover
 
         public string Nome => "Mover";
         public bool MantemBotaoAtivado => true;
+        public bool IsBusy => _selecionarTool.IsBusy;
 
         public void Ativar()
         {
@@ -32,6 +33,11 @@ namespace Araci.Applications.Editar.Mover
         public void Desativar()
         {
             _selecionarTool.Desativar();
+        }
+
+        public void Cancelar()
+        {
+            _selecionarTool.Cancelar();
         }
 
         public void OnMouseDown(ElementoViewModel? vm, Point position, ToolInputState inputState)

@@ -24,8 +24,14 @@ namespace Araci.Services
             get => _ferramentaAtual;
             set
             {
+                if (value == null)
+                    throw new ArgumentNullException(nameof(value));
+
                 if (ReferenceEquals(_ferramentaAtual, value))
                     return;
+
+                if (_ferramentaAtual.IsBusy)
+                    _ferramentaAtual.Cancelar();
 
                 _ferramentaAtual.Desativar();
 
@@ -45,7 +51,12 @@ namespace Araci.Services
         public void VoltarParaSelecao()
         {
             if (_ferramentaAtual is SelecionarTool)
+            {
+                if (_ferramentaAtual.IsBusy)
+                    _ferramentaAtual.Cancelar();
+
                 return;
+            }
 
             FerramentaAtual = new SelecionarTool(_context);
         }

@@ -231,6 +231,9 @@ namespace Araci.Views
                 return;
 
             e.Handled = _context.Input.KeyDown(e.Key);
+
+            if (e.Handled && e.Key == Key.Escape)
+                LiberarCapturaMouse();
         }
 
         private void OnPreviewKeyUp(object sender, KeyEventArgs e)

@@ -23,9 +23,13 @@ namespace Araci.Applications.Editar.Deletar
 
         public bool MantemBotaoAtivado => true;
 
+        public bool IsBusy => false;
+
         public void Ativar() { }
 
         public void Desativar() { }
+
+        public void Cancelar() { }
 
         public void OnMouseDown(
             ElementoViewModel? vm,

@@ -33,13 +33,20 @@ namespace Araci.Applications.Editar.Selecionar
 
         public string Nome => "Selecionar";
         public bool MantemBotaoAtivado => true;
+        public bool IsBusy => _arrastandoElementos || _selecionandoJanela;
 
         public void Ativar() { }
 
         public void Desativar()
         {
+            Cancelar();
+        }
+
+        public void Cancelar()
+        {
             _arrastandoElementos = false;
             _selecionandoJanela = false;
+            _context.Move.AbortMove();
             _context.SelectionBox.Visivel = false;
             _context.MoveHud.Visivel = false;
             _context.MoveHud.Reset();

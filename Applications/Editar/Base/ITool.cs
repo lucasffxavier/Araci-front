@@ -8,9 +8,11 @@ namespace Araci.Applications.Editar.Base
     {
         string Nome { get; }
         bool MantemBotaoAtivado { get; }
+        bool IsBusy { get; }
 
         void Ativar();
         void Desativar();
+        void Cancelar();
 
         void OnMouseDown(ElementoViewModel? vm, Point position, ToolInputState inputState);
         void OnMouseMove(Point position);

@@ -83,5 +83,19 @@ namespace Araci.Services
 
             _movendo = false;
         }
+
+        public void AbortMove()
+        {
+            if (!_movendo)
+                return;
+
+            foreach (var item in _estadoInicial)
+                item.Key.AplicarEstado(item.Value);
+
+            _context.SceneQueries.Invalidate();
+
+            _estadoInicial.Clear();
+            _movendo = false;
+        }
     }
 }
