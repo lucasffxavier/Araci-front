@@ -16,6 +16,9 @@ namespace Araci.Views
         private ViewportViewModel? _viewportViewModel;
         private EditorContext? _context;
         private bool _isPanning;
+        private bool _isSpacePressed;
+        private bool _isSpaceLeftPanning;
+        private bool _suppressNextLeftButtonUp;
         private Point _lastPanPoint;
 
         public ViewportView()
@@ -114,18 +117,19 @@ namespace Araci.Views
             if (_context?.Viewport == null || e.ChangedButton != MouseButton.Middle)
                 return;
 
-            Focus();
-            Keyboard.Focus(this);
-
-            _isPanning = true;
-            _lastPanPoint = e.GetPosition(this);
-            Cursor = Cursors.ScrollAll;
-            CaptureMouse();
+            IniciarPan(e.GetPosition(this), spaceLeftPan: false);
             e.Handled = true;
         }
 
         private void OnPreviewMouseLeftButtonDown(object sender, MouseButtonEventArgs e)
         {
+            if (_context?.Viewport != null && _isSpacePressed)
+            {
+                IniciarPan(e.GetPosition(this), spaceLeftPan: true);
+                e.Handled = true;
+                return;
+            }
+
             if (_context == null || _isPanning)
                 return;
 
@@ -162,6 +166,20 @@ namespace Araci.Views
 
         private void OnPreviewMouseLeftButtonUp(object sender, MouseButtonEventArgs e)
         {
+            if (_isSpaceLeftPanning)
+            {
+                CancelarPan();
+                e.Handled = true;
+                return;
+            }
+
+            if (_suppressNextLeftButtonUp)
+            {
+                _suppressNextLeftButtonUp = false;
+                e.Handled = true;
+                return;
+            }
+
             if (_isPanning)
                 return;
 
@@ -185,10 +203,38 @@ namespace Araci.Views
 
         private void OnPreviewKeyDown(object sender, KeyEventArgs e)
         {
+            if (e.Key == Key.Space)
+            {
+                _isSpacePressed = true;
+                Cursor = Cursors.ScrollAll;
+                e.Handled = true;
+                return;
+            }
+
             if (_context == null)
                 return;
 
             e.Handled = _context.Input.KeyDown(e.Key);
+        }
+
+        private void OnPreviewKeyUp(object sender, KeyEventArgs e)
+        {
+            if (e.Key != Key.Space)
+                return;
+
+            _isSpacePressed = false;
+
+            if (_isSpaceLeftPanning)
+            {
+                _suppressNextLeftButtonUp = true;
+                CancelarPan();
+            }
+            else
+            {
+                Cursor = Cursors.Arrow;
+            }
+
+            e.Handled = true;
         }
 
         private void OnMouseLeave(object sender, MouseEventArgs e)
@@ -199,14 +245,30 @@ namespace Araci.Views
 
         private void OnUnloaded(object sender, RoutedEventArgs e)
         {
+            _isSpacePressed = false;
+
             if (_isPanning)
                 CancelarPan();
 
             if (IsMouseCaptured)
                 ReleaseMouseCapture();
 
+            Cursor = Cursors.Arrow;
+
             if (_context?.Viewport != null)
                 _context.Viewport.Camera.PropertyChanged -= OnCameraChanged;
+        }
+
+        private void IniciarPan(Point start, bool spaceLeftPan)
+        {
+            Focus();
+            Keyboard.Focus(this);
+
+            _isPanning = true;
+            _isSpaceLeftPanning = spaceLeftPan;
+            _lastPanPoint = start;
+            Cursor = Cursors.ScrollAll;
+            CaptureMouse();
         }
 
         private void AtualizarPan(Point current)
@@ -224,7 +286,8 @@ namespace Araci.Views
         private void CancelarPan()
         {
             _isPanning = false;
-            Cursor = Cursors.Arrow;
+            _isSpaceLeftPanning = false;
+            Cursor = _isSpacePressed ? Cursors.ScrollAll : Cursors.Arrow;
 
             if (IsMouseCaptured)
                 ReleaseMouseCapture();

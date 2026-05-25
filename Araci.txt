@@ -488,86 +488,6 @@ return new Rect(minX, minY, maxX - minX, maxY - minY);
 
 
 ====================================================================================================
-ARQUIVO: C:\Araci-Engine-Front\Araci Engine\Core\SceneQueries\ISceneQueryService.cs
-====================================================================================================
-
-﻿using System.Collections.Generic;
-using System.Windows;
-using Araci.ViewModels;
-namespace Araci.Core.SceneQueries
-{
-public interface ISceneQueryService
-{
-SceneHitResult? HitTest(Point point);
-SceneHitResult? HitTest(Point point, double tolerance);
-IEnumerable<ElementoViewModel> Query(Rect area);
-IEnumerable<ElementoViewModel> Nearby(Point point, double radius);
-}
-}
-
-
-====================================================================================================
-ARQUIVO: C:\Araci-Engine-Front\Araci Engine\Core\SceneQueries\SceneQueryService.cs
-====================================================================================================
-
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Windows;
-using Araci.Core.Scenes;
-using Araci.Core.Spatial;
-using Araci.ViewModels;
-namespace Araci.Core.SceneQueries
-{
-public class SceneQueryService : ISceneQueryService
-{
-private readonly Scene _scene;
-private readonly ISpatialIndex _index;
-private bool _indexValido;
-public SceneQueryService(Scene scene)
-{
-_scene = scene ?? throw new ArgumentNullException(nameof(scene));
-_index = new SpatialHashGrid();
-_indexValido = false;
-_scene.Elementos.CollectionChanged += (_, __) => _indexValido = false;
-}
-private void GarantirIndex()
-{
-if (_indexValido)
-return;
-_index.Build(_scene.Elementos);
-_indexValido = true;
-}
-public SceneHitResult? HitTest(Point point)
-{
-return HitTest(point, 6);
-}
-public SceneHitResult? HitTest(Point point, double tolerance)
-{
-GarantirIndex();
-var candidatos = _index.Nearby(point, Math.Max(10, tolerance));
-foreach (var vm in candidatos.Reverse())
-{
-if (vm.Bounds.Contains(point))
-return new SceneHitResult(vm, point);
-}
-return null;
-}
-public IEnumerable<ElementoViewModel> Query(Rect area)
-{
-GarantirIndex();
-return _index.Query(area);
-}
-public IEnumerable<ElementoViewModel> Nearby(Point point, double radius)
-{
-GarantirIndex();
-return _index.Nearby(point, radius);
-}
-}
-}
-
-
-====================================================================================================
 ARQUIVO: C:\Araci-Engine-Front\Araci Engine\Core\Viewport\Camera.cs
 ====================================================================================================
 
@@ -579,6 +499,8 @@ namespace Araci.Core.Viewport
 {
 public class Camera : INotifyPropertyChanged
 {
+public const double MinZoom = 0.1;
+public const double MaxZoom = 8.0;
 private double _zoom = 1.0;
 private Point _offset;
 public event PropertyChangedEventHandler? PropertyChanged;
@@ -587,7 +509,7 @@ public double Zoom
 get => _zoom;
 set
 {
-double zoom = Math.Max(double.Epsilon, value);
+double zoom = Math.Max(MinZoom, Math.Min(MaxZoom, value));
 if (Math.Abs(_zoom - zoom) < 0.0001)
 return;
 _zoom = zoom;
@@ -604,6 +526,18 @@ return;
 _offset = value;
 OnPropertyChanged();
 }
+}
+public void Pan(Vector delta)
+{
+Offset = new Point(Offset.X + delta.X, Offset.Y + delta.Y);
+}
+public void ZoomAt(Point screenPoint, double factor)
+{
+Point worldBefore = ScreenToWorld(screenPoint);
+Zoom *= factor;
+Offset = new Point(
+screenPoint.X - worldBefore.X * Zoom,
+screenPoint.Y - worldBefore.Y * Zoom);
 }
 public Point WorldToScreen(Point point)
 {
@@ -800,154 +734,6 @@ Keyboard.Modifiers.HasFlag(ModifierKeys.Control));
 
 
 ====================================================================================================
-ARQUIVO: C:\Araci-Engine-Front\Araci Engine\Service\MoveService.cs
-====================================================================================================
-
-﻿using System.Collections.Generic;
-using System.Linq;
-using System.Windows;
-using Araci.Core.Commands;
-using Araci.ViewModels;
-namespace Araci.Services
-{
-public class MoveService
-{
-private readonly EditorContext _context;
-private readonly Dictionary<ElementoViewModel, ElementoEstado>
-_estadoInicial = new();
-private bool _movendo;
-public MoveService(EditorContext context)
-{
-_context = context ??
-throw new ArgumentNullException(nameof(context));
-}
-public void BeginMove(IEnumerable<ElementoViewModel> elementos)
-{
-_estadoInicial.Clear();
-foreach (var vm in elementos.Distinct())
-{
-_estadoInicial[vm] = vm.CapturarEstado();
-}
-_movendo = true;
-}
-public void MoverVisual(
-ElementoViewModel vm,
-Vector delta)
-{
-if (!_movendo)
-return;
-vm.Mover(delta);
-}
-public void EndMove(IEnumerable<ElementoViewModel> elementos)
-{
-if (!_movendo)
-return;
-using var transaction =
-_context.BeginTransaction();
-foreach (var vm in elementos.Distinct())
-{
-if (!_estadoInicial.TryGetValue(vm, out var antes))
-continue;
-var depois = vm.CapturarEstado();
-bool mudou =
-antes.X != depois.X ||
-antes.Y != depois.Y ||
-antes.X2 != depois.X2 ||
-antes.Y2 != depois.Y2 ||
-!antes.Vertices.SequenceEqual(depois.Vertices);
-if (!mudou)
-continue;
-transaction.Add(
-new MoveElementoCommand(
-vm,
-antes,
-depois));
-}
-transaction.Commit();
-_estadoInicial.Clear();
-_movendo = false;
-}
-}
-}
-
-
-====================================================================================================
-ARQUIVO: C:\Araci-Engine-Front\Araci Engine\Service\SelectionService.cs
-====================================================================================================
-
-﻿using System.Collections.Generic;
-using System.Collections.ObjectModel;
-using System.Linq;
-using Araci.Core.Events;
-using Araci.ViewModels;
-namespace Araci.Services
-{
-public class SelectionService
-{
-private readonly EditorContext _context;
-private readonly ObservableCollection<ElementoViewModel> _selecionados = new();
-public SelectionService(EditorContext context)
-{
-_context = context ?? throw new ArgumentNullException(nameof(context));
-}
-public IReadOnlyList<ElementoViewModel> Selecionados => _selecionados;
-public ObservableCollection<ElementoViewModel> SelecionadosObservable => _selecionados;
-public bool TemSelecionados => _selecionados.Count > 0;
-public void Selecionar(ElementoViewModel vm, bool adicionarAoExistente = false)
-{
-if (!adicionarAoExistente)
-Limpar();
-if (_selecionados.Contains(vm))
-{
-AtualizarElementoSelecionado();
-return;
-}
-vm.IsSelecionado = true;
-_selecionados.Add(vm);
-AtualizarElementoSelecionado();
-PublicarAlteracao();
-}
-public void Toggle(ElementoViewModel vm)
-{
-if (_selecionados.Contains(vm))
-{
-Deselecionar(vm);
-return;
-}
-Selecionar(vm, true);
-}
-public void Deselecionar(ElementoViewModel vm)
-{
-if (!_selecionados.Contains(vm))
-return;
-vm.IsSelecionado = false;
-_selecionados.Remove(vm);
-AtualizarElementoSelecionado();
-PublicarAlteracao();
-}
-public void Limpar()
-{
-if (_selecionados.Count == 0)
-return;
-foreach (var vm in _selecionados)
-vm.IsSelecionado = false;
-_selecionados.Clear();
-AtualizarElementoSelecionado();
-PublicarAlteracao();
-}
-private void AtualizarElementoSelecionado()
-{
-_context.Editor.ElementoSelecionado = _selecionados.LastOrDefault();
-}
-private void PublicarAlteracao()
-{
-_context.Events.Publish(new SelecaoAlteradaEvent(_selecionados.ToList()));
-}
-}
-}
-
-
-====================================================================================================
 ARQUIVO: C:\Araci-Engine-Front\Araci Engine\Service\ToolService.cs
 ====================================================================================================
 
@@ -1137,17 +923,20 @@ PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nome));
 ARQUIVO: C:\Araci-Engine-Front\Araci Engine\Views\ViewportView.xaml
 ====================================================================================================
 
-﻿<UserControl x:Class="Araci.Views.ViewportView"
+<UserControl x:Class="Araci.Views.ViewportView"
 xmlns="http:
 xmlns:x="http:
 xmlns:controls="clr-namespace:Araci.Controls"
 xmlns:viewModels="clr-namespace:Araci.ViewModels"
 Focusable="True"
+PreviewMouseDown="OnPreviewMouseDown"
 PreviewMouseLeftButtonDown="OnPreviewMouseLeftButtonDown"
 PreviewMouseMove="OnPreviewMouseMove"
+PreviewMouseUp="OnPreviewMouseUp"
 PreviewMouseLeftButtonUp="OnPreviewMouseLeftButtonUp"
 PreviewMouseWheel="OnPreviewMouseWheel"
 PreviewKeyDown="OnPreviewKeyDown"
+MouseLeave="OnMouseLeave"
 Loaded="OnLoaded">
 <UserControl.Resources>
 <BooleanToVisibilityConverter
@@ -1203,7 +992,7 @@ Value="{Binding WorldY}"/>
 </ItemsControl.Resources>
 </ItemsControl>
 <!-- ========================= -->
-<!-- JANELA DE SELEÇÃO -->
+<!-- JANELA DE SELECAO -->
 <!-- ========================= -->
 <Canvas x:Name="SelectionLayer"
 IsHitTestVisible="False">
@@ -1270,6 +1059,8 @@ public partial class ViewportView : UserControl
 private readonly MatrixTransform _cameraTransform = new();
 private ViewportViewModel? _viewportViewModel;
 private EditorContext? _context;
+private bool _isPanning;
+private Point _lastPanPoint;
 public ViewportView()
 {
 InitializeComponent();
@@ -1336,9 +1127,21 @@ private Point GetWorldPos(MouseEventArgs e)
 Point screen = e.GetPosition(this);
 return _context?.Viewport?.ScreenToWorld(screen) ?? screen;
 }
+private void OnPreviewMouseDown(object sender, MouseButtonEventArgs e)
+{
+if (_context?.Viewport == null || e.ChangedButton != MouseButton.Middle)
+return;
+Focus();
+Keyboard.Focus(this);
+_isPanning = true;
+_lastPanPoint = e.GetPosition(this);
+Cursor = Cursors.ScrollAll;
+CaptureMouse();
+e.Handled = true;
+}
 private void OnPreviewMouseLeftButtonDown(object sender, MouseButtonEventArgs e)
 {
-if (_context == null)
+if (_context == null || _isPanning)
 return;
 Focus();
 Keyboard.Focus(this);
@@ -1348,10 +1151,25 @@ CaptureMouse();
 }
 private void OnPreviewMouseMove(object sender, MouseEventArgs e)
 {
+if (_isPanning)
+{
+AtualizarPan(e.GetPosition(this));
+e.Handled = true;
+return;
+}
 _context?.Input.MouseMove(GetWorldPos(e));
+}
+private void OnPreviewMouseUp(object sender, MouseButtonEventArgs e)
+{
+if (e.ChangedButton != MouseButton.Middle || !_isPanning)
+return;
+CancelarPan();
+e.Handled = true;
 }
 private void OnPreviewMouseLeftButtonUp(object sender, MouseButtonEventArgs e)
 {
+if (_isPanning)
+return;
 _context?.Input.MouseUp(GetWorldPos(e));
 if (IsMouseCaptured)
 ReleaseMouseCapture();
@@ -1360,14 +1178,8 @@ private void OnPreviewMouseWheel(object sender, MouseWheelEventArgs e)
 {
 if (_context?.Viewport == null)
 return;
-var camera = _context.Viewport.Camera;
-Point cursor = e.GetPosition(this);
-Point worldBefore = camera.ScreenToWorld(cursor);
 double factor = e.Delta > 0 ? 1.1 : 1 / 1.1;
-camera.Zoom = Math.Max(0.1, Math.Min(8, camera.Zoom * factor));
-camera.Offset = new Point(
-cursor.X - worldBefore.X * camera.Zoom,
-cursor.Y - worldBefore.Y * camera.Zoom);
+_context.Viewport.Camera.ZoomAt(e.GetPosition(this), factor);
 e.Handled = true;
 }
 private void OnPreviewKeyDown(object sender, KeyEventArgs e)
@@ -1376,10 +1188,34 @@ if (_context == null)
 return;
 e.Handled = _context.Input.KeyDown(e.Key);
 }
+private void OnMouseLeave(object sender, MouseEventArgs e)
+{
+if (_isPanning)
+CancelarPan();
+}
 private void OnUnloaded(object sender, RoutedEventArgs e)
 {
+if (_isPanning)
+CancelarPan();
+if (IsMouseCaptured)
+ReleaseMouseCapture();
 if (_context?.Viewport != null)
 _context.Viewport.Camera.PropertyChanged -= OnCameraChanged;
+}
+private void AtualizarPan(Point current)
+{
+if (_context?.Viewport == null)
+return;
+Vector delta = current - _lastPanPoint;
+_context.Viewport.Camera.Pan(delta);
+_lastPanPoint = current;
+}
+private void CancelarPan()
+{
+_isPanning = false;
+Cursor = Cursors.Arrow;
+if (IsMouseCaptured)
+ReleaseMouseCapture();
 }
 private static ElementoViewModel? EncontrarElemento(DependencyObject? origem)
 {
