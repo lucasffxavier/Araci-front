@@ -734,6 +734,138 @@ Keyboard.Modifiers.HasFlag(ModifierKeys.Control));
 
 
 ====================================================================================================
+ARQUIVO: C:\Araci-Engine-Front\Araci Engine\Service\MoveHudService.cs
+====================================================================================================
+
+﻿using System.ComponentModel;
+using System.Windows;
+namespace Araci.Services
+{
+public class MoveHudService : INotifyPropertyChanged
+{
+private const double MARGEM = 10;
+private readonly EditorContext _context;
+private bool _visivel;
+private double _x;
+private double _y;
+private double _deltaX;
+private double _deltaY;
+public event PropertyChangedEventHandler? PropertyChanged;
+public MoveHudService(EditorContext context)
+{
+_context = context
+?? throw new System.ArgumentNullException(nameof(context));
+}
+public bool Visivel
+{
+get => _visivel;
+set
+{
+if (_visivel != value)
+{
+_visivel = value;
+OnChanged(nameof(Visivel));
+}
+}
+}
+public double X
+{
+get => _x;
+private set
+{
+if (_x != value)
+{
+_x = value;
+OnChanged(nameof(X));
+}
+}
+}
+public double Y
+{
+get => _y;
+private set
+{
+if (_y != value)
+{
+_y = value;
+OnChanged(nameof(Y));
+}
+}
+}
+public double DeltaX
+{
+get => _deltaX;
+set
+{
+if (_deltaX != value)
+{
+_deltaX = value;
+OnChanged(nameof(DeltaX));
+}
+}
+}
+public double DeltaY
+{
+get => _deltaY;
+set
+{
+if (_deltaY != value)
+{
+_deltaY = value;
+OnChanged(nameof(DeltaY));
+}
+}
+}
+public void AtualizarPosicao(Rect bounds)
+{
+double viewportX =
+_context.Viewport?.Largura ?? 1000;
+double viewportY =
+_context.Viewport?.Altura ?? 800;
+Point worldPoint =
+new(
+bounds.X + bounds.Width / 2,
+bounds.Y - 20);
+Point screenPoint =
+_context.Viewport?.WorldToScreen(worldPoint)
+?? worldPoint;
+double novoX =
+screenPoint.X;
+double novoY =
+screenPoint.Y;
+novoX = Math.Max(MARGEM, Math.Min(novoX, viewportX - MARGEM));
+novoY = Math.Max(MARGEM, Math.Min(novoY, viewportY - MARGEM));
+X = novoX;
+Y = novoY;
+}
+public void Reset()
+{
+DeltaX = 0;
+DeltaY = 0;
+}
+private void OnChanged(string nome)
+{
+PropertyChanged?.Invoke(this,
+new PropertyChangedEventArgs(nome));
+}
+}
+}
+
+
+====================================================================================================
+ARQUIVO: C:\Araci-Engine-Front\Araci Engine\Service\MoveHudState.cs
+====================================================================================================
+
+﻿namespace Araci.Services
+{
+[System.Obsolete]
+public class MoveHudState
+{
+}
+}
+
+
+====================================================================================================
 ARQUIVO: C:\Araci-Engine-Front\Araci Engine\Service\ToolService.cs
 ====================================================================================================
 
@@ -820,6 +952,92 @@ public void RegistrarViewModel(ElementoViewModel vm)
 if (vm == null)
 return;
 _vm.RegistrarViewModel(vm);
+}
+}
+}
+
+
+====================================================================================================
+ARQUIVO: C:\Araci-Engine-Front\Araci Engine\ViewModels\SelectionBoxViewModel.cs
+====================================================================================================
+
+﻿using System.Windows;
+using Araci.ViewModels.Base;
+namespace Araci.ViewModels
+{
+public class SelectionBoxViewModel
+: ViewModelBase
+{
+private bool _visivel;
+private double _x;
+private double _y;
+private double _largura;
+private double _altura;
+public bool Visivel
+{
+get => _visivel;
+set => Set(ref _visivel, value);
+}
+public double X
+{
+get => _x;
+set
+{
+if (Set(ref _x, value))
+{
+OnPropertyChanged(nameof(Bounds));
+}
+}
+}
+public double Y
+{
+get => _y;
+set
+{
+if (Set(ref _y, value))
+{
+OnPropertyChanged(nameof(Bounds));
+}
+}
+}
+public double Largura
+{
+get => _largura;
+set
+{
+if (Set(ref _largura, value))
+{
+OnPropertyChanged(nameof(Bounds));
+}
+}
+}
+public double Altura
+{
+get => _altura;
+set
+{
+if (Set(ref _altura, value))
+{
+OnPropertyChanged(nameof(Bounds));
+}
+}
+}
+public Rect Bounds =>
+new(X, Y, Largura, Altura);
+public void Atualizar(
+Point inicio,
+Point fim)
+{
+X = inicio.X < fim.X
+? inicio.X
+: fim.X;
+Y = inicio.Y < fim.Y
+? inicio.Y
+: fim.Y;
+Largura =
+System.Math.Abs(fim.X - inicio.X);
+Altura =
+System.Math.Abs(fim.Y - inicio.Y);
 }
 }
 }
@@ -936,6 +1154,7 @@ PreviewMouseUp="OnPreviewMouseUp"
 PreviewMouseLeftButtonUp="OnPreviewMouseLeftButtonUp"
 PreviewMouseWheel="OnPreviewMouseWheel"
 PreviewKeyDown="OnPreviewKeyDown"
+PreviewKeyUp="OnPreviewKeyUp"
 MouseLeave="OnMouseLeave"
 Loaded="OnLoaded">
 <UserControl.Resources>
@@ -1060,6 +1279,9 @@ private readonly MatrixTransform _cameraTransform = new();
 private ViewportViewModel? _viewportViewModel;
 private EditorContext? _context;
 private bool _isPanning;
+private bool _isSpacePressed;
+private bool _isSpaceLeftPanning;
+private bool _suppressNextLeftButtonUp;
 private Point _lastPanPoint;
 public ViewportView()
 {
@@ -1131,16 +1353,17 @@ private void OnPreviewMouseDown(object sender, MouseButtonEventArgs e)
 {
 if (_context?.Viewport == null || e.ChangedButton != MouseButton.Middle)
 return;
-Focus();
-Keyboard.Focus(this);
-_isPanning = true;
-_lastPanPoint = e.GetPosition(this);
-Cursor = Cursors.ScrollAll;
-CaptureMouse();
+IniciarPan(e.GetPosition(this), spaceLeftPan: false);
 e.Handled = true;
 }
 private void OnPreviewMouseLeftButtonDown(object sender, MouseButtonEventArgs e)
 {
+if (_context?.Viewport != null && _isSpacePressed)
+{
+IniciarPan(e.GetPosition(this), spaceLeftPan: true);
+e.Handled = true;
+return;
+}
 if (_context == null || _isPanning)
 return;
 Focus();
@@ -1168,6 +1391,18 @@ e.Handled = true;
 }
 private void OnPreviewMouseLeftButtonUp(object sender, MouseButtonEventArgs e)
 {
+if (_isSpaceLeftPanning)
+{
+CancelarPan();
+e.Handled = true;
+return;
+}
+if (_suppressNextLeftButtonUp)
+{
+_suppressNextLeftButtonUp = false;
+e.Handled = true;
+return;
+}
 if (_isPanning)
 return;
 _context?.Input.MouseUp(GetWorldPos(e));
@@ -1184,9 +1419,32 @@ e.Handled = true;
 }
 private void OnPreviewKeyDown(object sender, KeyEventArgs e)
 {
+if (e.Key == Key.Space)
+{
+_isSpacePressed = true;
+Cursor = Cursors.ScrollAll;
+e.Handled = true;
+return;
+}
 if (_context == null)
 return;
 e.Handled = _context.Input.KeyDown(e.Key);
+}
+private void OnPreviewKeyUp(object sender, KeyEventArgs e)
+{
+if (e.Key != Key.Space)
+return;
+_isSpacePressed = false;
+if (_isSpaceLeftPanning)
+{
+_suppressNextLeftButtonUp = true;
+CancelarPan();
+}
+else
+{
+Cursor = Cursors.Arrow;
+}
+e.Handled = true;
 }
 private void OnMouseLeave(object sender, MouseEventArgs e)
 {
@@ -1195,12 +1453,24 @@ CancelarPan();
 }
 private void OnUnloaded(object sender, RoutedEventArgs e)
 {
+_isSpacePressed = false;
 if (_isPanning)
 CancelarPan();
 if (IsMouseCaptured)
 ReleaseMouseCapture();
+Cursor = Cursors.Arrow;
 if (_context?.Viewport != null)
 _context.Viewport.Camera.PropertyChanged -= OnCameraChanged;
+}
+private void IniciarPan(Point start, bool spaceLeftPan)
+{
+Focus();
+Keyboard.Focus(this);
+_isPanning = true;
+_isSpaceLeftPanning = spaceLeftPan;
+_lastPanPoint = start;
+Cursor = Cursors.ScrollAll;
+CaptureMouse();
 }
 private void AtualizarPan(Point current)
 {
@@ -1213,7 +1483,8 @@ _lastPanPoint = current;
 private void CancelarPan()
 {
 _isPanning = false;
-Cursor = Cursors.Arrow;
+_isSpaceLeftPanning = false;
+Cursor = _isSpacePressed ? Cursors.ScrollAll : Cursors.Arrow;
 if (IsMouseCaptured)
 ReleaseMouseCapture();
 }
