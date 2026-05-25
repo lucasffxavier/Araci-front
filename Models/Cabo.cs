@@ -7,6 +7,8 @@ namespace Araci.Models
 {
     public class Cabo : ElementoLinear, ITerminalOwner
     {
+        public const string PARAM_ORIGEM_ID = "OrigemId";
+        public const string PARAM_DESTINO_ID = "DestinoId";
         public const string PARAM_BARRA_ORIGEM = "BarraOrigem";
         public const string PARAM_BARRA_DESTINO = "BarraDestino";
         public const string PARAM_COMPRIMENTO = "Comprimento";
@@ -24,6 +26,8 @@ namespace Araci.Models
 
         public Cabo()
         {
+            DefinirParametro(new Parameter<string>(PARAM_ORIGEM_ID, string.Empty));
+            DefinirParametro(new Parameter<string>(PARAM_DESTINO_ID, string.Empty));
             DefinirParametro(new Parameter<string>(PARAM_BARRA_ORIGEM, "GERADOR-001"));
             DefinirParametro(new Parameter<string>(PARAM_BARRA_DESTINO, "CARGA-001"));
             DefinirParametro(new Parameter<double>(PARAM_COMPRIMENTO, 1));
@@ -51,6 +55,18 @@ namespace Araci.Models
         public Terminal? Origem => _terminais.Count > 0 ? _terminais[0] : null;
 
         public Terminal? Destino => _terminais.Count > 1 ? _terminais[1] : null;
+
+        public string OrigemId
+        {
+            get => Obter<string>(PARAM_ORIGEM_ID);
+            set => Definir(PARAM_ORIGEM_ID, value);
+        }
+
+        public string DestinoId
+        {
+            get => Obter<string>(PARAM_DESTINO_ID);
+            set => Definir(PARAM_DESTINO_ID, value);
+        }
 
         public string BarraOrigem
         {

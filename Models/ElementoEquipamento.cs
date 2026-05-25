@@ -6,6 +6,7 @@ namespace Araci.Models
     public abstract class ElementoEquipamento : Elemento, ITerminalOwner
     {
         public const string PARAM_BARRA = "Barra";
+        public const string PARAM_BARRA_ID = "BarraId";
         public const string PARAM_ALIMENTADOR = "Alimentador";
         public const string PARAM_POTENCIA_ATIVA = "PotenciaAtiva";
         public const string PARAM_POTENCIA_REATIVA = "PotenciaReativa";
@@ -24,6 +25,7 @@ namespace Araci.Models
         {
             DefinirParametro(new Parameter<string>(PARAM_NOME, string.Empty));
             DefinirParametro(new Parameter<string>(PARAM_BARRA, string.Empty));
+            DefinirParametro(new Parameter<string>(PARAM_BARRA_ID, string.Empty));
             DefinirParametro(new Parameter<int>(PARAM_ALIMENTADOR, 0));
             DefinirParametro(new Parameter<double>(PARAM_POTENCIA_ATIVA, 0));
             DefinirParametro(new Parameter<double>(PARAM_POTENCIA_REATIVA, 0));
@@ -51,6 +53,12 @@ namespace Araci.Models
                 foreach (Terminal terminal in _terminais)
                     terminal.Barra = value;
             }
+        }
+
+        public string BarraId
+        {
+            get => Obter<string>(PARAM_BARRA_ID);
+            set => Definir(PARAM_BARRA_ID, value);
         }
 
         public int Alimentador

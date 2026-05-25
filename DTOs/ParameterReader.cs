@@ -12,6 +12,7 @@ namespace Araci.DTOs
     public class ParameterReader
     {
         private readonly CoreApi _api;
+        private readonly ConnectivityService? _connectivity;
 
         public ParameterReader(CoreApi api)
         {
@@ -19,13 +20,19 @@ namespace Araci.DTOs
         }
 
         public ParameterReader(EditorContext context)
-            : this(new CoreApi(context))
+            : this(new CoreApi(context), new ConnectivityService(context))
         {
         }
 
         public ParameterReader(AraciDocument document)
-            : this(new CoreApi(document))
+            : this(new CoreApi(document), new ConnectivityService(document))
         {
+        }
+
+        private ParameterReader(CoreApi api, ConnectivityService connectivity)
+        {
+            _api = api ?? throw new ArgumentNullException(nameof(api));
+            _connectivity = connectivity ?? throw new ArgumentNullException(nameof(connectivity));
         }
 
         public IList<LoadData> GetLoads()
@@ -35,10 +42,10 @@ namespace Araci.DTOs
                 {
                     Id = carga.Id.ToString(),
                     Nome = ReadString(carga, "Nome"),
-                    Barra = ReadBarra(carga, "Barra", "Barra 1"),
+                    Barra = ResolverBarraEquipamento(carga),
                     Fases = ReadInt(carga, "Fases"),
-                    R = ReadDouble(carga, "Carga resistencia", "Carga resistÃªncia"),
-                    X = ReadDouble(carga, "Carga reatancia", "Carga reatÃ¢ncia"),
+                    R = ReadDouble(carga, "Carga resistencia", "Carga resistência"),
+                    X = ReadDouble(carga, "Carga reatancia", "Carga reatância"),
                     PotenciaAtiva = ReadDouble(carga, "PotenciaAtiva"),
                     PotenciaReativa = ReadDouble(carga, "PotenciaReativa"),
                     Tensao = ReadVoltage(carga, "TensaoKV", "Tensao", "TensaoLinha"),
@@ -55,8 +62,8 @@ namespace Araci.DTOs
                 {
                     Id = cabo.Id.ToString(),
                     Nome = ReadString(cabo, "Nome"),
-                    Barra1 = ReadBarra(cabo, "BarraOrigem", "Barra 1"),
-                    Barra2 = ReadBarra(cabo, "BarraDestino", "Barra 2"),
+                    Barra1 = ResolverBus1(cabo),
+                    Barra2 = ResolverBus2(cabo),
                     Fases = ReadInt(cabo, "Fases"),
                     Comprimento = ReadDouble(cabo, "Comprimento"),
                     R1 = ReadDouble(cabo, "R1", "Resistencia"),
@@ -89,7 +96,7 @@ namespace Araci.DTOs
                 {
                     Id = gerador.Id.ToString(),
                     Nome = ReadString(gerador, "Nome"),
-                    Barra = ReadBarra(gerador, "Barra", "Barra 1"),
+                    Barra = ResolverBarraEquipamento(gerador),
                     Fases = ReadInt(gerador, "Fases"),
                     Tensao = ReadVoltage(gerador, "TensaoKV", "Tensao", "TensaoLinha"),
                     Potencia = ReadDouble(gerador, "PotenciaAtiva", "Potencia", "PotenciaAparente"),
@@ -105,6 +112,24 @@ namespace Araci.DTOs
                     string.Equals(elemento.GetType().Name, typeName, StringComparison.OrdinalIgnoreCase) ||
                     string.Equals(elemento.Tipo?.NomeTipo, typeName, StringComparison.OrdinalIgnoreCase)))
                 .ToList();
+        }
+
+        private string ResolverBus1(Cabo cabo)
+        {
+            string valor = _connectivity?.ResolverBus1(cabo) ?? string.Empty;
+            return string.IsNullOrWhiteSpace(valor) ? ReadBarra(cabo, "BarraOrigem", "Barra 1") : valor;
+        }
+
+        private string ResolverBus2(Cabo cabo)
+        {
+            string valor = _connectivity?.ResolverBus2(cabo) ?? string.Empty;
+            return string.IsNullOrWhiteSpace(valor) ? ReadBarra(cabo, "BarraDestino", "Barra 2") : valor;
+        }
+
+        private string ResolverBarraEquipamento(ElementoEquipamento equipamento)
+        {
+            string valor = _connectivity?.ResolverBusNameParaEquipamento(equipamento) ?? string.Empty;
+            return string.IsNullOrWhiteSpace(valor) ? ReadBarra(equipamento, "Barra", "Barra 1") : valor;
         }
 
         private static string ReadBarra(Elemento elemento, params string[] names)

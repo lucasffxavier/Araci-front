@@ -20,6 +20,34 @@ namespace Araci.ViewModels
 
         public override IEnumerable TiposDisponiveis => Types.TiposCabos;
 
+        public string OrigemId
+        {
+            get => Cabo.OrigemId;
+            set
+            {
+                if (Cabo.OrigemId == value)
+                    return;
+
+                Cabo.OrigemId = value;
+                OnPropertyChanged();
+                NotificarParametros();
+            }
+        }
+
+        public string DestinoId
+        {
+            get => Cabo.DestinoId;
+            set
+            {
+                if (Cabo.DestinoId == value)
+                    return;
+
+                Cabo.DestinoId = value;
+                OnPropertyChanged();
+                NotificarParametros();
+            }
+        }
+
         public string Nome
         {
             get => Cabo.Nome;

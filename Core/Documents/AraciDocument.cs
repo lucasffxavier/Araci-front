@@ -7,20 +7,26 @@ namespace Araci.Core.Documents
 {
     public class AraciDocument
     {
-        public ObservableCollection<Elemento> Elementos { get; }
-
         public AraciDocument()
         {
             Elementos = new ObservableCollection<Elemento>();
         }
+
+        public ObservableCollection<Elemento> Elementos { get; }
 
         public void AdicionarElemento(Elemento elemento)
         {
             if (Elementos.Contains(elemento))
                 return;
 
+            string nomeAnterior = elemento.Nome;
+
+            if (string.IsNullOrWhiteSpace(elemento.Nome) || NomeEmUso(elemento.Nome, elemento))
+                elemento.Nome = GerarNomeUnico(elemento);
+
+            SincronizarBarraDoNovoElemento(elemento, nomeAnterior);
+
             Elementos.Add(elemento);
-            AtualizarNomes(elemento.GetType());
         }
 
         public void RemoverElemento(Elemento elemento)
@@ -29,7 +35,6 @@ namespace Araci.Core.Documents
                 return;
 
             Elementos.Remove(elemento);
-            AtualizarNomes(elemento.GetType());
         }
 
         public void Limpar()
@@ -37,37 +42,41 @@ namespace Araci.Core.Documents
             Elementos.Clear();
         }
 
-        private void AtualizarNomes(Type tipo)
+        public string GerarNomeUnico(Elemento elemento)
         {
-            var lista = Elementos
-                .Where(e => e.GetType() == tipo)
-                .ToList();
+            string prefixo = ObterPrefixo(elemento);
 
-            for (int i = 0; i < lista.Count; i++)
+            for (int i = 1; i < int.MaxValue; i++)
             {
-                Elemento elemento = lista[i];
-                string nomeAntigo = elemento.Nome;
-                string prefixo = ObterPrefixo(elemento);
-                string nomeNovo = $"{prefixo}-{(i + 1).ToString("D3")}";
+                string nome = $"{prefixo}-{i.ToString("D3")}";
 
-                elemento.Nome = nomeNovo;
-                SincronizarBarraAutomatica(elemento, nomeAntigo, nomeNovo);
+                if (!NomeEmUso(nome, elemento))
+                    return nome;
             }
+
+            return $"{prefixo}-{Guid.NewGuid():N}";
         }
 
-        private static void SincronizarBarraAutomatica(Elemento elemento, string nomeAntigo, string nomeNovo)
+        private bool NomeEmUso(string nome, Elemento elementoAtual)
+        {
+            return Elementos.Any(e =>
+                !ReferenceEquals(e, elementoAtual) &&
+                string.Equals(e.Nome, nome, StringComparison.OrdinalIgnoreCase));
+        }
+
+        private static void SincronizarBarraDoNovoElemento(Elemento elemento, string nomeAnterior)
         {
             if (elemento is not ElementoEquipamento equipamento)
                 return;
 
             if (string.IsNullOrWhiteSpace(equipamento.Barra) ||
-                string.Equals(equipamento.Barra, nomeAntigo, StringComparison.OrdinalIgnoreCase))
+                string.Equals(equipamento.Barra, nomeAnterior, StringComparison.OrdinalIgnoreCase))
             {
-                equipamento.Barra = nomeNovo;
+                equipamento.Barra = elemento.Nome;
             }
         }
 
-        private string ObterPrefixo(Elemento elemento)
+        private static string ObterPrefixo(Elemento elemento)
         {
             return elemento switch
             {

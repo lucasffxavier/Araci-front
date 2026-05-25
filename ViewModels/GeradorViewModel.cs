@@ -19,6 +19,34 @@ namespace Araci.ViewModels
 
         public override IEnumerable TiposDisponiveis => Types.TiposGeradores;
 
+        public string Barra
+        {
+            get => Gerador.Barra;
+            set
+            {
+                if (Gerador.Barra == value)
+                    return;
+
+                Gerador.Barra = value;
+                OnPropertyChanged();
+                NotificarParametros();
+            }
+        }
+
+        public string BarraId
+        {
+            get => Gerador.BarraId;
+            set
+            {
+                if (Gerador.BarraId == value)
+                    return;
+
+                Gerador.BarraId = value;
+                OnPropertyChanged();
+                NotificarParametros();
+            }
+        }
+
         public string Nome
         {
             get => Gerador.Nome;

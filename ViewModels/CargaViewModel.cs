@@ -18,6 +18,34 @@ namespace Araci.ViewModels
 
         public override IEnumerable TiposDisponiveis => Types.TiposCargas;
 
+        public string Barra
+        {
+            get => Carga.Barra;
+            set
+            {
+                if (Carga.Barra == value)
+                    return;
+
+                Carga.Barra = value;
+                OnPropertyChanged();
+                NotificarParametros();
+            }
+        }
+
+        public string BarraId
+        {
+            get => Carga.BarraId;
+            set
+            {
+                if (Carga.BarraId == value)
+                    return;
+
+                Carga.BarraId = value;
+                OnPropertyChanged();
+                NotificarParametros();
+            }
+        }
+
         public string Nome
         {
             get => Carga.Nome;

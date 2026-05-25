@@ -132,12 +132,18 @@ namespace Araci.Applications.Diagrama.InserirCabo
             {
                 case ElementoEquipamento equipamento:
 
+                    _caboAtual.OrigemId =
+                        equipamento.Id.ToString();
+
                     _caboAtual.BarraOrigem =
                         equipamento.Nome;
 
                     break;
 
                 case Barra barra:
+
+                    _caboAtual.OrigemId =
+                        barra.Id.ToString();
 
                     _caboAtual.BarraOrigem =
                         barra.Nome;
@@ -161,12 +167,18 @@ namespace Araci.Applications.Diagrama.InserirCabo
             {
                 case ElementoEquipamento equipamento:
 
+                    _caboAtual.DestinoId =
+                        equipamento.Id.ToString();
+
                     _caboAtual.BarraDestino =
                         equipamento.Nome;
 
                     break;
 
                 case Barra barra:
+
+                    _caboAtual.DestinoId =
+                        barra.Id.ToString();
 
                     _caboAtual.BarraDestino =
                         barra.Nome;
