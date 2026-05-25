@@ -28,6 +28,7 @@ namespace Araci.Services
             Move = new MoveService(this);
             Tools = new ToolService(this);
             Input = new InputRouter(this);
+            Navigation = new ViewportNavigationService(this);
         }
 
         public IEventBus Events { get; }
@@ -41,6 +42,8 @@ namespace Araci.Services
         public ToolService Tools { get; }
 
         public InputRouter Input { get; }
+
+        public ViewportNavigationService Navigation { get; }
 
         public ViewportService? Viewport { get; private set; }
 

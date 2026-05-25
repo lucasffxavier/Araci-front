@@ -15,11 +15,6 @@ namespace Araci.Views
 
         private ViewportViewModel? _viewportViewModel;
         private EditorContext? _context;
-        private bool _isPanning;
-        private bool _isSpacePressed;
-        private bool _isSpaceLeftPanning;
-        private bool _suppressNextLeftButtonUp;
-        private Point _lastPanPoint;
 
         public ViewportView()
         {
@@ -114,32 +109,47 @@ namespace Araci.Views
 
         private void OnPreviewMouseDown(object sender, MouseButtonEventArgs e)
         {
-            if (_context?.Viewport == null || e.ChangedButton != MouseButton.Middle)
+            if (_context == null)
                 return;
 
-            if (e.ClickCount >= 2)
+            if (_context.Navigation.TryHandleMiddleDoubleClick(e))
             {
-                CancelarPan();
-                _context.Viewport.ZoomExtents();
+                AtualizarCursorNavegacao();
+                LiberarCapturaMouse();
                 e.Handled = true;
                 return;
             }
 
-            IniciarPan(e.GetPosition(this), spaceLeftPan: false);
-            e.Handled = true;
+            if (_context.Navigation.TryBeginMiddlePan(e, this))
+            {
+                Focus();
+                Keyboard.Focus(this);
+                AtualizarCursorNavegacao();
+                CaptureMouse();
+                e.Handled = true;
+            }
         }
 
         private void OnPreviewMouseLeftButtonDown(object sender, MouseButtonEventArgs e)
         {
-            if (_context?.Viewport != null && _isSpacePressed)
+            if (_context == null)
+                return;
+
+            if (_context.Navigation.TryBeginSpaceLeftPan(e, this))
             {
-                IniciarPan(e.GetPosition(this), spaceLeftPan: true);
+                Focus();
+                Keyboard.Focus(this);
+                AtualizarCursorNavegacao();
+                CaptureMouse();
                 e.Handled = true;
                 return;
             }
 
-            if (_context == null || _isPanning)
+            if (_context.Navigation.IsPanning)
+            {
+                e.Handled = true;
                 return;
+            }
 
             Focus();
             Keyboard.Focus(this);
@@ -153,9 +163,9 @@ namespace Araci.Views
 
         private void OnPreviewMouseMove(object sender, MouseEventArgs e)
         {
-            if (_isPanning)
+            if (_context?.Navigation.TryUpdatePan(e, this) == true)
             {
-                AtualizarPan(e.GetPosition(this));
+                AtualizarCursorNavegacao();
                 e.Handled = true;
                 return;
             }
@@ -165,65 +175,54 @@ namespace Araci.Views
 
         private void OnPreviewMouseUp(object sender, MouseButtonEventArgs e)
         {
-            if (e.ChangedButton != MouseButton.Middle || !_isPanning)
+            if (_context?.Navigation.TryEndMiddlePan(e) != true)
                 return;
 
-            CancelarPan();
+            AtualizarCursorNavegacao();
+            LiberarCapturaMouse();
             e.Handled = true;
         }
 
         private void OnPreviewMouseLeftButtonUp(object sender, MouseButtonEventArgs e)
         {
-            if (_isSpaceLeftPanning)
+            if (_context?.Navigation.TryEndSpaceLeftPan(e) == true)
             {
-                CancelarPan();
+                AtualizarCursorNavegacao();
+                LiberarCapturaMouse();
                 e.Handled = true;
                 return;
             }
 
-            if (_suppressNextLeftButtonUp)
+            if (_context?.Navigation.ConsumeSuppressNextLeftButtonUp() == true)
             {
-                _suppressNextLeftButtonUp = false;
                 e.Handled = true;
                 return;
             }
 
-            if (_isPanning)
+            if (_context?.Navigation.IsPanning == true)
+            {
+                e.Handled = true;
                 return;
+            }
 
             _context?.Input.MouseUp(GetWorldPos(e));
 
-            if (IsMouseCaptured)
-                ReleaseMouseCapture();
+            LiberarCapturaMouse();
         }
 
         private void OnPreviewMouseWheel(object sender, MouseWheelEventArgs e)
         {
-            if (_context?.Viewport == null)
+            if (_context?.Navigation.TryHandleMouseWheel(e, this) != true)
                 return;
-
-            Point cursor = e.GetPosition(this);
-
-            if (e.Delta > 0)
-                _context.Viewport.ZoomInAt(cursor);
-            else
-                _context.Viewport.ZoomOutAt(cursor);
 
             e.Handled = true;
         }
 
         private void OnPreviewKeyDown(object sender, KeyEventArgs e)
         {
-            if (e.Key == Key.Space)
+            if (_context?.Navigation.TryHandleKeyDown(e) == true)
             {
-                _isSpacePressed = true;
-                Cursor = Cursors.ScrollAll;
-                e.Handled = true;
-                return;
-            }
-
-            if (TryHandleViewportShortcut(e))
-            {
+                AtualizarCursorNavegacao();
                 e.Handled = true;
                 return;
             }
@@ -236,111 +235,40 @@ namespace Araci.Views
 
         private void OnPreviewKeyUp(object sender, KeyEventArgs e)
         {
-            if (e.Key != Key.Space)
+            if (_context?.Navigation.TryHandleKeyUp(e) != true)
                 return;
 
-            _isSpacePressed = false;
-
-            if (_isSpaceLeftPanning)
-            {
-                _suppressNextLeftButtonUp = true;
-                CancelarPan();
-            }
-            else
-            {
-                Cursor = Cursors.Arrow;
-            }
-
+            AtualizarCursorNavegacao();
+            LiberarCapturaMouse();
             e.Handled = true;
         }
 
         private void OnMouseLeave(object sender, MouseEventArgs e)
         {
-            if (_isPanning)
-                CancelarPan();
+            _context?.Navigation.CancelPan();
+            AtualizarCursorNavegacao();
         }
 
         private void OnUnloaded(object sender, RoutedEventArgs e)
         {
-            _isSpacePressed = false;
-
-            if (_isPanning)
-                CancelarPan();
-
-            if (IsMouseCaptured)
-                ReleaseMouseCapture();
-
+            _context?.Navigation.Reset();
+            LiberarCapturaMouse();
             Cursor = Cursors.Arrow;
 
             if (_context?.Viewport != null)
                 _context.Viewport.Camera.PropertyChanged -= OnCameraChanged;
         }
 
-        private bool TryHandleViewportShortcut(KeyEventArgs e)
+        private void AtualizarCursorNavegacao()
         {
-            if (_context?.Viewport == null)
-                return false;
-
-            if (!Keyboard.Modifiers.HasFlag(ModifierKeys.Control))
-                return false;
-
-            switch (e.Key)
-            {
-                case Key.OemPlus:
-                case Key.Add:
-                    _context.Viewport.ZoomInAtCenter();
-                    return true;
-
-                case Key.OemMinus:
-                case Key.Subtract:
-                    _context.Viewport.ZoomOutAtCenter();
-                    return true;
-
-                case Key.D0:
-                case Key.NumPad0:
-                    _context.Viewport.ResetCamera();
-                    return true;
-
-                case Key.D1:
-                case Key.NumPad1:
-                    _context.Viewport.Zoom100AtCenter();
-                    return true;
-
-                default:
-                    return false;
-            }
+            if (_context?.Navigation.IsPanning == true || _context?.Navigation.IsSpacePressed == true)
+                Cursor = Cursors.ScrollAll;
+            else
+                Cursor = Cursors.Arrow;
         }
 
-        private void IniciarPan(Point start, bool spaceLeftPan)
+        private void LiberarCapturaMouse()
         {
-            Focus();
-            Keyboard.Focus(this);
-
-            _isPanning = true;
-            _isSpaceLeftPanning = spaceLeftPan;
-            _lastPanPoint = start;
-            Cursor = Cursors.ScrollAll;
-            CaptureMouse();
-        }
-
-        private void AtualizarPan(Point current)
-        {
-            if (_context?.Viewport == null)
-                return;
-
-            Vector delta = current - _lastPanPoint;
-
-            _context.Viewport.Pan(delta);
-
-            _lastPanPoint = current;
-        }
-
-        private void CancelarPan()
-        {
-            _isPanning = false;
-            _isSpaceLeftPanning = false;
-            Cursor = _isSpacePressed ? Cursors.ScrollAll : Cursors.Arrow;
-
             if (IsMouseCaptured)
                 ReleaseMouseCapture();
         }
