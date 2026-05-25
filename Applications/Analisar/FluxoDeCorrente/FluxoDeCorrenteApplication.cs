@@ -47,7 +47,7 @@ namespace Araci.Applications.Analisar.FluxoDeCorrente
             try
             {
                 CoreApi api = new(_context);
-                ParameterReader reader = new(api);
+                ParameterReader reader = new(_context);
                 CircuitBuilder builder = new(reader);
                 CircuitDto dto = builder.Build();
                 SimulationApiClient client = new();

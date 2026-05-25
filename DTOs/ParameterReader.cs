@@ -13,6 +13,7 @@ namespace Araci.DTOs
     {
         private readonly CoreApi _api;
         private readonly ConnectivityService? _connectivity;
+        private readonly TopologyValidator? _topology;
 
         public ParameterReader(CoreApi api)
         {
@@ -20,19 +21,25 @@ namespace Araci.DTOs
         }
 
         public ParameterReader(EditorContext context)
-            : this(new CoreApi(context), new ConnectivityService(context))
+            : this(new CoreApi(context), new ConnectivityService(context), new TopologyValidator(context))
         {
         }
 
         public ParameterReader(AraciDocument document)
-            : this(new CoreApi(document), new ConnectivityService(document))
+            : this(new CoreApi(document), new ConnectivityService(document), new TopologyValidator(document))
         {
         }
 
-        private ParameterReader(CoreApi api, ConnectivityService connectivity)
+        private ParameterReader(CoreApi api, ConnectivityService connectivity, TopologyValidator topology)
         {
             _api = api ?? throw new ArgumentNullException(nameof(api));
             _connectivity = connectivity ?? throw new ArgumentNullException(nameof(connectivity));
+            _topology = topology ?? throw new ArgumentNullException(nameof(topology));
+        }
+
+        public TopologyValidationResult? ValidateTopology()
+        {
+            return _topology?.Validate();
         }
 
         public IList<LoadData> GetLoads()
@@ -116,20 +123,17 @@ namespace Araci.DTOs
 
         private string ResolverBus1(Cabo cabo)
         {
-            string valor = _connectivity?.ResolverBus1(cabo) ?? string.Empty;
-            return string.IsNullOrWhiteSpace(valor) ? ReadBarra(cabo, "BarraOrigem", "Barra 1") : valor;
+            return _connectivity?.ResolverBus1Estrito(cabo) ?? string.Empty;
         }
 
         private string ResolverBus2(Cabo cabo)
         {
-            string valor = _connectivity?.ResolverBus2(cabo) ?? string.Empty;
-            return string.IsNullOrWhiteSpace(valor) ? ReadBarra(cabo, "BarraDestino", "Barra 2") : valor;
+            return _connectivity?.ResolverBus2Estrito(cabo) ?? string.Empty;
         }
 
         private string ResolverBarraEquipamento(ElementoEquipamento equipamento)
         {
-            string valor = _connectivity?.ResolverBusNameParaEquipamento(equipamento) ?? string.Empty;
-            return string.IsNullOrWhiteSpace(valor) ? ReadBarra(equipamento, "Barra", "Barra 1") : valor;
+            return _connectivity?.ResolverBusNameParaEquipamentoEstrito(equipamento) ?? string.Empty;
         }
 
         private static string ReadBarra(Elemento elemento, params string[] names)

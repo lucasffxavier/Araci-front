@@ -43,6 +43,19 @@ namespace Araci.Services
             return elemento == null ? string.Empty : ResolverBusName(elemento);
         }
 
+        public string ResolverBusNamePorIdEstrito(string id, string contexto)
+        {
+            if (string.IsNullOrWhiteSpace(id))
+                throw new InvalidOperationException($"{contexto} sem Id de conexao.");
+
+            Elemento? elemento = ObterElementoPorId(id);
+
+            if (elemento == null)
+                throw new InvalidOperationException($"{contexto} aponta para Id inexistente: {id}.");
+
+            return ResolverBusName(elemento);
+        }
+
         public string ResolverBusNameParaEquipamento(ElementoEquipamento equipamento)
         {
             if (!string.IsNullOrWhiteSpace(equipamento.BarraId))
@@ -55,6 +68,16 @@ namespace Araci.Services
 
             if (!string.IsNullOrWhiteSpace(equipamento.Barra))
                 return equipamento.Barra.Trim();
+
+            return ResolverBusName(equipamento);
+        }
+
+        public string ResolverBusNameParaEquipamentoEstrito(ElementoEquipamento equipamento)
+        {
+            if (!string.IsNullOrWhiteSpace(equipamento.BarraId))
+                return ResolverBusNamePorIdEstrito(
+                    equipamento.BarraId,
+                    $"Equipamento '{ResolverBusName(equipamento)}'");
 
             return ResolverBusName(equipamento);
         }
@@ -72,6 +95,13 @@ namespace Araci.Services
             return cabo.BarraOrigem?.Trim() ?? string.Empty;
         }
 
+        public string ResolverBus1Estrito(Cabo cabo)
+        {
+            return ResolverBusNamePorIdEstrito(
+                cabo.OrigemId,
+                $"Cabo '{ResolverBusName(cabo)}' origem");
+        }
+
         public string ResolverBus2(Cabo cabo)
         {
             if (!string.IsNullOrWhiteSpace(cabo.DestinoId))
@@ -83,6 +113,13 @@ namespace Araci.Services
             }
 
             return cabo.BarraDestino?.Trim() ?? string.Empty;
+        }
+
+        public string ResolverBus2Estrito(Cabo cabo)
+        {
+            return ResolverBusNamePorIdEstrito(
+                cabo.DestinoId,
+                $"Cabo '{ResolverBusName(cabo)}' destino");
         }
     }
 }

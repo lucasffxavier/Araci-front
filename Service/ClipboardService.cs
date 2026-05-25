@@ -65,6 +65,7 @@ namespace Araci.Services
                 var clone = item.Clonar();
 
                 AplicarOffset(clone);
+                LimparConectividadeDeCaboColado(clone);
 
                 novos.Add(clone);
 
@@ -97,6 +98,15 @@ namespace Araci.Services
                 cabo.PosicaoX2 += OFFSET_X;
                 cabo.PosicaoY2 += OFFSET_Y;
             }
+        }
+
+        private static void LimparConectividadeDeCaboColado(Elemento elemento)
+        {
+            if (elemento is not Cabo cabo)
+                return;
+
+            cabo.OrigemId = string.Empty;
+            cabo.DestinoId = string.Empty;
         }
 
         // =========================

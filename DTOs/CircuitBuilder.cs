@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using Araci.Services;
 
 namespace Araci.DTOs
 {
@@ -17,6 +18,8 @@ namespace Araci.DTOs
 
         public CircuitDto Build()
         {
+            ValidarTopologia();
+
             IList<ParameterReader.GeneratorData> generators = _reader.GetGenerators();
             ParameterReader.GeneratorData slackGenerator = generators.FirstOrDefault()
                 ?? throw new InvalidOperationException("Nenhum gerador encontrado para definir a fonte slack.");
@@ -138,6 +141,19 @@ namespace Araci.DTOs
 
             if (!dto.Loads.Any())
                 throw new InvalidOperationException("Nenhuma carga encontrada para simular o fluxo.");
+        }
+
+        private void ValidarTopologia()
+        {
+            TopologyValidationResult? result = _reader.ValidateTopology();
+
+            if (result == null || result.IsValid)
+                return;
+
+            throw new InvalidOperationException(
+                "Topologia invalida para simulacao:" +
+                Environment.NewLine +
+                result.FormatErrors());
         }
 
         private static string SafeName(string value, string fallback)
