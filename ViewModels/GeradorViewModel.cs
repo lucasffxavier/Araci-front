@@ -8,8 +8,8 @@ namespace Araci.ViewModels
 {
     public class GeradorViewModel : ElementoViewModel
     {
-        public GeradorViewModel(Gerador modelo, TypeLibraryService types)
-            : base(modelo, new EquipamentoNode(modelo), types)
+        public GeradorViewModel(Gerador modelo, TypeLibraryService types, NameService names)
+            : base(modelo, new EquipamentoNode(modelo), types, names)
         {
             SelecionarPrimeiroTipoDisponivel();
             AtualizarTerminais();
@@ -55,7 +55,7 @@ namespace Araci.ViewModels
                 if (Gerador.Nome == value)
                     return;
 
-                Gerador.Nome = value;
+                RenomearModelo(value);
                 OnPropertyChanged();
                 NotificarParametros();
             }

@@ -19,14 +19,20 @@ namespace Araci.ViewModels
     public abstract class ElementoViewModel : ViewModelBase
     {
         private readonly ElementoNode _node;
+        private readonly NameService _names;
         private ICommand? _abrirPropriedadesTipoCommand;
         private ObservableCollection<ParameterViewModel>? _parametros;
 
-        protected ElementoViewModel(Elemento modelo, ElementoNode node, TypeLibraryService types)
+        protected ElementoViewModel(
+            Elemento modelo,
+            ElementoNode node,
+            TypeLibraryService types,
+            NameService names)
         {
             Modelo = modelo ?? throw new ArgumentNullException(nameof(modelo));
             _node = node ?? throw new ArgumentNullException(nameof(node));
             Types = types ?? throw new ArgumentNullException(nameof(types));
+            _names = names ?? throw new ArgumentNullException(nameof(names));
             VisualState = new ElementoVisualState();
             _node.AtualizarGeometria();
         }
@@ -36,6 +42,11 @@ namespace Araci.ViewModels
         public ElementoNode Node => _node;
 
         protected TypeLibraryService Types { get; }
+
+        protected void RenomearModelo(string novoNome)
+        {
+            _names.Renomear(Modelo, novoNome);
+        }
 
         public TipoElemento Tipo
         {

@@ -10,8 +10,8 @@ namespace Araci.ViewModels
     {
         private bool _possuiPreview;
 
-        public CaboViewModel(Cabo modelo, TypeLibraryService types)
-            : base(modelo, new CaboNode(modelo), types)
+        public CaboViewModel(Cabo modelo, TypeLibraryService types, NameService names)
+            : base(modelo, new CaboNode(modelo), types, names)
         {
             SelecionarPrimeiroTipoDisponivel();
         }
@@ -56,7 +56,7 @@ namespace Araci.ViewModels
                 if (Cabo.Nome == value)
                     return;
 
-                Cabo.Nome = value;
+                RenomearModelo(value);
                 OnPropertyChanged();
                 NotificarParametros();
             }

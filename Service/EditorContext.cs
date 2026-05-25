@@ -21,10 +21,12 @@ namespace Araci.Services
             Scene = new Scene();
             SceneQueries = new SceneQueryService(Scene);
             Snap = new SnapService(SceneQueries);
+            Names = new NameService(Document);
             Connectivity = new ConnectivityService(this);
             Topology = new TopologyValidator(this);
+            SimulationResults = new SimulationResultApplier(this);
 
-            ElementoFactory = new ElementoFactory(Types);
+            ElementoFactory = new ElementoFactory(Types, Names);
             Selection = new SelectionService(this);
             MoveHud = new MoveHudService(this);
             Move = new MoveService(this);
@@ -68,9 +70,13 @@ namespace Araci.Services
 
         public SnapService Snap { get; }
 
+        public NameService Names { get; }
+
         public ConnectivityService Connectivity { get; }
 
         public TopologyValidator Topology { get; }
+
+        public SimulationResultApplier SimulationResults { get; }
 
         public TypeLibraryService Types { get; } = new TypeLibraryService();
 

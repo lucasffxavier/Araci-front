@@ -1,16 +1,11 @@
 using System;
-using System.Globalization;
 using System.IO;
-using System.Linq;
 using System.Text;
 using System.Text.Json;
 using System.Threading.Tasks;
 using System.Windows;
-using Araci.API;
 using Araci.DTOs;
-using Araci.Models;
 using Araci.Services;
-using Araci.ViewModels;
 
 namespace Araci.Applications.Analisar.FluxoDeCorrente
 {
@@ -46,7 +41,6 @@ namespace Araci.Applications.Analisar.FluxoDeCorrente
 
             try
             {
-                CoreApi api = new(_context);
                 ParameterReader reader = new(_context);
                 CircuitBuilder builder = new(reader);
                 CircuitDto dto = builder.Build();
@@ -54,8 +48,7 @@ namespace Araci.Applications.Analisar.FluxoDeCorrente
 
                 Resultado = await client.SimularTipadoAsync(dto);
 
-                AplicarResultado(api, Resultado);
-                NotificarViewModels();
+                _context.SimulationResults.Apply(Resultado);
 
                 if (options != null)
                     dssPath = SalvarArquivos(options, Resultado);
@@ -70,74 +63,6 @@ namespace Araci.Applications.Analisar.FluxoDeCorrente
                     MessageBoxButton.OK,
                     MessageBoxImage.Warning);
             }
-        }
-
-        private static void AplicarResultado(CoreApi api, SimulationResultDto resultado)
-        {
-            foreach (LineResultDto lineResult in resultado.Lines)
-            {
-                Cabo? cabo = api.ObterElementos<Cabo>()
-                    .FirstOrDefault(c => string.Equals(c.Id.ToString(), lineResult.Id, StringComparison.OrdinalIgnoreCase));
-
-                if (cabo != null)
-                    AplicarCorrentes(cabo, lineResult);
-            }
-
-            foreach (LoadResultDto loadResult in resultado.Loads)
-            {
-                Carga? carga = api.ObterElementos<Carga>()
-                    .FirstOrDefault(c => string.Equals(c.Id.ToString(), loadResult.Id, StringComparison.OrdinalIgnoreCase));
-
-                if (carga != null)
-                    AplicarCorrentes(carga, loadResult);
-            }
-        }
-
-        private void NotificarViewModels()
-        {
-            if (_context.Viewport == null)
-                return;
-
-            foreach (ElementoViewModel vm in _context.Viewport.Elementos)
-            {
-                if (vm.Modelo is Cabo or Carga)
-                {
-                    vm.NotificarPropriedades(
-                        "CorrenteLinha",
-                        "CorrenteFaseA",
-                        "CorrenteFaseB",
-                        "CorrenteFaseC");
-                }
-            }
-        }
-
-        private static void AplicarCorrentes(Cabo cabo, LineResultDto resultado)
-        {
-            double corrente = resultado.Corrente;
-
-            cabo.CorrenteLinha = FormatPolar(resultado.CorrenteLinha ?? corrente, 0);
-            cabo.CorrenteFaseA = FormatPolar(resultado.CorrenteFaseA ?? corrente, resultado.AnguloFaseA ?? 0);
-            cabo.CorrenteFaseB = FormatPolar(resultado.CorrenteFaseB ?? corrente, resultado.AnguloFaseB ?? -120);
-            cabo.CorrenteFaseC = FormatPolar(resultado.CorrenteFaseC ?? corrente, resultado.AnguloFaseC ?? 120);
-        }
-
-        private static void AplicarCorrentes(Carga carga, LoadResultDto resultado)
-        {
-            double corrente = resultado.Corrente;
-
-            carga.CorrenteLinha = FormatPolar(resultado.CorrenteLinha ?? corrente, 0);
-            carga.CorrenteFaseA = FormatPolar(resultado.CorrenteFaseA ?? corrente, resultado.AnguloFaseA ?? 0);
-            carga.CorrenteFaseB = FormatPolar(resultado.CorrenteFaseB ?? corrente, resultado.AnguloFaseB ?? -120);
-            carga.CorrenteFaseC = FormatPolar(resultado.CorrenteFaseC ?? corrente, resultado.AnguloFaseC ?? 120);
-        }
-
-        private static string FormatPolar(double magnitude, double angle)
-        {
-            return string.Format(
-                CultureInfo.InvariantCulture,
-                "{0:0.##}∠{1:0.##}°",
-                magnitude,
-                angle);
         }
 
         private static string? SalvarArquivos(FluxoDeCorrenteOptions options, SimulationResultDto resultado)
@@ -173,7 +98,7 @@ namespace Araci.Applications.Analisar.FluxoDeCorrente
             catch (Exception ex)
             {
                 MessageBox.Show(
-                    $"A simulação foi aplicada, mas não foi possível salvar os arquivos.\n\n{ex.Message}",
+                    $"A simula\u00E7\u00E3o foi aplicada, mas n\u00E3o foi poss\u00EDvel salvar os arquivos.\n\n{ex.Message}",
                     "Fluxo de corrente",
                     MessageBoxButton.OK,
                     MessageBoxImage.Warning);
@@ -185,7 +110,7 @@ namespace Araci.Applications.Analisar.FluxoDeCorrente
         private static bool ConfirmarSubstituicao()
         {
             MessageBoxResult result = MessageBox.Show(
-                "Um ou mais arquivos de saída já existem. Deseja substituir?",
+                "Um ou mais arquivos de sa\u00EDda j\u00E1 existem. Deseja substituir?",
                 "Fluxo de corrente",
                 MessageBoxButton.YesNo,
                 MessageBoxImage.Question);

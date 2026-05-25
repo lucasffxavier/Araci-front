@@ -7,20 +7,22 @@ namespace Araci.Services
     public class ElementoFactory
     {
         private readonly TypeLibraryService _types;
+        private readonly NameService _names;
 
-        public ElementoFactory(TypeLibraryService types)
+        public ElementoFactory(TypeLibraryService types, NameService names)
         {
             _types = types ?? throw new ArgumentNullException(nameof(types));
+            _names = names ?? throw new ArgumentNullException(nameof(names));
         }
 
         public ElementoViewModel? CriarViewModel(Elemento modelo)
         {
             return modelo switch
             {
-                Cabo cabo => new CaboViewModel(cabo, _types),
-                Carga carga => new CargaViewModel(carga, _types),
-                Gerador gerador => new GeradorViewModel(gerador, _types),
-                Barra barra => new BarraViewModel(barra, _types),
+                Cabo cabo => new CaboViewModel(cabo, _types, _names),
+                Carga carga => new CargaViewModel(carga, _types, _names),
+                Gerador gerador => new GeradorViewModel(gerador, _types, _names),
+                Barra barra => new BarraViewModel(barra, _types, _names),
                 _ => null
             };
         }
@@ -36,7 +38,7 @@ namespace Araci.Services
 
         public CaboViewModel CriarCaboVM()
         {
-            return new CaboViewModel(CriarCabo(), _types);
+            return new CaboViewModel(CriarCabo(), _types, _names);
         }
 
         public Carga CriarCarga()
@@ -50,7 +52,7 @@ namespace Araci.Services
 
         public CargaViewModel CriarCargaVM()
         {
-            return new CargaViewModel(CriarCarga(), _types);
+            return new CargaViewModel(CriarCarga(), _types, _names);
         }
 
         public Gerador CriarGerador()
@@ -64,7 +66,7 @@ namespace Araci.Services
 
         public GeradorViewModel CriarGeradorVM()
         {
-            return new GeradorViewModel(CriarGerador(), _types);
+            return new GeradorViewModel(CriarGerador(), _types, _names);
         }
 
         public Barra CriarBarra()
@@ -78,7 +80,7 @@ namespace Araci.Services
 
         public BarraViewModel CriarBarraVM()
         {
-            return new BarraViewModel(CriarBarra(), _types);
+            return new BarraViewModel(CriarBarra(), _types, _names);
         }
     }
 }

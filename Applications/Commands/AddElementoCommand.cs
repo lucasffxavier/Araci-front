@@ -17,6 +17,7 @@ namespace Araci.Core.Commands
 
         public void Execute()
         {
+            _context.Names.GarantirNomeUnico(_elemento);
             _context.Document.AdicionarElemento(_elemento);
         }
 

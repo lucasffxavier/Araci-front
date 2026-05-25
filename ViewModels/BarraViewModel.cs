@@ -8,8 +8,8 @@ namespace Araci.ViewModels
 {
     public class BarraViewModel : ElementoViewModel
     {
-        public BarraViewModel(Barra modelo, TypeLibraryService types)
-            : base(modelo, new BarraNode(modelo), types)
+        public BarraViewModel(Barra modelo, TypeLibraryService types, NameService names)
+            : base(modelo, new BarraNode(modelo), types, names)
         {
             SelecionarPrimeiroTipoDisponivel();
             AtualizarTerminais();
@@ -27,7 +27,7 @@ namespace Araci.ViewModels
                 if (Barra.Nome == value)
                     return;
 
-                Barra.Nome = value;
+                RenomearModelo(value);
                 OnPropertyChanged();
                 NotificarParametros();
             }

@@ -7,8 +7,8 @@ namespace Araci.ViewModels
 {
     public class CargaViewModel : ElementoViewModel
     {
-        public CargaViewModel(Carga modelo, TypeLibraryService types)
-            : base(modelo, new EquipamentoNode(modelo), types)
+        public CargaViewModel(Carga modelo, TypeLibraryService types, NameService names)
+            : base(modelo, new EquipamentoNode(modelo), types, names)
         {
             SelecionarPrimeiroTipoDisponivel();
             AtualizarTerminais();
@@ -54,7 +54,7 @@ namespace Araci.ViewModels
                 if (Carga.Nome == value)
                     return;
 
-                Carga.Nome = value;
+                RenomearModelo(value);
                 OnPropertyChanged();
                 NotificarParametros();
             }

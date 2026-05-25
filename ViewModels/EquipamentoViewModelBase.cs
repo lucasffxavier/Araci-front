@@ -9,8 +9,8 @@ namespace Araci.ViewModels
     {
         protected readonly T _equipamento;
 
-        protected EquipamentoViewModelBase(T equipamento, TypeLibraryService types)
-            : base(equipamento, new EquipamentoNode(equipamento), types)
+        protected EquipamentoViewModelBase(T equipamento, TypeLibraryService types, NameService names)
+            : base(equipamento, new EquipamentoNode(equipamento), types, names)
         {
             _equipamento = equipamento;
         }
@@ -23,7 +23,7 @@ namespace Araci.ViewModels
                 if (_equipamento.Nome == value)
                     return;
 
-                _equipamento.Nome = value;
+                RenomearModelo(value);
                 OnPropertyChanged();
                 NotificarParametros();
             }
