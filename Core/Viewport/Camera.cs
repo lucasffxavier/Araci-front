@@ -52,11 +52,56 @@ namespace Araci.Core.Viewport
         {
             Point worldBefore = ScreenToWorld(screenPoint);
 
-            Zoom *= factor;
+            Zoom = Zoom * factor;
 
             Offset = new Point(
                 screenPoint.X - worldBefore.X * Zoom,
                 screenPoint.Y - worldBefore.Y * Zoom);
+        }
+
+        public void SetZoomAt(Point screenPoint, double zoom)
+        {
+            Point worldBefore = ScreenToWorld(screenPoint);
+
+            Zoom = zoom;
+
+            Offset = new Point(
+                screenPoint.X - worldBefore.X * Zoom,
+                screenPoint.Y - worldBefore.Y * Zoom);
+        }
+
+        public void Fit(Rect worldBounds, Size viewportSize, double margin)
+        {
+            if (worldBounds.IsEmpty || viewportSize.Width <= 0 || viewportSize.Height <= 0)
+            {
+                Reset();
+                return;
+            }
+
+            double availableWidth = Math.Max(1, viewportSize.Width - margin * 2);
+            double availableHeight = Math.Max(1, viewportSize.Height - margin * 2);
+            double boundsWidth = Math.Max(1, worldBounds.Width);
+            double boundsHeight = Math.Max(1, worldBounds.Height);
+
+            Zoom = Math.Min(availableWidth / boundsWidth, availableHeight / boundsHeight);
+
+            Point worldCenter = new(
+                worldBounds.X + worldBounds.Width / 2,
+                worldBounds.Y + worldBounds.Height / 2);
+
+            Point screenCenter = new(
+                viewportSize.Width / 2,
+                viewportSize.Height / 2);
+
+            Offset = new Point(
+                screenCenter.X - worldCenter.X * Zoom,
+                screenCenter.Y - worldCenter.Y * Zoom);
+        }
+
+        public void Reset()
+        {
+            Zoom = 1.0;
+            Offset = new Point(0, 0);
         }
 
         public Point WorldToScreen(Point point)

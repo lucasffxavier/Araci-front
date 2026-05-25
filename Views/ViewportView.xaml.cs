@@ -117,6 +117,14 @@ namespace Araci.Views
             if (_context?.Viewport == null || e.ChangedButton != MouseButton.Middle)
                 return;
 
+            if (e.ClickCount >= 2)
+            {
+                CancelarPan();
+                _context.Viewport.ZoomExtents();
+                e.Handled = true;
+                return;
+            }
+
             IniciarPan(e.GetPosition(this), spaceLeftPan: false);
             e.Handled = true;
         }
@@ -211,6 +219,12 @@ namespace Araci.Views
                 return;
             }
 
+            if (TryHandleViewportShortcut(e))
+            {
+                e.Handled = true;
+                return;
+            }
+
             if (_context == null)
                 return;
 
@@ -257,6 +271,41 @@ namespace Araci.Views
 
             if (_context?.Viewport != null)
                 _context.Viewport.Camera.PropertyChanged -= OnCameraChanged;
+        }
+
+        private bool TryHandleViewportShortcut(KeyEventArgs e)
+        {
+            if (_context?.Viewport == null)
+                return false;
+
+            if (!Keyboard.Modifiers.HasFlag(ModifierKeys.Control))
+                return false;
+
+            switch (e.Key)
+            {
+                case Key.OemPlus:
+                case Key.Add:
+                    _context.Viewport.ZoomInAtCenter();
+                    return true;
+
+                case Key.OemMinus:
+                case Key.Subtract:
+                    _context.Viewport.ZoomOutAtCenter();
+                    return true;
+
+                case Key.D0:
+                case Key.NumPad0:
+                    _context.Viewport.ResetCamera();
+                    return true;
+
+                case Key.D1:
+                case Key.NumPad1:
+                    _context.Viewport.Zoom100AtCenter();
+                    return true;
+
+                default:
+                    return false;
+            }
         }
 
         private void IniciarPan(Point start, bool spaceLeftPan)
