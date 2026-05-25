@@ -1,5 +1,6 @@
-﻿using System.Collections.Generic;
+using System.Collections.Generic;
 using System.Windows;
+using Araci.Models;
 
 namespace Araci.ViewModels
 {
@@ -26,6 +27,32 @@ namespace Araci.ViewModels
             Vertices = vertices != null
                 ? new List<Point>(vertices)
                 : new List<Point>();
+        }
+
+        public void AplicarEm(Elemento elemento)
+        {
+            elemento.PosicaoX = X;
+            elemento.PosicaoY = Y;
+
+            if (elemento is ElementoLinear linear)
+            {
+                linear.PosicaoX2 = X2;
+                linear.PosicaoY2 = Y2;
+            }
+
+            if (elemento is not Cabo cabo)
+                return;
+
+            cabo.Vertices.Clear();
+
+            foreach (var p in Vertices)
+                cabo.Vertices.Add(p);
+
+            if (cabo.Vertices.Count == 0)
+                return;
+
+            cabo.DefinirOrigem(cabo.Vertices[0]);
+            cabo.DefinirDestino(cabo.Vertices[^1]);
         }
     }
 }

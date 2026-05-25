@@ -3,6 +3,7 @@ using System.Collections.ObjectModel;
 using System.Linq;
 using System.Windows;
 using Araci.Core.Viewport;
+using Araci.Models;
 using Araci.ViewModels;
 
 namespace Araci.Services
@@ -105,6 +106,16 @@ namespace Araci.Services
                 return;
 
             _vm.RegistrarViewModel(vm);
+        }
+
+        public ElementoViewModel? ObterViewModel(Elemento modelo)
+        {
+            return _vm.ObterViewModel(modelo);
+        }
+
+        public void AtualizarViewModel(Elemento modelo)
+        {
+            _vm.AtualizarViewModel(modelo);
         }
     }
 }

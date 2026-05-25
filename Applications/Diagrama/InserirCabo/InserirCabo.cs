@@ -76,7 +76,7 @@ namespace Araci.Applications.Diagrama.InserirCabo
 
                 _context.Commands.Execute(
                     new AddElementoCommand(
-                        _caboAtual,
+                        _caboAtual.Modelo,
                         _context));
 
                 ConectarOrigem(vm);

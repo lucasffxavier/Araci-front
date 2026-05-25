@@ -2,6 +2,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Windows;
 using Araci.Core.Commands;
+using Araci.Models;
 using Araci.ViewModels;
 
 namespace Araci.Services
@@ -71,9 +72,10 @@ namespace Araci.Services
 
                 transaction.Add(
                     new MoveElementoCommand(
-                        vm,
+                        vm.Modelo,
                         antes,
-                        depois));
+                        depois,
+                        AtualizarElementoMovido));
             }
 
             transaction.Commit();
@@ -96,6 +98,12 @@ namespace Araci.Services
 
             _estadoInicial.Clear();
             _movendo = false;
+        }
+
+        private void AtualizarElementoMovido(Elemento elemento)
+        {
+            _context.Viewport?.AtualizarViewModel(elemento);
+            _context.SceneQueries.Invalidate();
         }
     }
 }

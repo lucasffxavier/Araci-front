@@ -1,23 +1,20 @@
-﻿using System;
-
-using Araci.Core.Events;
+using System;
+using Araci.Models;
 using Araci.Services;
-using Araci.ViewModels;
 
 namespace Araci.Core.Commands
 {
     public class DeleteElementCommand : IUndoableCommand
     {
-        private readonly ElementoViewModel _vm;
-
+        private readonly Elemento _elemento;
         private readonly EditorContext _context;
 
         public DeleteElementCommand(
-            ElementoViewModel vm,
+            Elemento elemento,
             EditorContext context)
         {
-            _vm = vm
-                ?? throw new ArgumentNullException(nameof(vm));
+            _elemento = elemento
+                ?? throw new ArgumentNullException(nameof(elemento));
 
             _context = context
                 ?? throw new ArgumentNullException(nameof(context));
@@ -25,17 +22,12 @@ namespace Araci.Core.Commands
 
         public void Execute()
         {
-            _context.Selection.Deselecionar(_vm);
-            _context.Document.RemoverElemento(_vm.Modelo);
-            _context.Events.Publish(new ElementoRemovidoEvent(_vm));
+            _context.Document.RemoverElemento(_elemento);
         }
 
         public void Undo()
         {
-            _context.Document.AdicionarElemento(_vm.Modelo);
-
-            _context.Events.Publish(
-                new ElementoAdicionadoEvent(_vm));
+            _context.Document.AdicionarElemento(_elemento);
         }
 
         public void Redo()

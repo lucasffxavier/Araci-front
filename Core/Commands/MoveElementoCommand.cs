@@ -1,36 +1,47 @@
-﻿using Araci.ViewModels;
+using System;
+using Araci.Models;
+using Araci.ViewModels;
 
 namespace Araci.Core.Commands
 {
     public class MoveElementoCommand : IUndoableCommand
     {
-        private readonly ElementoViewModel _vm;
+        private readonly Elemento _elemento;
         private readonly ElementoEstado _antes;
         private readonly ElementoEstado _depois;
+        private readonly Action<Elemento>? _onStateApplied;
 
         public MoveElementoCommand(
-            ElementoViewModel vm,
+            Elemento elemento,
             ElementoEstado antes,
-            ElementoEstado depois)
+            ElementoEstado depois,
+            Action<Elemento>? onStateApplied = null)
         {
-            _vm = vm;
+            _elemento = elemento ?? throw new ArgumentNullException(nameof(elemento));
             _antes = antes;
             _depois = depois;
+            _onStateApplied = onStateApplied;
         }
 
         public void Execute()
         {
-            _vm.AplicarEstado(_depois);
+            Aplicar(_depois);
         }
 
         public void Undo()
         {
-            _vm.AplicarEstado(_antes);
+            Aplicar(_antes);
         }
 
         public void Redo()
         {
-            _vm.AplicarEstado(_depois);
+            Aplicar(_depois);
+        }
+
+        private void Aplicar(ElementoEstado estado)
+        {
+            estado.AplicarEm(_elemento);
+            _onStateApplied?.Invoke(_elemento);
         }
     }
 }

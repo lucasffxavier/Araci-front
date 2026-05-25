@@ -55,7 +55,7 @@ namespace Araci.Services
             if (_buffer.Count == 0)
                 return;
 
-            var novos = new List<ElementoViewModel>();
+            var novos = new List<Elemento>();
 
             using var transaction =
                 editorContext.BeginTransaction();
@@ -66,17 +66,11 @@ namespace Araci.Services
 
                 AplicarOffset(clone);
 
-                var vm = editorContext.ElementoFactory
-                    .CriarViewModel(clone);
-
-                if (vm == null)
-                    continue;
-
-                novos.Add(vm);
+                novos.Add(clone);
 
                 transaction.Add(
                     new AddElementoCommand(
-                        vm,
+                        clone,
                         editorContext));
             }
 
@@ -111,13 +105,16 @@ namespace Araci.Services
 
         private static void AtualizarSelecao(
             EditorContext context,
-            List<ElementoViewModel> elementos)
+            List<Elemento> elementos)
         {
             context.Selection.Limpar();
 
-            foreach (var item in elementos)
+            foreach (var modelo in elementos)
             {
-                context.Selection.Selecionar(item, true);
+                var vm = context.Viewport?.ObterViewModel(modelo);
+
+                if (vm != null)
+                    context.Selection.Selecionar(vm, true);
             }
         }
 
@@ -125,13 +122,13 @@ namespace Araci.Services
         // BUFFER
         // =========================
 
-        private static void AtualizarBuffer(List<ElementoViewModel> elementos)
+        private static void AtualizarBuffer(List<Elemento> elementos)
         {
             _buffer.Clear();
 
             foreach (var item in elementos)
             {
-                _buffer.Add(item.Modelo.Clonar());
+                _buffer.Add(item.Clonar());
             }
         }
     }

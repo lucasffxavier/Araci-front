@@ -51,11 +51,12 @@ namespace Araci.Applications.Editar.Deletar
             {
                 tx.Add(
                     new DeleteElementCommand(
-                        item,
+                        item.Modelo,
                         _context));
             }
 
             tx.Commit();
+            _context.Selection.Limpar();
         }
 
         public void OnMouseMove(Point position) { }

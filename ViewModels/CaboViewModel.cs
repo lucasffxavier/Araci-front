@@ -318,6 +318,11 @@ namespace Araci.ViewModels
             Atualizar();
         }
 
+        public override void AtualizarAposModeloAlterado()
+        {
+            Atualizar();
+        }
+
         private CaboNode CaboNode => (CaboNode)Node;
 
         private void Atualizar()

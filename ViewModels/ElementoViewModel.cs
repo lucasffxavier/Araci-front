@@ -199,6 +199,11 @@ namespace Araci.ViewModels
             AtualizarNode();
         }
 
+        public virtual void AtualizarAposModeloAlterado()
+        {
+            AtualizarNode();
+        }
+
         public virtual void NotificarParametros()
         {
             foreach (var parametro in Parametros)

@@ -1,6 +1,5 @@
-﻿using Araci.Core.Commands;
+using Araci.Core.Commands;
 using Araci.Services;
-using Araci.ViewModels;
 
 namespace Araci.Applications.Diagrama.InserirBarra
 {
@@ -15,10 +14,10 @@ namespace Araci.Applications.Diagrama.InserirBarra
 
         public void Executar()
         {
-            BarraViewModel vm = _context.ElementoFactory.CriarBarraVM();
-            vm.X = 200;
-            vm.Y = 100;
-            _context.Commands.Execute(new AddElementoCommand(vm, _context));
+            var barra = _context.ElementoFactory.CriarBarra();
+            barra.PosicaoX = 200;
+            barra.PosicaoY = 100;
+            _context.Commands.Execute(new AddElementoCommand(barra, _context));
         }
     }
 }

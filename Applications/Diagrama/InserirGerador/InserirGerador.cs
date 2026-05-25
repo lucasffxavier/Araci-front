@@ -1,6 +1,5 @@
 using Araci.Core.Commands;
 using Araci.Services;
-using Araci.ViewModels;
 
 namespace Araci.Applications.Diagrama.InserirGerador
 {
@@ -15,10 +14,10 @@ namespace Araci.Applications.Diagrama.InserirGerador
 
         public void Executar()
         {
-            GeradorViewModel vm = _context.ElementoFactory.CriarGeradorVM();
-            vm.X = 150;
-            vm.Y = 150;
-            _context.Commands.Execute(new AddElementoCommand(vm, _context));
+            var gerador = _context.ElementoFactory.CriarGerador();
+            gerador.PosicaoX = 150;
+            gerador.PosicaoY = 150;
+            _context.Commands.Execute(new AddElementoCommand(gerador, _context));
         }
     }
 }

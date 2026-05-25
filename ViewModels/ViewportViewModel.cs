@@ -42,6 +42,18 @@ namespace Araci.ViewModels
             _viewModelsPorModelo[vm.Modelo] = vm;
         }
 
+        public ElementoViewModel? ObterViewModel(Elemento modelo)
+        {
+            return _viewModelsPorModelo.TryGetValue(modelo, out var vm)
+                ? vm
+                : null;
+        }
+
+        public void AtualizarViewModel(Elemento modelo)
+        {
+            ObterViewModel(modelo)?.AtualizarAposModeloAlterado();
+        }
+
         private void OnDocumentElementosChanged(object? sender, NotifyCollectionChangedEventArgs e)
         {
             if (e.Action == NotifyCollectionChangedAction.Reset)
@@ -86,6 +98,7 @@ namespace Araci.ViewModels
             if (!_viewModelsPorModelo.TryGetValue(modelo, out var vm))
                 return;
 
+            _context.Selection.Deselecionar(vm);
             Elementos.Remove(vm);
         }
 
