@@ -488,6 +488,107 @@ return new Rect(minX, minY, maxX - minX, maxY - minY);
 
 
 ====================================================================================================
+ARQUIVO: C:\Araci-Engine-Front\Araci Engine\Core\SceneQueries\ISceneQueryService.cs
+====================================================================================================
+
+﻿using System.Collections.Generic;
+using System.Windows;
+using Araci.ViewModels;
+namespace Araci.Core.SceneQueries
+{
+public interface ISceneQueryService
+{
+SceneHitResult? HitTest(Point point);
+SceneHitResult? HitTest(Point point, double tolerance);
+IEnumerable<ElementoViewModel> Query(Rect area);
+IEnumerable<ElementoViewModel> Nearby(Point point, double radius);
+}
+}
+
+
+====================================================================================================
+ARQUIVO: C:\Araci-Engine-Front\Araci Engine\Core\SceneQueries\SceneHitResult.cs
+====================================================================================================
+
+﻿using System.Windows;
+using Araci.ViewModels;
+namespace Araci.Core.SceneQueries
+{
+public sealed class SceneHitResult
+{
+public SceneHitResult(ElementoViewModel elemento, Point point)
+{
+Elemento = elemento;
+Point = point;
+}
+public ElementoViewModel Elemento { get; }
+public Point Point { get; }
+}
+}
+
+
+====================================================================================================
+ARQUIVO: C:\Araci-Engine-Front\Araci Engine\Core\SceneQueries\SceneQueryService.cs
+====================================================================================================
+
+﻿using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Windows;
+using Araci.Core.Scenes;
+using Araci.Core.Spatial;
+using Araci.ViewModels;
+namespace Araci.Core.SceneQueries
+{
+public class SceneQueryService : ISceneQueryService
+{
+private readonly Scene _scene;
+private readonly ISpatialIndex _index;
+private bool _indexValido;
+public SceneQueryService(Scene scene)
+{
+_scene = scene ?? throw new ArgumentNullException(nameof(scene));
+_index = new SpatialHashGrid();
+_indexValido = false;
+_scene.Elementos.CollectionChanged += (_, __) => _indexValido = false;
+}
+private void GarantirIndex()
+{
+if (_indexValido)
+return;
+_index.Build(_scene.Elementos);
+_indexValido = true;
+}
+public SceneHitResult? HitTest(Point point)
+{
+return HitTest(point, 6);
+}
+public SceneHitResult? HitTest(Point point, double tolerance)
+{
+GarantirIndex();
+var candidatos = _index.Nearby(point, Math.Max(10, tolerance));
+foreach (var vm in candidatos.Reverse())
+{
+if (vm.Bounds.Contains(point))
+return new SceneHitResult(vm, point);
+}
+return null;
+}
+public IEnumerable<ElementoViewModel> Query(Rect area)
+{
+GarantirIndex();
+return _index.Query(area);
+}
+public IEnumerable<ElementoViewModel> Nearby(Point point, double radius)
+{
+GarantirIndex();
+return _index.Nearby(point, radius);
+}
+}
+}
+
+
+====================================================================================================
 ARQUIVO: C:\Araci-Engine-Front\Araci Engine\Core\Viewport\Camera.cs
 ====================================================================================================
 
@@ -499,9 +600,11 @@ namespace Araci.Core.Viewport
 {
 public class Camera : INotifyPropertyChanged
 {
+public const double DefaultZoom = 1.0;
+public const double DefaultWheelZoomFactor = 1.1;
 public const double MinZoom = 0.1;
 public const double MaxZoom = 8.0;
-private double _zoom = 1.0;
+private double _zoom = DefaultZoom;
 private Point _offset;
 public event PropertyChangedEventHandler? PropertyChanged;
 public double Zoom
@@ -509,7 +612,7 @@ public double Zoom
 get => _zoom;
 set
 {
-double zoom = Math.Max(MinZoom, Math.Min(MaxZoom, value));
+double zoom = ClampZoom(value);
 if (Math.Abs(_zoom - zoom) < 0.0001)
 return;
 _zoom = zoom;
@@ -533,8 +636,10 @@ Offset = new Point(Offset.X + delta.X, Offset.Y + delta.Y);
 }
 public void ZoomAt(Point screenPoint, double factor)
 {
+if (factor <= 0)
+return;
 Point worldBefore = ScreenToWorld(screenPoint);
-Zoom = Zoom * factor;
+Zoom = ClampZoom(Zoom * factor);
 Offset = new Point(
 screenPoint.X - worldBefore.X * Zoom,
 screenPoint.Y - worldBefore.Y * Zoom);
@@ -542,10 +647,22 @@ screenPoint.Y - worldBefore.Y * Zoom);
 public void SetZoomAt(Point screenPoint, double zoom)
 {
 Point worldBefore = ScreenToWorld(screenPoint);
-Zoom = zoom;
+Zoom = ClampZoom(zoom);
 Offset = new Point(
 screenPoint.X - worldBefore.X * Zoom,
 screenPoint.Y - worldBefore.Y * Zoom);
+}
+public void ZoomInAt(Point screenPoint)
+{
+ZoomAt(screenPoint, DefaultWheelZoomFactor);
+}
+public void ZoomOutAt(Point screenPoint)
+{
+ZoomAt(screenPoint, 1 / DefaultWheelZoomFactor);
+}
+public void Zoom100At(Point screenPoint)
+{
+SetZoomAt(screenPoint, DefaultZoom);
 }
 public void Fit(Rect worldBounds, Size viewportSize, double margin)
 {
@@ -554,11 +671,12 @@ if (worldBounds.IsEmpty || viewportSize.Width <= 0 || viewportSize.Height <= 0)
 Reset();
 return;
 }
-double availableWidth = Math.Max(1, viewportSize.Width - margin * 2);
-double availableHeight = Math.Max(1, viewportSize.Height - margin * 2);
+double safeMargin = Math.Max(0, margin);
+double availableWidth = Math.Max(1, viewportSize.Width - safeMargin * 2);
+double availableHeight = Math.Max(1, viewportSize.Height - safeMargin * 2);
 double boundsWidth = Math.Max(1, worldBounds.Width);
 double boundsHeight = Math.Max(1, worldBounds.Height);
-Zoom = Math.Min(availableWidth / boundsWidth, availableHeight / boundsHeight);
+Zoom = ClampZoom(Math.Min(availableWidth / boundsWidth, availableHeight / boundsHeight));
 Point worldCenter = new(
 worldBounds.X + worldBounds.Width / 2,
 worldBounds.Y + worldBounds.Height / 2);
@@ -571,7 +689,7 @@ screenCenter.Y - worldCenter.Y * Zoom);
 }
 public void Reset()
 {
-Zoom = 1.0;
+Zoom = DefaultZoom;
 Offset = new Point(0, 0);
 }
 public Point WorldToScreen(Point point)
@@ -585,6 +703,10 @@ public Point ScreenToWorld(Point point)
 return new Point(
 (point.X - Offset.X) / Zoom,
 (point.Y - Offset.Y) / Zoom);
+}
+private static double ClampZoom(double value)
+{
+return Math.Max(MinZoom, Math.Min(MaxZoom, value));
 }
 private void OnPropertyChanged([CallerMemberName] string? propertyName = null)
 {
@@ -769,6 +891,154 @@ Keyboard.Modifiers.HasFlag(ModifierKeys.Control));
 
 
 ====================================================================================================
+ARQUIVO: C:\Araci-Engine-Front\Araci Engine\Service\MoveService.cs
+====================================================================================================
+
+﻿using System.Collections.Generic;
+using System.Linq;
+using System.Windows;
+using Araci.Core.Commands;
+using Araci.ViewModels;
+namespace Araci.Services
+{
+public class MoveService
+{
+private readonly EditorContext _context;
+private readonly Dictionary<ElementoViewModel, ElementoEstado>
+_estadoInicial = new();
+private bool _movendo;
+public MoveService(EditorContext context)
+{
+_context = context ??
+throw new ArgumentNullException(nameof(context));
+}
+public void BeginMove(IEnumerable<ElementoViewModel> elementos)
+{
+_estadoInicial.Clear();
+foreach (var vm in elementos.Distinct())
+{
+_estadoInicial[vm] = vm.CapturarEstado();
+}
+_movendo = true;
+}
+public void MoverVisual(
+ElementoViewModel vm,
+Vector delta)
+{
+if (!_movendo)
+return;
+vm.Mover(delta);
+}
+public void EndMove(IEnumerable<ElementoViewModel> elementos)
+{
+if (!_movendo)
+return;
+using var transaction =
+_context.BeginTransaction();
+foreach (var vm in elementos.Distinct())
+{
+if (!_estadoInicial.TryGetValue(vm, out var antes))
+continue;
+var depois = vm.CapturarEstado();
+bool mudou =
+antes.X != depois.X ||
+antes.Y != depois.Y ||
+antes.X2 != depois.X2 ||
+antes.Y2 != depois.Y2 ||
+!antes.Vertices.SequenceEqual(depois.Vertices);
+if (!mudou)
+continue;
+transaction.Add(
+new MoveElementoCommand(
+vm,
+antes,
+depois));
+}
+transaction.Commit();
+_estadoInicial.Clear();
+_movendo = false;
+}
+}
+}
+
+
+====================================================================================================
+ARQUIVO: C:\Araci-Engine-Front\Araci Engine\Service\SelectionService.cs
+====================================================================================================
+
+﻿using System.Collections.Generic;
+using System.Collections.ObjectModel;
+using System.Linq;
+using Araci.Core.Events;
+using Araci.ViewModels;
+namespace Araci.Services
+{
+public class SelectionService
+{
+private readonly EditorContext _context;
+private readonly ObservableCollection<ElementoViewModel> _selecionados = new();
+public SelectionService(EditorContext context)
+{
+_context = context ?? throw new ArgumentNullException(nameof(context));
+}
+public IReadOnlyList<ElementoViewModel> Selecionados => _selecionados;
+public ObservableCollection<ElementoViewModel> SelecionadosObservable => _selecionados;
+public bool TemSelecionados => _selecionados.Count > 0;
+public void Selecionar(ElementoViewModel vm, bool adicionarAoExistente = false)
+{
+if (!adicionarAoExistente)
+Limpar();
+if (_selecionados.Contains(vm))
+{
+AtualizarElementoSelecionado();
+return;
+}
+vm.IsSelecionado = true;
+_selecionados.Add(vm);
+AtualizarElementoSelecionado();
+PublicarAlteracao();
+}
+public void Toggle(ElementoViewModel vm)
+{
+if (_selecionados.Contains(vm))
+{
+Deselecionar(vm);
+return;
+}
+Selecionar(vm, true);
+}
+public void Deselecionar(ElementoViewModel vm)
+{
+if (!_selecionados.Contains(vm))
+return;
+vm.IsSelecionado = false;
+_selecionados.Remove(vm);
+AtualizarElementoSelecionado();
+PublicarAlteracao();
+}
+public void Limpar()
+{
+if (_selecionados.Count == 0)
+return;
+foreach (var vm in _selecionados)
+vm.IsSelecionado = false;
+_selecionados.Clear();
+AtualizarElementoSelecionado();
+PublicarAlteracao();
+}
+private void AtualizarElementoSelecionado()
+{
+_context.Editor.ElementoSelecionado = _selecionados.LastOrDefault();
+}
+private void PublicarAlteracao()
+{
+_context.Events.Publish(new SelecaoAlteradaEvent(_selecionados.ToList()));
+}
+}
+}
+
+
+====================================================================================================
 ARQUIVO: C:\Araci-Engine-Front\Araci Engine\Service\ToolService.cs
 ====================================================================================================
 
@@ -853,13 +1123,25 @@ public void AtualizarTamanho(Size size)
 Largura = Math.Max(0, size.Width);
 Altura = Math.Max(0, size.Height);
 }
+public void Pan(Vector delta)
+{
+Camera.Pan(delta);
+}
+public void ZoomInAt(Point screenPoint)
+{
+Camera.ZoomInAt(screenPoint);
+}
+public void ZoomOutAt(Point screenPoint)
+{
+Camera.ZoomOutAt(screenPoint);
+}
 public void ZoomInAtCenter()
 {
-Camera.ZoomAt(CentroTela, 1.1);
+Camera.ZoomInAt(CentroTela);
 }
 public void ZoomOutAtCenter()
 {
-Camera.ZoomAt(CentroTela, 1 / 1.1);
+Camera.ZoomOutAt(CentroTela);
 }
 public void ResetCamera()
 {
@@ -867,7 +1149,7 @@ Camera.Reset();
 }
 public void Zoom100AtCenter()
 {
-Camera.SetZoomAt(CentroTela, 1.0);
+Camera.Zoom100At(CentroTela);
 }
 public void ZoomExtents(double margem = 40)
 {
@@ -1272,8 +1554,11 @@ private void OnPreviewMouseWheel(object sender, MouseWheelEventArgs e)
 {
 if (_context?.Viewport == null)
 return;
-double factor = e.Delta > 0 ? 1.1 : 1 / 1.1;
-_context.Viewport.Camera.ZoomAt(e.GetPosition(this), factor);
+Point cursor = e.GetPosition(this);
+if (e.Delta > 0)
+_context.Viewport.ZoomInAt(cursor);
+else
+_context.Viewport.ZoomOutAt(cursor);
 e.Handled = true;
 }
 private void OnPreviewKeyDown(object sender, KeyEventArgs e)
@@ -1369,7 +1654,7 @@ private void AtualizarPan(Point current)
 if (_context?.Viewport == null)
 return;
 Vector delta = current - _lastPanPoint;
-_context.Viewport.Camera.Pan(delta);
+_context.Viewport.Pan(delta);
 _lastPanPoint = current;
 }
 private void CancelarPan()
