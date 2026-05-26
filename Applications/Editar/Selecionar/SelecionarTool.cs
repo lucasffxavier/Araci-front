@@ -1,5 +1,4 @@
 ﻿using System;
-using System.Linq;
 using System.Windows;
 using System.Windows.Input;
 using Araci.Applications.Editar.Base;
@@ -11,29 +10,27 @@ namespace Araci.Applications.Editar.Selecionar
 {
     public class SelecionarTool : ITool
     {
-        private readonly EditorContext _context;
         private readonly ISceneQueryService _queries;
+        private readonly SelectionController _selection;
         private readonly SelectionBoxController _selectionBox;
+        private readonly DragMoveController _dragMove;
         private readonly bool _modoSoMover;
-        private readonly bool _mostrarHud;
-
-        private bool _arrastandoElementos;
-
-        private Point _ultimoPontoMouse;
-        private Point _pontoInicialArrasto;
 
         public SelecionarTool(EditorContext context, bool modoSoMover = false, bool mostrarHud = false)
         {
-            _context = context ?? throw new ArgumentNullException(nameof(context));
+            if (context == null)
+                throw new ArgumentNullException(nameof(context));
+
             _queries = context.SceneQueries;
+            _selection = new SelectionController(context.Selection);
             _selectionBox = new SelectionBoxController(context.SelectionBox, _queries, context.Selection);
+            _dragMove = new DragMoveController(context.Selection, context.Move, context.MoveHud, mostrarHud);
             _modoSoMover = modoSoMover;
-            _mostrarHud = mostrarHud;
         }
 
         public string Nome => "Selecionar";
         public bool MantemBotaoAtivado => true;
-        public bool IsBusy => _arrastandoElementos || _selectionBox.IsActive;
+        public bool IsBusy => _dragMove.IsActive || _selectionBox.IsActive;
 
         public void Ativar() { }
 
@@ -44,11 +41,8 @@ namespace Araci.Applications.Editar.Selecionar
 
         public void Cancelar()
         {
-            _arrastandoElementos = false;
+            _dragMove.Cancel();
             _selectionBox.Cancel();
-            _context.Move.AbortMove();
-            _context.MoveHud.Visivel = false;
-            _context.MoveHud.Reset();
         }
 
         public void OnMouseDown(ElementoViewModel? vm, Point position, ToolInputState inputState)
@@ -59,8 +53,10 @@ namespace Araci.Applications.Editar.Selecionar
 
             if (hit != null)
             {
-                IniciarSelecaoElemento(hit, ctrl);
-                IniciarMovimento(position);
+                if (!_modoSoMover)
+                    _selection.Select(hit, ctrl);
+
+                _dragMove.Begin(position);
                 return;
             }
 
@@ -72,9 +68,9 @@ namespace Araci.Applications.Editar.Selecionar
 
         public void OnMouseMove(Point position)
         {
-            if (_arrastandoElementos)
+            if (_dragMove.IsActive)
             {
-                AtualizarMovimento(position);
+                _dragMove.Update(position);
                 return;
             }
 
@@ -84,95 +80,13 @@ namespace Araci.Applications.Editar.Selecionar
 
         public void OnMouseUp(Point position)
         {
-            if (_arrastandoElementos)
-                FinalizarMovimento();
+            if (_dragMove.IsActive)
+                _dragMove.End();
 
             if (_selectionBox.IsActive)
                 _selectionBox.End();
-
-            _arrastandoElementos = false;
         }
 
         public void OnKeyDown(Key key) { }
-
-        private void IniciarSelecaoElemento(ElementoViewModel vm, bool ctrl)
-        {
-            if (_modoSoMover)
-                return;
-
-            if (ctrl)
-            {
-                _context.Selection.Toggle(vm);
-                return;
-            }
-
-            if (!_context.Selection.Selecionados.Contains(vm))
-                _context.Selection.Selecionar(vm);
-        }
-
-        private void IniciarMovimento(Point position)
-        {
-            _arrastandoElementos = true;
-            _ultimoPontoMouse = position;
-            _pontoInicialArrasto = position;
-
-            _context.Move.BeginMove(_context.Selection.Selecionados);
-
-            if (!_mostrarHud)
-                return;
-
-            var hud = _context.MoveHud;
-            hud.Reset();
-            hud.AtualizarPosicao(CalcularBoundsSelecionados());
-            hud.Visivel = true;
-        }
-
-        private void AtualizarMovimento(Point position)
-        {
-            Vector delta = position - _ultimoPontoMouse;
-
-            if (delta.X != 0 || delta.Y != 0)
-            {
-                foreach (var item in _context.Selection.Selecionados.ToList())
-                    _context.Move.MoverVisual(item, delta);
-            }
-
-            if (_mostrarHud)
-                AtualizarHud(position);
-
-            _ultimoPontoMouse = position;
-        }
-
-        private void AtualizarHud(Point position)
-        {
-            Vector delta = position - _pontoInicialArrasto;
-
-            var hud = _context.MoveHud;
-            hud.DeltaX = delta.X;
-            hud.DeltaY = delta.Y;
-            hud.AtualizarPosicao(CalcularBoundsSelecionados());
-        }
-
-        private void FinalizarMovimento()
-        {
-            _context.Move.EndMove(_context.Selection.Selecionados.ToList());
-            _context.MoveHud.Visivel = false;
-            _context.MoveHud.Reset();
-        }
-
-        private Rect CalcularBoundsSelecionados()
-        {
-            var items = _context.Selection.Selecionados;
-
-            if (items.Count == 0)
-                return Rect.Empty;
-
-            double minX = items.Min(i => i.Bounds.Left);
-            double minY = items.Min(i => i.Bounds.Top);
-            double maxX = items.Max(i => i.Bounds.Right);
-            double maxY = items.Max(i => i.Bounds.Bottom);
-
-            return new Rect(minX, minY, maxX - minX, maxY - minY);
-        }
     }
 }
