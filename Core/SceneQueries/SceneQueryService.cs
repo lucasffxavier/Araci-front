@@ -45,15 +45,20 @@ namespace Araci.Core.SceneQueries
             GarantirIndex();
 
             double effectiveTolerance = Math.Max(6, tolerance);
-            var candidatos = _index.Nearby(point, Math.Max(10, effectiveTolerance));
+            var candidatos = _index.Nearby(point, Math.Max(10, effectiveTolerance)).ToList();
+            HitCandidate? melhor = null;
 
-            foreach (var vm in candidatos.Reverse())
+            for (int i = 0; i < candidatos.Count; i++)
             {
-                if (HitTestElemento(vm, point, effectiveTolerance))
-                    return new SceneHitResult(vm, point);
+                HitCandidate? candidato = CriarCandidato(candidatos[i], point, effectiveTolerance, i);
+
+                if (candidato.HasValue && EhMelhor(candidato.Value, melhor))
+                    melhor = candidato.Value;
             }
 
-            return null;
+            return melhor.HasValue
+                ? new SceneHitResult(melhor.Value.Elemento, point)
+                : null;
         }
 
         public IEnumerable<ElementoViewModel> Query(Rect area)
@@ -77,28 +82,59 @@ namespace Araci.Core.SceneQueries
             _indexValido = true;
         }
 
-        private static bool HitTestElemento(ElementoViewModel vm, Point point, double tolerance)
+        private static HitCandidate? CriarCandidato(ElementoViewModel vm, Point point, double tolerance, int order)
         {
             if (vm is CaboViewModel cabo)
-                return HitTestCabo(cabo, point, tolerance);
+                return CriarCandidatoCabo(cabo, point, tolerance, order);
 
-            return vm.Bounds.Contains(point);
+            return vm.Bounds.Contains(point)
+                ? new HitCandidate(vm, 0, 0, order)
+                : null;
         }
 
-        private static bool HitTestCabo(CaboViewModel cabo, Point point, double tolerance)
+        private static HitCandidate? CriarCandidatoCabo(CaboViewModel cabo, Point point, double tolerance, int order)
         {
             var vertices = cabo.Cabo.Vertices;
 
             if (vertices.Count < 2)
-                return cabo.Bounds.Contains(point);
-
-            for (int i = 0; i < vertices.Count - 1; i++)
             {
-                if (DistanciaPontoSegmento(point, vertices[i], vertices[i + 1]) <= tolerance)
-                    return true;
+                return cabo.Bounds.Contains(point)
+                    ? new HitCandidate(cabo, 0, 3, order)
+                    : null;
             }
 
-            return false;
+            double distancia = MenorDistanciaCabo(cabo, point);
+
+            return distancia <= tolerance
+                ? new HitCandidate(cabo, distancia, 2, order)
+                : null;
+        }
+
+        private static bool EhMelhor(HitCandidate candidato, HitCandidate? atual)
+        {
+            if (!atual.HasValue)
+                return true;
+
+            HitCandidate existente = atual.Value;
+
+            if (candidato.Priority != existente.Priority)
+                return candidato.Priority < existente.Priority;
+
+            if (Math.Abs(candidato.Distance - existente.Distance) > 0.000001)
+                return candidato.Distance < existente.Distance;
+
+            return candidato.Order > existente.Order;
+        }
+
+        private static double MenorDistanciaCabo(CaboViewModel cabo, Point point)
+        {
+            var vertices = cabo.Cabo.Vertices;
+            double menor = double.MaxValue;
+
+            for (int i = 0; i < vertices.Count - 1; i++)
+                menor = Math.Min(menor, DistanciaPontoSegmento(point, vertices[i], vertices[i + 1]));
+
+            return menor;
         }
 
         private static double DistanciaPontoSegmento(Point p, Point a, Point b)
@@ -126,6 +162,25 @@ namespace Araci.Core.SceneQueries
             double dy = a.Y - b.Y;
 
             return Math.Sqrt(dx * dx + dy * dy);
+        }
+
+        private readonly struct HitCandidate
+        {
+            public HitCandidate(ElementoViewModel elemento, double distance, int priority, int order)
+            {
+                Elemento = elemento;
+                Distance = distance;
+                Priority = priority;
+                Order = order;
+            }
+
+            public ElementoViewModel Elemento { get; }
+
+            public double Distance { get; }
+
+            public int Priority { get; }
+
+            public int Order { get; }
         }
 
         private void OnElementosChanged(object? sender, NotifyCollectionChangedEventArgs e)
