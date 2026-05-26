@@ -77,14 +77,7 @@ namespace Araci.Core.Spatial
                 radius * 2);
 
             foreach (var e in Query(area))
-            {
-                var c = e.Centro;
-                double dx = c.X - point.X;
-                double dy = c.Y - point.Y;
-
-                if (dx * dx + dy * dy <= radius * radius)
-                    yield return e;
-            }
+                yield return e;
         }
 
         private IEnumerable<(int, int)> GetCells(Rect bounds)

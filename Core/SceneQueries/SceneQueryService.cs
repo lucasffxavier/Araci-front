@@ -44,11 +44,12 @@ namespace Araci.Core.SceneQueries
         {
             GarantirIndex();
 
-            var candidatos = _index.Nearby(point, Math.Max(10, tolerance));
+            double effectiveTolerance = Math.Max(6, tolerance);
+            var candidatos = _index.Nearby(point, Math.Max(10, effectiveTolerance));
 
             foreach (var vm in candidatos.Reverse())
             {
-                if (vm.Bounds.Contains(point))
+                if (HitTestElemento(vm, point, effectiveTolerance))
                     return new SceneHitResult(vm, point);
             }
 
@@ -74,6 +75,57 @@ namespace Araci.Core.SceneQueries
 
             _index.Build(_scene.Elementos);
             _indexValido = true;
+        }
+
+        private static bool HitTestElemento(ElementoViewModel vm, Point point, double tolerance)
+        {
+            if (vm is CaboViewModel cabo)
+                return HitTestCabo(cabo, point, tolerance);
+
+            return vm.Bounds.Contains(point);
+        }
+
+        private static bool HitTestCabo(CaboViewModel cabo, Point point, double tolerance)
+        {
+            var vertices = cabo.Cabo.Vertices;
+
+            if (vertices.Count < 2)
+                return cabo.Bounds.Contains(point);
+
+            for (int i = 0; i < vertices.Count - 1; i++)
+            {
+                if (DistanciaPontoSegmento(point, vertices[i], vertices[i + 1]) <= tolerance)
+                    return true;
+            }
+
+            return false;
+        }
+
+        private static double DistanciaPontoSegmento(Point p, Point a, Point b)
+        {
+            double dx = b.X - a.X;
+            double dy = b.Y - a.Y;
+            double lengthSquared = dx * dx + dy * dy;
+
+            if (lengthSquared <= double.Epsilon)
+                return Distancia(p, a);
+
+            double t = ((p.X - a.X) * dx + (p.Y - a.Y) * dy) / lengthSquared;
+            t = Math.Max(0, Math.Min(1, t));
+
+            var projection = new Point(
+                a.X + t * dx,
+                a.Y + t * dy);
+
+            return Distancia(p, projection);
+        }
+
+        private static double Distancia(Point a, Point b)
+        {
+            double dx = a.X - b.X;
+            double dy = a.Y - b.Y;
+
+            return Math.Sqrt(dx * dx + dy * dy);
         }
 
         private void OnElementosChanged(object? sender, NotifyCollectionChangedEventArgs e)
