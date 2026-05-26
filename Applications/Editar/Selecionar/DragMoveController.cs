@@ -16,6 +16,7 @@ namespace Araci.Applications.Editar.Selecionar
         private Point _ultimoPontoMouse;
         private Point _ultimoPontoEfetivo;
         private Point _pontoInicialArrasto;
+        private OrthogonalAxis? _eixoTravado;
 
         public DragMoveController(
             SelectionService selection,
@@ -37,6 +38,7 @@ namespace Araci.Applications.Editar.Selecionar
             _ultimoPontoMouse = position;
             _ultimoPontoEfetivo = position;
             _pontoInicialArrasto = position;
+            _eixoTravado = null;
 
             _move.BeginMove(_selection.Selecionados);
 
@@ -53,9 +55,7 @@ namespace Araci.Applications.Editar.Selecionar
             if (!IsActive)
                 return;
 
-            Point pontoEfetivo = inputState.IsShiftPressed
-                ? AplicarTravaOrtogonal(position)
-                : position;
+            Point pontoEfetivo = CalcularPontoEfetivo(position, inputState);
 
             Vector delta = pontoEfetivo - _ultimoPontoEfetivo;
 
@@ -79,12 +79,14 @@ namespace Araci.Applications.Editar.Selecionar
 
             _move.EndMove(_selection.Selecionados.ToList());
             IsActive = false;
+            _eixoTravado = null;
             LimparHud();
         }
 
         public void Cancel()
         {
             IsActive = false;
+            _eixoTravado = null;
             _move.AbortMove();
             LimparHud();
         }
@@ -98,11 +100,32 @@ namespace Araci.Applications.Editar.Selecionar
             _hud.AtualizarPosicao(CalcularBoundsSelecionados());
         }
 
+        private Point CalcularPontoEfetivo(Point position, ToolInputState inputState)
+        {
+            if (!inputState.IsShiftPressed)
+            {
+                _eixoTravado = null;
+                return position;
+            }
+
+            return AplicarTravaOrtogonal(position);
+        }
+
         private Point AplicarTravaOrtogonal(Point position)
         {
             Vector total = position - _pontoInicialArrasto;
 
-            return Math.Abs(total.X) >= Math.Abs(total.Y)
+            if (!_eixoTravado.HasValue)
+            {
+                if (Math.Abs(total.X) < 0.0001 && Math.Abs(total.Y) < 0.0001)
+                    return _ultimoPontoEfetivo;
+
+                _eixoTravado = Math.Abs(total.X) >= Math.Abs(total.Y)
+                    ? OrthogonalAxis.Horizontal
+                    : OrthogonalAxis.Vertical;
+            }
+
+            return _eixoTravado == OrthogonalAxis.Horizontal
                 ? new Point(position.X, _pontoInicialArrasto.Y)
                 : new Point(_pontoInicialArrasto.X, position.Y);
         }
@@ -126,6 +149,12 @@ namespace Araci.Applications.Editar.Selecionar
             double maxY = items.Max(i => i.Bounds.Bottom);
 
             return new Rect(minX, minY, maxX - minX, maxY - minY);
+        }
+
+        private enum OrthogonalAxis
+        {
+            Horizontal,
+            Vertical
         }
     }
 }

@@ -325,70 +325,13 @@ public static ToolInputState Empty => new(ModifierKeys.None);
 
 
 ====================================================================================================
-ARQUIVO: C:\Araci-Engine-Front\Araci Engine\Applications\Editar\Mover\MoverTool.cs
-====================================================================================================
-
-﻿using System.Windows;
-using System.Windows.Input;
-using Araci.Applications.Editar.Base;
-using Araci.Applications.Editar.Selecionar;
-using Araci.Services;
-using Araci.ViewModels;
-namespace Araci.Applications.Editar.Mover
-{
-public class MoverTool : ITool
-{
-private readonly SelecionarTool _selecionarTool;
-public MoverTool(EditorContext context)
-{
-ArgumentNullException.ThrowIfNull(context);
-_selecionarTool = new SelecionarTool(
-context,
-modoSoMover: true,
-mostrarHud: true);
-}
-public string Nome => "Mover";
-public bool MantemBotaoAtivado => true;
-public bool IsBusy => _selecionarTool.IsBusy;
-public void Ativar()
-{
-_selecionarTool.Ativar();
-}
-public void Desativar()
-{
-_selecionarTool.Desativar();
-}
-public void Cancelar()
-{
-_selecionarTool.Cancelar();
-}
-public void OnMouseDown(ElementoViewModel? vm, Point position, ToolInputState inputState)
-{
-_selecionarTool.OnMouseDown(vm, position, inputState);
-}
-public void OnMouseMove(Point position, ToolInputState inputState)
-{
-_selecionarTool.OnMouseMove(position, inputState);
-}
-public void OnMouseUp(Point position, ToolInputState inputState)
-{
-_selecionarTool.OnMouseUp(position, inputState);
-}
-public void OnKeyDown(Key key)
-{
-_selecionarTool.OnKeyDown(key);
-}
-}
-}
-
-
-====================================================================================================
 ARQUIVO: C:\Araci-Engine-Front\Araci Engine\Applications\Editar\Selecionar\DragMoveController.cs
 ====================================================================================================
 
 using System;
 using System.Linq;
 using System.Windows;
+using Araci.Applications.Editar.Base;
 using Araci.Services;
 namespace Araci.Applications.Editar.Selecionar
 {
@@ -399,6 +342,7 @@ private readonly MoveService _move;
 private readonly MoveHudService _hud;
 private readonly bool _mostrarHud;
 private Point _ultimoPontoMouse;
+private Point _ultimoPontoEfetivo;
 private Point _pontoInicialArrasto;
 public DragMoveController(
 SelectionService selection,
@@ -416,6 +360,7 @@ public void Begin(Point position)
 {
 IsActive = true;
 _ultimoPontoMouse = position;
+_ultimoPontoEfetivo = position;
 _pontoInicialArrasto = position;
 _move.BeginMove(_selection.Selecionados);
 if (!_mostrarHud)
@@ -424,19 +369,23 @@ _hud.Reset();
 _hud.AtualizarPosicao(CalcularBoundsSelecionados());
 _hud.Visivel = true;
 }
-public void Update(Point position)
+public void Update(Point position, ToolInputState inputState)
 {
 if (!IsActive)
 return;
-Vector delta = position - _ultimoPontoMouse;
+Point pontoEfetivo = inputState.IsShiftPressed
+? AplicarTravaOrtogonal(position)
+: position;
+Vector delta = pontoEfetivo - _ultimoPontoEfetivo;
 if (delta.X != 0 || delta.Y != 0)
 {
 foreach (var item in _selection.Selecionados.ToList())
 _move.MoverVisual(item, delta);
 }
 if (_mostrarHud)
-AtualizarHud(position);
+AtualizarHud(pontoEfetivo);
 _ultimoPontoMouse = position;
+_ultimoPontoEfetivo = pontoEfetivo;
 }
 public void End()
 {
@@ -458,6 +407,13 @@ Vector delta = position - _pontoInicialArrasto;
 _hud.DeltaX = delta.X;
 _hud.DeltaY = delta.Y;
 _hud.AtualizarPosicao(CalcularBoundsSelecionados());
+}
+private Point AplicarTravaOrtogonal(Point position)
+{
+Vector total = position - _pontoInicialArrasto;
+return Math.Abs(total.X) >= Math.Abs(total.Y)
+? new Point(position.X, _pontoInicialArrasto.Y)
+: new Point(_pontoInicialArrasto.X, position.Y);
 }
 private void LimparHud()
 {
@@ -541,7 +497,7 @@ public void OnMouseMove(Point position, ToolInputState inputState)
 {
 if (_dragMove.IsActive)
 {
-_dragMove.Update(position);
+_dragMove.Update(position, inputState);
 return;
 }
 if (_selectionBox.IsActive)
@@ -555,88 +511,6 @@ if (_selectionBox.IsActive)
 _selectionBox.End();
 }
 public void OnKeyDown(Key key) { }
-}
-}
-
-
-====================================================================================================
-ARQUIVO: C:\Araci-Engine-Front\Araci Engine\Service\EditorContext.cs
-====================================================================================================
-
-using Araci.Core.Commands;
-using Araci.Core.Documents;
-using Araci.Core.Events;
-using Araci.Core.SceneQueries;
-using Araci.Core.Scenes;
-using Araci.Core.Transactions;
-using Araci.ViewModels;
-namespace Araci.Services
-{
-public class EditorContext
-{
-public EditorContext()
-: this(new EventBus())
-{
-}
-public EditorContext(IEventBus eventBus)
-{
-Events = eventBus;
-Scene = new Scene();
-SceneQueries = new SceneQueryService(Scene);
-Hover = new HoverService(SceneQueries);
-Snap = new SnapService(SceneQueries);
-Names = new NameService(Document);
-Connectivity = new ConnectivityService(this);
-Topology = new TopologyValidator(this);
-SimulationResults = new SimulationResultApplier(this);
-Simulation = new SimulationPipeline(this);
-SimulationExport = new SimulationExportService();
-SimulationMessages = new SimulationMessageBuilder();
-TypePropertiesDialogs = new TypePropertiesDialogService();
-Dialogs = new DialogService();
-ElementoFactory = new ElementoFactory(Types, Names, TypePropertiesDialogs);
-Selection = new SelectionService(this);
-MoveHud = new MoveHudService(this);
-Move = new MoveService(this);
-Tools = new ToolService(this);
-Input = new InputRouter(this);
-Navigation = new ViewportNavigationService(this);
-}
-public IEventBus Events { get; }
-public AraciDocument Document { get; set; } = new AraciDocument();
-public Scene Scene { get; } = new Scene();
-public ISceneQueryService SceneQueries { get; }
-public HoverService Hover { get; }
-public ToolService Tools { get; }
-public InputRouter Input { get; }
-public ViewportNavigationService Navigation { get; }
-public ViewportService? Viewport { get; private set; }
-public void InicializarViewport(ViewportViewModel viewportViewModel)
-{
-Viewport = new ViewportService(viewportViewModel);
-}
-public EditorState Editor { get; } = new EditorState();
-public MoveHudService MoveHud { get; }
-public SelectionBoxViewModel SelectionBox { get; } = new SelectionBoxViewModel();
-public CommandManager Commands { get; } = new CommandManager();
-public SelectionService Selection { get; }
-public MoveService Move { get; }
-public SnapService Snap { get; }
-public NameService Names { get; }
-public ConnectivityService Connectivity { get; }
-public TopologyValidator Topology { get; }
-public SimulationResultApplier SimulationResults { get; }
-public SimulationPipeline Simulation { get; }
-public SimulationExportService SimulationExport { get; }
-public SimulationMessageBuilder SimulationMessages { get; }
-public TypePropertiesDialogService TypePropertiesDialogs { get; }
-public DialogService Dialogs { get; }
-public TypeLibraryService Types { get; } = new TypeLibraryService();
-public ElementoFactory ElementoFactory { get; }
-public TransactionScope BeginTransaction()
-{
-return new TransactionScope(Commands);
-}
 }
 }
 
