@@ -64,8 +64,15 @@ namespace Araci.Applications.Diagrama.InserirCabo
             Point position,
             ToolInputState inputState)
         {
+            if (ReferenceEquals(vm, _caboAtual))
+                vm = null;
+
+            Terminal? terminal =
+                ObterTerminalConexao(vm, position);
+
             Point pontoSnap =
-                _context.Snap.SnapFromElemento(vm, position);
+                terminal?.Posicao
+                ?? _context.Snap.SnapFromElemento(vm, position, _caboAtual);
 
             if (!_inserindo)
             {
@@ -79,7 +86,7 @@ namespace Araci.Applications.Diagrama.InserirCabo
                         _caboAtual.Modelo,
                         _context));
 
-                ConectarOrigem(vm);
+                ConectarOrigem(terminal);
 
                 _inserindo = true;
 
@@ -91,8 +98,7 @@ namespace Araci.Applications.Diagrama.InserirCabo
 
             _caboAtual.FinalizarNoPonto(pontoSnap);
 
-            if (EhElementoConectavel(vm))
-                ConectarDestino(vm);
+            ConectarDestino(terminal);
 
             Finalizar();
         }
@@ -103,7 +109,7 @@ namespace Araci.Applications.Diagrama.InserirCabo
                 return;
 
             Point pontoSnap =
-                _context.Snap.Snap(position);
+                _context.Snap.Snap(position, _caboAtual);
 
             _caboAtual.AtualizarPreview(pontoSnap);
         }
@@ -125,80 +131,80 @@ namespace Araci.Applications.Diagrama.InserirCabo
         }
 
         private static bool EhElementoConectavel(
-            ElementoViewModel? vm)
+            Elemento? elemento)
         {
-            return vm?.Modelo is ElementoEquipamento
-                || vm?.Modelo is Barra;
+            return elemento is ElementoEquipamento
+                || elemento is Barra;
+        }
+
+        private Terminal? ObterTerminalConexao(
+            ElementoViewModel? vm,
+            Point position)
+        {
+            Terminal? terminal =
+                _context.Snap.ObterTerminalMaisProximo(vm, position);
+
+            if (terminal != null && EhElementoConectavel(terminal.Dono))
+                return terminal;
+
+            terminal =
+                _context.Snap.ObterTerminalMaisProximo(
+                    position,
+                    _caboAtual,
+                    t => EhElementoConectavel(t.Dono));
+
+            return terminal;
         }
 
         private void ConectarOrigem(
-            ElementoViewModel? vm)
+            Terminal? terminal)
         {
-            if (_caboAtual == null || vm?.Modelo == null)
+            if (_caboAtual == null || terminal == null)
                 return;
 
-            switch (vm.Modelo)
-            {
-                case ElementoEquipamento equipamento:
+            Elemento elemento = terminal.Dono;
 
-                    _caboAtual.OrigemId =
-                        equipamento.Id.ToString();
+            _caboAtual.OrigemId =
+                elemento.Id.ToString();
 
-                    _caboAtual.BarraOrigem =
-                        equipamento.Nome;
+            _caboAtual.OrigemTerminalId =
+                terminal.Id;
 
-                    break;
+            _caboAtual.BarraOrigem =
+                ObterRotuloTerminal(terminal);
 
-                case Barra barra:
-
-                    _caboAtual.OrigemId =
-                        barra.Id.ToString();
-
-                    _caboAtual.BarraOrigem =
-                        barra.Nome;
-
-                    break;
-
-                default:
-                    return;
-            }
+            _caboAtual.Cabo.DefinirOrigem(terminal.Posicao);
 
             _caboAtual.NotificarParametros();
         }
 
         private void ConectarDestino(
-            ElementoViewModel? vm)
+            Terminal? terminal)
         {
-            if (_caboAtual == null || vm?.Modelo == null)
+            if (_caboAtual == null || terminal == null)
                 return;
 
-            switch (vm.Modelo)
-            {
-                case ElementoEquipamento equipamento:
+            Elemento elemento = terminal.Dono;
 
-                    _caboAtual.DestinoId =
-                        equipamento.Id.ToString();
+            _caboAtual.DestinoId =
+                elemento.Id.ToString();
 
-                    _caboAtual.BarraDestino =
-                        equipamento.Nome;
+            _caboAtual.DestinoTerminalId =
+                terminal.Id;
 
-                    break;
+            _caboAtual.BarraDestino =
+                ObterRotuloTerminal(terminal);
 
-                case Barra barra:
-
-                    _caboAtual.DestinoId =
-                        barra.Id.ToString();
-
-                    _caboAtual.BarraDestino =
-                        barra.Nome;
-
-                    break;
-
-                default:
-                    return;
-            }
+            _caboAtual.Cabo.DefinirDestino(terminal.Posicao);
 
             _caboAtual.NotificarParametros();
+        }
+
+        private static string ObterRotuloTerminal(Terminal terminal)
+        {
+            return string.IsNullOrWhiteSpace(terminal.Barra)
+                ? terminal.Dono.Nome
+                : terminal.Barra;
         }
 
         private void Finalizar()

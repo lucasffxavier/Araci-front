@@ -69,7 +69,7 @@ namespace Araci.Models
             int quantidade = 24;
 
             for (int i = 0; i < quantidade; i++)
-                _terminais.Add(new Terminal(this, new Point()));
+                _terminais.Add(new Terminal(this, new Point(), $"BARRA-{i + 1:00}"));
         }
     }
 }

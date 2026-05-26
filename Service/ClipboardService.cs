@@ -107,6 +107,8 @@ namespace Araci.Services
 
             cabo.OrigemId = string.Empty;
             cabo.DestinoId = string.Empty;
+            cabo.OrigemTerminalId = string.Empty;
+            cabo.DestinoTerminalId = string.Empty;
         }
 
         // =========================

@@ -34,10 +34,10 @@ namespace Araci.Services
             if (!Habilitado)
                 return point;
 
-            Point? terminal =
+            Terminal? terminal =
                 SnapTerminal(point, ignorar);
 
-            return terminal ?? point;
+            return terminal?.Posicao ?? point;
         }
 
         public Point SnapFromElemento(
@@ -70,6 +70,34 @@ namespace Araci.Services
             return Snap(fallback, ignorar);
         }
 
+        public Terminal? ObterTerminalMaisProximo(
+            ElementoViewModel? vm,
+            Point point)
+        {
+            if (vm?.Modelo is not ITerminalOwner owner)
+                return null;
+
+            return ObterTerminalMaisProximo(owner, point);
+        }
+
+        public Terminal? ObterTerminalMaisProximo(
+            Point point,
+            ElementoViewModel? ignorar = null)
+        {
+            return ObterTerminalMaisProximo(point, ignorar, null);
+        }
+
+        public Terminal? ObterTerminalMaisProximo(
+            Point point,
+            ElementoViewModel? ignorar,
+            Func<Terminal, bool>? filtro)
+        {
+            if (!Habilitado)
+                return null;
+
+            return SnapTerminal(point, ignorar, filtro);
+        }
+
         public Point SnapPoint(Point point)
         {
             return point;
@@ -80,7 +108,15 @@ namespace Araci.Services
             return delta;
         }
 
-        private Point? SnapTerminal(Point point, ElementoViewModel? ignorar)
+        private Terminal? SnapTerminal(Point point, ElementoViewModel? ignorar)
+        {
+            return SnapTerminal(point, ignorar, null);
+        }
+
+        private Terminal? SnapTerminal(
+            Point point,
+            ElementoViewModel? ignorar,
+            Func<Terminal, bool>? filtro)
         {
             Terminal? melhor = null;
 
@@ -94,6 +130,9 @@ namespace Araci.Services
             foreach (Terminal terminal
                 in EnumerarTerminais(elementos, ignorar))
             {
+                if (filtro != null && !filtro(terminal))
+                    continue;
+
                 double dx =
                     terminal.Posicao.X - point.X;
 
@@ -117,7 +156,7 @@ namespace Araci.Services
                 melhor = terminal;
             }
 
-            return melhor?.Posicao;
+            return melhor;
         }
 
         private static IEnumerable<Terminal>

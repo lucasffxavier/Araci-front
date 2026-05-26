@@ -9,6 +9,8 @@ namespace Araci.Models
     {
         public const string PARAM_ORIGEM_ID = "OrigemId";
         public const string PARAM_DESTINO_ID = "DestinoId";
+        public const string PARAM_ORIGEM_TERMINAL_ID = "OrigemTerminalId";
+        public const string PARAM_DESTINO_TERMINAL_ID = "DestinoTerminalId";
         public const string PARAM_BARRA_ORIGEM = "BarraOrigem";
         public const string PARAM_BARRA_DESTINO = "BarraDestino";
         public const string PARAM_COMPRIMENTO = "Comprimento";
@@ -28,6 +30,8 @@ namespace Araci.Models
         {
             DefinirParametro(new Parameter<string>(PARAM_ORIGEM_ID, string.Empty));
             DefinirParametro(new Parameter<string>(PARAM_DESTINO_ID, string.Empty));
+            DefinirParametro(new Parameter<string>(PARAM_ORIGEM_TERMINAL_ID, string.Empty));
+            DefinirParametro(new Parameter<string>(PARAM_DESTINO_TERMINAL_ID, string.Empty));
             DefinirParametro(new Parameter<string>(PARAM_BARRA_ORIGEM, "GERADOR-001"));
             DefinirParametro(new Parameter<string>(PARAM_BARRA_DESTINO, "CARGA-001"));
             DefinirParametro(new Parameter<double>(PARAM_COMPRIMENTO, 1));
@@ -66,6 +70,18 @@ namespace Araci.Models
         {
             get => Obter<string>(PARAM_DESTINO_ID);
             set => Definir(PARAM_DESTINO_ID, value);
+        }
+
+        public string OrigemTerminalId
+        {
+            get => Obter<string>(PARAM_ORIGEM_TERMINAL_ID);
+            set => Definir(PARAM_ORIGEM_TERMINAL_ID, value);
+        }
+
+        public string DestinoTerminalId
+        {
+            get => Obter<string>(PARAM_DESTINO_TERMINAL_ID);
+            set => Definir(PARAM_DESTINO_TERMINAL_ID, value);
         }
 
         public string BarraOrigem
@@ -143,7 +159,7 @@ namespace Araci.Models
         public void DefinirOrigem(Point p)
         {
             if (_terminais.Count == 0)
-                _terminais.Add(new Terminal(this, p) { Barra = BarraOrigem });
+                _terminais.Add(new Terminal(this, p, "ORIGEM") { Barra = BarraOrigem });
             else
                 _terminais[0].Posicao = p;
         }
@@ -151,7 +167,7 @@ namespace Araci.Models
         public void DefinirDestino(Point p)
         {
             if (_terminais.Count < 2)
-                _terminais.Add(new Terminal(this, p) { Barra = BarraDestino });
+                _terminais.Add(new Terminal(this, p, "DESTINO") { Barra = BarraDestino });
             else
                 _terminais[1].Posicao = p;
         }
@@ -171,7 +187,7 @@ namespace Araci.Models
             foreach (Terminal t in _terminais)
             {
                 clone._terminais.Add(
-                    new Terminal(clone, t.Posicao)
+                    new Terminal(clone, t.Posicao, t.Id)
                     {
                         Barra = t.Barra
                     });

@@ -47,7 +47,7 @@ namespace Araci.Models
                 terminais.Clear();
 
                 for (int i = 0; i < 4; i++)
-                    terminais.Add(new Terminal(this, new Point()) { Barra = Barra });
+                    terminais.Add(new Terminal(this, new Point(), IdTerminal(i)) { Barra = Barra });
             }
 
             terminais[0].Barra = Barra;
@@ -64,6 +64,18 @@ namespace Araci.Models
             CopiarEquipamentoPara(clone);
 
             return clone;
+        }
+
+        private static string IdTerminal(int index)
+        {
+            return index switch
+            {
+                0 => "TOPO",
+                1 => "BASE",
+                2 => "ESQUERDA",
+                3 => "DIREITA",
+                _ => $"T{index + 1}"
+            };
         }
     }
 }

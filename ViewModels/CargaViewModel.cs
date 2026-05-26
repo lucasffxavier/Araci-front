@@ -1,4 +1,5 @@
 using System.Collections;
+using System.Windows;
 using Araci.Core.SceneNodes;
 using Araci.Models;
 using Araci.Services;
@@ -221,6 +222,12 @@ namespace Araci.ViewModels
         protected override void AtualizarNode()
         {
             base.AtualizarNode();
+            AtualizarTerminais();
+        }
+
+        public override void Mover(Vector delta)
+        {
+            base.Mover(delta);
             AtualizarTerminais();
         }
 

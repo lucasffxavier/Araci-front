@@ -52,6 +52,34 @@ namespace Araci.ViewModels
             }
         }
 
+        public string OrigemTerminalId
+        {
+            get => Cabo.OrigemTerminalId;
+            set
+            {
+                if (Cabo.OrigemTerminalId == value)
+                    return;
+
+                Cabo.OrigemTerminalId = value;
+                OnPropertyChanged();
+                NotificarParametros();
+            }
+        }
+
+        public string DestinoTerminalId
+        {
+            get => Cabo.DestinoTerminalId;
+            set
+            {
+                if (Cabo.DestinoTerminalId == value)
+                    return;
+
+                Cabo.DestinoTerminalId = value;
+                OnPropertyChanged();
+                NotificarParametros();
+            }
+        }
+
         public string Nome
         {
             get => Cabo.Nome;
