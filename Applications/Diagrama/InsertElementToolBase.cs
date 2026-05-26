@@ -1,0 +1,86 @@
+using System;
+using System.Windows;
+using System.Windows.Input;
+using Araci.Applications.Editar.Base;
+using Araci.Core.Commands;
+using Araci.Models;
+using Araci.Services;
+using Araci.ViewModels;
+
+namespace Araci.Applications.Diagrama
+{
+    public abstract class InsertElementToolBase<TViewModel, TModel> : ITool
+        where TViewModel : ElementoViewModel
+        where TModel : Elemento
+    {
+        private readonly InsertPreviewController<TViewModel, TModel> _preview;
+
+        protected InsertElementToolBase(
+            EditorContext context,
+            Func<TViewModel> criarPreview,
+            Func<TViewModel, TModel> obterModeloPreview)
+        {
+            Context = context ?? throw new ArgumentNullException(nameof(context));
+            _preview = new InsertPreviewController<TViewModel, TModel>(
+                Context,
+                criarPreview,
+                obterModeloPreview);
+        }
+
+        protected EditorContext Context { get; }
+
+        protected abstract string ToolName { get; }
+
+        public string Nome => ToolName;
+
+        public bool MantemBotaoAtivado => true;
+
+        public bool IsBusy => _preview.HasPreview;
+
+        public void Ativar() { }
+
+        public void Desativar()
+        {
+            _preview.Clear();
+        }
+
+        public void Cancelar()
+        {
+            _preview.Clear();
+        }
+
+        public void OnMouseDown(ElementoViewModel? vm, Point position, ToolInputState inputState)
+        {
+            if (_preview.IsPreview(vm))
+                vm = null;
+
+            Point pontoSnap = Context.Snap.SnapFromElemento(vm, position);
+            TModel modelo = CriarModeloReal();
+            Point posicao = Context.Geometry.CalcularTopoEsquerdoPorCentro(modelo, pontoSnap);
+            modelo.PosicaoX = posicao.X;
+            modelo.PosicaoY = posicao.Y;
+
+            _preview.Clear();
+            Context.Commands.Execute(new AddElementoCommand(modelo, Context));
+            Context.Tools.VoltarParaSelecao();
+        }
+
+        public void OnMouseMove(Point position, ToolInputState inputState)
+        {
+            _preview.Update(position);
+        }
+
+        public void OnMouseUp(Point position, ToolInputState inputState) { }
+
+        public void OnKeyDown(Key key)
+        {
+            if (key == Key.Escape)
+            {
+                _preview.Clear();
+                Context.Tools.VoltarParaSelecao();
+            }
+        }
+
+        protected abstract TModel CriarModeloReal();
+    }
+}
