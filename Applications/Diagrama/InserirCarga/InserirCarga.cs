@@ -49,7 +49,7 @@ namespace Araci.Applications.Diagrama.InserirCarga
         {
             Point pontoSnap = _context.Snap.SnapFromElemento(vm, position);
             Carga carga = _context.ElementoFactory.CriarCarga();
-            Point posicao = CalcularPosicaoPorCentro(pontoSnap, 70, 70);
+            Point posicao = _context.Geometry.CalcularTopoEsquerdoPorCentro(carga, pontoSnap);
             carga.PosicaoX = posicao.X;
             carga.PosicaoY = posicao.Y;
 
@@ -65,13 +65,6 @@ namespace Araci.Applications.Diagrama.InserirCarga
         {
             if (key == Key.Escape)
                 _context.Tools.VoltarParaSelecao();
-        }
-
-        private static Point CalcularPosicaoPorCentro(Point centro, double largura, double altura)
-        {
-            return new Point(
-                centro.X - largura / 2,
-                centro.Y - altura / 2);
         }
     }
 }

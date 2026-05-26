@@ -31,6 +31,7 @@ namespace Araci.Services
             SimulationMessages = new SimulationMessageBuilder();
             TypePropertiesDialogs = new TypePropertiesDialogService();
             Dialogs = new DialogService();
+            Geometry = new ElementGeometryService();
 
             ElementoFactory = new ElementoFactory(Types, Names, TypePropertiesDialogs);
             Selection = new SelectionService(this);
@@ -100,6 +101,8 @@ namespace Araci.Services
         public TypePropertiesDialogService TypePropertiesDialogs { get; }
 
         public DialogService Dialogs { get; }
+
+        public ElementGeometryService Geometry { get; }
 
         public TypeLibraryService Types { get; } = new TypeLibraryService();
 

@@ -49,7 +49,7 @@ namespace Araci.Applications.Diagrama.InserirBarra
         {
             Point pontoSnap = _context.Snap.SnapFromElemento(vm, position);
             Barra barra = _context.ElementoFactory.CriarBarra();
-            Point posicao = CalcularPosicaoPorCentro(pontoSnap, 10, barra.Altura);
+            Point posicao = _context.Geometry.CalcularTopoEsquerdoPorCentro(barra, pontoSnap);
             barra.PosicaoX = posicao.X;
             barra.PosicaoY = posicao.Y;
 
@@ -65,13 +65,6 @@ namespace Araci.Applications.Diagrama.InserirBarra
         {
             if (key == Key.Escape)
                 _context.Tools.VoltarParaSelecao();
-        }
-
-        private static Point CalcularPosicaoPorCentro(Point centro, double largura, double altura)
-        {
-            return new Point(
-                centro.X - largura / 2,
-                centro.Y - altura / 2);
         }
     }
 }

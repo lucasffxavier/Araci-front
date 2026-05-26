@@ -49,7 +49,7 @@ namespace Araci.Applications.Diagrama.InserirGerador
         {
             Point pontoSnap = _context.Snap.SnapFromElemento(vm, position);
             Gerador gerador = _context.ElementoFactory.CriarGerador();
-            Point posicao = CalcularPosicaoPorCentro(pontoSnap, 70, 70);
+            Point posicao = _context.Geometry.CalcularTopoEsquerdoPorCentro(gerador, pontoSnap);
             gerador.PosicaoX = posicao.X;
             gerador.PosicaoY = posicao.Y;
 
@@ -65,13 +65,6 @@ namespace Araci.Applications.Diagrama.InserirGerador
         {
             if (key == Key.Escape)
                 _context.Tools.VoltarParaSelecao();
-        }
-
-        private static Point CalcularPosicaoPorCentro(Point centro, double largura, double altura)
-        {
-            return new Point(
-                centro.X - largura / 2,
-                centro.Y - altura / 2);
         }
     }
 }
