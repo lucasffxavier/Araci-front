@@ -71,6 +71,8 @@ namespace Araci.Views
                 camera.Zoom,
                 camera.Offset.X,
                 camera.Offset.Y);
+
+            _viewportViewModel?.AtualizarZoomVisual(camera.Zoom);
         }
 
         private void OnLoaded(object sender, RoutedEventArgs e)

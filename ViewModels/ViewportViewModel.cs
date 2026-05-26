@@ -15,6 +15,7 @@ namespace Araci.ViewModels
     {
         private readonly EditorContext _context;
         private readonly Dictionary<Elemento, ElementoViewModel> _viewModelsPorModelo = new();
+        private double _inverseZoom = 1;
 
         public ViewportViewModel(EditorContext context)
         {
@@ -40,6 +41,27 @@ namespace Araci.ViewModels
         public MoveHudService MoveHud { get; }
 
         public ObservableCollection<ElementoViewModel> Elementos => Scene.Elementos;
+
+        public double InverseZoom => _inverseZoom;
+
+        public double CableHandleVisualOffset => -5 * _inverseZoom;
+
+        public double TerminalMarkerVisualOffset => -7 * _inverseZoom;
+
+        public void AtualizarZoomVisual(double zoom)
+        {
+            double inverseZoom = zoom > 0
+                ? 1 / zoom
+                : 1;
+
+            if (Math.Abs(_inverseZoom - inverseZoom) < 0.000001)
+                return;
+
+            _inverseZoom = inverseZoom;
+            OnPropertyChanged(nameof(InverseZoom));
+            OnPropertyChanged(nameof(CableHandleVisualOffset));
+            OnPropertyChanged(nameof(TerminalMarkerVisualOffset));
+        }
 
         public void RegistrarViewModel(ElementoViewModel vm)
         {
