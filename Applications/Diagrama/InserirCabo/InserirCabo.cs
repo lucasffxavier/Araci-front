@@ -31,6 +31,8 @@ namespace Araci.Applications.Diagrama.InserirCabo
 
         private CaboViewModel? _caboAtual;
         private CaboViewModel? _previewInicial;
+        private Terminal? _terminalPreviewInicial;
+        private Terminal? _terminalPreviewFinal;
         private bool _inserindo;
 
         public InserirCaboTool(EditorContext context)
@@ -73,7 +75,7 @@ namespace Araci.Applications.Diagrama.InserirCabo
             }
 
             Terminal? terminal =
-                ObterTerminalConexao(vm, position);
+                ObterTerminalParaClique(vm, position);
 
             Point pontoSnap =
                 terminal?.Posicao
@@ -130,6 +132,8 @@ namespace Araci.Applications.Diagrama.InserirCabo
             Terminal? terminal =
                 ObterTerminalConexao(null, position);
 
+            _terminalPreviewFinal = terminal;
+
             Point pontoSnap =
                 terminal?.Posicao
                 ?? _context.Snap.Snap(position, _caboAtual);
@@ -176,10 +180,46 @@ namespace Araci.Applications.Diagrama.InserirCabo
             return terminal;
         }
 
+        private Terminal? ObterTerminalParaClique(
+            ElementoViewModel? vm,
+            Point position)
+        {
+            Terminal? terminal =
+                ObterTerminalConexao(vm, position);
+
+            if (terminal != null)
+                return terminal;
+
+            Terminal? terminalPreview =
+                _inserindo
+                    ? _terminalPreviewFinal
+                    : _terminalPreviewInicial;
+
+            return TerminalAindaValido(terminalPreview, position)
+                ? terminalPreview
+                : null;
+        }
+
+        private bool TerminalAindaValido(
+            Terminal? terminal,
+            Point position)
+        {
+            if (terminal == null)
+                return false;
+
+            double dx = terminal.Posicao.X - position.X;
+            double dy = terminal.Posicao.Y - position.Y;
+            double tolerancia = _context.Snap.TerminalTolerance;
+
+            return dx * dx + dy * dy <= tolerancia * tolerancia;
+        }
+
         private void AtualizarPreviewInicial(Point position)
         {
             Terminal? terminal =
                 ObterTerminalConexao(null, position);
+
+            _terminalPreviewInicial = terminal;
 
             if (terminal == null)
             {
@@ -219,6 +259,7 @@ namespace Araci.Applications.Diagrama.InserirCabo
             _previewInicial.IsPreview = false;
             _context.Scene.Elementos.Remove(_previewInicial);
             _previewInicial = null;
+            _terminalPreviewInicial = null;
             _context.SceneQueries.Invalidate();
         }
 
@@ -286,6 +327,7 @@ namespace Araci.Applications.Diagrama.InserirCabo
             _caboAtual?.RemoverPreview();
 
             _caboAtual = null;
+            _terminalPreviewFinal = null;
             _inserindo = false;
         }
     }
