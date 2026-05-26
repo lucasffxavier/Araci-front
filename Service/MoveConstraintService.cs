@@ -37,7 +37,11 @@ namespace Araci.Services
                 result = ApplyOrthogonal(position);
             }
 
-            return inputState.IsControlPressed && _settings.GridSnapEnabled
+            bool shouldApplyGrid =
+                inputState.IsControlPressed &&
+                _settings.GridSnapEnabled;
+
+            return shouldApplyGrid
                 ? ApplyGrid(result)
                 : result;
         }

@@ -185,6 +185,7 @@ Araci Engine
 │   ├── ConnectivityService.cs
 │   ├── DialogService.cs
 │   ├── EditorContext.cs
+│   ├── EditorSettings.cs
 │   ├── EditorState.cs
 │   ├── ElementoFactory.cs
 │   ├── HoverService.cs
@@ -446,7 +447,7 @@ Dialogs = new DialogService();
 ElementoFactory = new ElementoFactory(Types, Names, TypePropertiesDialogs);
 Selection = new SelectionService(this);
 MoveHud = new MoveHudService(this);
-MoveConstraints = new MoveConstraintService();
+MoveConstraints = new MoveConstraintService(Settings);
 Move = new MoveService(this);
 Tools = new ToolService(this);
 Input = new InputRouter(this);
@@ -466,6 +467,7 @@ public void InicializarViewport(ViewportViewModel viewportViewModel)
 Viewport = new ViewportService(viewportViewModel);
 }
 public EditorState Editor { get; } = new EditorState();
+public EditorSettings Settings { get; } = new EditorSettings();
 public MoveHudService MoveHud { get; }
 public MoveConstraintService MoveConstraints { get; }
 public SelectionBoxViewModel SelectionBox { get; } = new SelectionBoxViewModel();
@@ -493,40 +495,15 @@ return new TransactionScope(Commands);
 
 
 ====================================================================================================
-ARQUIVO: C:\Araci-Engine-Front\Araci Engine\Service\EditorState.cs
+ARQUIVO: C:\Araci-Engine-Front\Araci Engine\Service\EditorSettings.cs
 ====================================================================================================
 
-﻿using System.ComponentModel;
-using System.Runtime.CompilerServices;
-namespace Araci.ViewModels
+namespace Araci.Services
 {
-public class EditorState
-: INotifyPropertyChanged
+public class EditorSettings
 {
-private object?
-_elementoSelecionado;
-public object?
-ElementoSelecionado
-{
-get => _elementoSelecionado;
-set
-{
-if (_elementoSelecionado == value)
-return;
-_elementoSelecionado = value;
-OnPropertyChanged();
-}
-}
-public event PropertyChangedEventHandler?
-PropertyChanged;
-protected virtual void OnPropertyChanged(
-[CallerMemberName]
-string? propertyName = null)
-{
-PropertyChanged?.Invoke(
-this,
-new PropertyChangedEventArgs(propertyName));
-}
+public double GridStep { get; set; } = 10.0;
+public bool GridSnapEnabled { get; set; } = true;
 }
 }
 
@@ -542,9 +519,14 @@ namespace Araci.Services
 {
 public class MoveConstraintService
 {
-private const double GridStep = 10.0;
+private const double DefaultGridStep = 10.0;
+private readonly EditorSettings _settings;
 private Point _start;
 private OrthogonalAxis? _orthogonalAxis;
+public MoveConstraintService(EditorSettings settings)
+{
+_settings = settings ?? throw new ArgumentNullException(nameof(settings));
+}
 public void Begin(Point start)
 {
 _start = start;
@@ -561,7 +543,7 @@ else
 {
 result = ApplyOrthogonal(position);
 }
-return inputState.IsControlPressed
+return inputState.IsControlPressed && _settings.GridSnapEnabled
 ? ApplyGrid(result)
 : result;
 }
@@ -595,224 +577,21 @@ return new Point(
 _start.X + Quantize(delta.X),
 _start.Y + Quantize(delta.Y));
 }
-private static double Quantize(double value)
+private double Quantize(double value)
 {
-return Math.Round(value / GridStep) * GridStep;
+double step = GetGridStep();
+return Math.Round(value / step) * step;
+}
+private double GetGridStep()
+{
+return _settings.GridStep > 0
+? _settings.GridStep
+: DefaultGridStep;
 }
 private enum OrthogonalAxis
 {
 Horizontal,
 Vertical
-}
-}
-}
-
-
-====================================================================================================
-ARQUIVO: C:\Araci-Engine-Front\Araci Engine\Service\MoveHudService.cs
-====================================================================================================
-
-﻿using System.ComponentModel;
-using System.Windows;
-namespace Araci.Services
-{
-public class MoveHudService : INotifyPropertyChanged
-{
-private const double MARGEM = 10;
-private readonly EditorContext _context;
-private bool _visivel;
-private double _x;
-private double _y;
-private double _deltaX;
-private double _deltaY;
-public event PropertyChangedEventHandler? PropertyChanged;
-public MoveHudService(EditorContext context)
-{
-_context = context
-?? throw new System.ArgumentNullException(nameof(context));
-}
-public bool Visivel
-{
-get => _visivel;
-set
-{
-if (_visivel != value)
-{
-_visivel = value;
-OnChanged(nameof(Visivel));
-}
-}
-}
-public double X
-{
-get => _x;
-private set
-{
-if (_x != value)
-{
-_x = value;
-OnChanged(nameof(X));
-}
-}
-}
-public double Y
-{
-get => _y;
-private set
-{
-if (_y != value)
-{
-_y = value;
-OnChanged(nameof(Y));
-}
-}
-}
-public double DeltaX
-{
-get => _deltaX;
-set
-{
-if (_deltaX != value)
-{
-_deltaX = value;
-OnChanged(nameof(DeltaX));
-}
-}
-}
-public double DeltaY
-{
-get => _deltaY;
-set
-{
-if (_deltaY != value)
-{
-_deltaY = value;
-OnChanged(nameof(DeltaY));
-}
-}
-}
-public void AtualizarPosicao(Rect bounds)
-{
-double viewportX =
-_context.Viewport?.Largura ?? 1000;
-double viewportY =
-_context.Viewport?.Altura ?? 800;
-Point worldPoint =
-new(
-bounds.X + bounds.Width / 2,
-bounds.Y - 20);
-Point screenPoint =
-_context.Viewport?.WorldToScreen(worldPoint)
-?? worldPoint;
-double novoX =
-screenPoint.X;
-double novoY =
-screenPoint.Y;
-novoX = Math.Max(MARGEM, Math.Min(novoX, viewportX - MARGEM));
-novoY = Math.Max(MARGEM, Math.Min(novoY, viewportY - MARGEM));
-X = novoX;
-Y = novoY;
-}
-public void Reset()
-{
-DeltaX = 0;
-DeltaY = 0;
-}
-private void OnChanged(string nome)
-{
-PropertyChanged?.Invoke(this,
-new PropertyChangedEventArgs(nome));
-}
-}
-}
-
-
-====================================================================================================
-ARQUIVO: C:\Araci-Engine-Front\Araci Engine\Service\MoveService.cs
-====================================================================================================
-
-using System.Collections.Generic;
-using System.Linq;
-using System.Windows;
-using Araci.Core.Commands;
-using Araci.Models;
-using Araci.ViewModels;
-namespace Araci.Services
-{
-public class MoveService
-{
-private readonly EditorContext _context;
-private readonly Dictionary<ElementoViewModel, ElementoEstado>
-_estadoInicial = new();
-private bool _movendo;
-public MoveService(EditorContext context)
-{
-_context = context ??
-throw new ArgumentNullException(nameof(context));
-}
-public void BeginMove(IEnumerable<ElementoViewModel> elementos)
-{
-_estadoInicial.Clear();
-foreach (var vm in elementos.Distinct())
-{
-_estadoInicial[vm] = vm.CapturarEstado();
-}
-_movendo = true;
-}
-public void MoverVisual(
-ElementoViewModel vm,
-Vector delta)
-{
-if (!_movendo)
-return;
-vm.Mover(delta);
-_context.SceneQueries.Invalidate();
-}
-public void EndMove(IEnumerable<ElementoViewModel> elementos)
-{
-if (!_movendo)
-return;
-using var transaction =
-_context.BeginTransaction();
-foreach (var vm in elementos.Distinct())
-{
-if (!_estadoInicial.TryGetValue(vm, out var antes))
-continue;
-var depois = vm.CapturarEstado();
-bool mudou =
-antes.X != depois.X ||
-antes.Y != depois.Y ||
-antes.X2 != depois.X2 ||
-antes.Y2 != depois.Y2 ||
-!antes.Vertices.SequenceEqual(depois.Vertices);
-if (!mudou)
-continue;
-transaction.Add(
-new MoveElementoCommand(
-vm.Modelo,
-antes,
-depois,
-AtualizarElementoMovido));
-}
-transaction.Commit();
-_context.SceneQueries.Invalidate();
-_estadoInicial.Clear();
-_movendo = false;
-}
-public void AbortMove()
-{
-if (!_movendo)
-return;
-foreach (var item in _estadoInicial)
-item.Key.AplicarEstado(item.Value);
-_context.SceneQueries.Invalidate();
-_estadoInicial.Clear();
-_movendo = false;
-}
-private void AtualizarElementoMovido(Elemento elemento)
-{
-_context.Viewport?.AtualizarViewModel(elemento);
-_context.SceneQueries.Invalidate();
 }
 }
 }
