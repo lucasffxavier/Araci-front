@@ -113,14 +113,5 @@ namespace Araci.Maestro
                 .ToList();
         }
 
-        public void JanelaMensagem(string titulo, string mensagem)
-        {
-            _api.MostrarMensagem(titulo, mensagem);
-        }
-
-        public void ImprimirTexto(string texto)
-        {
-            _api.ImprimirTexto(texto);
-        }
     }
 }

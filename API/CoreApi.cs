@@ -1,7 +1,6 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Windows;
 using Araci.Core.Documents;
 using Araci.Models;
 using Araci.Services;
@@ -10,12 +9,13 @@ namespace Araci.API
 {
     public class CoreApi
     {
-        private readonly EditorContext? _context;
         private readonly AraciDocument _document;
 
         public CoreApi(EditorContext context)
         {
-            _context = context ?? throw new ArgumentNullException(nameof(context));
+            if (context == null)
+                throw new ArgumentNullException(nameof(context));
+
             _document = context.Document;
         }
 
@@ -105,20 +105,6 @@ namespace Araci.API
         public string ObterValorParametroTexto(Elemento elemento, string nomeParametro)
         {
             return ObterValorParametro(elemento, nomeParametro)?.ToString() ?? string.Empty;
-        }
-
-        public void MostrarMensagem(string titulo, string mensagem)
-        {
-            MessageBox.Show(
-                mensagem ?? string.Empty,
-                string.IsNullOrWhiteSpace(titulo) ? "Araci" : titulo,
-                MessageBoxButton.OK,
-                MessageBoxImage.Information);
-        }
-
-        public void ImprimirTexto(string texto)
-        {
-            MostrarMensagem("Araci", texto);
         }
 
         private static void ValidarElemento(Elemento? elemento)

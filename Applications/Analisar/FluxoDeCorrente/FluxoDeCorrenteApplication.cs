@@ -1,6 +1,5 @@
 using System;
 using System.Threading.Tasks;
-using System.Windows;
 using Araci.DTOs;
 using Araci.Services;
 
@@ -47,11 +46,7 @@ namespace Araci.Applications.Analisar.FluxoDeCorrente
             }
             catch (Exception ex)
             {
-                MessageBox.Show(
-                    ex.Message,
-                    "Fluxo de corrente",
-                    MessageBoxButton.OK,
-                    MessageBoxImage.Warning);
+                _context.Dialogs.ShowWarning("Fluxo de corrente", ex.Message);
             }
         }
 
@@ -68,32 +63,26 @@ namespace Araci.Applications.Analisar.FluxoDeCorrente
             }
             catch (Exception ex)
             {
-                MessageBox.Show(
-                    $"A simula\u00E7\u00E3o foi aplicada, mas n\u00E3o foi poss\u00EDvel salvar os arquivos.\n\n{ex.Message}",
+                _context.Dialogs.ShowWarning(
                     "Fluxo de corrente",
-                    MessageBoxButton.OK,
-                    MessageBoxImage.Warning);
+                    $"A simula\u00E7\u00E3o foi aplicada, mas n\u00E3o foi poss\u00EDvel salvar os arquivos.\n\n{ex.Message}");
 
                 return null;
             }
         }
 
-        private static bool ConfirmarSubstituicao()
+        private bool ConfirmarSubstituicao()
         {
-            MessageBoxResult result = MessageBox.Show(
-                "Um ou mais arquivos de sa\u00EDda j\u00E1 existem. Deseja substituir?",
+            return _context.Dialogs.Confirm(
                 "Fluxo de corrente",
-                MessageBoxButton.YesNo,
-                MessageBoxImage.Question);
-
-            return result == MessageBoxResult.Yes;
+                "Um ou mais arquivos de sa\u00EDda j\u00E1 existem. Deseja substituir?");
         }
 
         private void MostrarResultado(SimulationResultDto resultado, string? dssPath)
         {
             SimulationMessage message = _context.SimulationMessages.Build(resultado, dssPath);
 
-            MessageBox.Show(message.Text, message.Title, MessageBoxButton.OK, message.Icon);
+            _context.Dialogs.Show(message);
         }
     }
 }
