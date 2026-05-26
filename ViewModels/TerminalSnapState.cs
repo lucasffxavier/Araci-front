@@ -7,10 +7,15 @@ namespace Araci.ViewModels
     public class TerminalSnapState : INotifyPropertyChanged
     {
         private bool _visivel;
+        private bool _invalido;
+        private bool _mensagemVisivel;
         private double _x;
         private double _y;
+        private double _mensagemX;
+        private double _mensagemY;
         private string? _terminalId;
         private string? _elementoId;
+        private string _mensagem = string.Empty;
 
         public bool Visivel
         {
@@ -22,6 +27,8 @@ namespace Araci.ViewModels
 
                 _visivel = value;
                 OnPropertyChanged();
+                OnPropertyChanged(nameof(MarcadorValidoVisivel));
+                OnPropertyChanged(nameof(MarcadorInvalidoVisivel));
             }
         }
 
@@ -47,6 +54,77 @@ namespace Araci.ViewModels
                     return;
 
                 _y = value;
+                OnPropertyChanged();
+            }
+        }
+
+        public bool Invalido
+        {
+            get => _invalido;
+            private set
+            {
+                if (_invalido == value)
+                    return;
+
+                _invalido = value;
+                OnPropertyChanged();
+                OnPropertyChanged(nameof(MarcadorValidoVisivel));
+                OnPropertyChanged(nameof(MarcadorInvalidoVisivel));
+            }
+        }
+
+        public bool MarcadorValidoVisivel => Visivel && !Invalido;
+
+        public bool MarcadorInvalidoVisivel => Visivel && Invalido;
+
+        public bool MensagemVisivel
+        {
+            get => _mensagemVisivel;
+            private set
+            {
+                if (_mensagemVisivel == value)
+                    return;
+
+                _mensagemVisivel = value;
+                OnPropertyChanged();
+            }
+        }
+
+        public string Mensagem
+        {
+            get => _mensagem;
+            private set
+            {
+                if (_mensagem == value)
+                    return;
+
+                _mensagem = value;
+                OnPropertyChanged();
+            }
+        }
+
+        public double MensagemX
+        {
+            get => _mensagemX;
+            private set
+            {
+                if (System.Math.Abs(_mensagemX - value) < 0.0001)
+                    return;
+
+                _mensagemX = value;
+                OnPropertyChanged();
+            }
+        }
+
+        public double MensagemY
+        {
+            get => _mensagemY;
+            private set
+            {
+                if (System.Math.Abs(_mensagemY - value) < 0.0001)
+                    return;
+
+                _mensagemY = value;
                 OnPropertyChanged();
             }
         }
@@ -83,12 +161,32 @@ namespace Araci.ViewModels
             Y = terminal.Posicao.Y;
             TerminalId = terminal.Id;
             ElementoId = terminal.Dono.Id.ToString();
+            Invalido = false;
+            MensagemVisivel = false;
+            Mensagem = string.Empty;
+            Visivel = true;
+        }
+
+        public void MostrarInvalido(Terminal terminal, System.Windows.Point cursor, string mensagem)
+        {
+            X = terminal.Posicao.X;
+            Y = terminal.Posicao.Y;
+            TerminalId = terminal.Id;
+            ElementoId = terminal.Dono.Id.ToString();
+            Invalido = true;
+            Mensagem = mensagem;
+            MensagemX = cursor.X + 14;
+            MensagemY = cursor.Y + 14;
+            MensagemVisivel = true;
             Visivel = true;
         }
 
         public void Limpar()
         {
             Visivel = false;
+            Invalido = false;
+            MensagemVisivel = false;
+            Mensagem = string.Empty;
             TerminalId = null;
             ElementoId = null;
         }

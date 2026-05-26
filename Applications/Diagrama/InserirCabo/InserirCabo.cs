@@ -79,8 +79,6 @@ namespace Araci.Applications.Diagrama.InserirCabo
             Terminal? terminal =
                 ObterTerminalParaClique(vm, position);
 
-            AtualizarTerminalCapturado(terminal);
-
             Point pontoSnap =
                 terminal?.Posicao
                 ?? _context.Snap.SnapFromElemento(vm, position, _caboAtual);
@@ -96,6 +94,7 @@ namespace Araci.Applications.Diagrama.InserirCabo
                     return;
                 }
 
+                AtualizarTerminalCapturado(terminal);
                 LimparPreviewInicial();
 
                 _caboAtual =
@@ -125,10 +124,11 @@ namespace Araci.Applications.Diagrama.InserirCabo
 
             if (!DestinoValido(terminal))
             {
-                LimparTerminalCapturado();
+                MostrarTerminalInvalido(terminal, inputState.ScreenPosition);
                 return;
             }
 
+            AtualizarTerminalCapturado(terminal);
             _caboAtual.FinalizarNoPonto(pontoSnap);
 
             ConectarDestino(terminal);
@@ -151,7 +151,13 @@ namespace Araci.Applications.Diagrama.InserirCabo
                 ObterTerminalConexao(null, position);
 
             _terminalPreviewFinal = terminal;
-            AtualizarTerminalCapturado(terminal);
+
+            if (terminal == null)
+                LimparTerminalCapturado();
+            else if (DestinoValido(terminal))
+                AtualizarTerminalCapturado(terminal);
+            else
+                MostrarTerminalInvalido(terminal, inputState.ScreenPosition);
 
             Point pontoSnap =
                 terminal?.Posicao
@@ -292,6 +298,14 @@ namespace Araci.Applications.Diagrama.InserirCabo
             }
 
             _context.TerminalSnap.Mostrar(terminal);
+        }
+
+        private void MostrarTerminalInvalido(Terminal terminal, Point cursor)
+        {
+            _context.TerminalSnap.MostrarInvalido(
+                terminal,
+                cursor,
+                "Conexão inválida");
         }
 
         private void LimparTerminalCapturado()

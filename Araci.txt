@@ -185,6 +185,7 @@ Araci Engine
 │   └── RibbonView.xaml.cs
 ├── Service
 │   ├── ClipboardService.cs
+│   ├── ConnectionValidationResult.cs
 │   ├── ConnectivityService.cs
 │   ├── DialogService.cs
 │   ├── EditorContext.cs
@@ -291,6 +292,7 @@ private CaboViewModel? _caboAtual;
 private CaboViewModel? _previewInicial;
 private Terminal? _terminalPreviewInicial;
 private Terminal? _terminalPreviewFinal;
+private Terminal? _terminalOrigem;
 private bool _inserindo;
 public InserirCaboTool(EditorContext context)
 {
@@ -334,6 +336,11 @@ if (!_inserindo)
 {
 if (terminal == null)
 return;
+if (!OrigemValida(terminal))
+{
+LimparTerminalCapturado();
+return;
+}
 LimparPreviewInicial();
 _caboAtual =
 _context.ElementoFactory.CriarCaboVM();
@@ -351,6 +358,11 @@ if (_caboAtual == null)
 return;
 if (terminal == null)
 return;
+if (!DestinoValido(terminal))
+{
+LimparTerminalCapturado();
+return;
+}
 _caboAtual.FinalizarNoPonto(pontoSnap);
 ConectarDestino(terminal);
 Finalizar();
@@ -497,7 +509,24 @@ terminal.Id;
 _caboAtual.BarraOrigem =
 ObterRotuloTerminal(terminal);
 _caboAtual.Cabo.DefinirOrigem(terminal.Posicao);
+_terminalOrigem = terminal;
 _caboAtual.NotificarParametros();
+}
+private bool OrigemValida(Terminal terminal)
+{
+return !string.IsNullOrWhiteSpace(terminal.Dono.Id.ToString()) &&
+!string.IsNullOrWhiteSpace(terminal.Id);
+}
+private bool DestinoValido(Terminal terminal)
+{
+if (_caboAtual == null || _terminalOrigem == null)
+{
+return false;
+}
+return _context.Connectivity.ValidarConexaoCabo(
+_caboAtual.Cabo,
+_terminalOrigem,
+terminal).IsValid;
 }
 private void UsarViewModelDaCena()
 {
@@ -542,6 +571,7 @@ private void LimparEstado()
 _caboAtual?.RemoverPreview();
 _caboAtual = null;
 _terminalPreviewFinal = null;
+_terminalOrigem = null;
 LimparTerminalCapturado();
 _inserindo = false;
 }
@@ -550,210 +580,27 @@ _inserindo = false;
 
 
 ====================================================================================================
-ARQUIVO: C:\Araci-Engine-Front\Araci Engine\Models\Cabo.cs
+ARQUIVO: C:\Araci-Engine-Front\Araci Engine\Service\ConnectionValidationResult.cs
 ====================================================================================================
 
-using System.Collections.Generic;
-using System.Collections.ObjectModel;
-using System.Windows;
-using Araci.Models.Tipos;
-namespace Araci.Models
+namespace Araci.Services
 {
-public class Cabo : ElementoLinear, ITerminalOwner
+public class ConnectionValidationResult
 {
-public const string PARAM_ORIGEM_ID = "OrigemId";
-public const string PARAM_DESTINO_ID = "DestinoId";
-public const string PARAM_ORIGEM_TERMINAL_ID = "OrigemTerminalId";
-public const string PARAM_DESTINO_TERMINAL_ID = "DestinoTerminalId";
-public const string PARAM_BARRA_ORIGEM = "BarraOrigem";
-public const string PARAM_BARRA_DESTINO = "BarraDestino";
-public const string PARAM_COMPRIMENTO = "Comprimento";
-public const string PARAM_AMPACIDADE = "Ampacidade";
-public const string PARAM_TENSAO_LINHA = "TensaoLinha";
-public const string PARAM_TENSAO_FASE_A = "TensaoFaseA";
-public const string PARAM_TENSAO_FASE_B = "TensaoFaseB";
-public const string PARAM_TENSAO_FASE_C = "TensaoFaseC";
-public const string PARAM_CORRENTE_LINHA = "CorrenteLinha";
-public const string PARAM_CORRENTE_FASE_A = "CorrenteFaseA";
-public const string PARAM_CORRENTE_FASE_B = "CorrenteFaseB";
-public const string PARAM_CORRENTE_FASE_C = "CorrenteFaseC";
-private readonly List<Terminal> _terminais = new();
-public Cabo()
+private ConnectionValidationResult(bool isValid, string? message)
 {
-DefinirParametro(new Parameter<string>(PARAM_ORIGEM_ID, string.Empty));
-DefinirParametro(new Parameter<string>(PARAM_DESTINO_ID, string.Empty));
-DefinirParametro(new Parameter<string>(PARAM_ORIGEM_TERMINAL_ID, string.Empty));
-DefinirParametro(new Parameter<string>(PARAM_DESTINO_TERMINAL_ID, string.Empty));
-DefinirParametro(new Parameter<string>(PARAM_BARRA_ORIGEM, "GERADOR-001"));
-DefinirParametro(new Parameter<string>(PARAM_BARRA_DESTINO, "CARGA-001"));
-DefinirParametro(new Parameter<double>(PARAM_COMPRIMENTO, 1));
-DefinirParametro(new Parameter<double>(PARAM_AMPACIDADE, 520));
-DefinirParametro(new Parameter<string>(PARAM_TENSAO_LINHA, "12.47∠0°"));
-DefinirParametro(new Parameter<string>(PARAM_TENSAO_FASE_A, "7.2∠0°"));
-DefinirParametro(new Parameter<string>(PARAM_TENSAO_FASE_B, "7.2∠-120°"));
-DefinirParametro(new Parameter<string>(PARAM_TENSAO_FASE_C, "7.2∠120°"));
-DefinirParametro(new Parameter<string>(PARAM_CORRENTE_LINHA, "0∠0°"));
-DefinirParametro(new Parameter<string>(PARAM_CORRENTE_FASE_A, "0∠0°"));
-DefinirParametro(new Parameter<string>(PARAM_CORRENTE_FASE_B, "0∠-120°"));
-DefinirParametro(new Parameter<string>(PARAM_CORRENTE_FASE_C, "0∠120°"));
-Nome = "L1";
+IsValid = isValid;
+Message = message;
 }
-public IReadOnlyList<Terminal> Terminais => _terminais;
-public ObservableCollection<Point> Vertices { get; } = new();
-public Point? PreviewPonto { get; set; }
-public TipoCabo TipoCabo => (TipoCabo)Tipo!;
-public Terminal? Origem => _terminais.Count > 0 ? _terminais[0] : null;
-public Terminal? Destino => _terminais.Count > 1 ? _terminais[1] : null;
-public string OrigemId
+public bool IsValid { get; }
+public string? Message { get; }
+public static ConnectionValidationResult Valid()
 {
-get => Obter<string>(PARAM_ORIGEM_ID);
-set => Definir(PARAM_ORIGEM_ID, value);
+return new ConnectionValidationResult(true, null);
 }
-public string DestinoId
+public static ConnectionValidationResult Invalid(string message)
 {
-get => Obter<string>(PARAM_DESTINO_ID);
-set => Definir(PARAM_DESTINO_ID, value);
-}
-public string OrigemTerminalId
-{
-get => Obter<string>(PARAM_ORIGEM_TERMINAL_ID);
-set => Definir(PARAM_ORIGEM_TERMINAL_ID, value);
-}
-public string DestinoTerminalId
-{
-get => Obter<string>(PARAM_DESTINO_TERMINAL_ID);
-set => Definir(PARAM_DESTINO_TERMINAL_ID, value);
-}
-public string BarraOrigem
-{
-get => Obter<string>(PARAM_BARRA_ORIGEM);
-set => Definir(PARAM_BARRA_ORIGEM, value);
-}
-public string BarraDestino
-{
-get => Obter<string>(PARAM_BARRA_DESTINO);
-set => Definir(PARAM_BARRA_DESTINO, value);
-}
-public new double Comprimento
-{
-get => Obter<double>(PARAM_COMPRIMENTO);
-set => Definir(PARAM_COMPRIMENTO, value);
-}
-public double Ampacidade
-{
-get => Obter<double>(PARAM_AMPACIDADE);
-set => Definir(PARAM_AMPACIDADE, value);
-}
-public string TensaoLinha
-{
-get => Obter<string>(PARAM_TENSAO_LINHA);
-set => Definir(PARAM_TENSAO_LINHA, value);
-}
-public string TensaoFaseA
-{
-get => Obter<string>(PARAM_TENSAO_FASE_A);
-set => Definir(PARAM_TENSAO_FASE_A, value);
-}
-public string TensaoFaseB
-{
-get => Obter<string>(PARAM_TENSAO_FASE_B);
-set => Definir(PARAM_TENSAO_FASE_B, value);
-}
-public string TensaoFaseC
-{
-get => Obter<string>(PARAM_TENSAO_FASE_C);
-set => Definir(PARAM_TENSAO_FASE_C, value);
-}
-public string CorrenteLinha
-{
-get => Obter<string>(PARAM_CORRENTE_LINHA);
-set => Definir(PARAM_CORRENTE_LINHA, value);
-}
-public string CorrenteFaseA
-{
-get => Obter<string>(PARAM_CORRENTE_FASE_A);
-set => Definir(PARAM_CORRENTE_FASE_A, value);
-}
-public string CorrenteFaseB
-{
-get => Obter<string>(PARAM_CORRENTE_FASE_B);
-set => Definir(PARAM_CORRENTE_FASE_B, value);
-}
-public string CorrenteFaseC
-{
-get => Obter<string>(PARAM_CORRENTE_FASE_C);
-set => Definir(PARAM_CORRENTE_FASE_C, value);
-}
-public void DefinirOrigem(Point p)
-{
-if (_terminais.Count == 0)
-_terminais.Add(new Terminal(this, p, "ORIGEM") { Barra = BarraOrigem });
-else
-_terminais[0].Posicao = p;
-}
-public void DefinirDestino(Point p)
-{
-if (_terminais.Count < 2)
-_terminais.Add(new Terminal(this, p, "DESTINO") { Barra = BarraDestino });
-else
-_terminais[1].Posicao = p;
-}
-public override Elemento Clonar()
-{
-var clone = new Cabo();
-CopiarLinearPara(clone);
-foreach (Point p in Vertices)
-clone.Vertices.Add(p);
-clone.PreviewPonto = PreviewPonto;
-clone._terminais.Clear();
-foreach (Terminal t in _terminais)
-{
-clone._terminais.Add(
-new Terminal(clone, t.Posicao, t.Id)
-{
-Barra = t.Barra
-});
-}
-return clone;
-}
-}
-}
-
-
-====================================================================================================
-ARQUIVO: C:\Araci-Engine-Front\Araci Engine\Models\ITerminalOwner.cs
-====================================================================================================
-
-﻿using System.Collections.Generic;
-namespace Araci.Models
-{
-public interface ITerminalOwner
-{
-IReadOnlyList<Terminal> Terminais { get; }
-}
-}
-
-
-====================================================================================================
-ARQUIVO: C:\Araci-Engine-Front\Araci Engine\Models\Terminal.cs
-====================================================================================================
-
-﻿using System.Windows;
-namespace Araci.Models
-{
-public class Terminal
-{
-public Elemento Dono { get; }
-public string Id { get; }
-public Point Posicao { get; set; }
-public string? Barra { get; set; }
-public Terminal(Elemento dono, Point posicao, string? id = null)
-{
-Dono = dono;
-Id = string.IsNullOrWhiteSpace(id)
-? System.Guid.NewGuid().ToString("N")
-: id;
-Posicao = posicao;
+return new ConnectionValidationResult(false, message);
 }
 }
 }
@@ -892,12 +739,124 @@ alterados.Add(cabo);
 }
 return alterados;
 }
+public ConnectionValidationResult ValidarConexaoCabo(
+Cabo? caboAtual,
+Terminal? origem,
+Terminal? destino)
+{
+if (origem == null)
+return ConnectionValidationResult.Invalid("Origem sem terminal valido.");
+if (destino == null)
+return ConnectionValidationResult.Invalid("Destino sem terminal valido.");
+if (string.IsNullOrWhiteSpace(origem.Dono.Id.ToString()) ||
+string.IsNullOrWhiteSpace(origem.Id) ||
+string.IsNullOrWhiteSpace(destino.Dono.Id.ToString()) ||
+string.IsNullOrWhiteSpace(destino.Id))
+{
+return ConnectionValidationResult.Invalid("Conexao sem ElementoId ou TerminalId valido.");
+}
+if (MesmoElemento(origem, destino))
+return ConnectionValidationResult.Invalid("Origem e destino pertencem ao mesmo elemento.");
+if (MesmoTerminal(origem, destino))
+return ConnectionValidationResult.Invalid("Origem e destino usam o mesmo terminal.");
+if (ExisteCaboDuplicado(caboAtual, origem, destino))
+return ConnectionValidationResult.Invalid("Ja existe cabo entre estes terminais.");
+return ConnectionValidationResult.Valid();
+}
+public bool EhCaboDuplicado(Cabo cabo, IEnumerable<Cabo> anteriores)
+{
+foreach (Cabo anterior in anteriores)
+{
+if (MesmoParDeTerminais(
+cabo.OrigemId,
+cabo.OrigemTerminalId,
+cabo.DestinoId,
+cabo.DestinoTerminalId,
+anterior.OrigemId,
+anterior.OrigemTerminalId,
+anterior.DestinoId,
+anterior.DestinoTerminalId))
+{
+return true;
+}
+}
+return false;
+}
 private static bool EhMesmoElemento(string id, Elemento elemento)
 {
 return string.Equals(
 id,
 elemento.Id.ToString(),
 StringComparison.OrdinalIgnoreCase);
+}
+private bool ExisteCaboDuplicado(
+Cabo? caboAtual,
+Terminal origem,
+Terminal destino)
+{
+string origemId = origem.Dono.Id.ToString();
+string destinoId = destino.Dono.Id.ToString();
+return _document.Elementos.OfType<Cabo>().Any(c =>
+!ReferenceEquals(c, caboAtual) &&
+MesmoParDeTerminais(
+origemId,
+origem.Id,
+destinoId,
+destino.Id,
+c.OrigemId,
+c.OrigemTerminalId,
+c.DestinoId,
+c.DestinoTerminalId));
+}
+private static bool MesmoElemento(Terminal origem, Terminal destino)
+{
+return string.Equals(
+origem.Dono.Id.ToString(),
+destino.Dono.Id.ToString(),
+StringComparison.OrdinalIgnoreCase);
+}
+private static bool MesmoTerminal(Terminal origem, Terminal destino)
+{
+return MesmoElemento(origem, destino) &&
+string.Equals(origem.Id, destino.Id, StringComparison.OrdinalIgnoreCase);
+}
+private static bool MesmoParDeTerminais(
+string origemA,
+string origemTerminalA,
+string destinoA,
+string destinoTerminalA,
+string origemB,
+string origemTerminalB,
+string destinoB,
+string destinoTerminalB)
+{
+if (string.IsNullOrWhiteSpace(origemA) ||
+string.IsNullOrWhiteSpace(origemTerminalA) ||
+string.IsNullOrWhiteSpace(destinoA) ||
+string.IsNullOrWhiteSpace(destinoTerminalA) ||
+string.IsNullOrWhiteSpace(origemB) ||
+string.IsNullOrWhiteSpace(origemTerminalB) ||
+string.IsNullOrWhiteSpace(destinoB) ||
+string.IsNullOrWhiteSpace(destinoTerminalB))
+{
+return false;
+}
+bool direto =
+MesmoPonto(origemA, origemTerminalA, origemB, origemTerminalB) &&
+MesmoPonto(destinoA, destinoTerminalA, destinoB, destinoTerminalB);
+bool invertido =
+MesmoPonto(origemA, origemTerminalA, destinoB, destinoTerminalB) &&
+MesmoPonto(destinoA, destinoTerminalA, origemB, origemTerminalB);
+return direto || invertido;
+}
+private static bool MesmoPonto(
+string elementoA,
+string terminalA,
+string elementoB,
+string terminalB)
+{
+return string.Equals(elementoA, elementoB, StringComparison.OrdinalIgnoreCase) &&
+string.Equals(terminalA, terminalB, StringComparison.OrdinalIgnoreCase);
 }
 private static bool ReancorarOrigem(Cabo cabo, Elemento elemento)
 {
@@ -1028,368 +987,6 @@ public ElementoFactory ElementoFactory { get; }
 public TransactionScope BeginTransaction()
 {
 return new TransactionScope(Commands);
-}
-}
-}
-
-
-====================================================================================================
-ARQUIVO: C:\Araci-Engine-Front\Araci Engine\Service\SnapService.cs
-====================================================================================================
-
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Windows;
-using Araci.Core.SceneQueries;
-using Araci.Models;
-using Araci.ViewModels;
-namespace Araci.Services
-{
-public class SnapService
-{
-private readonly ISceneQueryService _queries;
-public SnapService(ISceneQueryService queries)
-{
-_queries = queries
-?? throw new ArgumentNullException(nameof(queries));
-}
-public bool Habilitado { get; set; } = true;
-public double TerminalTolerance { get; set; } = 15;
-public Point Snap(Point point)
-{
-return Snap(point, null);
-}
-public Point Snap(Point point, ElementoViewModel? ignorar)
-{
-if (!Habilitado)
-return point;
-Terminal? terminal =
-SnapTerminal(point, ignorar);
-return terminal?.Posicao ?? point;
-}
-public Point SnapFromElemento(
-ElementoViewModel? vm,
-Point fallback)
-{
-return SnapFromElemento(vm, fallback, null);
-}
-public Point SnapFromElemento(
-ElementoViewModel? vm,
-Point fallback,
-ElementoViewModel? ignorar)
-{
-if (!Habilitado)
-return fallback;
-if (!ReferenceEquals(vm, ignorar) &&
-vm?.Modelo is ITerminalOwner owner)
-{
-Terminal? terminal =
-ObterTerminalMaisProximo(
-owner,
-fallback);
-if (terminal != null)
-return terminal.Posicao;
-}
-return Snap(fallback, ignorar);
-}
-public Terminal? ObterTerminalMaisProximo(
-ElementoViewModel? vm,
-Point point)
-{
-if (vm?.Modelo is not ITerminalOwner owner)
-return null;
-return ObterTerminalMaisProximo(owner, point);
-}
-public Terminal? ObterTerminalMaisProximo(
-Point point,
-ElementoViewModel? ignorar = null)
-{
-return ObterTerminalMaisProximo(point, ignorar, null);
-}
-public Terminal? ObterTerminalMaisProximo(
-Point point,
-ElementoViewModel? ignorar,
-Func<Terminal, bool>? filtro)
-{
-if (!Habilitado)
-return null;
-return SnapTerminal(point, ignorar, filtro);
-}
-public Point SnapPoint(Point point)
-{
-return point;
-}
-public Vector SnapDelta(Vector delta)
-{
-return delta;
-}
-private Terminal? SnapTerminal(Point point, ElementoViewModel? ignorar)
-{
-return SnapTerminal(point, ignorar, null);
-}
-private Terminal? SnapTerminal(
-Point point,
-ElementoViewModel? ignorar,
-Func<Terminal, bool>? filtro)
-{
-Terminal? melhor = null;
-double menorDist = double.MaxValue;
-var elementos =
-_queries.Nearby(
-point,
-TerminalTolerance);
-foreach (Terminal terminal
-in EnumerarTerminais(elementos, ignorar))
-{
-if (filtro != null && !filtro(terminal))
-continue;
-double dx =
-terminal.Posicao.X - point.X;
-double dy =
-terminal.Posicao.Y - point.Y;
-double dist =
-dx * dx + dy * dy;
-if (dist >
-TerminalTolerance * TerminalTolerance)
-{
-continue;
-}
-if (dist >= menorDist)
-continue;
-menorDist = dist;
-melhor = terminal;
-}
-return melhor;
-}
-private static IEnumerable<Terminal>
-EnumerarTerminais(
-IEnumerable<ElementoViewModel> elementos,
-ElementoViewModel? ignorar)
-{
-return elementos
-.Where(e => !ReferenceEquals(e, ignorar))
-.SelectMany(
-e =>
-(e.Modelo as ITerminalOwner)?.Terminais
-?? Enumerable.Empty<Terminal>());
-}
-private static Terminal?
-ObterTerminalMaisProximo(
-ITerminalOwner owner,
-Point point)
-{
-Terminal? melhor = null;
-double menorDist = double.MaxValue;
-foreach (Terminal terminal in owner.Terminais)
-{
-double dx =
-terminal.Posicao.X - point.X;
-double dy =
-terminal.Posicao.Y - point.Y;
-double dist =
-dx * dx + dy * dy;
-if (dist >= menorDist)
-continue;
-menorDist = dist;
-melhor = terminal;
-}
-return melhor;
-}
-}
-}
-
-
-====================================================================================================
-ARQUIVO: C:\Araci-Engine-Front\Araci Engine\Service\TopologyIssue.cs
-====================================================================================================
-
-using Araci.Models;
-namespace Araci.Services
-{
-public class TopologyIssue
-{
-public TopologyIssue(
-TopologyIssueSeverity severity,
-string message,
-Elemento? elemento = null)
-{
-Severity = severity;
-Message = message;
-Elemento = elemento;
-}
-public TopologyIssueSeverity Severity { get; }
-public string Message { get; }
-public Elemento? Elemento { get; }
-}
-}
-
-
-====================================================================================================
-ARQUIVO: C:\Araci-Engine-Front\Araci Engine\Service\TopologyIssueSeverity.cs
-====================================================================================================
-
-namespace Araci.Services
-{
-public enum TopologyIssueSeverity
-{
-Warning,
-Error
-}
-}
-
-
-====================================================================================================
-ARQUIVO: C:\Araci-Engine-Front\Araci Engine\Service\TopologyValidationResult.cs
-====================================================================================================
-
-using System.Collections.Generic;
-using System.Linq;
-namespace Araci.Services
-{
-public class TopologyValidationResult
-{
-private readonly List<TopologyIssue> _issues = new();
-public IReadOnlyList<TopologyIssue> Issues => _issues;
-public IEnumerable<TopologyIssue> Errors =>
-_issues.Where(i => i.Severity == TopologyIssueSeverity.Error);
-public IEnumerable<TopologyIssue> Warnings =>
-_issues.Where(i => i.Severity == TopologyIssueSeverity.Warning);
-public bool IsValid => !Errors.Any();
-public void AddError(string message)
-{
-_issues.Add(new TopologyIssue(TopologyIssueSeverity.Error, message));
-}
-public void AddWarning(string message)
-{
-_issues.Add(new TopologyIssue(TopologyIssueSeverity.Warning, message));
-}
-public string FormatErrors()
-{
-return string.Join(
-System.Environment.NewLine,
-Errors.Select(i => $"- {i.Message}"));
-}
-}
-}
-
-
-====================================================================================================
-ARQUIVO: C:\Araci-Engine-Front\Araci Engine\Service\TopologyValidator.cs
-====================================================================================================
-
-using System;
-using System.Linq;
-using Araci.Core.Documents;
-using Araci.Models;
-namespace Araci.Services
-{
-public class TopologyValidator
-{
-private readonly AraciDocument _document;
-private readonly ConnectivityService _connectivity;
-public TopologyValidator(EditorContext context)
-: this(context?.Document ?? throw new ArgumentNullException(nameof(context)))
-{
-}
-public TopologyValidator(AraciDocument document)
-{
-_document = document ?? throw new ArgumentNullException(nameof(document));
-_connectivity = new ConnectivityService(_document);
-}
-public TopologyValidationResult Validate()
-{
-var result = new TopologyValidationResult();
-ValidarNomes(result);
-ValidarCabos(result);
-ValidarEquipamentos(result);
-ValidarCircuito(result);
-return result;
-}
-private void ValidarNomes(TopologyValidationResult result)
-{
-foreach (Elemento elemento in _document.Elementos)
-{
-if (string.IsNullOrWhiteSpace(elemento.Nome))
-result.AddError($"Elemento {elemento.Id} sem Nome.");
-}
-var duplicados = _document.Elementos
-.Where(e => !string.IsNullOrWhiteSpace(e.Nome))
-.GroupBy(e => e.Nome.Trim(), StringComparer.OrdinalIgnoreCase)
-.Where(g => g.Count() > 1);
-foreach (var grupo in duplicados)
-result.AddError($"Nome duplicado no documento: '{grupo.Key}'.");
-}
-private void ValidarCabos(TopologyValidationResult result)
-{
-foreach (Cabo cabo in _document.Elementos.OfType<Cabo>())
-{
-bool origemVazia = string.IsNullOrWhiteSpace(cabo.OrigemId);
-bool destinoVazio = string.IsNullOrWhiteSpace(cabo.DestinoId);
-if (origemVazia)
-result.AddError($"Cabo '{Nome(cabo)}' sem OrigemId.");
-if (destinoVazio)
-result.AddError($"Cabo '{Nome(cabo)}' sem DestinoId.");
-if (!origemVazia && _connectivity.ObterElementoPorId(cabo.OrigemId) == null)
-result.AddError($"Cabo '{Nome(cabo)}' com OrigemId invalido: {cabo.OrigemId}.");
-if (!destinoVazio && _connectivity.ObterElementoPorId(cabo.DestinoId) == null)
-result.AddError($"Cabo '{Nome(cabo)}' com DestinoId invalido: {cabo.DestinoId}.");
-if (!origemVazia &&
-!destinoVazio &&
-string.Equals(cabo.OrigemId.Trim(), cabo.DestinoId.Trim(), StringComparison.OrdinalIgnoreCase))
-{
-result.AddError($"Cabo '{Nome(cabo)}' conecta origem e destino ao mesmo elemento.");
-}
-}
-}
-private void ValidarEquipamentos(TopologyValidationResult result)
-{
-foreach (ElementoEquipamento equipamento in _document.Elementos.OfType<ElementoEquipamento>())
-{
-if (!string.IsNullOrWhiteSpace(equipamento.BarraId) &&
-_connectivity.ObterElementoPorId(equipamento.BarraId) == null)
-{
-result.AddError($"Equipamento '{Nome(equipamento)}' com BarraId invalido: {equipamento.BarraId}.");
-}
-}
-foreach (Carga carga in _document.Elementos.OfType<Carga>())
-{
-if (!TemConexaoTopologica(carga))
-result.AddError($"Carga '{Nome(carga)}' sem conexao topologica utilizavel por Id.");
-}
-foreach (Gerador gerador in _document.Elementos.OfType<Gerador>())
-{
-if (!TemConexaoTopologica(gerador))
-result.AddError($"Gerador '{Nome(gerador)}' sem conexao topologica utilizavel por Id.");
-}
-}
-private void ValidarCircuito(TopologyValidationResult result)
-{
-int equipamentos = _document.Elementos.OfType<ElementoEquipamento>().Count();
-if (!_document.Elementos.OfType<Gerador>().Any())
-result.AddError("Circuito sem gerador.");
-if (!_document.Elementos.OfType<Carga>().Any())
-result.AddError("Circuito sem carga.");
-if (equipamentos > 1 && !_document.Elementos.OfType<Cabo>().Any())
-result.AddError("Circuito com mais de um equipamento e sem cabo.");
-}
-private bool TemConexaoTopologica(ElementoEquipamento equipamento)
-{
-if (!string.IsNullOrWhiteSpace(equipamento.BarraId) &&
-_connectivity.ObterElementoPorId(equipamento.BarraId) != null)
-{
-return true;
-}
-string id = equipamento.Id.ToString();
-return _document.Elementos.OfType<Cabo>().Any(c =>
-string.Equals(c.OrigemId, id, StringComparison.OrdinalIgnoreCase) ||
-string.Equals(c.DestinoId, id, StringComparison.OrdinalIgnoreCase));
-}
-private static string Nome(Elemento elemento)
-{
-return string.IsNullOrWhiteSpace(elemento.Nome)
-? elemento.Id.ToString()
-: elemento.Nome.Trim();
 }
 }
 }
@@ -1591,6 +1188,411 @@ public event PropertyChangedEventHandler? PropertyChanged;
 protected virtual void OnPropertyChanged([CallerMemberName] string? nome = null)
 {
 PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nome));
+}
+}
+}
+
+
+====================================================================================================
+ARQUIVO: C:\Araci-Engine-Front\Araci Engine\Views\ViewportView.xaml
+====================================================================================================
+
+<UserControl x:Class="Araci.Views.ViewportView"
+xmlns="http:
+xmlns:x="http:
+xmlns:controls="clr-namespace:Araci.Controls"
+xmlns:viewModels="clr-namespace:Araci.ViewModels"
+Focusable="True"
+PreviewMouseDown="OnPreviewMouseDown"
+PreviewMouseLeftButtonDown="OnPreviewMouseLeftButtonDown"
+PreviewMouseMove="OnPreviewMouseMove"
+PreviewMouseUp="OnPreviewMouseUp"
+PreviewMouseLeftButtonUp="OnPreviewMouseLeftButtonUp"
+PreviewMouseWheel="OnPreviewMouseWheel"
+PreviewKeyDown="OnPreviewKeyDown"
+PreviewKeyUp="OnPreviewKeyUp"
+MouseLeave="OnMouseLeave"
+Loaded="OnLoaded">
+<UserControl.Resources>
+<BooleanToVisibilityConverter
+x:Key="BooleanToVisibilityConverter"/>
+</UserControl.Resources>
+<Border x:Name="RootBorder"
+BorderThickness="1"
+BorderBrush="#252526"
+Background="#F4F4F4"
+ClipToBounds="True"
+SnapsToDevicePixels="True"
+UseLayoutRounding="True">
+<Grid ClipToBounds="True">
+<!-- ========================= -->
+<!-- ELEMENTOS -->
+<!-- ========================= -->
+<ItemsControl x:Name="WorldLayer"
+ItemsSource="{Binding Elementos}"
+ClipToBounds="False"
+SnapsToDevicePixels="True"
+HorizontalContentAlignment="Left"
+VerticalContentAlignment="Top">
+<ItemsControl.ItemsPanel>
+<ItemsPanelTemplate>
+<Canvas x:Name="ViewportCanvas"
+Background="#F4F4F4"
+ClipToBounds="False"
+SnapsToDevicePixels="True"
+UseLayoutRounding="True"/>
+</ItemsPanelTemplate>
+</ItemsControl.ItemsPanel>
+<ItemsControl.ItemContainerStyle>
+<Style TargetType="ContentPresenter">
+<Setter Property="Canvas.Left"
+Value="{Binding WorldX}"/>
+<Setter Property="Canvas.Top"
+Value="{Binding WorldY}"/>
+</Style>
+</ItemsControl.ItemContainerStyle>
+<ItemsControl.Resources>
+<DataTemplate DataType="{x:Type viewModels:CaboViewModel}">
+<controls:CaboControl/>
+</DataTemplate>
+<DataTemplate DataType="{x:Type viewModels:CargaViewModel}">
+<controls:CargaControl/>
+</DataTemplate>
+<DataTemplate DataType="{x:Type viewModels:GeradorViewModel}">
+<controls:GeradorControl/>
+</DataTemplate>
+<DataTemplate DataType="{x:Type viewModels:BarraViewModel}">
+<controls:BarraControl/>
+</DataTemplate>
+</ItemsControl.Resources>
+</ItemsControl>
+<!-- ========================= -->
+<!-- JANELA DE SELECAO -->
+<!-- ========================= -->
+<Canvas x:Name="SelectionLayer"
+IsHitTestVisible="False">
+<Rectangle
+Stroke="#007ACC"
+StrokeThickness="1.5"
+Fill="#22007ACC"
+StrokeDashArray="3 2"
+Canvas.Left="{Binding SelectionBox.X}"
+Canvas.Top="{Binding SelectionBox.Y}"
+Width="{Binding SelectionBox.Largura}"
+Height="{Binding SelectionBox.Altura}"
+Visibility="{Binding SelectionBox.Visivel,
+Converter={StaticResource BooleanToVisibilityConverter}}"/>
+</Canvas>
+<!-- ========================= -->
+<!-- TERMINAL SNAP -->
+<!-- ========================= -->
+<Canvas x:Name="TerminalSnapLayer"
+IsHitTestVisible="False">
+<Ellipse
+Width="14"
+Height="14"
+Stroke="#007ACC"
+StrokeThickness="2"
+Fill="#33007ACC"
+Canvas.Left="{Binding TerminalSnap.X}"
+Canvas.Top="{Binding TerminalSnap.Y}"
+Visibility="{Binding TerminalSnap.Visivel,
+Converter={StaticResource BooleanToVisibilityConverter}}">
+<Ellipse.RenderTransform>
+<TranslateTransform X="-7" Y="-7"/>
+</Ellipse.RenderTransform>
+</Ellipse>
+</Canvas>
+<!-- ========================= -->
+<!-- HUD -->
+<!-- ========================= -->
+<Canvas IsHitTestVisible="False"
+ClipToBounds="True">
+<Border
+Background="#AA1E1E1E"
+CornerRadius="6"
+Padding="8"
+Canvas.Left="{Binding MoveHud.X}"
+Canvas.Top="{Binding MoveHud.Y}"
+Visibility="{Binding MoveHud.Visivel,
+Converter={StaticResource BooleanToVisibilityConverter}}">
+<StackPanel>
+<TextBlock
+Foreground="White"
+FontSize="12"
+Text="{Binding MoveHud.DeltaX,
+StringFormat=ΔX: {0:F1}}"/>
+<TextBlock
+Foreground="White"
+FontSize="12"
+Text="{Binding MoveHud.DeltaY,
+StringFormat=ΔY: {0:F1}}"/>
+</StackPanel>
+</Border>
+</Canvas>
+</Grid>
+</Border>
+</UserControl>
+
+
+====================================================================================================
+ARQUIVO: C:\Araci-Engine-Front\Araci Engine\Views\ViewportView.xaml.cs
+====================================================================================================
+
+using System;
+using System.ComponentModel;
+using System.Windows;
+using System.Windows.Controls;
+using System.Windows.Input;
+using System.Windows.Media;
+using Araci.Applications.Editar.Base;
+using Araci.Services;
+using Araci.ViewModels;
+namespace Araci.Views
+{
+public partial class ViewportView : UserControl
+{
+private readonly MatrixTransform _cameraTransform = new();
+private ViewportViewModel? _viewportViewModel;
+private EditorContext? _context;
+public ViewportView()
+{
+InitializeComponent();
+}
+public void Inicializar(EditorContext context)
+{
+_context = context ?? throw new ArgumentNullException(nameof(context));
+_viewportViewModel = new ViewportViewModel(_context);
+DataContext = _viewportViewModel;
+_context.InicializarViewport(_viewportViewModel);
+ConfigurarCamera();
+Unloaded += OnUnloaded;
+}
+private void ConfigurarCamera()
+{
+if (_context?.Viewport == null)
+return;
+WorldLayer.RenderTransform = _cameraTransform;
+SelectionLayer.RenderTransform = _cameraTransform;
+TerminalSnapLayer.RenderTransform = _cameraTransform;
+_context.Viewport.Camera.PropertyChanged += OnCameraChanged;
+AtualizarCameraTransform();
+}
+private void OnCameraChanged(object? sender, PropertyChangedEventArgs e)
+{
+AtualizarCameraTransform();
+}
+private void AtualizarCameraTransform()
+{
+if (_context?.Viewport == null)
+return;
+var camera = _context.Viewport.Camera;
+_cameraTransform.Matrix = new Matrix(
+camera.Zoom,
+0,
+0,
+camera.Zoom,
+camera.Offset.X,
+camera.Offset.Y);
+}
+private void OnLoaded(object sender, RoutedEventArgs e)
+{
+Focus();
+Keyboard.Focus(this);
+AtualizarViewport();
+SizeChanged += (_, _) => AtualizarViewport();
+}
+private void AtualizarViewport()
+{
+if (_context?.Viewport == null)
+return;
+double largura = ActualWidth;
+double altura = ActualHeight;
+if (RootBorder != null)
+{
+largura -= RootBorder.BorderThickness.Left + RootBorder.BorderThickness.Right;
+altura -= RootBorder.BorderThickness.Top + RootBorder.BorderThickness.Bottom;
+}
+largura = Math.Max(0, largura);
+altura = Math.Max(0, altura);
+_context.Viewport.AtualizarTamanho(new Size(largura, altura));
+}
+private Point GetWorldPos(MouseEventArgs e)
+{
+Point screen = e.GetPosition(this);
+return _context?.Viewport?.ScreenToWorld(screen) ?? screen;
+}
+private void OnPreviewMouseDown(object sender, MouseButtonEventArgs e)
+{
+if (_context == null)
+return;
+if (_context.Navigation.TryHandleMiddleDoubleClick(e))
+{
+AtualizarCursorNavegacao();
+LiberarCapturaMouse();
+e.Handled = true;
+return;
+}
+if (_context.Navigation.TryBeginMiddlePan(e, this))
+{
+Focus();
+Keyboard.Focus(this);
+AtualizarCursorNavegacao();
+CaptureMouse();
+e.Handled = true;
+}
+}
+private void OnPreviewMouseLeftButtonDown(object sender, MouseButtonEventArgs e)
+{
+if (_context == null)
+return;
+if (_context.Navigation.TryBeginSpaceLeftPan(e, this))
+{
+Focus();
+Keyboard.Focus(this);
+AtualizarCursorNavegacao();
+CaptureMouse();
+e.Handled = true;
+return;
+}
+if (_context.Navigation.IsPanning)
+{
+e.Handled = true;
+return;
+}
+Focus();
+Keyboard.Focus(this);
+var vm = EncontrarElemento(e.OriginalSource as DependencyObject);
+Point worldPosition = GetWorldPos(e);
+ToolInputState inputState = CriarInputState(e, e.ChangedButton, e.ClickCount);
+_context.Input.MouseDown(vm, worldPosition, inputState);
+CaptureMouse();
+}
+private void OnPreviewMouseMove(object sender, MouseEventArgs e)
+{
+if (_context?.Navigation.TryUpdatePan(e, this) == true)
+{
+AtualizarCursorNavegacao();
+e.Handled = true;
+return;
+}
+if (_context == null)
+return;
+Point worldPosition = GetWorldPos(e);
+_context.Input.MouseMove(worldPosition, CriarInputState(e));
+}
+private void OnPreviewMouseUp(object sender, MouseButtonEventArgs e)
+{
+if (_context?.Navigation.TryEndMiddlePan(e) != true)
+return;
+AtualizarCursorNavegacao();
+LiberarCapturaMouse();
+e.Handled = true;
+}
+private void OnPreviewMouseLeftButtonUp(object sender, MouseButtonEventArgs e)
+{
+if (_context?.Navigation.TryEndSpaceLeftPan(e) == true)
+{
+AtualizarCursorNavegacao();
+LiberarCapturaMouse();
+e.Handled = true;
+return;
+}
+if (_context?.Navigation.ConsumeSuppressNextLeftButtonUp() == true)
+{
+e.Handled = true;
+return;
+}
+if (_context?.Navigation.IsPanning == true)
+{
+e.Handled = true;
+return;
+}
+if (_context != null)
+{
+Point worldPosition = GetWorldPos(e);
+_context.Input.MouseUp(worldPosition, CriarInputState(e, e.ChangedButton, e.ClickCount));
+}
+LiberarCapturaMouse();
+}
+private void OnPreviewMouseWheel(object sender, MouseWheelEventArgs e)
+{
+if (_context?.Navigation.TryHandleMouseWheel(e, this) != true)
+return;
+e.Handled = true;
+}
+private void OnPreviewKeyDown(object sender, KeyEventArgs e)
+{
+if (_context?.Navigation.TryHandleKeyDown(e) == true)
+{
+AtualizarCursorNavegacao();
+e.Handled = true;
+return;
+}
+if (_context == null)
+return;
+e.Handled = _context.Input.KeyDown(e.Key);
+if (e.Handled && e.Key == Key.Escape)
+LiberarCapturaMouse();
+}
+private void OnPreviewKeyUp(object sender, KeyEventArgs e)
+{
+if (_context?.Navigation.TryHandleKeyUp(e) != true)
+return;
+AtualizarCursorNavegacao();
+LiberarCapturaMouse();
+e.Handled = true;
+}
+private void OnMouseLeave(object sender, MouseEventArgs e)
+{
+_context?.Hover.Clear();
+_context?.TerminalSnap.Limpar();
+_context?.Navigation.CancelPan();
+AtualizarCursorNavegacao();
+}
+private void OnUnloaded(object sender, RoutedEventArgs e)
+{
+_context?.Navigation.Reset();
+LiberarCapturaMouse();
+Cursor = Cursors.Arrow;
+if (_context?.Viewport != null)
+_context.Viewport.Camera.PropertyChanged -= OnCameraChanged;
+}
+private void AtualizarCursorNavegacao()
+{
+if (_context?.Navigation.IsPanning == true || _context?.Navigation.IsSpacePressed == true)
+Cursor = Cursors.ScrollAll;
+else
+Cursor = Cursors.Arrow;
+}
+private void LiberarCapturaMouse()
+{
+if (IsMouseCaptured)
+ReleaseMouseCapture();
+}
+private ToolInputState CriarInputState(
+MouseEventArgs e,
+MouseButton? button = null,
+int clickCount = 0)
+{
+Point screenPosition = e.GetPosition(this);
+Point worldPosition = _context?.Viewport?.ScreenToWorld(screenPosition) ?? screenPosition;
+return new ToolInputState(
+Keyboard.Modifiers,
+button,
+clickCount,
+worldPosition,
+screenPosition);
+}
+private static ElementoViewModel? EncontrarElemento(DependencyObject? origem)
+{
+while (origem != null)
+{
+if (origem is FrameworkElement fe && fe.DataContext is ElementoViewModel vm)
+return vm;
+origem = VisualTreeHelper.GetParent(origem);
+}
+return null;
 }
 }
 }
