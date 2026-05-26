@@ -278,8 +278,10 @@ namespace Araci.ViewModels
 
         public void AtualizarPreview(Point p)
         {
-            if (!_possuiPreview)
+            if (!_possuiPreview && Cabo.Vertices.Count == 0)
                 return;
+
+            _possuiPreview = true;
 
             if (Cabo.PreviewPonto.HasValue && Cabo.PreviewPonto.Value == p)
                 return;

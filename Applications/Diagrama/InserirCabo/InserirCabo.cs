@@ -98,6 +98,8 @@ namespace Araci.Applications.Diagrama.InserirCabo
                         _caboAtual.Modelo,
                         _context));
 
+                UsarViewModelDaCena();
+
                 ConectarOrigem(terminal);
 
                 _inserindo = true;
@@ -283,6 +285,18 @@ namespace Araci.Applications.Diagrama.InserirCabo
             _caboAtual.Cabo.DefinirOrigem(terminal.Posicao);
 
             _caboAtual.NotificarParametros();
+        }
+
+        private void UsarViewModelDaCena()
+        {
+            if (_caboAtual == null)
+                return;
+
+            if (_context.Viewport?.ObterViewModel(_caboAtual.Modelo)
+                is CaboViewModel caboNaCena)
+            {
+                _caboAtual = caboNaCena;
+            }
         }
 
         private void ConectarDestino(
