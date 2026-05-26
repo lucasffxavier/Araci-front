@@ -66,6 +66,12 @@ namespace Araci.Applications.Editar.Selecionar
         {
             bool ctrl = inputState.IsControlPressed;
 
+            if (!_modoSoMover && inputState.IsAltPressed && _cableVertexEdit.TryRemoveHandle(position))
+                return;
+
+            if (!_modoSoMover && ctrl && _cableVertexEdit.TryInsertVertex(position))
+                return;
+
             if (!_modoSoMover && _cableVertexEdit.TryBegin(position))
                 return;
 
@@ -91,7 +97,7 @@ namespace Araci.Applications.Editar.Selecionar
         {
             if (_cableVertexEdit.IsEditing)
             {
-                _cableVertexEdit.Update(position);
+                _cableVertexEdit.Update(position, inputState);
                 return;
             }
 
@@ -123,6 +129,10 @@ namespace Araci.Applications.Editar.Selecionar
                 _selectionBox.End();
         }
 
-        public void OnKeyDown(Key key) { }
+        public void OnKeyDown(Key key)
+        {
+            if (!_modoSoMover && key == Key.Delete)
+                _cableVertexEdit.TryRemoveActive();
+        }
     }
 }

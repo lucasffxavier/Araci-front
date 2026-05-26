@@ -121,7 +121,8 @@ namespace Araci.Applications.Diagrama.InserirCabo
 
             if (terminal == null)
             {
-                AdicionarVerticeIntermediario(pontoSnap);
+                AdicionarVerticeIntermediario(
+                    AplicarOrtogonalizacao(pontoSnap, inputState));
                 return;
             }
 
@@ -166,7 +167,12 @@ namespace Araci.Applications.Diagrama.InserirCabo
                 terminal?.Posicao
                 ?? _context.Snap.Snap(position, _caboAtual);
 
-            _caboAtual.AtualizarPreview(pontoSnap);
+            Point pontoPreview =
+                terminal == null
+                    ? AplicarOrtogonalizacao(pontoSnap, inputState)
+                    : pontoSnap;
+
+            _caboAtual.AtualizarPreview(pontoPreview);
         }
 
         public void OnMouseUp(Point position, ToolInputState inputState)
@@ -346,6 +352,28 @@ namespace Araci.Applications.Diagrama.InserirCabo
 
             _caboAtual.AdicionarVerticeIntermediario(ponto);
             _context.SceneQueries.Invalidate();
+        }
+
+        private Point AplicarOrtogonalizacao(
+            Point ponto,
+            ToolInputState inputState)
+        {
+            if (!inputState.IsShiftPressed ||
+                _caboAtual == null ||
+                _caboAtual.Cabo.Vertices.Count == 0)
+            {
+                return ponto;
+            }
+
+            Point origem = _caboAtual.Cabo.Vertices[^1];
+            Vector delta = ponto - origem;
+
+            if (Math.Abs(delta.X) < 0.0001 && Math.Abs(delta.Y) < 0.0001)
+                return origem;
+
+            return Math.Abs(delta.X) >= Math.Abs(delta.Y)
+                ? new Point(ponto.X, origem.Y)
+                : new Point(origem.X, ponto.Y);
         }
 
         private bool OrigemValida(Terminal terminal)
