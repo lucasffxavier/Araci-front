@@ -25,6 +25,9 @@ namespace Araci.Services
             Connectivity = new ConnectivityService(this);
             Topology = new TopologyValidator(this);
             SimulationResults = new SimulationResultApplier(this);
+            Simulation = new SimulationPipeline(this);
+            SimulationExport = new SimulationExportService();
+            SimulationMessages = new SimulationMessageBuilder();
 
             ElementoFactory = new ElementoFactory(Types, Names);
             Selection = new SelectionService(this);
@@ -77,6 +80,12 @@ namespace Araci.Services
         public TopologyValidator Topology { get; }
 
         public SimulationResultApplier SimulationResults { get; }
+
+        public SimulationPipeline Simulation { get; }
+
+        public SimulationExportService SimulationExport { get; }
+
+        public SimulationMessageBuilder SimulationMessages { get; }
 
         public TypeLibraryService Types { get; } = new TypeLibraryService();
 

@@ -1,7 +1,4 @@
 using System;
-using System.IO;
-using System.Text;
-using System.Text.Json;
 using System.Threading.Tasks;
 using System.Windows;
 using Araci.DTOs;
@@ -41,14 +38,7 @@ namespace Araci.Applications.Analisar.FluxoDeCorrente
 
             try
             {
-                ParameterReader reader = new(_context);
-                CircuitBuilder builder = new(reader);
-                CircuitDto dto = builder.Build();
-                SimulationApiClient client = new();
-
-                Resultado = await client.SimularTipadoAsync(dto);
-
-                _context.SimulationResults.Apply(Resultado);
+                Resultado = await _context.Simulation.ExecutarFluxoDeCorrenteAsync();
 
                 if (options != null)
                     dssPath = SalvarArquivos(options, Resultado);
@@ -65,35 +55,16 @@ namespace Araci.Applications.Analisar.FluxoDeCorrente
             }
         }
 
-        private static string? SalvarArquivos(FluxoDeCorrenteOptions options, SimulationResultDto resultado)
+        private string? SalvarArquivos(FluxoDeCorrenteOptions options, SimulationResultDto resultado)
         {
             try
             {
-                Directory.CreateDirectory(options.PastaSaida);
+                SimulationExportPaths paths = _context.SimulationExport.GetPaths(options);
 
-                string baseName = SanitizarNomeArquivo(options.NomeArquivo);
-                string dssFileName = baseName.EndsWith(".dss", StringComparison.OrdinalIgnoreCase)
-                    ? baseName
-                    : $"{baseName}.dss";
-
-                string jsonBaseName = Path.GetFileNameWithoutExtension(dssFileName);
-                string dssPath = Path.Combine(options.PastaSaida, dssFileName);
-                string jsonPath = Path.Combine(options.PastaSaida, $"{jsonBaseName}_resultado.json");
-
-                if ((File.Exists(dssPath) || File.Exists(jsonPath)) && !ConfirmarSubstituicao())
+                if (_context.SimulationExport.Exists(paths) && !ConfirmarSubstituicao())
                     return null;
 
-                File.WriteAllText(dssPath, resultado.Script, Encoding.UTF8);
-
-                var jsonOptions = new JsonSerializerOptions
-                {
-                    WriteIndented = true
-                };
-
-                string json = JsonSerializer.Serialize(resultado, jsonOptions);
-                File.WriteAllText(jsonPath, json, Encoding.UTF8);
-
-                return dssPath;
+                return _context.SimulationExport.Save(options, resultado);
             }
             catch (Exception ex)
             {
@@ -118,55 +89,11 @@ namespace Araci.Applications.Analisar.FluxoDeCorrente
             return result == MessageBoxResult.Yes;
         }
 
-        private static string SanitizarNomeArquivo(string nomeArquivo)
+        private void MostrarResultado(SimulationResultDto resultado, string? dssPath)
         {
-            string nome = string.IsNullOrWhiteSpace(nomeArquivo)
-                ? "circuito"
-                : nomeArquivo.Trim();
+            SimulationMessage message = _context.SimulationMessages.Build(resultado, dssPath);
 
-            foreach (char invalid in Path.GetInvalidFileNameChars())
-                nome = nome.Replace(invalid.ToString(), string.Empty);
-
-            return string.IsNullOrWhiteSpace(nome) ? "circuito" : nome;
-        }
-
-        private static void MostrarResultado(SimulationResultDto resultado, string? dssPath)
-        {
-            var message = new StringBuilder();
-
-            message.AppendLine(resultado.Sucesso ? "Fluxo resolvido com sucesso." : "Fluxo retornou falha.");
-
-            if (!string.IsNullOrWhiteSpace(resultado.Mensagem))
-                message.AppendLine(resultado.Mensagem);
-
-            if (!string.IsNullOrWhiteSpace(dssPath))
-            {
-                message.AppendLine();
-                message.AppendLine("Arquivo DSS salvo em:");
-                message.AppendLine(dssPath);
-            }
-
-            if (resultado.Avisos.Count > 0)
-            {
-                message.AppendLine();
-                message.AppendLine("Avisos:");
-
-                foreach (string aviso in resultado.Avisos)
-                    message.AppendLine($"- {aviso}");
-            }
-
-            if (!string.IsNullOrWhiteSpace(resultado.Script))
-            {
-                message.AppendLine();
-                message.AppendLine("Script DSS gerado:");
-                message.AppendLine(resultado.Script);
-            }
-
-            MessageBox.Show(
-                message.ToString(),
-                "Fluxo de corrente",
-                MessageBoxButton.OK,
-                resultado.Sucesso ? MessageBoxImage.Information : MessageBoxImage.Warning);
+            MessageBox.Show(message.Text, message.Title, MessageBoxButton.OK, message.Icon);
         }
     }
 }
