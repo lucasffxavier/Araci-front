@@ -14,6 +14,7 @@ namespace Araci.Controls
         private readonly Grid _root;
         private readonly SvgViewbox _svg;
         private readonly Border _overlay;
+        private readonly Border _previewOverlay;
 
         public BarraControl()
         {
@@ -32,8 +33,17 @@ namespace Araci.Controls
                 Visibility = Visibility.Collapsed
             };
 
+            _previewOverlay = new Border
+            {
+                Background = Brushes.DeepSkyBlue,
+                Opacity = 0.35,
+                Visibility = Visibility.Collapsed,
+                IsHitTestVisible = false
+            };
+
             _root = new Grid();
             _root.Children.Add(_svg);
+            _root.Children.Add(_previewOverlay);
             _root.Children.Add(_overlay);
 
             Content = _root;
@@ -47,6 +57,7 @@ namespace Araci.Controls
         private void OnLoaded(object sender, RoutedEventArgs e)
         {
             _overlay.OpacityMask = new VisualBrush(_svg);
+            _previewOverlay.OpacityMask = new VisualBrush(_svg);
         }
 
         private void ConfigurarBindings()
@@ -56,6 +67,13 @@ namespace Araci.Controls
 
             _svg.SetBinding(WidthProperty, new Binding("RenderData.Largura"));
             _svg.SetBinding(HeightProperty, new Binding("RenderData.Altura"));
+
+            _previewOverlay.SetBinding(WidthProperty, new Binding("RenderData.Largura"));
+            _previewOverlay.SetBinding(HeightProperty, new Binding("RenderData.Altura"));
+            _previewOverlay.SetBinding(VisibilityProperty, new Binding("IsPreview")
+            {
+                Converter = new BooleanToVisibilityConverter()
+            });
 
             var multi = new MultiBinding
             {

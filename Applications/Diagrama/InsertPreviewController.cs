@@ -37,7 +37,7 @@ namespace Araci.Applications.Diagrama
         {
             TViewModel preview = ObterPreview();
             TModel modelo = _obterModelo(preview);
-            Point pontoSnap = _context.Snap.Snap(position);
+            Point pontoSnap = _context.Snap.Snap(position, preview);
             Point posicao = _context.Geometry.CalcularTopoEsquerdoPorCentro(modelo, pontoSnap);
 
             modelo.PosicaoX = posicao.X;
@@ -51,6 +51,7 @@ namespace Araci.Applications.Diagrama
             if (Preview == null)
                 return;
 
+            Preview.IsPreview = false;
             _context.Scene.Elementos.Remove(Preview);
             Preview = null;
             _context.SceneQueries.Invalidate();
@@ -62,6 +63,7 @@ namespace Araci.Applications.Diagrama
                 return Preview;
 
             Preview = _criarPreview();
+            Preview.IsPreview = true;
             _context.Scene.Elementos.Add(Preview);
             _context.SceneQueries.Invalidate();
 

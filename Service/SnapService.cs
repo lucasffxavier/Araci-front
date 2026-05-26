@@ -26,11 +26,16 @@ namespace Araci.Services
 
         public Point Snap(Point point)
         {
+            return Snap(point, null);
+        }
+
+        public Point Snap(Point point, ElementoViewModel? ignorar)
+        {
             if (!Habilitado)
                 return point;
 
             Point? terminal =
-                SnapTerminal(point);
+                SnapTerminal(point, ignorar);
 
             return terminal ?? point;
         }
@@ -39,10 +44,19 @@ namespace Araci.Services
             ElementoViewModel? vm,
             Point fallback)
         {
+            return SnapFromElemento(vm, fallback, null);
+        }
+
+        public Point SnapFromElemento(
+            ElementoViewModel? vm,
+            Point fallback,
+            ElementoViewModel? ignorar)
+        {
             if (!Habilitado)
                 return fallback;
 
-            if (vm?.Modelo is ITerminalOwner owner)
+            if (!ReferenceEquals(vm, ignorar) &&
+                vm?.Modelo is ITerminalOwner owner)
             {
                 Terminal? terminal =
                     ObterTerminalMaisProximo(
@@ -53,7 +67,7 @@ namespace Araci.Services
                     return terminal.Posicao;
             }
 
-            return Snap(fallback);
+            return Snap(fallback, ignorar);
         }
 
         public Point SnapPoint(Point point)
@@ -66,7 +80,7 @@ namespace Araci.Services
             return delta;
         }
 
-        private Point? SnapTerminal(Point point)
+        private Point? SnapTerminal(Point point, ElementoViewModel? ignorar)
         {
             Terminal? melhor = null;
 
@@ -78,7 +92,7 @@ namespace Araci.Services
                     TerminalTolerance);
 
             foreach (Terminal terminal
-                in EnumerarTerminais(elementos))
+                in EnumerarTerminais(elementos, ignorar))
             {
                 double dx =
                     terminal.Posicao.X - point.X;
@@ -108,12 +122,15 @@ namespace Araci.Services
 
         private static IEnumerable<Terminal>
             EnumerarTerminais(
-                IEnumerable<ElementoViewModel> elementos)
+                IEnumerable<ElementoViewModel> elementos,
+                ElementoViewModel? ignorar)
         {
-            return elementos.SelectMany(
-                e =>
-                    (e.Modelo as ITerminalOwner)?.Terminais
-                    ?? Enumerable.Empty<Terminal>());
+            return elementos
+                .Where(e => !ReferenceEquals(e, ignorar))
+                .SelectMany(
+                    e =>
+                        (e.Modelo as ITerminalOwner)?.Terminais
+                        ?? Enumerable.Empty<Terminal>());
         }
 
         private static Terminal?

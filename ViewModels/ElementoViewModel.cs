@@ -22,6 +22,7 @@ namespace Araci.ViewModels
         private readonly TypePropertiesDialogService _typePropertiesDialogs;
         private ICommand? _abrirPropriedadesTipoCommand;
         private ObservableCollection<ParameterViewModel>? _parametros;
+        private bool _isPreview;
 
         protected ElementoViewModel(
             Elemento modelo,
@@ -102,6 +103,20 @@ namespace Araci.ViewModels
                 OnPropertyChanged();
                 OnPropertyChanged(nameof(Stroke));
                 OnPropertyChanged(nameof(StrokeThickness));
+                OnPropertyChanged(nameof(RenderData));
+            }
+        }
+
+        public bool IsPreview
+        {
+            get => _isPreview;
+            set
+            {
+                if (_isPreview == value)
+                    return;
+
+                _isPreview = value;
+                OnPropertyChanged();
                 OnPropertyChanged(nameof(RenderData));
             }
         }

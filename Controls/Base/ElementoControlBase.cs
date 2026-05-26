@@ -15,6 +15,7 @@ namespace Araci.Controls.Base
             nameof(ElementoViewModel.RenderData),
             nameof(ElementoViewModel.IsSelecionado),
             nameof(ElementoViewModel.IsHover),
+            nameof(ElementoViewModel.IsPreview),
             nameof(ElementoViewModel.X),
             nameof(ElementoViewModel.Y),
             nameof(ElementoViewModel.WorldX),

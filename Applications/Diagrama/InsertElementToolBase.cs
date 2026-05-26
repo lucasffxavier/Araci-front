@@ -54,7 +54,7 @@ namespace Araci.Applications.Diagrama
             if (_preview.IsPreview(vm))
                 vm = null;
 
-            Point pontoSnap = Context.Snap.SnapFromElemento(vm, position);
+            Point pontoSnap = Context.Snap.SnapFromElemento(vm, position, _preview.Preview);
             TModel modelo = CriarModeloReal();
             Point posicao = Context.Geometry.CalcularTopoEsquerdoPorCentro(modelo, pontoSnap);
             modelo.PosicaoX = posicao.X;
