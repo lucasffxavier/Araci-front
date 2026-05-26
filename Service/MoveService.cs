@@ -27,9 +27,7 @@ namespace Araci.Services
             _estadoInicial.Clear();
 
             foreach (var vm in elementos.Distinct())
-            {
-                _estadoInicial[vm] = vm.CapturarEstado();
-            }
+                CapturarEstadoInicial(vm);
 
             _movendo = true;
         }
@@ -42,6 +40,7 @@ namespace Araci.Services
                 return;
 
             vm.Mover(delta);
+            ReancorarCabosConectados(vm.Modelo);
             _context.SceneQueries.Invalidate();
         }
 
@@ -54,9 +53,12 @@ namespace Araci.Services
                 _context.BeginTransaction();
 
             foreach (var vm in elementos.Distinct())
+                CapturarCabosConectados(vm.Modelo);
+
+            foreach (var item in _estadoInicial)
             {
-                if (!_estadoInicial.TryGetValue(vm, out var antes))
-                    continue;
+                var vm = item.Key;
+                var antes = item.Value;
 
                 var depois = vm.CapturarEstado();
 
@@ -104,6 +106,38 @@ namespace Araci.Services
         {
             _context.Viewport?.AtualizarViewModel(elemento);
             _context.SceneQueries.Invalidate();
+        }
+
+        private void CapturarEstadoInicial(ElementoViewModel vm)
+        {
+            if (_estadoInicial.ContainsKey(vm))
+                return;
+
+            _estadoInicial[vm] = vm.CapturarEstado();
+            CapturarCabosConectados(vm.Modelo);
+        }
+
+        private void CapturarCabosConectados(Elemento elemento)
+        {
+            if (elemento is Cabo)
+                return;
+
+            foreach (Cabo cabo in _context.Connectivity.ObterCabosConectados(elemento))
+            {
+                ElementoViewModel? caboVm = _context.Viewport?.ObterViewModel(cabo);
+
+                if (caboVm != null && !_estadoInicial.ContainsKey(caboVm))
+                    _estadoInicial[caboVm] = caboVm.CapturarEstado();
+            }
+        }
+
+        private void ReancorarCabosConectados(Elemento elemento)
+        {
+            if (elemento is Cabo)
+                return;
+
+            foreach (Cabo cabo in _context.Connectivity.ReancorarCabosConectados(elemento))
+                _context.Viewport?.AtualizarViewModel(cabo);
         }
     }
 }

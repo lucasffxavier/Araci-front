@@ -76,6 +76,9 @@ namespace Araci.Applications.Diagrama.InserirCabo
 
             if (!_inserindo)
             {
+                if (terminal == null)
+                    return;
+
                 _caboAtual =
                     _context.ElementoFactory.CriarCaboVM();
 
@@ -94,6 +97,9 @@ namespace Araci.Applications.Diagrama.InserirCabo
             }
 
             if (_caboAtual == null)
+                return;
+
+            if (terminal == null)
                 return;
 
             _caboAtual.FinalizarNoPonto(pontoSnap);

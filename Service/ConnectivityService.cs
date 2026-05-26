@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Linq;
 using Araci.Core.Documents;
 using Araci.Models;
@@ -120,6 +121,105 @@ namespace Araci.Services
             return ResolverBusNamePorIdEstrito(
                 cabo.DestinoId,
                 $"Cabo '{ResolverBusName(cabo)}' destino");
+        }
+
+        public IReadOnlyList<Cabo> ObterCabosConectados(Elemento elemento)
+        {
+            string id = elemento.Id.ToString();
+
+            return _document.Elementos
+                .OfType<Cabo>()
+                .Where(c =>
+                    string.Equals(c.OrigemId, id, StringComparison.OrdinalIgnoreCase) ||
+                    string.Equals(c.DestinoId, id, StringComparison.OrdinalIgnoreCase))
+                .ToList();
+        }
+
+        public IReadOnlyList<Cabo> ReancorarCabosConectados(Elemento elemento)
+        {
+            var alterados = new List<Cabo>();
+
+            foreach (Cabo cabo in ObterCabosConectados(elemento))
+            {
+                bool alterou = false;
+
+                if (EhMesmoElemento(cabo.OrigemId, elemento) &&
+                    ReancorarOrigem(cabo, elemento))
+                {
+                    alterou = true;
+                }
+
+                if (EhMesmoElemento(cabo.DestinoId, elemento) &&
+                    ReancorarDestino(cabo, elemento))
+                {
+                    alterou = true;
+                }
+
+                if (alterou)
+                    alterados.Add(cabo);
+            }
+
+            return alterados;
+        }
+
+        private static bool EhMesmoElemento(string id, Elemento elemento)
+        {
+            return string.Equals(
+                id,
+                elemento.Id.ToString(),
+                StringComparison.OrdinalIgnoreCase);
+        }
+
+        private static bool ReancorarOrigem(Cabo cabo, Elemento elemento)
+        {
+            Terminal? terminal = ObterTerminal(elemento, cabo.OrigemTerminalId);
+
+            if (terminal == null)
+                return false;
+
+            if (cabo.Vertices.Count == 0)
+                cabo.Vertices.Add(terminal.Posicao);
+            else
+                cabo.Vertices[0] = terminal.Posicao;
+
+            cabo.DefinirOrigem(terminal.Posicao);
+            return true;
+        }
+
+        private static bool ReancorarDestino(Cabo cabo, Elemento elemento)
+        {
+            Terminal? terminal = ObterTerminal(elemento, cabo.DestinoTerminalId);
+
+            if (terminal == null)
+                return false;
+
+            if (cabo.Vertices.Count == 0)
+            {
+                cabo.Vertices.Add(terminal.Posicao);
+            }
+            else if (cabo.Vertices.Count == 1)
+            {
+                cabo.Vertices.Add(terminal.Posicao);
+            }
+            else
+            {
+                cabo.Vertices[^1] = terminal.Posicao;
+            }
+
+            cabo.DefinirDestino(terminal.Posicao);
+            return true;
+        }
+
+        private static Terminal? ObterTerminal(Elemento elemento, string terminalId)
+        {
+            if (elemento is not ITerminalOwner owner ||
+                string.IsNullOrWhiteSpace(terminalId))
+            {
+                return null;
+            }
+
+            return owner.Terminais.FirstOrDefault(t =>
+                string.Equals(t.Id, terminalId, StringComparison.OrdinalIgnoreCase));
         }
     }
 }
