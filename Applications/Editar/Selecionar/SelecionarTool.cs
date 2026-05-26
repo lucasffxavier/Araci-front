@@ -66,7 +66,7 @@ namespace Araci.Applications.Editar.Selecionar
             _selectionBox.Begin(position, ctrl);
         }
 
-        public void OnMouseMove(Point position)
+        public void OnMouseMove(Point position, ToolInputState inputState)
         {
             if (_dragMove.IsActive)
             {
@@ -78,7 +78,7 @@ namespace Araci.Applications.Editar.Selecionar
                 _selectionBox.Update(position);
         }
 
-        public void OnMouseUp(Point position)
+        public void OnMouseUp(Point position, ToolInputState inputState)
         {
             if (_dragMove.IsActive)
                 _dragMove.End();

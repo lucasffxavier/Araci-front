@@ -59,9 +59,9 @@ namespace Araci.Applications.Editar.Deletar
             _context.Selection.Limpar();
         }
 
-        public void OnMouseMove(Point position) { }
+        public void OnMouseMove(Point position, ToolInputState inputState) { }
 
-        public void OnMouseUp(Point position) { }
+        public void OnMouseUp(Point position, ToolInputState inputState) { }
 
         public void OnKeyDown(Key key) { }
     }

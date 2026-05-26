@@ -45,14 +45,14 @@ namespace Araci.Applications.Editar.Mover
             _selecionarTool.OnMouseDown(vm, position, inputState);
         }
 
-        public void OnMouseMove(Point position)
+        public void OnMouseMove(Point position, ToolInputState inputState)
         {
-            _selecionarTool.OnMouseMove(position);
+            _selecionarTool.OnMouseMove(position, inputState);
         }
 
-        public void OnMouseUp(Point position)
+        public void OnMouseUp(Point position, ToolInputState inputState)
         {
-            _selecionarTool.OnMouseUp(position);
+            _selecionarTool.OnMouseUp(position, inputState);
         }
 
         public void OnKeyDown(Key key)

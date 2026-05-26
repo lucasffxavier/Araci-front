@@ -22,22 +22,37 @@ namespace Araci.Services
 
         public void MouseDown(ElementoViewModel? vm, Point position)
         {
-            ToolAtual.OnMouseDown(vm, position, CapturarEstadoAtual());
+            ToolAtual.OnMouseDown(vm, position, CapturarEstadoAtual(position));
+        }
+
+        public void MouseDown(ElementoViewModel? vm, Point position, ToolInputState inputState)
+        {
+            ToolAtual.OnMouseDown(vm, position, inputState);
         }
 
         public void MouseMove(Point position)
+        {
+            MouseMove(position, CapturarEstadoAtual(position));
+        }
+
+        public void MouseMove(Point position, ToolInputState inputState)
         {
             if (ToolAtual.IsBusy)
                 _context.Hover.Clear();
             else
                 _context.Hover.Update(position);
 
-            ToolAtual.OnMouseMove(position);
+            ToolAtual.OnMouseMove(position, inputState);
         }
 
         public void MouseUp(Point position)
         {
-            ToolAtual.OnMouseUp(position);
+            MouseUp(position, CapturarEstadoAtual(position));
+        }
+
+        public void MouseUp(Point position, ToolInputState inputState)
+        {
+            ToolAtual.OnMouseUp(position, inputState);
         }
 
         public bool KeyDown(Key key)
@@ -90,10 +105,14 @@ namespace Araci.Services
             return false;
         }
 
-        private static ToolInputState CapturarEstadoAtual()
+        private static ToolInputState CapturarEstadoAtual(Point worldPosition)
         {
             return new ToolInputState(
-                Keyboard.Modifiers.HasFlag(ModifierKeys.Control));
+                Keyboard.Modifiers,
+                null,
+                0,
+                worldPosition,
+                default);
         }
     }
 }

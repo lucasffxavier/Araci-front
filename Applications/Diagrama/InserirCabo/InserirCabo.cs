@@ -97,7 +97,7 @@ namespace Araci.Applications.Diagrama.InserirCabo
             Finalizar();
         }
 
-        public void OnMouseMove(Point position)
+        public void OnMouseMove(Point position, ToolInputState inputState)
         {
             if (!_inserindo || _caboAtual == null)
                 return;
@@ -108,7 +108,7 @@ namespace Araci.Applications.Diagrama.InserirCabo
             _caboAtual.AtualizarPreview(pontoSnap);
         }
 
-        public void OnMouseUp(Point position)
+        public void OnMouseUp(Point position, ToolInputState inputState)
         {
         }
 

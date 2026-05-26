@@ -4,6 +4,7 @@ using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
 using System.Windows.Media;
+using Araci.Applications.Editar.Base;
 using Araci.Services;
 using Araci.ViewModels;
 
@@ -155,8 +156,10 @@ namespace Araci.Views
             Keyboard.Focus(this);
 
             var vm = EncontrarElemento(e.OriginalSource as DependencyObject);
+            Point worldPosition = GetWorldPos(e);
+            ToolInputState inputState = CriarInputState(e, e.ChangedButton, e.ClickCount);
 
-            _context.Input.MouseDown(vm, GetWorldPos(e));
+            _context.Input.MouseDown(vm, worldPosition, inputState);
 
             CaptureMouse();
         }
@@ -170,7 +173,11 @@ namespace Araci.Views
                 return;
             }
 
-            _context?.Input.MouseMove(GetWorldPos(e));
+            if (_context == null)
+                return;
+
+            Point worldPosition = GetWorldPos(e);
+            _context.Input.MouseMove(worldPosition, CriarInputState(e));
         }
 
         private void OnPreviewMouseUp(object sender, MouseButtonEventArgs e)
@@ -205,7 +212,11 @@ namespace Araci.Views
                 return;
             }
 
-            _context?.Input.MouseUp(GetWorldPos(e));
+            if (_context != null)
+            {
+                Point worldPosition = GetWorldPos(e);
+                _context.Input.MouseUp(worldPosition, CriarInputState(e, e.ChangedButton, e.ClickCount));
+            }
 
             LiberarCapturaMouse();
         }
@@ -275,6 +286,22 @@ namespace Araci.Views
         {
             if (IsMouseCaptured)
                 ReleaseMouseCapture();
+        }
+
+        private ToolInputState CriarInputState(
+            MouseEventArgs e,
+            MouseButton? button = null,
+            int clickCount = 0)
+        {
+            Point screenPosition = e.GetPosition(this);
+            Point worldPosition = _context?.Viewport?.ScreenToWorld(screenPosition) ?? screenPosition;
+
+            return new ToolInputState(
+                Keyboard.Modifiers,
+                button,
+                clickCount,
+                worldPosition,
+                screenPosition);
         }
 
         private static ElementoViewModel? EncontrarElemento(DependencyObject? origem)

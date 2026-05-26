@@ -279,16 +279,47 @@ void OnKeyDown(Key key);
 ARQUIVO: C:\Araci-Engine-Front\Araci Engine\Applications\Editar\Base\ToolInputState.cs
 ====================================================================================================
 
+using System.Windows;
+using System.Windows.Input;
 namespace Araci.Applications.Editar.Base
 {
 public readonly struct ToolInputState
 {
 public ToolInputState(bool isControlPressed)
+: this(
+isControlPressed ? ModifierKeys.Control : ModifierKeys.None,
+null,
+0,
+default,
+default)
 {
-IsControlPressed = isControlPressed;
 }
-public bool IsControlPressed { get; }
-public static ToolInputState Empty => new(false);
+public ToolInputState(
+ModifierKeys modifiers,
+MouseButton? button = null,
+int clickCount = 0,
+Point worldPosition = default,
+Point screenPosition = default)
+{
+Modifiers = modifiers;
+Button = button;
+ClickCount = clickCount;
+WorldPosition = worldPosition;
+ScreenPosition = screenPosition;
+}
+public ModifierKeys Modifiers { get; }
+public MouseButton? Button { get; }
+public int ClickCount { get; }
+public Point WorldPosition { get; }
+public Point ScreenPosition { get; }
+public bool IsControlPressed => Modifiers.HasFlag(ModifierKeys.Control);
+public bool IsShiftPressed => Modifiers.HasFlag(ModifierKeys.Shift);
+public bool IsAltPressed => Modifiers.HasFlag(ModifierKeys.Alt);
+public bool IsDoubleClick => ClickCount >= 2;
+public bool IsLeftButton => Button == MouseButton.Left;
+public bool IsMiddleButton => Button == MouseButton.Middle;
+public bool IsRightButton => Button == MouseButton.Right;
+public static ToolInputState Empty => new(ModifierKeys.None);
 }
 }
 
@@ -906,7 +937,11 @@ set => _context.Tools.AtivarFerramenta(value);
 }
 public void MouseDown(ElementoViewModel? vm, Point position)
 {
-ToolAtual.OnMouseDown(vm, position, CapturarEstadoAtual());
+ToolAtual.OnMouseDown(vm, position, CapturarEstadoAtual(position));
+}
+public void MouseDown(ElementoViewModel? vm, Point position, ToolInputState inputState)
+{
+ToolAtual.OnMouseDown(vm, position, inputState);
 }
 public void MouseMove(Point position)
 {
@@ -961,10 +996,14 @@ return true;
 ToolAtual.OnKeyDown(key);
 return false;
 }
-private static ToolInputState CapturarEstadoAtual()
+private static ToolInputState CapturarEstadoAtual(Point worldPosition)
 {
 return new ToolInputState(
-Keyboard.Modifiers.HasFlag(ModifierKeys.Control));
+Keyboard.Modifiers,
+null,
+0,
+worldPosition,
+default);
 }
 }
 }
@@ -1194,6 +1233,7 @@ using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
 using System.Windows.Media;
+using Araci.Applications.Editar.Base;
 using Araci.Services;
 using Araci.ViewModels;
 namespace Araci.Views
@@ -1310,7 +1350,15 @@ return;
 Focus();
 Keyboard.Focus(this);
 var vm = EncontrarElemento(e.OriginalSource as DependencyObject);
-_context.Input.MouseDown(vm, GetWorldPos(e));
+Point screenPosition = e.GetPosition(this);
+Point worldPosition = _context.Viewport?.ScreenToWorld(screenPosition) ?? screenPosition;
+var inputState = new ToolInputState(
+Keyboard.Modifiers,
+e.ChangedButton,
+e.ClickCount,
+worldPosition,
+screenPosition);
+_context.Input.MouseDown(vm, worldPosition, inputState);
 CaptureMouse();
 }
 private void OnPreviewMouseMove(object sender, MouseEventArgs e)
