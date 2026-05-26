@@ -76,6 +76,8 @@ namespace Araci.Services
 
         public SelectionBoxViewModel SelectionBox { get; } = new SelectionBoxViewModel();
 
+        public TerminalSnapState TerminalSnap { get; } = new TerminalSnapState();
+
         public CommandManager Commands { get; } = new CommandManager();
 
         public SelectionService Selection { get; }

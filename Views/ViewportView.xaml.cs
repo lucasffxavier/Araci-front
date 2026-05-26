@@ -44,6 +44,7 @@ namespace Araci.Views
 
             WorldLayer.RenderTransform = _cameraTransform;
             SelectionLayer.RenderTransform = _cameraTransform;
+            TerminalSnapLayer.RenderTransform = _cameraTransform;
 
             _context.Viewport.Camera.PropertyChanged += OnCameraChanged;
 
@@ -260,6 +261,7 @@ namespace Araci.Views
         private void OnMouseLeave(object sender, MouseEventArgs e)
         {
             _context?.Hover.Clear();
+            _context?.TerminalSnap.Limpar();
             _context?.Navigation.CancelPan();
             AtualizarCursorNavegacao();
         }

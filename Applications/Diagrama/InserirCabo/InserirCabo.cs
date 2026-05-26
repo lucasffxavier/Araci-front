@@ -59,6 +59,7 @@ namespace Araci.Applications.Diagrama.InserirCabo
             if (_caboAtual != null)
                 _context.Commands.Undo();
 
+            LimparTerminalCapturado();
             LimparPreviewInicial();
             LimparEstado();
         }
@@ -76,6 +77,8 @@ namespace Araci.Applications.Diagrama.InserirCabo
 
             Terminal? terminal =
                 ObterTerminalParaClique(vm, position);
+
+            AtualizarTerminalCapturado(terminal);
 
             Point pontoSnap =
                 terminal?.Posicao
@@ -135,6 +138,7 @@ namespace Araci.Applications.Diagrama.InserirCabo
                 ObterTerminalConexao(null, position);
 
             _terminalPreviewFinal = terminal;
+            AtualizarTerminalCapturado(terminal);
 
             Point pontoSnap =
                 terminal?.Posicao
@@ -222,6 +226,7 @@ namespace Araci.Applications.Diagrama.InserirCabo
                 ObterTerminalConexao(null, position);
 
             _terminalPreviewInicial = terminal;
+            AtualizarTerminalCapturado(terminal);
 
             if (terminal == null)
             {
@@ -263,6 +268,22 @@ namespace Araci.Applications.Diagrama.InserirCabo
             _previewInicial = null;
             _terminalPreviewInicial = null;
             _context.SceneQueries.Invalidate();
+        }
+
+        private void AtualizarTerminalCapturado(Terminal? terminal)
+        {
+            if (terminal == null)
+            {
+                LimparTerminalCapturado();
+                return;
+            }
+
+            _context.TerminalSnap.Mostrar(terminal);
+        }
+
+        private void LimparTerminalCapturado()
+        {
+            _context.TerminalSnap.Limpar();
         }
 
         private void ConectarOrigem(
@@ -330,6 +351,7 @@ namespace Araci.Applications.Diagrama.InserirCabo
 
         private void Finalizar()
         {
+            LimparTerminalCapturado();
             LimparPreviewInicial();
             LimparEstado();
 
@@ -342,6 +364,7 @@ namespace Araci.Applications.Diagrama.InserirCabo
 
             _caboAtual = null;
             _terminalPreviewFinal = null;
+            LimparTerminalCapturado();
             _inserindo = false;
         }
     }

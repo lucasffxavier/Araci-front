@@ -23,6 +23,7 @@ namespace Araci.ViewModels
             Document = context.Document;
             Scene = context.Scene;
             SelectionBox = context.SelectionBox;
+            TerminalSnap = context.TerminalSnap;
             MoveHud = context.MoveHud;
 
             Document.Elementos.CollectionChanged += OnDocumentElementosChanged;
@@ -33,6 +34,7 @@ namespace Araci.ViewModels
         public AraciDocument Document { get; }
         public Scene Scene { get; }
         public SelectionBoxViewModel SelectionBox { get; }
+        public TerminalSnapState TerminalSnap { get; }
         public MoveHudService MoveHud { get; }
 
         public ObservableCollection<ElementoViewModel> Elementos => Scene.Elementos;
