@@ -27,6 +27,11 @@ namespace Araci.Services
 
         public void MouseMove(Point position)
         {
+            if (ToolAtual.IsBusy)
+                _context.Hover.Clear();
+            else
+                _context.Hover.Update(position);
+
             ToolAtual.OnMouseMove(position);
         }
 

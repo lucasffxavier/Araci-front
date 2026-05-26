@@ -248,6 +248,7 @@ namespace Araci.Views
 
         private void OnMouseLeave(object sender, MouseEventArgs e)
         {
+            _context?.Hover.Clear();
             _context?.Navigation.CancelPan();
             AtualizarCursorNavegacao();
         }

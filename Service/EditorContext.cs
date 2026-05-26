@@ -20,6 +20,7 @@ namespace Araci.Services
             Events = eventBus;
             Scene = new Scene();
             SceneQueries = new SceneQueryService(Scene);
+            Hover = new HoverService(SceneQueries);
             Snap = new SnapService(SceneQueries);
             Names = new NameService(Document);
             Connectivity = new ConnectivityService(this);
@@ -47,6 +48,8 @@ namespace Araci.Services
         public Scene Scene { get; } = new Scene();
 
         public ISceneQueryService SceneQueries { get; }
+
+        public HoverService Hover { get; }
 
         public ToolService Tools { get; }
 
