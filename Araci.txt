@@ -268,8 +268,8 @@ void Ativar();
 void Desativar();
 void Cancelar();
 void OnMouseDown(ElementoViewModel? vm, Point position, ToolInputState inputState);
-void OnMouseMove(Point position);
-void OnMouseUp(Point position);
+void OnMouseMove(Point position, ToolInputState inputState);
+void OnMouseUp(Point position, ToolInputState inputState);
 void OnKeyDown(Key key);
 }
 }
@@ -325,63 +325,6 @@ public static ToolInputState Empty => new(ModifierKeys.None);
 
 
 ====================================================================================================
-ARQUIVO: C:\Araci-Engine-Front\Araci Engine\Applications\Editar\Deletar\DeletarTool.cs
-====================================================================================================
-
-﻿using System.Linq;
-using System.Windows;
-using System.Windows.Input;
-using Araci.Applications.Editar.Base;
-using Araci.Core.Commands;
-using Araci.Services;
-using Araci.ViewModels;
-namespace Araci.Applications.Editar.Deletar
-{
-public class DeletarTool : ITool
-{
-private readonly EditorContext _context;
-public DeletarTool(EditorContext context)
-{
-_context = context
-?? throw new System.ArgumentNullException(nameof(context));
-}
-public string Nome => "Deletar";
-public bool MantemBotaoAtivado => true;
-public bool IsBusy => false;
-public void Ativar() { }
-public void Desativar() { }
-public void Cancelar() { }
-public void OnMouseDown(
-ElementoViewModel? vm,
-Point position,
-ToolInputState inputState)
-{
-var selecionados =
-_context.Selection
-.Selecionados
-.ToList();
-if (selecionados.Count == 0)
-return;
-using var tx =
-_context.BeginTransaction();
-foreach (var item in selecionados)
-{
-tx.Add(
-new DeleteElementCommand(
-item.Modelo,
-_context));
-}
-tx.Commit();
-_context.Selection.Limpar();
-}
-public void OnMouseMove(Point position) { }
-public void OnMouseUp(Point position) { }
-public void OnKeyDown(Key key) { }
-}
-}
-
-
-====================================================================================================
 ARQUIVO: C:\Araci-Engine-Front\Araci Engine\Applications\Editar\Mover\MoverTool.cs
 ====================================================================================================
 
@@ -423,13 +366,13 @@ public void OnMouseDown(ElementoViewModel? vm, Point position, ToolInputState in
 {
 _selecionarTool.OnMouseDown(vm, position, inputState);
 }
-public void OnMouseMove(Point position)
+public void OnMouseMove(Point position, ToolInputState inputState)
 {
-_selecionarTool.OnMouseMove(position);
+_selecionarTool.OnMouseMove(position, inputState);
 }
-public void OnMouseUp(Point position)
+public void OnMouseUp(Point position, ToolInputState inputState)
 {
-_selecionarTool.OnMouseUp(position);
+_selecionarTool.OnMouseUp(position, inputState);
 }
 public void OnKeyDown(Key key)
 {
@@ -594,7 +537,7 @@ if (_modoSoMover)
 return;
 _selectionBox.Begin(position, ctrl);
 }
-public void OnMouseMove(Point position)
+public void OnMouseMove(Point position, ToolInputState inputState)
 {
 if (_dragMove.IsActive)
 {
@@ -604,7 +547,7 @@ return;
 if (_selectionBox.IsActive)
 _selectionBox.Update(position);
 }
-public void OnMouseUp(Point position)
+public void OnMouseUp(Point position, ToolInputState inputState)
 {
 if (_dragMove.IsActive)
 _dragMove.End();
@@ -612,181 +555,6 @@ if (_selectionBox.IsActive)
 _selectionBox.End();
 }
 public void OnKeyDown(Key key) { }
-}
-}
-
-
-====================================================================================================
-ARQUIVO: C:\Araci-Engine-Front\Araci Engine\Applications\Editar\Selecionar\SelectionBoxController.cs
-====================================================================================================
-
-using System;
-using System.Windows;
-using Araci.Core.SceneQueries;
-using Araci.Services;
-using Araci.ViewModels;
-namespace Araci.Applications.Editar.Selecionar
-{
-public class SelectionBoxController
-{
-private readonly SelectionBoxViewModel _selectionBox;
-private readonly ISceneQueryService _queries;
-private readonly SelectionService _selection;
-private Point _inicio;
-private bool _adicionarAoExistente;
-public SelectionBoxController(
-SelectionBoxViewModel selectionBox,
-ISceneQueryService queries,
-SelectionService selection)
-{
-_selectionBox = selectionBox ?? throw new ArgumentNullException(nameof(selectionBox));
-_queries = queries ?? throw new ArgumentNullException(nameof(queries));
-_selection = selection ?? throw new ArgumentNullException(nameof(selection));
-}
-public bool IsActive { get; private set; }
-public void Begin(Point position, bool adicionarAoExistente)
-{
-_adicionarAoExistente = adicionarAoExistente;
-if (!_adicionarAoExistente)
-_selection.Limpar();
-_inicio = position;
-IsActive = true;
-_selectionBox.Visivel = true;
-_selectionBox.Atualizar(position, position);
-}
-public void Update(Point position)
-{
-if (!IsActive)
-return;
-_selectionBox.Atualizar(_inicio, position);
-}
-public void End()
-{
-if (!IsActive)
-return;
-Rect bounds = _selectionBox.Bounds;
-foreach (ElementoViewModel item in _queries.Query(bounds))
-{
-if (IntersectaSelecao(item, bounds))
-_selection.Selecionar(item, true);
-}
-Cancel();
-}
-public void Cancel()
-{
-IsActive = false;
-_selectionBox.Visivel = false;
-}
-private static bool IntersectaSelecao(ElementoViewModel vm, Rect area)
-{
-if (vm is CaboViewModel cabo)
-return IntersectaCabo(cabo, area);
-return vm.Bounds.IntersectsWith(area);
-}
-private static bool IntersectaCabo(CaboViewModel cabo, Rect area)
-{
-var vertices = cabo.Cabo.Vertices;
-if (vertices.Count < 2)
-return cabo.Bounds.IntersectsWith(area);
-for (int i = 0; i < vertices.Count; i++)
-{
-if (area.Contains(vertices[i]))
-return true;
-}
-for (int i = 0; i < vertices.Count - 1; i++)
-{
-if (SegmentoIntersectaRect(vertices[i], vertices[i + 1], area))
-return true;
-}
-return false;
-}
-private static bool SegmentoIntersectaRect(Point a, Point b, Rect rect)
-{
-if (rect.Contains(a) || rect.Contains(b))
-return true;
-Point topLeft = new(rect.Left, rect.Top);
-Point topRight = new(rect.Right, rect.Top);
-Point bottomRight = new(rect.Right, rect.Bottom);
-Point bottomLeft = new(rect.Left, rect.Bottom);
-return SegmentosIntersectam(a, b, topLeft, topRight) ||
-SegmentosIntersectam(a, b, topRight, bottomRight) ||
-SegmentosIntersectam(a, b, bottomRight, bottomLeft) ||
-SegmentosIntersectam(a, b, bottomLeft, topLeft);
-}
-private static bool SegmentosIntersectam(Point a, Point b, Point c, Point d)
-{
-double o1 = Orientacao(a, b, c);
-double o2 = Orientacao(a, b, d);
-double o3 = Orientacao(c, d, a);
-double o4 = Orientacao(c, d, b);
-if (SinaisOpostos(o1, o2) && SinaisOpostos(o3, o4))
-return true;
-return EhZero(o1) && EstaNoSegmento(a, c, b) ||
-EhZero(o2) && EstaNoSegmento(a, d, b) ||
-EhZero(o3) && EstaNoSegmento(c, a, d) ||
-EhZero(o4) && EstaNoSegmento(c, b, d);
-}
-private static double Orientacao(Point a, Point b, Point c)
-{
-return (b.X - a.X) * (c.Y - a.Y) -
-(b.Y - a.Y) * (c.X - a.X);
-}
-private static bool SinaisOpostos(double a, double b)
-{
-return a > 0 && b < 0 || a < 0 && b > 0;
-}
-private static bool EhZero(double value)
-{
-return Math.Abs(value) < 0.000001;
-}
-private static bool EstaNoSegmento(Point a, Point p, Point b)
-{
-return p.X >= Math.Min(a.X, b.X) - 0.000001 &&
-p.X <= Math.Max(a.X, b.X) + 0.000001 &&
-p.Y >= Math.Min(a.Y, b.Y) - 0.000001 &&
-p.Y <= Math.Max(a.Y, b.Y) + 0.000001;
-}
-}
-}
-
-
-====================================================================================================
-ARQUIVO: C:\Araci-Engine-Front\Araci Engine\Applications\Editar\Selecionar\SelectionController.cs
-====================================================================================================
-
-using System;
-using Araci.Services;
-using Araci.ViewModels;
-namespace Araci.Applications.Editar.Selecionar
-{
-public class SelectionController
-{
-private readonly SelectionService _selection;
-public SelectionController(SelectionService selection)
-{
-_selection = selection ?? throw new ArgumentNullException(nameof(selection));
-}
-public void Select(ElementoViewModel vm, bool ctrl)
-{
-if (vm == null)
-throw new ArgumentNullException(nameof(vm));
-if (ctrl)
-{
-_selection.Toggle(vm);
-return;
-}
-if (!EstaSelecionado(vm))
-_selection.Selecionar(vm);
-}
-private bool EstaSelecionado(ElementoViewModel vm)
-{
-foreach (ElementoViewModel selecionado in _selection.Selecionados)
-{
-if (ReferenceEquals(selecionado, vm))
-return true;
-}
-return false;
-}
 }
 }
 
@@ -874,46 +642,6 @@ return new TransactionScope(Commands);
 
 
 ====================================================================================================
-ARQUIVO: C:\Araci-Engine-Front\Araci Engine\Service\HoverService.cs
-====================================================================================================
-
-using System;
-using System.Windows;
-using Araci.Core.SceneQueries;
-using Araci.ViewModels;
-namespace Araci.Services
-{
-public class HoverService
-{
-private readonly ISceneQueryService _queries;
-private ElementoViewModel? _atual;
-public HoverService(ISceneQueryService queries)
-{
-_queries = queries ?? throw new ArgumentNullException(nameof(queries));
-}
-public void Update(Point worldPosition)
-{
-ElementoViewModel? novo = _queries.HitTest(worldPosition)?.Elemento;
-if (ReferenceEquals(_atual, novo))
-return;
-Clear();
-if (novo == null)
-return;
-novo.IsHover = true;
-_atual = novo;
-}
-public void Clear()
-{
-if (_atual == null)
-return;
-_atual.IsHover = false;
-_atual = null;
-}
-}
-}
-
-
-====================================================================================================
 ARQUIVO: C:\Araci-Engine-Front\Araci Engine\Service\InputRouter.cs
 ====================================================================================================
 
@@ -945,15 +673,23 @@ ToolAtual.OnMouseDown(vm, position, inputState);
 }
 public void MouseMove(Point position)
 {
+MouseMove(position, CapturarEstadoAtual(position));
+}
+public void MouseMove(Point position, ToolInputState inputState)
+{
 if (ToolAtual.IsBusy)
 _context.Hover.Clear();
 else
 _context.Hover.Update(position);
-ToolAtual.OnMouseMove(position);
+ToolAtual.OnMouseMove(position, inputState);
 }
 public void MouseUp(Point position)
 {
-ToolAtual.OnMouseUp(position);
+MouseUp(position, CapturarEstadoAtual(position));
+}
+public void MouseUp(Point position, ToolInputState inputState)
+{
+ToolAtual.OnMouseUp(position, inputState);
 }
 public bool KeyDown(Key key)
 {
@@ -1010,214 +746,286 @@ default);
 
 
 ====================================================================================================
-ARQUIVO: C:\Araci-Engine-Front\Araci Engine\Service\ToolService.cs
+ARQUIVO: C:\Araci-Engine-Front\Araci Engine\Service\MoveHudService.cs
 ====================================================================================================
 
-using System;
-using Araci.Applications.Editar.Base;
-using Araci.Applications.Editar.Selecionar;
+﻿using System.ComponentModel;
+using System.Windows;
 namespace Araci.Services
 {
-public class ToolService
+public class MoveHudService : INotifyPropertyChanged
 {
+private const double MARGEM = 10;
 private readonly EditorContext _context;
-private ITool _ferramentaAtual;
-public ToolService(EditorContext context)
+private bool _visivel;
+private double _x;
+private double _y;
+private double _deltaX;
+private double _deltaY;
+public event PropertyChangedEventHandler? PropertyChanged;
+public MoveHudService(EditorContext context)
 {
-_context = context ?? throw new ArgumentNullException(nameof(context));
-_ferramentaAtual = new SelecionarTool(_context);
-_ferramentaAtual.Ativar();
+_context = context
+?? throw new System.ArgumentNullException(nameof(context));
 }
-public event Action<ITool>? FerramentaAlterada;
-public ITool FerramentaAtual
+public bool Visivel
 {
-get => _ferramentaAtual;
+get => _visivel;
 set
 {
-if (value == null)
-throw new ArgumentNullException(nameof(value));
-if (ReferenceEquals(_ferramentaAtual, value))
-return;
-if (_ferramentaAtual.IsBusy)
-_ferramentaAtual.Cancelar();
-_ferramentaAtual.Desativar();
-_ferramentaAtual = value;
-_ferramentaAtual.Ativar();
-FerramentaAlterada?.Invoke(_ferramentaAtual);
-}
-}
-public void AtivarFerramenta(ITool ferramenta)
+if (_visivel != value)
 {
-FerramentaAtual = ferramenta;
-}
-public void VoltarParaSelecao()
-{
-if (_ferramentaAtual is SelecionarTool)
-{
-if (_ferramentaAtual.IsBusy)
-_ferramentaAtual.Cancelar();
-return;
-}
-FerramentaAtual = new SelecionarTool(_context);
+_visivel = value;
+OnChanged(nameof(Visivel));
 }
 }
 }
-
-
-====================================================================================================
-ARQUIVO: C:\Araci-Engine-Front\Araci Engine\Service\ViewportNavigationService.cs
-====================================================================================================
-
-using System.Windows;
-using System.Windows.Input;
-namespace Araci.Services
+public double X
 {
-public class ViewportNavigationService
+get => _x;
+private set
 {
-private readonly EditorContext _context;
-private bool _isPanning;
-private bool _isSpacePressed;
-private bool _isSpaceLeftPanning;
-private bool _suppressNextLeftButtonUp;
-private Point _lastPanPoint;
-public ViewportNavigationService(EditorContext context)
+if (_x != value)
 {
-_context = context;
-}
-public bool IsPanning => _isPanning;
-public bool IsSpacePressed => _isSpacePressed;
-public bool SuppressNextLeftButtonUp => _suppressNextLeftButtonUp;
-public bool TryBeginMiddlePan(MouseButtonEventArgs e, IInputElement relativeTo)
-{
-if (_context.Viewport == null || e.ChangedButton != MouseButton.Middle || e.ClickCount >= 2)
-return false;
-BeginPan(e.GetPosition(relativeTo), spaceLeftPan: false);
-return true;
-}
-public bool TryBeginSpaceLeftPan(MouseButtonEventArgs e, IInputElement relativeTo)
-{
-if (_context.Viewport == null || !_isSpacePressed || e.ChangedButton != MouseButton.Left)
-return false;
-BeginPan(e.GetPosition(relativeTo), spaceLeftPan: true);
-return true;
-}
-public bool TryUpdatePan(MouseEventArgs e, IInputElement relativeTo)
-{
-if (_context.Viewport == null || !_isPanning)
-return false;
-Point current = e.GetPosition(relativeTo);
-Vector delta = current - _lastPanPoint;
-_context.Viewport.Pan(delta);
-_lastPanPoint = current;
-return true;
-}
-public bool TryEndMiddlePan(MouseButtonEventArgs e)
-{
-if (e.ChangedButton != MouseButton.Middle || !_isPanning || _isSpaceLeftPanning)
-return false;
-CancelPan();
-return true;
-}
-public bool TryEndSpaceLeftPan(MouseButtonEventArgs e)
-{
-if (e.ChangedButton != MouseButton.Left || !_isSpaceLeftPanning)
-return false;
-CancelPan();
-return true;
-}
-public bool TryHandleKeyDown(KeyEventArgs e)
-{
-if (e.Key == Key.Space)
-{
-_isSpacePressed = true;
-return true;
-}
-return TryHandleViewportShortcut(e);
-}
-public bool TryHandleKeyUp(KeyEventArgs e)
-{
-if (e.Key != Key.Space)
-return false;
-_isSpacePressed = false;
-if (_isSpaceLeftPanning)
-{
-_suppressNextLeftButtonUp = true;
-CancelPan();
-}
-return true;
-}
-public bool TryHandleMouseWheel(MouseWheelEventArgs e, IInputElement relativeTo)
-{
-if (_context.Viewport == null)
-return false;
-Point cursor = e.GetPosition(relativeTo);
-if (e.Delta > 0)
-_context.Viewport.ZoomInAt(cursor);
-else if (e.Delta < 0)
-_context.Viewport.ZoomOutAt(cursor);
-return true;
-}
-public bool TryHandleViewportShortcut(KeyEventArgs e)
-{
-if (_context.Viewport == null)
-return false;
-if (!Keyboard.Modifiers.HasFlag(ModifierKeys.Control))
-return false;
-switch (e.Key)
-{
-case Key.OemPlus:
-case Key.Add:
-_context.Viewport.ZoomInAtCenter();
-return true;
-case Key.OemMinus:
-case Key.Subtract:
-_context.Viewport.ZoomOutAtCenter();
-return true;
-case Key.D0:
-case Key.NumPad0:
-_context.Viewport.ResetCamera();
-return true;
-case Key.D1:
-case Key.NumPad1:
-_context.Viewport.Zoom100AtCenter();
-return true;
-default:
-return false;
+_x = value;
+OnChanged(nameof(X));
 }
 }
-public bool TryHandleMiddleDoubleClick(MouseButtonEventArgs e)
-{
-if (_context.Viewport == null || e.ChangedButton != MouseButton.Middle || e.ClickCount < 2)
-return false;
-CancelPan();
-_context.Viewport.ZoomExtents();
-return true;
 }
-public bool ConsumeSuppressNextLeftButtonUp()
+public double Y
 {
-if (!_suppressNextLeftButtonUp)
-return false;
-_suppressNextLeftButtonUp = false;
-return true;
+get => _y;
+private set
+{
+if (_y != value)
+{
+_y = value;
+OnChanged(nameof(Y));
 }
-public void CancelPan()
+}
+}
+public double DeltaX
 {
-_isPanning = false;
-_isSpaceLeftPanning = false;
+get => _deltaX;
+set
+{
+if (_deltaX != value)
+{
+_deltaX = value;
+OnChanged(nameof(DeltaX));
+}
+}
+}
+public double DeltaY
+{
+get => _deltaY;
+set
+{
+if (_deltaY != value)
+{
+_deltaY = value;
+OnChanged(nameof(DeltaY));
+}
+}
+}
+public void AtualizarPosicao(Rect bounds)
+{
+double viewportX =
+_context.Viewport?.Largura ?? 1000;
+double viewportY =
+_context.Viewport?.Altura ?? 800;
+Point worldPoint =
+new(
+bounds.X + bounds.Width / 2,
+bounds.Y - 20);
+Point screenPoint =
+_context.Viewport?.WorldToScreen(worldPoint)
+?? worldPoint;
+double novoX =
+screenPoint.X;
+double novoY =
+screenPoint.Y;
+novoX = Math.Max(MARGEM, Math.Min(novoX, viewportX - MARGEM));
+novoY = Math.Max(MARGEM, Math.Min(novoY, viewportY - MARGEM));
+X = novoX;
+Y = novoY;
 }
 public void Reset()
 {
-_isPanning = false;
-_isSpacePressed = false;
-_isSpaceLeftPanning = false;
-_suppressNextLeftButtonUp = false;
-_lastPanPoint = new Point();
+DeltaX = 0;
+DeltaY = 0;
 }
-private void BeginPan(Point start, bool spaceLeftPan)
+private void OnChanged(string nome)
 {
-_isPanning = true;
-_isSpaceLeftPanning = spaceLeftPan;
-_lastPanPoint = start;
+PropertyChanged?.Invoke(this,
+new PropertyChangedEventArgs(nome));
+}
+}
+}
+
+
+====================================================================================================
+ARQUIVO: C:\Araci-Engine-Front\Araci Engine\Service\MoveService.cs
+====================================================================================================
+
+using System.Collections.Generic;
+using System.Linq;
+using System.Windows;
+using Araci.Core.Commands;
+using Araci.Models;
+using Araci.ViewModels;
+namespace Araci.Services
+{
+public class MoveService
+{
+private readonly EditorContext _context;
+private readonly Dictionary<ElementoViewModel, ElementoEstado>
+_estadoInicial = new();
+private bool _movendo;
+public MoveService(EditorContext context)
+{
+_context = context ??
+throw new ArgumentNullException(nameof(context));
+}
+public void BeginMove(IEnumerable<ElementoViewModel> elementos)
+{
+_estadoInicial.Clear();
+foreach (var vm in elementos.Distinct())
+{
+_estadoInicial[vm] = vm.CapturarEstado();
+}
+_movendo = true;
+}
+public void MoverVisual(
+ElementoViewModel vm,
+Vector delta)
+{
+if (!_movendo)
+return;
+vm.Mover(delta);
+_context.SceneQueries.Invalidate();
+}
+public void EndMove(IEnumerable<ElementoViewModel> elementos)
+{
+if (!_movendo)
+return;
+using var transaction =
+_context.BeginTransaction();
+foreach (var vm in elementos.Distinct())
+{
+if (!_estadoInicial.TryGetValue(vm, out var antes))
+continue;
+var depois = vm.CapturarEstado();
+bool mudou =
+antes.X != depois.X ||
+antes.Y != depois.Y ||
+antes.X2 != depois.X2 ||
+antes.Y2 != depois.Y2 ||
+!antes.Vertices.SequenceEqual(depois.Vertices);
+if (!mudou)
+continue;
+transaction.Add(
+new MoveElementoCommand(
+vm.Modelo,
+antes,
+depois,
+AtualizarElementoMovido));
+}
+transaction.Commit();
+_context.SceneQueries.Invalidate();
+_estadoInicial.Clear();
+_movendo = false;
+}
+public void AbortMove()
+{
+if (!_movendo)
+return;
+foreach (var item in _estadoInicial)
+item.Key.AplicarEstado(item.Value);
+_context.SceneQueries.Invalidate();
+_estadoInicial.Clear();
+_movendo = false;
+}
+private void AtualizarElementoMovido(Elemento elemento)
+{
+_context.Viewport?.AtualizarViewModel(elemento);
+_context.SceneQueries.Invalidate();
+}
+}
+}
+
+
+====================================================================================================
+ARQUIVO: C:\Araci-Engine-Front\Araci Engine\Service\SelectionService.cs
+====================================================================================================
+
+﻿using System.Collections.Generic;
+using System.Collections.ObjectModel;
+using System.Linq;
+using Araci.Core.Events;
+using Araci.ViewModels;
+namespace Araci.Services
+{
+public class SelectionService
+{
+private readonly EditorContext _context;
+private readonly ObservableCollection<ElementoViewModel> _selecionados = new();
+public SelectionService(EditorContext context)
+{
+_context = context ?? throw new ArgumentNullException(nameof(context));
+}
+public IReadOnlyList<ElementoViewModel> Selecionados => _selecionados;
+public ObservableCollection<ElementoViewModel> SelecionadosObservable => _selecionados;
+public bool TemSelecionados => _selecionados.Count > 0;
+public void Selecionar(ElementoViewModel vm, bool adicionarAoExistente = false)
+{
+if (!adicionarAoExistente)
+Limpar();
+if (_selecionados.Contains(vm))
+{
+AtualizarElementoSelecionado();
+return;
+}
+vm.IsSelecionado = true;
+_selecionados.Add(vm);
+AtualizarElementoSelecionado();
+PublicarAlteracao();
+}
+public void Toggle(ElementoViewModel vm)
+{
+if (_selecionados.Contains(vm))
+{
+Deselecionar(vm);
+return;
+}
+Selecionar(vm, true);
+}
+public void Deselecionar(ElementoViewModel vm)
+{
+if (!_selecionados.Contains(vm))
+return;
+vm.IsSelecionado = false;
+_selecionados.Remove(vm);
+AtualizarElementoSelecionado();
+PublicarAlteracao();
+}
+public void Limpar()
+{
+if (_selecionados.Count == 0)
+return;
+foreach (var vm in _selecionados)
+vm.IsSelecionado = false;
+_selecionados.Clear();
+AtualizarElementoSelecionado();
+PublicarAlteracao();
+}
+private void AtualizarElementoSelecionado()
+{
+_context.Editor.ElementoSelecionado = _selecionados.LastOrDefault();
+}
+private void PublicarAlteracao()
+{
+_context.Events.Publish(new SelecaoAlteradaEvent(_selecionados.ToList()));
 }
 }
 }
@@ -1350,14 +1158,8 @@ return;
 Focus();
 Keyboard.Focus(this);
 var vm = EncontrarElemento(e.OriginalSource as DependencyObject);
-Point screenPosition = e.GetPosition(this);
-Point worldPosition = _context.Viewport?.ScreenToWorld(screenPosition) ?? screenPosition;
-var inputState = new ToolInputState(
-Keyboard.Modifiers,
-e.ChangedButton,
-e.ClickCount,
-worldPosition,
-screenPosition);
+Point worldPosition = GetWorldPos(e);
+ToolInputState inputState = CriarInputState(e, e.ChangedButton, e.ClickCount);
 _context.Input.MouseDown(vm, worldPosition, inputState);
 CaptureMouse();
 }
@@ -1369,7 +1171,10 @@ AtualizarCursorNavegacao();
 e.Handled = true;
 return;
 }
-_context?.Input.MouseMove(GetWorldPos(e));
+if (_context == null)
+return;
+Point worldPosition = GetWorldPos(e);
+_context.Input.MouseMove(worldPosition, CriarInputState(e));
 }
 private void OnPreviewMouseUp(object sender, MouseButtonEventArgs e)
 {
@@ -1398,7 +1203,11 @@ if (_context?.Navigation.IsPanning == true)
 e.Handled = true;
 return;
 }
-_context?.Input.MouseUp(GetWorldPos(e));
+if (_context != null)
+{
+Point worldPosition = GetWorldPos(e);
+_context.Input.MouseUp(worldPosition, CriarInputState(e, e.ChangedButton, e.ClickCount));
+}
 LiberarCapturaMouse();
 }
 private void OnPreviewMouseWheel(object sender, MouseWheelEventArgs e)
@@ -1454,6 +1263,20 @@ private void LiberarCapturaMouse()
 {
 if (IsMouseCaptured)
 ReleaseMouseCapture();
+}
+private ToolInputState CriarInputState(
+MouseEventArgs e,
+MouseButton? button = null,
+int clickCount = 0)
+{
+Point screenPosition = e.GetPosition(this);
+Point worldPosition = _context?.Viewport?.ScreenToWorld(screenPosition) ?? screenPosition;
+return new ToolInputState(
+Keyboard.Modifiers,
+button,
+clickCount,
+worldPosition,
+screenPosition);
 }
 private static ElementoViewModel? EncontrarElemento(DependencyObject? origem)
 {

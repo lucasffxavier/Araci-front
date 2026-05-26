@@ -1,6 +1,7 @@
 using System;
 using System.Linq;
 using System.Windows;
+using Araci.Applications.Editar.Base;
 using Araci.Services;
 
 namespace Araci.Applications.Editar.Selecionar
@@ -13,6 +14,7 @@ namespace Araci.Applications.Editar.Selecionar
         private readonly bool _mostrarHud;
 
         private Point _ultimoPontoMouse;
+        private Point _ultimoPontoEfetivo;
         private Point _pontoInicialArrasto;
 
         public DragMoveController(
@@ -33,6 +35,7 @@ namespace Araci.Applications.Editar.Selecionar
         {
             IsActive = true;
             _ultimoPontoMouse = position;
+            _ultimoPontoEfetivo = position;
             _pontoInicialArrasto = position;
 
             _move.BeginMove(_selection.Selecionados);
@@ -45,12 +48,16 @@ namespace Araci.Applications.Editar.Selecionar
             _hud.Visivel = true;
         }
 
-        public void Update(Point position)
+        public void Update(Point position, ToolInputState inputState)
         {
             if (!IsActive)
                 return;
 
-            Vector delta = position - _ultimoPontoMouse;
+            Point pontoEfetivo = inputState.IsShiftPressed
+                ? AplicarTravaOrtogonal(position)
+                : position;
+
+            Vector delta = pontoEfetivo - _ultimoPontoEfetivo;
 
             if (delta.X != 0 || delta.Y != 0)
             {
@@ -59,9 +66,10 @@ namespace Araci.Applications.Editar.Selecionar
             }
 
             if (_mostrarHud)
-                AtualizarHud(position);
+                AtualizarHud(pontoEfetivo);
 
             _ultimoPontoMouse = position;
+            _ultimoPontoEfetivo = pontoEfetivo;
         }
 
         public void End()
@@ -88,6 +96,15 @@ namespace Araci.Applications.Editar.Selecionar
             _hud.DeltaX = delta.X;
             _hud.DeltaY = delta.Y;
             _hud.AtualizarPosicao(CalcularBoundsSelecionados());
+        }
+
+        private Point AplicarTravaOrtogonal(Point position)
+        {
+            Vector total = position - _pontoInicialArrasto;
+
+            return Math.Abs(total.X) >= Math.Abs(total.Y)
+                ? new Point(position.X, _pontoInicialArrasto.Y)
+                : new Point(_pontoInicialArrasto.X, position.Y);
         }
 
         private void LimparHud()

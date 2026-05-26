@@ -70,7 +70,7 @@ namespace Araci.Applications.Editar.Selecionar
         {
             if (_dragMove.IsActive)
             {
-                _dragMove.Update(position);
+                _dragMove.Update(position, inputState);
                 return;
             }
 
