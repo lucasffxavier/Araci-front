@@ -1,4 +1,5 @@
 ﻿using System.Windows;
+using Araci.Core.Rendering;
 using Araci.Models;
 
 namespace Araci.Core.SceneNodes
@@ -14,7 +15,7 @@ namespace Araci.Core.SceneNodes
             AtualizarGeometria();
         }
 
-        public override double Largura => 10;
+        public override double Largura => ElementGeometryDefaults.BarraLargura;
 
         public override double Altura => _barra.Altura;
 

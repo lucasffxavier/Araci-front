@@ -72,6 +72,7 @@ Araci Engine
 │   ├── Features
 │   │   └── Ifeaturemodule.cs
 │   ├── Rendering
+│   │   ├── ElementGeometryDefaults.cs
 │   │   └── ElementoRenderData.cs
 │   ├── SceneNodes
 │   │   ├── BarraNode.cs
@@ -187,6 +188,7 @@ Araci Engine
 │   ├── EditorContext.cs
 │   ├── EditorSettings.cs
 │   ├── EditorState.cs
+│   ├── ElementGeometryService.cs
 │   ├── ElementoFactory.cs
 │   ├── HoverService.cs
 │   ├── InputRouter.cs
@@ -295,7 +297,7 @@ public void OnMouseDown(ElementoViewModel? vm, Point position, ToolInputState in
 {
 Point pontoSnap = _context.Snap.SnapFromElemento(vm, position);
 Barra barra = _context.ElementoFactory.CriarBarra();
-Point posicao = CalcularPosicaoPorCentro(pontoSnap, 10, barra.Altura);
+Point posicao = _context.Geometry.CalcularTopoEsquerdoPorCentro(barra, pontoSnap);
 barra.PosicaoX = posicao.X;
 barra.PosicaoY = posicao.Y;
 _context.Commands.Execute(new AddElementoCommand(barra, _context));
@@ -307,12 +309,6 @@ public void OnKeyDown(Key key)
 {
 if (key == Key.Escape)
 _context.Tools.VoltarParaSelecao();
-}
-private static Point CalcularPosicaoPorCentro(Point centro, double largura, double altura)
-{
-return new Point(
-centro.X - largura / 2,
-centro.Y - altura / 2);
 }
 }
 }
@@ -361,7 +357,7 @@ public void OnMouseDown(ElementoViewModel? vm, Point position, ToolInputState in
 {
 Point pontoSnap = _context.Snap.SnapFromElemento(vm, position);
 Carga carga = _context.ElementoFactory.CriarCarga();
-Point posicao = CalcularPosicaoPorCentro(pontoSnap, 70, 70);
+Point posicao = _context.Geometry.CalcularTopoEsquerdoPorCentro(carga, pontoSnap);
 carga.PosicaoX = posicao.X;
 carga.PosicaoY = posicao.Y;
 _context.Commands.Execute(new AddElementoCommand(carga, _context));
@@ -373,12 +369,6 @@ public void OnKeyDown(Key key)
 {
 if (key == Key.Escape)
 _context.Tools.VoltarParaSelecao();
-}
-private static Point CalcularPosicaoPorCentro(Point centro, double largura, double altura)
-{
-return new Point(
-centro.X - largura / 2,
-centro.Y - altura / 2);
 }
 }
 }
@@ -427,7 +417,7 @@ public void OnMouseDown(ElementoViewModel? vm, Point position, ToolInputState in
 {
 Point pontoSnap = _context.Snap.SnapFromElemento(vm, position);
 Gerador gerador = _context.ElementoFactory.CriarGerador();
-Point posicao = CalcularPosicaoPorCentro(pontoSnap, 70, 70);
+Point posicao = _context.Geometry.CalcularTopoEsquerdoPorCentro(gerador, pontoSnap);
 gerador.PosicaoX = posicao.X;
 gerador.PosicaoY = posicao.Y;
 _context.Commands.Execute(new AddElementoCommand(gerador, _context));
@@ -440,199 +430,39 @@ public void OnKeyDown(Key key)
 if (key == Key.Escape)
 _context.Tools.VoltarParaSelecao();
 }
-private static Point CalcularPosicaoPorCentro(Point centro, double largura, double altura)
-{
-return new Point(
-centro.X - largura / 2,
-centro.Y - altura / 2);
-}
 }
 }
 
 
 ====================================================================================================
-ARQUIVO: C:\Araci-Engine-Front\Araci Engine\Core\SceneNodes\BarraNode.cs
+ARQUIVO: C:\Araci-Engine-Front\Araci Engine\Core\Rendering\ElementGeometryDefaults.cs
 ====================================================================================================
 
-﻿using System.Windows;
-using Araci.Models;
-namespace Araci.Core.SceneNodes
+namespace Araci.Core.Rendering
 {
-public class BarraNode : ElementoNode
+public static class ElementGeometryDefaults
 {
-private readonly Barra _barra;
-public BarraNode(Barra barra)
-: base(barra)
-{
-_barra = barra;
-AtualizarGeometria();
-}
-public override double Largura => 10;
-public override double Altura => _barra.Altura;
-public override void AtualizarGeometria()
-{
-Bounds = new Rect(
-Modelo.PosicaoX,
-Modelo.PosicaoY,
-Largura,
-Altura);
-}
+public const double EquipamentoLargura = 70;
+public const double EquipamentoAltura = 70;
+public const double BarraLargura = 10;
 }
 }
 
 
 ====================================================================================================
-ARQUIVO: C:\Araci-Engine-Front\Araci Engine\Core\SceneNodes\CaboNode.cs
+ARQUIVO: C:\Araci-Engine-Front\Araci Engine\Core\Scenes\Scene.cs
 ====================================================================================================
 
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Windows;
-using Araci.Models;
-namespace Araci.Core.SceneNodes
+using System.Collections.ObjectModel;
+using Araci.ViewModels;
+namespace Araci.Core.Scenes
 {
-public class CaboNode : ElementoNode
+public class Scene
 {
-private readonly Cabo _cabo;
-private double _x;
-private double _y;
-public CaboNode(Cabo cabo)
-: base(cabo)
+public ObservableCollection<ElementoViewModel> Elementos { get; }
+public Scene()
 {
-_cabo = cabo ?? throw new ArgumentNullException(nameof(cabo));
-InicializarPosicao();
-AtualizarGeometria();
-}
-public override double X => _x;
-public override double Y => _y;
-public override double Largura => Bounds.Width;
-public override double Altura => Bounds.Height;
-private void InicializarPosicao()
-{
-if (_cabo.Vertices.Count == 0)
-{
-_x = 0;
-_y = 0;
-return;
-}
-var p = _cabo.Vertices[0];
-_x = p.X;
-_y = p.Y;
-}
-public override void Mover(Vector delta)
-{
-if (delta.X == 0 && delta.Y == 0)
-return;
-_x += delta.X;
-_y += delta.Y;
-for (int i = 0; i < _cabo.Vertices.Count; i++)
-{
-var p = _cabo.Vertices[i];
-_cabo.Vertices[i] = new Point(
-p.X + delta.X,
-p.Y + delta.Y);
-}
-if (_cabo.PreviewPonto.HasValue)
-{
-var preview = _cabo.PreviewPonto.Value;
-_cabo.PreviewPonto = new Point(
-preview.X + delta.X,
-preview.Y + delta.Y);
-}
-AtualizarGeometria();
-}
-public override void AtualizarGeometria()
-{
-var pontos = new List<Point>();
-pontos.AddRange(_cabo.Vertices);
-if (_cabo.PreviewPonto.HasValue)
-pontos.Add(_cabo.PreviewPonto.Value);
-if (pontos.Count == 0)
-{
-Bounds = Rect.Empty;
-return;
-}
-double minX = pontos.Min(p => p.X);
-double minY = pontos.Min(p => p.Y);
-double maxX = pontos.Max(p => p.X);
-double maxY = pontos.Max(p => p.Y);
-double largura = Math.Max(1, maxX - minX);
-double altura = Math.Max(1, maxY - minY);
-Bounds = new Rect(
-minX,
-minY,
-largura,
-altura);
-}
-}
-}
-
-
-====================================================================================================
-ARQUIVO: C:\Araci-Engine-Front\Araci Engine\Core\SceneNodes\ElementoNode.cs
-====================================================================================================
-
-﻿using System.Windows;
-using Araci.Models;
-namespace Araci.Core.SceneNodes
-{
-public abstract class ElementoNode
-{
-protected ElementoNode(Elemento modelo)
-{
-Modelo = modelo;
-}
-public Elemento Modelo { get; }
-public Rect Bounds { get; protected set; }
-public Point Centro => new(
-Bounds.X + Bounds.Width / 2,
-Bounds.Y + Bounds.Height / 2);
-public virtual double Largura => Bounds.Width;
-public virtual double Altura => Bounds.Height;
-public virtual double X
-{
-get => Modelo.PosicaoX;
-set => Modelo.PosicaoX = value;
-}
-public virtual double Y
-{
-get => Modelo.PosicaoY;
-set => Modelo.PosicaoY = value;
-}
-public virtual void Mover(Vector delta)
-{
-Modelo.PosicaoX += delta.X;
-Modelo.PosicaoY += delta.Y;
-AtualizarGeometria();
-}
-public abstract void AtualizarGeometria();
-}
-}
-
-
-====================================================================================================
-ARQUIVO: C:\Araci-Engine-Front\Araci Engine\Core\SceneNodes\EquipamentoNode.cs
-====================================================================================================
-
-﻿using System.Windows;
-using Araci.Models;
-namespace Araci.Core.SceneNodes
-{
-public class EquipamentoNode : ElementoNode
-{
-private readonly double _largura;
-private readonly double _altura;
-public EquipamentoNode(ElementoEquipamento modelo, double largura = 70, double altura = 70)
-: base(modelo)
-{
-_largura = largura;
-_altura = altura;
-AtualizarGeometria();
-}
-public override void AtualizarGeometria()
-{
-Bounds = new Rect(Modelo.PosicaoX, Modelo.PosicaoY, _largura, _altura);
+Elementos = new ObservableCollection<ElementoViewModel>();
 }
 }
 }
@@ -673,6 +503,7 @@ SimulationExport = new SimulationExportService();
 SimulationMessages = new SimulationMessageBuilder();
 TypePropertiesDialogs = new TypePropertiesDialogService();
 Dialogs = new DialogService();
+Geometry = new ElementGeometryService();
 ElementoFactory = new ElementoFactory(Types, Names, TypePropertiesDialogs);
 Selection = new SelectionService(this);
 MoveHud = new MoveHudService(this);
@@ -713,11 +544,134 @@ public SimulationExportService SimulationExport { get; }
 public SimulationMessageBuilder SimulationMessages { get; }
 public TypePropertiesDialogService TypePropertiesDialogs { get; }
 public DialogService Dialogs { get; }
+public ElementGeometryService Geometry { get; }
 public TypeLibraryService Types { get; } = new TypeLibraryService();
 public ElementoFactory ElementoFactory { get; }
 public TransactionScope BeginTransaction()
 {
 return new TransactionScope(Commands);
+}
+}
+}
+
+
+====================================================================================================
+ARQUIVO: C:\Araci-Engine-Front\Araci Engine\Service\ElementGeometryService.cs
+====================================================================================================
+
+using System.Windows;
+using Araci.Core.Rendering;
+using Araci.Models;
+namespace Araci.Services
+{
+public class ElementGeometryService
+{
+public Size ObterTamanho(Elemento elemento)
+{
+return elemento switch
+{
+Barra barra => new Size(ElementGeometryDefaults.BarraLargura, barra.Altura),
+ElementoEquipamento => new Size(
+ElementGeometryDefaults.EquipamentoLargura,
+ElementGeometryDefaults.EquipamentoAltura),
+ElementoLinear => Size.Empty,
+_ => new Size(
+ElementGeometryDefaults.EquipamentoLargura,
+ElementGeometryDefaults.EquipamentoAltura)
+};
+}
+public Point CalcularTopoEsquerdoPorCentro(Elemento elemento, Point centro)
+{
+Size tamanho = ObterTamanho(elemento);
+return new Point(
+centro.X - tamanho.Width / 2,
+centro.Y - tamanho.Height / 2);
+}
+}
+}
+
+
+====================================================================================================
+ARQUIVO: C:\Araci-Engine-Front\Araci Engine\Service\ElementoFactory.cs
+====================================================================================================
+
+using System;
+using Araci.Models;
+using Araci.ViewModels;
+namespace Araci.Services
+{
+public class ElementoFactory
+{
+private readonly TypeLibraryService _types;
+private readonly NameService _names;
+private readonly TypePropertiesDialogService _typePropertiesDialogs;
+public ElementoFactory(
+TypeLibraryService types,
+NameService names,
+TypePropertiesDialogService typePropertiesDialogs)
+{
+_types = types ?? throw new ArgumentNullException(nameof(types));
+_names = names ?? throw new ArgumentNullException(nameof(names));
+_typePropertiesDialogs = typePropertiesDialogs ?? throw new ArgumentNullException(nameof(typePropertiesDialogs));
+}
+public ElementoViewModel? CriarViewModel(Elemento modelo)
+{
+return modelo switch
+{
+Cabo cabo => new CaboViewModel(cabo, _types, _names, _typePropertiesDialogs),
+Carga carga => new CargaViewModel(carga, _types, _names, _typePropertiesDialogs),
+Gerador gerador => new GeradorViewModel(gerador, _types, _names, _typePropertiesDialogs),
+Barra barra => new BarraViewModel(barra, _types, _names, _typePropertiesDialogs),
+_ => null
+};
+}
+public Cabo CriarCabo()
+{
+return new Cabo
+{
+Tipo = _types.TipoCaboPadrao
+?? throw new InvalidOperationException("Nenhum tipo de cabo cadastrado.")
+};
+}
+public CaboViewModel CriarCaboVM()
+{
+return new CaboViewModel(CriarCabo(), _types, _names, _typePropertiesDialogs);
+}
+public Carga CriarCarga()
+{
+return new Carga
+{
+Tipo = _types.TipoCargaPadrao
+?? throw new InvalidOperationException("Nenhum tipo de carga cadastrado.")
+};
+}
+public CargaViewModel CriarCargaVM()
+{
+return new CargaViewModel(CriarCarga(), _types, _names, _typePropertiesDialogs);
+}
+public Gerador CriarGerador()
+{
+return new Gerador
+{
+Tipo = _types.TipoGeradorPadrao
+?? throw new InvalidOperationException("Nenhum tipo de gerador cadastrado.")
+};
+}
+public GeradorViewModel CriarGeradorVM()
+{
+return new GeradorViewModel(CriarGerador(), _types, _names, _typePropertiesDialogs);
+}
+public Barra CriarBarra()
+{
+return new Barra
+{
+Tipo = _types.TipoBarraPadrao
+?? throw new InvalidOperationException("Nenhum tipo de barra cadastrado.")
+};
+}
+public BarraViewModel CriarBarraVM()
+{
+return new BarraViewModel(CriarBarra(), _types, _names, _typePropertiesDialogs);
 }
 }
 }
@@ -1443,6 +1397,111 @@ AtualizarTerminais();
 private void AtualizarTerminais()
 {
 Gerador.AtualizarTerminais(Largura, Altura);
+}
+}
+}
+
+
+====================================================================================================
+ARQUIVO: C:\Araci-Engine-Front\Araci Engine\ViewModels\ViewportViewModel.cs
+====================================================================================================
+
+using System;
+using System.Collections.Generic;
+using System.Collections.ObjectModel;
+using System.Collections.Specialized;
+using System.ComponentModel;
+using System.Runtime.CompilerServices;
+using Araci.Core.Documents;
+using Araci.Core.Scenes;
+using Araci.Models;
+using Araci.Services;
+namespace Araci.ViewModels
+{
+public class ViewportViewModel : INotifyPropertyChanged
+{
+private readonly EditorContext _context;
+private readonly Dictionary<Elemento, ElementoViewModel> _viewModelsPorModelo = new();
+public ViewportViewModel(EditorContext context)
+{
+_context = context ?? throw new ArgumentNullException(nameof(context));
+Document = context.Document;
+Scene = context.Scene;
+SelectionBox = context.SelectionBox;
+MoveHud = context.MoveHud;
+Document.Elementos.CollectionChanged += OnDocumentElementosChanged;
+SincronizarComDocumento();
+}
+public AraciDocument Document { get; }
+public Scene Scene { get; }
+public SelectionBoxViewModel SelectionBox { get; }
+public MoveHudService MoveHud { get; }
+public ObservableCollection<ElementoViewModel> Elementos => Scene.Elementos;
+public void RegistrarViewModel(ElementoViewModel vm)
+{
+_viewModelsPorModelo[vm.Modelo] = vm;
+}
+public ElementoViewModel? ObterViewModel(Elemento modelo)
+{
+return _viewModelsPorModelo.TryGetValue(modelo, out var vm)
+? vm
+: null;
+}
+public void AtualizarViewModel(Elemento modelo)
+{
+ObterViewModel(modelo)?.AtualizarAposModeloAlterado();
+}
+private void OnDocumentElementosChanged(object? sender, NotifyCollectionChangedEventArgs e)
+{
+if (e.Action == NotifyCollectionChangedAction.Reset)
+{
+Elementos.Clear();
+return;
+}
+if (e.OldItems != null)
+{
+foreach (Elemento modelo in e.OldItems)
+RemoverViewModel(modelo);
+}
+if (e.NewItems != null)
+{
+foreach (Elemento modelo in e.NewItems)
+AdicionarViewModel(modelo);
+}
+}
+private void SincronizarComDocumento()
+{
+Elementos.Clear();
+foreach (Elemento modelo in Document.Elementos)
+AdicionarViewModel(modelo);
+}
+private void AdicionarViewModel(Elemento modelo)
+{
+var vm = ObterOuCriarViewModel(modelo);
+if (vm == null || Elementos.Contains(vm))
+return;
+Elementos.Add(vm);
+}
+private void RemoverViewModel(Elemento modelo)
+{
+if (!_viewModelsPorModelo.TryGetValue(modelo, out var vm))
+return;
+_context.Selection.Deselecionar(vm);
+Elementos.Remove(vm);
+}
+private ElementoViewModel? ObterOuCriarViewModel(Elemento modelo)
+{
+if (_viewModelsPorModelo.TryGetValue(modelo, out var existente))
+return existente;
+var vm = _context.ElementoFactory.CriarViewModel(modelo);
+if (vm != null)
+_viewModelsPorModelo[modelo] = vm;
+return vm;
+}
+public event PropertyChangedEventHandler? PropertyChanged;
+protected virtual void OnPropertyChanged([CallerMemberName] string? nome = null)
+{
+PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nome));
 }
 }
 }

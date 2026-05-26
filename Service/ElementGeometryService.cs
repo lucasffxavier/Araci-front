@@ -1,21 +1,23 @@
 using System.Windows;
+using Araci.Core.Rendering;
 using Araci.Models;
 
 namespace Araci.Services
 {
     public class ElementGeometryService
     {
-        private const double LarguraBarra = 10;
-        private const double TamanhoEquipamento = 70;
-
         public Size ObterTamanho(Elemento elemento)
         {
             return elemento switch
             {
-                Barra barra => new Size(LarguraBarra, barra.Altura),
-                ElementoEquipamento => new Size(TamanhoEquipamento, TamanhoEquipamento),
+                Barra barra => new Size(ElementGeometryDefaults.BarraLargura, barra.Altura),
+                ElementoEquipamento => new Size(
+                    ElementGeometryDefaults.EquipamentoLargura,
+                    ElementGeometryDefaults.EquipamentoAltura),
                 ElementoLinear => Size.Empty,
-                _ => new Size(TamanhoEquipamento, TamanhoEquipamento)
+                _ => new Size(
+                    ElementGeometryDefaults.EquipamentoLargura,
+                    ElementGeometryDefaults.EquipamentoAltura)
             };
         }
 

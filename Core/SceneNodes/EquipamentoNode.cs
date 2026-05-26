@@ -1,4 +1,5 @@
 ﻿using System.Windows;
+using Araci.Core.Rendering;
 using Araci.Models;
 
 namespace Araci.Core.SceneNodes
@@ -8,7 +9,10 @@ namespace Araci.Core.SceneNodes
         private readonly double _largura;
         private readonly double _altura;
 
-        public EquipamentoNode(ElementoEquipamento modelo, double largura = 70, double altura = 70)
+        public EquipamentoNode(
+            ElementoEquipamento modelo,
+            double largura = ElementGeometryDefaults.EquipamentoLargura,
+            double altura = ElementGeometryDefaults.EquipamentoAltura)
             : base(modelo)
         {
             _largura = largura;
