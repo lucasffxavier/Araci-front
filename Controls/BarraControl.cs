@@ -67,6 +67,10 @@ namespace Araci.Controls
 
             _svg.SetBinding(WidthProperty, new Binding("RenderData.Largura"));
             _svg.SetBinding(HeightProperty, new Binding("RenderData.Altura"));
+            _svg.SetBinding(OpacityProperty, new Binding("IsPreview")
+            {
+                Converter = new BoolToOpacityConverter()
+            });
 
             _previewOverlay.SetBinding(WidthProperty, new Binding("RenderData.Largura"));
             _previewOverlay.SetBinding(HeightProperty, new Binding("RenderData.Altura"));
