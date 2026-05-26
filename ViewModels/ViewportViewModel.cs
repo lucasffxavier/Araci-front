@@ -24,6 +24,7 @@ namespace Araci.ViewModels
             Scene = context.Scene;
             SelectionBox = context.SelectionBox;
             TerminalSnap = context.TerminalSnap;
+            CableVertexEdit = context.CableVertexEdit;
             MoveHud = context.MoveHud;
 
             Document.Elementos.CollectionChanged += OnDocumentElementosChanged;
@@ -35,6 +36,7 @@ namespace Araci.ViewModels
         public Scene Scene { get; }
         public SelectionBoxViewModel SelectionBox { get; }
         public TerminalSnapState TerminalSnap { get; }
+        public CableVertexEditService CableVertexEdit { get; }
         public MoveHudService MoveHud { get; }
 
         public ObservableCollection<ElementoViewModel> Elementos => Scene.Elementos;

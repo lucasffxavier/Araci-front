@@ -34,7 +34,9 @@ namespace Araci.Services
             Geometry = new ElementGeometryService();
 
             ElementoFactory = new ElementoFactory(Types, Names, TypePropertiesDialogs);
+            CableVertexEdit = new CableVertexEditService(this);
             Selection = new SelectionService(this);
+            Selection.SelectionChanged += CableVertexEdit.Refresh;
             MoveHud = new MoveHudService(this);
             MoveConstraints = new MoveConstraintService(Settings);
             Move = new MoveService(this);
@@ -77,6 +79,8 @@ namespace Araci.Services
         public SelectionBoxViewModel SelectionBox { get; } = new SelectionBoxViewModel();
 
         public TerminalSnapState TerminalSnap { get; } = new TerminalSnapState();
+
+        public CableVertexEditService CableVertexEdit { get; }
 
         public CommandManager Commands { get; } = new CommandManager();
 

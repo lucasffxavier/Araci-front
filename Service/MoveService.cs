@@ -106,6 +106,7 @@ namespace Araci.Services
         {
             _context.Viewport?.AtualizarViewModel(elemento);
             _context.SceneQueries.Invalidate();
+            _context.CableVertexEdit.Refresh();
         }
 
         private void CapturarEstadoInicial(ElementoViewModel vm)

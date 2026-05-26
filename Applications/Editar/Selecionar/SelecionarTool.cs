@@ -14,6 +14,7 @@ namespace Araci.Applications.Editar.Selecionar
         private readonly SelectionController _selection;
         private readonly SelectionBoxController _selectionBox;
         private readonly DragMoveController _dragMove;
+        private readonly CableVertexEditService _cableVertexEdit;
         private readonly bool _modoSoMover;
 
         public SelecionarTool(EditorContext context, bool modoSoMover = false, bool mostrarHud = false)
@@ -24,6 +25,7 @@ namespace Araci.Applications.Editar.Selecionar
             _queries = context.SceneQueries;
             _selection = new SelectionController(context.Selection);
             _selectionBox = new SelectionBoxController(context.SelectionBox, _queries, context.Selection);
+            _cableVertexEdit = context.CableVertexEdit;
             _dragMove = new DragMoveController(
                 context.Selection,
                 context.Move,
@@ -35,24 +37,37 @@ namespace Araci.Applications.Editar.Selecionar
 
         public string Nome => "Selecionar";
         public bool MantemBotaoAtivado => true;
-        public bool IsBusy => _dragMove.IsActive || _selectionBox.IsActive;
+        public bool IsBusy =>
+            _dragMove.IsActive ||
+            _selectionBox.IsActive ||
+            _cableVertexEdit.IsEditing;
 
-        public void Ativar() { }
+        public void Ativar()
+        {
+            if (!_modoSoMover)
+                _cableVertexEdit.Refresh();
+        }
 
         public void Desativar()
         {
             Cancelar();
+            _cableVertexEdit.Clear();
         }
 
         public void Cancelar()
         {
             _dragMove.Cancel();
             _selectionBox.Cancel();
+            _cableVertexEdit.Cancel();
+            _cableVertexEdit.Refresh();
         }
 
         public void OnMouseDown(ElementoViewModel? vm, Point position, ToolInputState inputState)
         {
             bool ctrl = inputState.IsControlPressed;
+
+            if (!_modoSoMover && _cableVertexEdit.TryBegin(position))
+                return;
 
             var hit = vm ?? _queries.HitTest(position)?.Elemento;
 
@@ -61,6 +76,7 @@ namespace Araci.Applications.Editar.Selecionar
                 if (!_modoSoMover)
                     _selection.Select(hit, ctrl);
 
+                _cableVertexEdit.Clear();
                 _dragMove.Begin(position);
                 return;
             }
@@ -73,6 +89,12 @@ namespace Araci.Applications.Editar.Selecionar
 
         public void OnMouseMove(Point position, ToolInputState inputState)
         {
+            if (_cableVertexEdit.IsEditing)
+            {
+                _cableVertexEdit.Update(position);
+                return;
+            }
+
             if (_dragMove.IsActive)
             {
                 _dragMove.Update(position, inputState);
@@ -85,8 +107,17 @@ namespace Araci.Applications.Editar.Selecionar
 
         public void OnMouseUp(Point position, ToolInputState inputState)
         {
+            if (_cableVertexEdit.IsEditing)
+            {
+                _cableVertexEdit.End();
+                return;
+            }
+
             if (_dragMove.IsActive)
+            {
                 _dragMove.End();
+                _cableVertexEdit.Refresh();
+            }
 
             if (_selectionBox.IsActive)
                 _selectionBox.End();

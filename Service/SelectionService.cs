@@ -1,6 +1,7 @@
 ﻿using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Linq;
+using System;
 using Araci.Core.Events;
 using Araci.ViewModels;
 
@@ -21,6 +22,8 @@ namespace Araci.Services
         public ObservableCollection<ElementoViewModel> SelecionadosObservable => _selecionados;
 
         public bool TemSelecionados => _selecionados.Count > 0;
+
+        public event Action? SelectionChanged;
 
         public void Selecionar(ElementoViewModel vm, bool adicionarAoExistente = false)
         {
@@ -87,6 +90,7 @@ namespace Araci.Services
         private void PublicarAlteracao()
         {
             _context.Events.Publish(new SelecaoAlteradaEvent(_selecionados.ToList()));
+            SelectionChanged?.Invoke();
         }
     }
 }
