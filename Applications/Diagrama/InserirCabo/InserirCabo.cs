@@ -30,6 +30,7 @@ namespace Araci.Applications.Diagrama.InserirCabo
         private readonly EditorContext _context;
 
         private CaboViewModel? _caboAtual;
+        private CaboViewModel? _previewInicial;
         private bool _inserindo;
 
         public InserirCaboTool(EditorContext context)
@@ -40,7 +41,7 @@ namespace Araci.Applications.Diagrama.InserirCabo
         public string Nome => "Inserir Cabo";
 
         public bool MantemBotaoAtivado => true;
-        public bool IsBusy => _inserindo;
+        public bool IsBusy => _inserindo || _previewInicial != null;
 
         public void Ativar()
         {
@@ -56,6 +57,7 @@ namespace Araci.Applications.Diagrama.InserirCabo
             if (_caboAtual != null)
                 _context.Commands.Undo();
 
+            LimparPreviewInicial();
             LimparEstado();
         }
 
@@ -64,8 +66,11 @@ namespace Araci.Applications.Diagrama.InserirCabo
             Point position,
             ToolInputState inputState)
         {
-            if (ReferenceEquals(vm, _caboAtual))
+            if (ReferenceEquals(vm, _caboAtual) ||
+                ReferenceEquals(vm, _previewInicial))
+            {
                 vm = null;
+            }
 
             Terminal? terminal =
                 ObterTerminalConexao(vm, position);
@@ -78,6 +83,8 @@ namespace Araci.Applications.Diagrama.InserirCabo
             {
                 if (terminal == null)
                     return;
+
+                LimparPreviewInicial();
 
                 _caboAtual =
                     _context.ElementoFactory.CriarCaboVM();
@@ -111,11 +118,21 @@ namespace Araci.Applications.Diagrama.InserirCabo
 
         public void OnMouseMove(Point position, ToolInputState inputState)
         {
-            if (!_inserindo || _caboAtual == null)
+            if (!_inserindo)
+            {
+                AtualizarPreviewInicial(position);
+                return;
+            }
+
+            if (_caboAtual == null)
                 return;
 
+            Terminal? terminal =
+                ObterTerminalConexao(null, position);
+
             Point pontoSnap =
-                _context.Snap.Snap(position, _caboAtual);
+                terminal?.Posicao
+                ?? _context.Snap.Snap(position, _caboAtual);
 
             _caboAtual.AtualizarPreview(pontoSnap);
         }
@@ -127,10 +144,7 @@ namespace Araci.Applications.Diagrama.InserirCabo
         public void OnKeyDown(Key key)
         {
             if (key == Key.Enter)
-            {
-                Finalizar();
                 return;
-            }
 
             if (key == Key.Escape)
                 Cancelar();
@@ -156,10 +170,56 @@ namespace Araci.Applications.Diagrama.InserirCabo
             terminal =
                 _context.Snap.ObterTerminalMaisProximo(
                     position,
-                    _caboAtual,
+                    _caboAtual ?? _previewInicial,
                     t => EhElementoConectavel(t.Dono));
 
             return terminal;
+        }
+
+        private void AtualizarPreviewInicial(Point position)
+        {
+            Terminal? terminal =
+                ObterTerminalConexao(null, position);
+
+            if (terminal == null)
+            {
+                LimparPreviewInicial();
+                return;
+            }
+
+            CaboViewModel preview = ObterPreviewInicial();
+            preview.Cabo.Vertices.Clear();
+            preview.Cabo.Vertices.Add(terminal.Posicao);
+            preview.Cabo.DefinirOrigem(terminal.Posicao);
+            preview.Cabo.PreviewPonto = position;
+            preview.AtualizarAposModeloAlterado();
+            _context.SceneQueries.Invalidate();
+        }
+
+        private CaboViewModel ObterPreviewInicial()
+        {
+            if (_previewInicial != null)
+                return _previewInicial;
+
+            _previewInicial =
+                _context.ElementoFactory.CriarCaboVM();
+
+            _previewInicial.IsPreview = true;
+            _context.Scene.Elementos.Add(_previewInicial);
+            _context.SceneQueries.Invalidate();
+
+            return _previewInicial;
+        }
+
+        private void LimparPreviewInicial()
+        {
+            if (_previewInicial == null)
+                return;
+
+            _previewInicial.IsPreview = false;
+            _context.Scene.Elementos.Remove(_previewInicial);
+            _previewInicial = null;
+            _context.SceneQueries.Invalidate();
         }
 
         private void ConectarOrigem(
@@ -215,6 +275,7 @@ namespace Araci.Applications.Diagrama.InserirCabo
 
         private void Finalizar()
         {
+            LimparPreviewInicial();
             LimparEstado();
 
             _context.Tools.VoltarParaSelecao();

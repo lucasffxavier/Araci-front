@@ -45,7 +45,9 @@ namespace Araci.Core.SceneQueries
             GarantirIndex();
 
             double effectiveTolerance = Math.Max(6, tolerance);
-            var candidatos = _index.Nearby(point, Math.Max(10, effectiveTolerance)).ToList();
+            var candidatos = _index.Nearby(point, Math.Max(10, effectiveTolerance))
+                .Where(e => !e.IsPreview)
+                .ToList();
             HitCandidate? melhor = null;
 
             for (int i = 0; i < candidatos.Count; i++)
@@ -64,13 +66,13 @@ namespace Araci.Core.SceneQueries
         public IEnumerable<ElementoViewModel> Query(Rect area)
         {
             GarantirIndex();
-            return _index.Query(area);
+            return _index.Query(area).Where(e => !e.IsPreview);
         }
 
         public IEnumerable<ElementoViewModel> Nearby(Point point, double radius)
         {
             GarantirIndex();
-            return _index.Nearby(point, radius);
+            return _index.Nearby(point, radius).Where(e => !e.IsPreview);
         }
 
         private void GarantirIndex()

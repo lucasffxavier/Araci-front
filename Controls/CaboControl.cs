@@ -79,6 +79,7 @@ namespace Araci.Controls
             vm.Cabo.Vertices.CollectionChanged += OnVerticesChanged;
 
             AtualizarPolyline();
+            AplicarEstadoVisual(vm);
         }
 
         private void Desconectar()
@@ -101,12 +102,16 @@ namespace Araci.Controls
             if (e.PropertyName != nameof(ElementoViewModel.Bounds) &&
                 e.PropertyName != nameof(ElementoViewModel.WorldX) &&
                 e.PropertyName != nameof(ElementoViewModel.WorldY) &&
-                e.PropertyName != nameof(ElementoViewModel.RenderData))
+                e.PropertyName != nameof(ElementoViewModel.RenderData) &&
+                e.PropertyName != nameof(ElementoViewModel.IsPreview) &&
+                e.PropertyName != nameof(ElementoViewModel.IsHover) &&
+                e.PropertyName != nameof(ElementoViewModel.IsSelecionado))
             {
                 return;
             }
 
             AtualizarPolyline();
+            AplicarEstadoVisual((ElementoViewModel)sender!);
         }
 
         private void AtualizarPolyline()
@@ -154,8 +159,19 @@ namespace Araci.Controls
             if (vm is not CaboViewModel cabo)
                 return;
 
+            if (cabo.IsPreview)
+            {
+                _polyline.Stroke = Brushes.DeepSkyBlue;
+                _polyline.StrokeThickness = 3;
+                _polyline.Opacity = 0.65;
+                _hitArea.IsHitTestVisible = false;
+                return;
+            }
+
             _polyline.Stroke = cabo.Stroke;
             _polyline.StrokeThickness = cabo.StrokeThickness;
+            _polyline.Opacity = 1;
+            _hitArea.IsHitTestVisible = true;
         }
     }
 }
