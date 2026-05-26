@@ -24,7 +24,12 @@ namespace Araci.Applications.Editar.Selecionar
             _queries = context.SceneQueries;
             _selection = new SelectionController(context.Selection);
             _selectionBox = new SelectionBoxController(context.SelectionBox, _queries, context.Selection);
-            _dragMove = new DragMoveController(context.Selection, context.Move, context.MoveHud, mostrarHud);
+            _dragMove = new DragMoveController(
+                context.Selection,
+                context.Move,
+                context.MoveHud,
+                context.MoveConstraints,
+                mostrarHud);
             _modoSoMover = modoSoMover;
         }
 

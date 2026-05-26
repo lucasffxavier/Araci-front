@@ -189,6 +189,7 @@ Araci Engine
 │   ├── ElementoFactory.cs
 │   ├── HoverService.cs
 │   ├── InputRouter.cs
+│   ├── MoveConstraintService.cs
 │   ├── MoveHudService.cs
 │   ├── MoveHudState.cs
 │   ├── MoveService.cs
@@ -248,31 +249,6 @@ Araci Engine
 ├── GlobalUsings.cs
 ├── MainWindow.xaml
 └── MainWindow.xaml.cs
-
-
-====================================================================================================
-ARQUIVO: C:\Araci-Engine-Front\Araci Engine\Applications\Editar\Base\ITool.cs
-====================================================================================================
-
-﻿using System.Windows;
-using System.Windows.Input;
-using Araci.ViewModels;
-namespace Araci.Applications.Editar.Base
-{
-public interface ITool
-{
-string Nome { get; }
-bool MantemBotaoAtivado { get; }
-bool IsBusy { get; }
-void Ativar();
-void Desativar();
-void Cancelar();
-void OnMouseDown(ElementoViewModel? vm, Point position, ToolInputState inputState);
-void OnMouseMove(Point position, ToolInputState inputState);
-void OnMouseUp(Point position, ToolInputState inputState);
-void OnKeyDown(Key key);
-}
-}
 
 
 ====================================================================================================
@@ -340,6 +316,7 @@ public class DragMoveController
 private readonly SelectionService _selection;
 private readonly MoveService _move;
 private readonly MoveHudService _hud;
+private readonly MoveConstraintService _constraints;
 private readonly bool _mostrarHud;
 private Point _ultimoPontoMouse;
 private Point _ultimoPontoEfetivo;
@@ -348,11 +325,13 @@ public DragMoveController(
 SelectionService selection,
 MoveService move,
 MoveHudService hud,
+MoveConstraintService constraints,
 bool mostrarHud)
 {
 _selection = selection ?? throw new ArgumentNullException(nameof(selection));
 _move = move ?? throw new ArgumentNullException(nameof(move));
 _hud = hud ?? throw new ArgumentNullException(nameof(hud));
+_constraints = constraints ?? throw new ArgumentNullException(nameof(constraints));
 _mostrarHud = mostrarHud;
 }
 public bool IsActive { get; private set; }
@@ -362,6 +341,7 @@ IsActive = true;
 _ultimoPontoMouse = position;
 _ultimoPontoEfetivo = position;
 _pontoInicialArrasto = position;
+_constraints.Begin(position);
 _move.BeginMove(_selection.Selecionados);
 if (!_mostrarHud)
 return;
@@ -373,9 +353,7 @@ public void Update(Point position, ToolInputState inputState)
 {
 if (!IsActive)
 return;
-Point pontoEfetivo = inputState.IsShiftPressed
-? AplicarTravaOrtogonal(position)
-: position;
+Point pontoEfetivo = _constraints.Apply(position, inputState);
 Vector delta = pontoEfetivo - _ultimoPontoEfetivo;
 if (delta.X != 0 || delta.Y != 0)
 {
@@ -393,11 +371,13 @@ if (!IsActive)
 return;
 _move.EndMove(_selection.Selecionados.ToList());
 IsActive = false;
+_constraints.End();
 LimparHud();
 }
 public void Cancel()
 {
 IsActive = false;
+_constraints.Cancel();
 _move.AbortMove();
 LimparHud();
 }
@@ -407,13 +387,6 @@ Vector delta = position - _pontoInicialArrasto;
 _hud.DeltaX = delta.X;
 _hud.DeltaY = delta.Y;
 _hud.AtualizarPosicao(CalcularBoundsSelecionados());
-}
-private Point AplicarTravaOrtogonal(Point position)
-{
-Vector total = position - _pontoInicialArrasto;
-return Math.Abs(total.X) >= Math.Abs(total.Y)
-? new Point(position.X, _pontoInicialArrasto.Y)
-: new Point(_pontoInicialArrasto.X, position.Y);
 }
 private void LimparHud()
 {
@@ -462,7 +435,12 @@ throw new ArgumentNullException(nameof(context));
 _queries = context.SceneQueries;
 _selection = new SelectionController(context.Selection);
 _selectionBox = new SelectionBoxController(context.SelectionBox, _queries, context.Selection);
-_dragMove = new DragMoveController(context.Selection, context.Move, context.MoveHud, mostrarHud);
+_dragMove = new DragMoveController(
+context.Selection,
+context.Move,
+context.MoveHud,
+context.MoveConstraints,
+mostrarHud);
 _modoSoMover = modoSoMover;
 }
 public string Nome => "Selecionar";
@@ -516,104 +494,143 @@ public void OnKeyDown(Key key) { }
 
 
 ====================================================================================================
-ARQUIVO: C:\Araci-Engine-Front\Araci Engine\Service\InputRouter.cs
+ARQUIVO: C:\Araci-Engine-Front\Araci Engine\Service\EditorContext.cs
 ====================================================================================================
 
-using System.Windows;
-using System.Windows.Input;
-using Araci.Applications.Editar.Base;
+using Araci.Core.Commands;
+using Araci.Core.Documents;
+using Araci.Core.Events;
+using Araci.Core.SceneQueries;
+using Araci.Core.Scenes;
+using Araci.Core.Transactions;
 using Araci.ViewModels;
 namespace Araci.Services
 {
-public class InputRouter
+public class EditorContext
 {
-private readonly EditorContext _context;
-public InputRouter(EditorContext context)
+public EditorContext()
+: this(new EventBus())
 {
-_context = context ?? throw new ArgumentNullException(nameof(context));
 }
-public ITool ToolAtual
+public EditorContext(IEventBus eventBus)
 {
-get => _context.Tools.FerramentaAtual;
-set => _context.Tools.AtivarFerramenta(value);
+Events = eventBus;
+Scene = new Scene();
+SceneQueries = new SceneQueryService(Scene);
+Hover = new HoverService(SceneQueries);
+Snap = new SnapService(SceneQueries);
+Names = new NameService(Document);
+Connectivity = new ConnectivityService(this);
+Topology = new TopologyValidator(this);
+SimulationResults = new SimulationResultApplier(this);
+Simulation = new SimulationPipeline(this);
+SimulationExport = new SimulationExportService();
+SimulationMessages = new SimulationMessageBuilder();
+TypePropertiesDialogs = new TypePropertiesDialogService();
+Dialogs = new DialogService();
+ElementoFactory = new ElementoFactory(Types, Names, TypePropertiesDialogs);
+Selection = new SelectionService(this);
+MoveHud = new MoveHudService(this);
+MoveConstraints = new MoveConstraintService();
+Move = new MoveService(this);
+Tools = new ToolService(this);
+Input = new InputRouter(this);
+Navigation = new ViewportNavigationService(this);
 }
-public void MouseDown(ElementoViewModel? vm, Point position)
+public IEventBus Events { get; }
+public AraciDocument Document { get; set; } = new AraciDocument();
+public Scene Scene { get; } = new Scene();
+public ISceneQueryService SceneQueries { get; }
+public HoverService Hover { get; }
+public ToolService Tools { get; }
+public InputRouter Input { get; }
+public ViewportNavigationService Navigation { get; }
+public ViewportService? Viewport { get; private set; }
+public void InicializarViewport(ViewportViewModel viewportViewModel)
 {
-ToolAtual.OnMouseDown(vm, position, CapturarEstadoAtual(position));
+Viewport = new ViewportService(viewportViewModel);
 }
-public void MouseDown(ElementoViewModel? vm, Point position, ToolInputState inputState)
+public EditorState Editor { get; } = new EditorState();
+public MoveHudService MoveHud { get; }
+public MoveConstraintService MoveConstraints { get; }
+public SelectionBoxViewModel SelectionBox { get; } = new SelectionBoxViewModel();
+public CommandManager Commands { get; } = new CommandManager();
+public SelectionService Selection { get; }
+public MoveService Move { get; }
+public SnapService Snap { get; }
+public NameService Names { get; }
+public ConnectivityService Connectivity { get; }
+public TopologyValidator Topology { get; }
+public SimulationResultApplier SimulationResults { get; }
+public SimulationPipeline Simulation { get; }
+public SimulationExportService SimulationExport { get; }
+public SimulationMessageBuilder SimulationMessages { get; }
+public TypePropertiesDialogService TypePropertiesDialogs { get; }
+public DialogService Dialogs { get; }
+public TypeLibraryService Types { get; } = new TypeLibraryService();
+public ElementoFactory ElementoFactory { get; }
+public TransactionScope BeginTransaction()
 {
-ToolAtual.OnMouseDown(vm, position, inputState);
+return new TransactionScope(Commands);
 }
-public void MouseMove(Point position)
-{
-MouseMove(position, CapturarEstadoAtual(position));
 }
-public void MouseMove(Point position, ToolInputState inputState)
-{
-if (ToolAtual.IsBusy)
-_context.Hover.Clear();
-else
-_context.Hover.Update(position);
-ToolAtual.OnMouseMove(position, inputState);
 }
-public void MouseUp(Point position)
+
+
+====================================================================================================
+ARQUIVO: C:\Araci-Engine-Front\Araci Engine\Service\MoveConstraintService.cs
+====================================================================================================
+
+using System;
+using System.Windows;
+using Araci.Applications.Editar.Base;
+namespace Araci.Services
 {
-MouseUp(position, CapturarEstadoAtual(position));
+public class MoveConstraintService
+{
+private Point _start;
+private OrthogonalAxis? _orthogonalAxis;
+public void Begin(Point start)
+{
+_start = start;
+_orthogonalAxis = null;
 }
-public void MouseUp(Point position, ToolInputState inputState)
+public Point Apply(Point position, ToolInputState inputState)
 {
-ToolAtual.OnMouseUp(position, inputState);
+if (!inputState.IsShiftPressed)
+{
+_orthogonalAxis = null;
+return position;
 }
-public bool KeyDown(Key key)
-{
-bool control = Keyboard.Modifiers.HasFlag(ModifierKeys.Control);
-if (control && key == Key.Z)
-{
-_context.Commands.Undo();
-return true;
+return ApplyOrthogonal(position);
 }
-if (control && key == Key.Y)
+public void End()
 {
-_context.Commands.Redo();
-return true;
+_orthogonalAxis = null;
 }
-if (control && key == Key.C)
+public void Cancel()
 {
-ClipboardService.CopiarSelecionados(_context);
-return true;
+_orthogonalAxis = null;
 }
-if (control && key == Key.V)
+private Point ApplyOrthogonal(Point position)
 {
-ClipboardService.Colar(_context);
-return true;
-}
-if (key == Key.Escape)
+Vector total = position - _start;
+if (!_orthogonalAxis.HasValue)
 {
-if (ToolAtual.IsBusy)
+if (Math.Abs(total.X) < 0.0001 && Math.Abs(total.Y) < 0.0001)
+return _start;
+_orthogonalAxis = Math.Abs(total.X) >= Math.Abs(total.Y)
+? OrthogonalAxis.Horizontal
+: OrthogonalAxis.Vertical;
+}
+return _orthogonalAxis == OrthogonalAxis.Horizontal
+? new Point(position.X, _start.Y)
+: new Point(_start.X, position.Y);
+}
+private enum OrthogonalAxis
 {
-ToolAtual.Cancelar();
-return true;
-}
-if (ToolAtual is not Araci.Applications.Editar.Selecionar.SelecionarTool)
-{
-_context.Tools.VoltarParaSelecao();
-return true;
-}
-_context.Selection.Limpar();
-return true;
-}
-ToolAtual.OnKeyDown(key);
-return false;
-}
-private static ToolInputState CapturarEstadoAtual(Point worldPosition)
-{
-return new ToolInputState(
-Keyboard.Modifiers,
-null,
-0,
-worldPosition,
-default);
+Horizontal,
+Vertical
 }
 }
 }
@@ -900,267 +917,6 @@ _context.Editor.ElementoSelecionado = _selecionados.LastOrDefault();
 private void PublicarAlteracao()
 {
 _context.Events.Publish(new SelecaoAlteradaEvent(_selecionados.ToList()));
-}
-}
-}
-
-
-====================================================================================================
-ARQUIVO: C:\Araci-Engine-Front\Araci Engine\Views\ViewportView.xaml.cs
-====================================================================================================
-
-using System;
-using System.ComponentModel;
-using System.Windows;
-using System.Windows.Controls;
-using System.Windows.Input;
-using System.Windows.Media;
-using Araci.Applications.Editar.Base;
-using Araci.Services;
-using Araci.ViewModels;
-namespace Araci.Views
-{
-public partial class ViewportView : UserControl
-{
-private readonly MatrixTransform _cameraTransform = new();
-private ViewportViewModel? _viewportViewModel;
-private EditorContext? _context;
-public ViewportView()
-{
-InitializeComponent();
-}
-public void Inicializar(EditorContext context)
-{
-_context = context ?? throw new ArgumentNullException(nameof(context));
-_viewportViewModel = new ViewportViewModel(_context);
-DataContext = _viewportViewModel;
-_context.InicializarViewport(_viewportViewModel);
-ConfigurarCamera();
-Unloaded += OnUnloaded;
-}
-private void ConfigurarCamera()
-{
-if (_context?.Viewport == null)
-return;
-WorldLayer.RenderTransform = _cameraTransform;
-SelectionLayer.RenderTransform = _cameraTransform;
-_context.Viewport.Camera.PropertyChanged += OnCameraChanged;
-AtualizarCameraTransform();
-}
-private void OnCameraChanged(object? sender, PropertyChangedEventArgs e)
-{
-AtualizarCameraTransform();
-}
-private void AtualizarCameraTransform()
-{
-if (_context?.Viewport == null)
-return;
-var camera = _context.Viewport.Camera;
-_cameraTransform.Matrix = new Matrix(
-camera.Zoom,
-0,
-0,
-camera.Zoom,
-camera.Offset.X,
-camera.Offset.Y);
-}
-private void OnLoaded(object sender, RoutedEventArgs e)
-{
-Focus();
-Keyboard.Focus(this);
-AtualizarViewport();
-SizeChanged += (_, _) => AtualizarViewport();
-}
-private void AtualizarViewport()
-{
-if (_context?.Viewport == null)
-return;
-double largura = ActualWidth;
-double altura = ActualHeight;
-if (RootBorder != null)
-{
-largura -= RootBorder.BorderThickness.Left + RootBorder.BorderThickness.Right;
-altura -= RootBorder.BorderThickness.Top + RootBorder.BorderThickness.Bottom;
-}
-largura = Math.Max(0, largura);
-altura = Math.Max(0, altura);
-_context.Viewport.AtualizarTamanho(new Size(largura, altura));
-}
-private Point GetWorldPos(MouseEventArgs e)
-{
-Point screen = e.GetPosition(this);
-return _context?.Viewport?.ScreenToWorld(screen) ?? screen;
-}
-private void OnPreviewMouseDown(object sender, MouseButtonEventArgs e)
-{
-if (_context == null)
-return;
-if (_context.Navigation.TryHandleMiddleDoubleClick(e))
-{
-AtualizarCursorNavegacao();
-LiberarCapturaMouse();
-e.Handled = true;
-return;
-}
-if (_context.Navigation.TryBeginMiddlePan(e, this))
-{
-Focus();
-Keyboard.Focus(this);
-AtualizarCursorNavegacao();
-CaptureMouse();
-e.Handled = true;
-}
-}
-private void OnPreviewMouseLeftButtonDown(object sender, MouseButtonEventArgs e)
-{
-if (_context == null)
-return;
-if (_context.Navigation.TryBeginSpaceLeftPan(e, this))
-{
-Focus();
-Keyboard.Focus(this);
-AtualizarCursorNavegacao();
-CaptureMouse();
-e.Handled = true;
-return;
-}
-if (_context.Navigation.IsPanning)
-{
-e.Handled = true;
-return;
-}
-Focus();
-Keyboard.Focus(this);
-var vm = EncontrarElemento(e.OriginalSource as DependencyObject);
-Point worldPosition = GetWorldPos(e);
-ToolInputState inputState = CriarInputState(e, e.ChangedButton, e.ClickCount);
-_context.Input.MouseDown(vm, worldPosition, inputState);
-CaptureMouse();
-}
-private void OnPreviewMouseMove(object sender, MouseEventArgs e)
-{
-if (_context?.Navigation.TryUpdatePan(e, this) == true)
-{
-AtualizarCursorNavegacao();
-e.Handled = true;
-return;
-}
-if (_context == null)
-return;
-Point worldPosition = GetWorldPos(e);
-_context.Input.MouseMove(worldPosition, CriarInputState(e));
-}
-private void OnPreviewMouseUp(object sender, MouseButtonEventArgs e)
-{
-if (_context?.Navigation.TryEndMiddlePan(e) != true)
-return;
-AtualizarCursorNavegacao();
-LiberarCapturaMouse();
-e.Handled = true;
-}
-private void OnPreviewMouseLeftButtonUp(object sender, MouseButtonEventArgs e)
-{
-if (_context?.Navigation.TryEndSpaceLeftPan(e) == true)
-{
-AtualizarCursorNavegacao();
-LiberarCapturaMouse();
-e.Handled = true;
-return;
-}
-if (_context?.Navigation.ConsumeSuppressNextLeftButtonUp() == true)
-{
-e.Handled = true;
-return;
-}
-if (_context?.Navigation.IsPanning == true)
-{
-e.Handled = true;
-return;
-}
-if (_context != null)
-{
-Point worldPosition = GetWorldPos(e);
-_context.Input.MouseUp(worldPosition, CriarInputState(e, e.ChangedButton, e.ClickCount));
-}
-LiberarCapturaMouse();
-}
-private void OnPreviewMouseWheel(object sender, MouseWheelEventArgs e)
-{
-if (_context?.Navigation.TryHandleMouseWheel(e, this) != true)
-return;
-e.Handled = true;
-}
-private void OnPreviewKeyDown(object sender, KeyEventArgs e)
-{
-if (_context?.Navigation.TryHandleKeyDown(e) == true)
-{
-AtualizarCursorNavegacao();
-e.Handled = true;
-return;
-}
-if (_context == null)
-return;
-e.Handled = _context.Input.KeyDown(e.Key);
-if (e.Handled && e.Key == Key.Escape)
-LiberarCapturaMouse();
-}
-private void OnPreviewKeyUp(object sender, KeyEventArgs e)
-{
-if (_context?.Navigation.TryHandleKeyUp(e) != true)
-return;
-AtualizarCursorNavegacao();
-LiberarCapturaMouse();
-e.Handled = true;
-}
-private void OnMouseLeave(object sender, MouseEventArgs e)
-{
-_context?.Hover.Clear();
-_context?.Navigation.CancelPan();
-AtualizarCursorNavegacao();
-}
-private void OnUnloaded(object sender, RoutedEventArgs e)
-{
-_context?.Navigation.Reset();
-LiberarCapturaMouse();
-Cursor = Cursors.Arrow;
-if (_context?.Viewport != null)
-_context.Viewport.Camera.PropertyChanged -= OnCameraChanged;
-}
-private void AtualizarCursorNavegacao()
-{
-if (_context?.Navigation.IsPanning == true || _context?.Navigation.IsSpacePressed == true)
-Cursor = Cursors.ScrollAll;
-else
-Cursor = Cursors.Arrow;
-}
-private void LiberarCapturaMouse()
-{
-if (IsMouseCaptured)
-ReleaseMouseCapture();
-}
-private ToolInputState CriarInputState(
-MouseEventArgs e,
-MouseButton? button = null,
-int clickCount = 0)
-{
-Point screenPosition = e.GetPosition(this);
-Point worldPosition = _context?.Viewport?.ScreenToWorld(screenPosition) ?? screenPosition;
-return new ToolInputState(
-Keyboard.Modifiers,
-button,
-clickCount,
-worldPosition,
-screenPosition);
-}
-private static ElementoViewModel? EncontrarElemento(DependencyObject? origem)
-{
-while (origem != null)
-{
-if (origem is FrameworkElement fe && fe.DataContext is ElementoViewModel vm)
-return vm;
-origem = VisualTreeHelper.GetParent(origem);
-}
-return null;
 }
 }
 }

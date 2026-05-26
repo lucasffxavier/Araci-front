@@ -35,6 +35,7 @@ namespace Araci.Services
             ElementoFactory = new ElementoFactory(Types, Names, TypePropertiesDialogs);
             Selection = new SelectionService(this);
             MoveHud = new MoveHudService(this);
+            MoveConstraints = new MoveConstraintService();
             Move = new MoveService(this);
             Tools = new ToolService(this);
             Input = new InputRouter(this);
@@ -67,6 +68,8 @@ namespace Araci.Services
         public EditorState Editor { get; } = new EditorState();
 
         public MoveHudService MoveHud { get; }
+
+        public MoveConstraintService MoveConstraints { get; }
 
         public SelectionBoxViewModel SelectionBox { get; } = new SelectionBoxViewModel();
 
