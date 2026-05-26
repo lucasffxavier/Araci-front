@@ -52,16 +52,26 @@ namespace Araci.Services
 
         private void ValidarCabos(TopologyValidationResult result)
         {
+            var cabosAnteriores = new System.Collections.Generic.List<Cabo>();
+
             foreach (Cabo cabo in _document.Elementos.OfType<Cabo>())
             {
                 bool origemVazia = string.IsNullOrWhiteSpace(cabo.OrigemId);
                 bool destinoVazio = string.IsNullOrWhiteSpace(cabo.DestinoId);
+                bool origemTerminalVazio = string.IsNullOrWhiteSpace(cabo.OrigemTerminalId);
+                bool destinoTerminalVazio = string.IsNullOrWhiteSpace(cabo.DestinoTerminalId);
 
                 if (origemVazia)
                     result.AddError($"Cabo '{Nome(cabo)}' sem OrigemId.");
 
                 if (destinoVazio)
                     result.AddError($"Cabo '{Nome(cabo)}' sem DestinoId.");
+
+                if (origemTerminalVazio)
+                    result.AddError($"Cabo '{Nome(cabo)}' sem OrigemTerminalId.");
+
+                if (destinoTerminalVazio)
+                    result.AddError($"Cabo '{Nome(cabo)}' sem DestinoTerminalId.");
 
                 if (!origemVazia && _connectivity.ObterElementoPorId(cabo.OrigemId) == null)
                     result.AddError($"Cabo '{Nome(cabo)}' com OrigemId invalido: {cabo.OrigemId}.");
@@ -75,6 +85,21 @@ namespace Araci.Services
                 {
                     result.AddError($"Cabo '{Nome(cabo)}' conecta origem e destino ao mesmo elemento.");
                 }
+
+                if (!origemVazia &&
+                    !destinoVazio &&
+                    !origemTerminalVazio &&
+                    !destinoTerminalVazio &&
+                    string.Equals(cabo.OrigemId.Trim(), cabo.DestinoId.Trim(), StringComparison.OrdinalIgnoreCase) &&
+                    string.Equals(cabo.OrigemTerminalId.Trim(), cabo.DestinoTerminalId.Trim(), StringComparison.OrdinalIgnoreCase))
+                {
+                    result.AddError($"Cabo '{Nome(cabo)}' conecta origem e destino ao mesmo terminal.");
+                }
+
+                if (_connectivity.EhCaboDuplicado(cabo, cabosAnteriores))
+                    result.AddError($"Cabo '{Nome(cabo)}' duplica uma conexao existente entre os mesmos terminais.");
+
+                cabosAnteriores.Add(cabo);
             }
         }
 

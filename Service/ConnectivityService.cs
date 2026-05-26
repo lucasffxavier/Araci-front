@@ -162,12 +162,142 @@ namespace Araci.Services
             return alterados;
         }
 
+        public ConnectionValidationResult ValidarConexaoCabo(
+            Cabo? caboAtual,
+            Terminal? origem,
+            Terminal? destino)
+        {
+            if (origem == null)
+                return ConnectionValidationResult.Invalid("Origem sem terminal valido.");
+
+            if (destino == null)
+                return ConnectionValidationResult.Invalid("Destino sem terminal valido.");
+
+            if (string.IsNullOrWhiteSpace(origem.Dono.Id.ToString()) ||
+                string.IsNullOrWhiteSpace(origem.Id) ||
+                string.IsNullOrWhiteSpace(destino.Dono.Id.ToString()) ||
+                string.IsNullOrWhiteSpace(destino.Id))
+            {
+                return ConnectionValidationResult.Invalid("Conexao sem ElementoId ou TerminalId valido.");
+            }
+
+            if (MesmoElemento(origem, destino))
+                return ConnectionValidationResult.Invalid("Origem e destino pertencem ao mesmo elemento.");
+
+            if (MesmoTerminal(origem, destino))
+                return ConnectionValidationResult.Invalid("Origem e destino usam o mesmo terminal.");
+
+            if (ExisteCaboDuplicado(caboAtual, origem, destino))
+                return ConnectionValidationResult.Invalid("Ja existe cabo entre estes terminais.");
+
+            return ConnectionValidationResult.Valid();
+        }
+
+        public bool EhCaboDuplicado(Cabo cabo, IEnumerable<Cabo> anteriores)
+        {
+            foreach (Cabo anterior in anteriores)
+            {
+                if (MesmoParDeTerminais(
+                    cabo.OrigemId,
+                    cabo.OrigemTerminalId,
+                    cabo.DestinoId,
+                    cabo.DestinoTerminalId,
+                    anterior.OrigemId,
+                    anterior.OrigemTerminalId,
+                    anterior.DestinoId,
+                    anterior.DestinoTerminalId))
+                {
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
         private static bool EhMesmoElemento(string id, Elemento elemento)
         {
             return string.Equals(
                 id,
                 elemento.Id.ToString(),
                 StringComparison.OrdinalIgnoreCase);
+        }
+
+        private bool ExisteCaboDuplicado(
+            Cabo? caboAtual,
+            Terminal origem,
+            Terminal destino)
+        {
+            string origemId = origem.Dono.Id.ToString();
+            string destinoId = destino.Dono.Id.ToString();
+
+            return _document.Elementos.OfType<Cabo>().Any(c =>
+                !ReferenceEquals(c, caboAtual) &&
+                MesmoParDeTerminais(
+                    origemId,
+                    origem.Id,
+                    destinoId,
+                    destino.Id,
+                    c.OrigemId,
+                    c.OrigemTerminalId,
+                    c.DestinoId,
+                    c.DestinoTerminalId));
+        }
+
+        private static bool MesmoElemento(Terminal origem, Terminal destino)
+        {
+            return string.Equals(
+                origem.Dono.Id.ToString(),
+                destino.Dono.Id.ToString(),
+                StringComparison.OrdinalIgnoreCase);
+        }
+
+        private static bool MesmoTerminal(Terminal origem, Terminal destino)
+        {
+            return MesmoElemento(origem, destino) &&
+                string.Equals(origem.Id, destino.Id, StringComparison.OrdinalIgnoreCase);
+        }
+
+        private static bool MesmoParDeTerminais(
+            string origemA,
+            string origemTerminalA,
+            string destinoA,
+            string destinoTerminalA,
+            string origemB,
+            string origemTerminalB,
+            string destinoB,
+            string destinoTerminalB)
+        {
+            if (string.IsNullOrWhiteSpace(origemA) ||
+                string.IsNullOrWhiteSpace(origemTerminalA) ||
+                string.IsNullOrWhiteSpace(destinoA) ||
+                string.IsNullOrWhiteSpace(destinoTerminalA) ||
+                string.IsNullOrWhiteSpace(origemB) ||
+                string.IsNullOrWhiteSpace(origemTerminalB) ||
+                string.IsNullOrWhiteSpace(destinoB) ||
+                string.IsNullOrWhiteSpace(destinoTerminalB))
+            {
+                return false;
+            }
+
+            bool direto =
+                MesmoPonto(origemA, origemTerminalA, origemB, origemTerminalB) &&
+                MesmoPonto(destinoA, destinoTerminalA, destinoB, destinoTerminalB);
+
+            bool invertido =
+                MesmoPonto(origemA, origemTerminalA, destinoB, destinoTerminalB) &&
+                MesmoPonto(destinoA, destinoTerminalA, origemB, origemTerminalB);
+
+            return direto || invertido;
+        }
+
+        private static bool MesmoPonto(
+            string elementoA,
+            string terminalA,
+            string elementoB,
+            string terminalB)
+        {
+            return string.Equals(elementoA, elementoB, StringComparison.OrdinalIgnoreCase) &&
+                string.Equals(terminalA, terminalB, StringComparison.OrdinalIgnoreCase);
         }
 
         private static bool ReancorarOrigem(Cabo cabo, Elemento elemento)

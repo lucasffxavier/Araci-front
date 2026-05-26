@@ -33,6 +33,7 @@ namespace Araci.Applications.Diagrama.InserirCabo
         private CaboViewModel? _previewInicial;
         private Terminal? _terminalPreviewInicial;
         private Terminal? _terminalPreviewFinal;
+        private Terminal? _terminalOrigem;
         private bool _inserindo;
 
         public InserirCaboTool(EditorContext context)
@@ -89,6 +90,12 @@ namespace Araci.Applications.Diagrama.InserirCabo
                 if (terminal == null)
                     return;
 
+                if (!OrigemValida(terminal))
+                {
+                    LimparTerminalCapturado();
+                    return;
+                }
+
                 LimparPreviewInicial();
 
                 _caboAtual =
@@ -115,6 +122,12 @@ namespace Araci.Applications.Diagrama.InserirCabo
 
             if (terminal == null)
                 return;
+
+            if (!DestinoValido(terminal))
+            {
+                LimparTerminalCapturado();
+                return;
+            }
 
             _caboAtual.FinalizarNoPonto(pontoSnap);
 
@@ -304,8 +317,28 @@ namespace Araci.Applications.Diagrama.InserirCabo
                 ObterRotuloTerminal(terminal);
 
             _caboAtual.Cabo.DefinirOrigem(terminal.Posicao);
+            _terminalOrigem = terminal;
 
             _caboAtual.NotificarParametros();
+        }
+
+        private bool OrigemValida(Terminal terminal)
+        {
+            return !string.IsNullOrWhiteSpace(terminal.Dono.Id.ToString()) &&
+                !string.IsNullOrWhiteSpace(terminal.Id);
+        }
+
+        private bool DestinoValido(Terminal terminal)
+        {
+            if (_caboAtual == null || _terminalOrigem == null)
+            {
+                return false;
+            }
+
+            return _context.Connectivity.ValidarConexaoCabo(
+                _caboAtual.Cabo,
+                _terminalOrigem,
+                terminal).IsValid;
         }
 
         private void UsarViewModelDaCena()
@@ -364,6 +397,7 @@ namespace Araci.Applications.Diagrama.InserirCabo
 
             _caboAtual = null;
             _terminalPreviewFinal = null;
+            _terminalOrigem = null;
             LimparTerminalCapturado();
             _inserindo = false;
         }
