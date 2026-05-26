@@ -13,13 +13,12 @@ namespace Araci.Applications.Editar.Selecionar
     {
         private readonly EditorContext _context;
         private readonly ISceneQueryService _queries;
+        private readonly SelectionBoxController _selectionBox;
         private readonly bool _modoSoMover;
         private readonly bool _mostrarHud;
 
         private bool _arrastandoElementos;
-        private bool _selecionandoJanela;
 
-        private Point _inicioJanela;
         private Point _ultimoPontoMouse;
         private Point _pontoInicialArrasto;
 
@@ -27,13 +26,14 @@ namespace Araci.Applications.Editar.Selecionar
         {
             _context = context ?? throw new ArgumentNullException(nameof(context));
             _queries = context.SceneQueries;
+            _selectionBox = new SelectionBoxController(context.SelectionBox, _queries, context.Selection);
             _modoSoMover = modoSoMover;
             _mostrarHud = mostrarHud;
         }
 
         public string Nome => "Selecionar";
         public bool MantemBotaoAtivado => true;
-        public bool IsBusy => _arrastandoElementos || _selecionandoJanela;
+        public bool IsBusy => _arrastandoElementos || _selectionBox.IsActive;
 
         public void Ativar() { }
 
@@ -45,9 +45,8 @@ namespace Araci.Applications.Editar.Selecionar
         public void Cancelar()
         {
             _arrastandoElementos = false;
-            _selecionandoJanela = false;
+            _selectionBox.Cancel();
             _context.Move.AbortMove();
-            _context.SelectionBox.Visivel = false;
             _context.MoveHud.Visivel = false;
             _context.MoveHud.Reset();
         }
@@ -68,7 +67,7 @@ namespace Araci.Applications.Editar.Selecionar
             if (_modoSoMover)
                 return;
 
-            IniciarJanelaSelecao(position, ctrl);
+            _selectionBox.Begin(position, ctrl);
         }
 
         public void OnMouseMove(Point position)
@@ -79,8 +78,8 @@ namespace Araci.Applications.Editar.Selecionar
                 return;
             }
 
-            if (_selecionandoJanela)
-                _context.SelectionBox.Atualizar(_inicioJanela, position);
+            if (_selectionBox.IsActive)
+                _selectionBox.Update(position);
         }
 
         public void OnMouseUp(Point position)
@@ -88,11 +87,10 @@ namespace Araci.Applications.Editar.Selecionar
             if (_arrastandoElementos)
                 FinalizarMovimento();
 
-            if (_selecionandoJanela)
-                FinalizarJanelaSelecao();
+            if (_selectionBox.IsActive)
+                _selectionBox.End();
 
             _arrastandoElementos = false;
-            _selecionandoJanela = false;
         }
 
         public void OnKeyDown(Key key) { }
@@ -160,28 +158,6 @@ namespace Araci.Applications.Editar.Selecionar
             _context.Move.EndMove(_context.Selection.Selecionados.ToList());
             _context.MoveHud.Visivel = false;
             _context.MoveHud.Reset();
-        }
-
-        private void IniciarJanelaSelecao(Point position, bool ctrl)
-        {
-            if (!ctrl)
-                _context.Selection.Limpar();
-
-            _inicioJanela = position;
-            _selecionandoJanela = true;
-
-            _context.SelectionBox.Visivel = true;
-            _context.SelectionBox.Atualizar(position, position);
-        }
-
-        private void FinalizarJanelaSelecao()
-        {
-            var rect = _context.SelectionBox.Bounds;
-
-            foreach (var item in _queries.Query(rect))
-                _context.Selection.Selecionar(item, true);
-
-            _context.SelectionBox.Visivel = false;
         }
 
         private Rect CalcularBoundsSelecionados()
