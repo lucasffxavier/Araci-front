@@ -307,6 +307,22 @@ namespace Araci.ViewModels
             Atualizar();
         }
 
+        public void AdicionarVerticeIntermediario(Point p)
+        {
+            if (Cabo.Vertices.Count == 0)
+                return;
+
+            var ultimo = Cabo.Vertices[^1];
+
+            if (DistanciaQuadrada(ultimo, p) < 0.0001)
+                return;
+
+            Cabo.Vertices.Add(p);
+            Cabo.PreviewPonto = p;
+            _possuiPreview = true;
+            Atualizar();
+        }
+
         public void RemoverPreview()
         {
             if (!_possuiPreview && Cabo.PreviewPonto == null)
@@ -368,6 +384,14 @@ namespace Araci.ViewModels
             OnPropertyChanged(nameof(Bounds));
 
             NotificarGeometria();
+        }
+
+        private static double DistanciaQuadrada(Point a, Point b)
+        {
+            double dx = a.X - b.X;
+            double dy = a.Y - b.Y;
+
+            return dx * dx + dy * dy;
         }
     }
 }

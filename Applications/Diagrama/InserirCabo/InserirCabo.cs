@@ -120,7 +120,10 @@ namespace Araci.Applications.Diagrama.InserirCabo
                 return;
 
             if (terminal == null)
+            {
+                AdicionarVerticeIntermediario(pontoSnap);
                 return;
+            }
 
             if (!DestinoValido(terminal))
             {
@@ -334,6 +337,15 @@ namespace Araci.Applications.Diagrama.InserirCabo
             _terminalOrigem = terminal;
 
             _caboAtual.NotificarParametros();
+        }
+
+        private void AdicionarVerticeIntermediario(Point ponto)
+        {
+            if (_caboAtual == null)
+                return;
+
+            _caboAtual.AdicionarVerticeIntermediario(ponto);
+            _context.SceneQueries.Invalidate();
         }
 
         private bool OrigemValida(Terminal terminal)
