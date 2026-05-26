@@ -10,8 +10,12 @@ namespace Araci.ViewModels
     {
         private bool _possuiPreview;
 
-        public CaboViewModel(Cabo modelo, TypeLibraryService types, NameService names)
-            : base(modelo, new CaboNode(modelo), types, names)
+        public CaboViewModel(
+            Cabo modelo,
+            TypeLibraryService types,
+            NameService names,
+            TypePropertiesDialogService typePropertiesDialogs)
+            : base(modelo, new CaboNode(modelo), types, names, typePropertiesDialogs)
         {
             SelecionarPrimeiroTipoDisponivel();
         }

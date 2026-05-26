@@ -28,8 +28,9 @@ namespace Araci.Services
             Simulation = new SimulationPipeline(this);
             SimulationExport = new SimulationExportService();
             SimulationMessages = new SimulationMessageBuilder();
+            TypePropertiesDialogs = new TypePropertiesDialogService();
 
-            ElementoFactory = new ElementoFactory(Types, Names);
+            ElementoFactory = new ElementoFactory(Types, Names, TypePropertiesDialogs);
             Selection = new SelectionService(this);
             MoveHud = new MoveHudService(this);
             Move = new MoveService(this);
@@ -86,6 +87,8 @@ namespace Araci.Services
         public SimulationExportService SimulationExport { get; }
 
         public SimulationMessageBuilder SimulationMessages { get; }
+
+        public TypePropertiesDialogService TypePropertiesDialogs { get; }
 
         public TypeLibraryService Types { get; } = new TypeLibraryService();
 

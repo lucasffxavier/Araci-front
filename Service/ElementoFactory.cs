@@ -8,21 +8,26 @@ namespace Araci.Services
     {
         private readonly TypeLibraryService _types;
         private readonly NameService _names;
+        private readonly TypePropertiesDialogService _typePropertiesDialogs;
 
-        public ElementoFactory(TypeLibraryService types, NameService names)
+        public ElementoFactory(
+            TypeLibraryService types,
+            NameService names,
+            TypePropertiesDialogService typePropertiesDialogs)
         {
             _types = types ?? throw new ArgumentNullException(nameof(types));
             _names = names ?? throw new ArgumentNullException(nameof(names));
+            _typePropertiesDialogs = typePropertiesDialogs ?? throw new ArgumentNullException(nameof(typePropertiesDialogs));
         }
 
         public ElementoViewModel? CriarViewModel(Elemento modelo)
         {
             return modelo switch
             {
-                Cabo cabo => new CaboViewModel(cabo, _types, _names),
-                Carga carga => new CargaViewModel(carga, _types, _names),
-                Gerador gerador => new GeradorViewModel(gerador, _types, _names),
-                Barra barra => new BarraViewModel(barra, _types, _names),
+                Cabo cabo => new CaboViewModel(cabo, _types, _names, _typePropertiesDialogs),
+                Carga carga => new CargaViewModel(carga, _types, _names, _typePropertiesDialogs),
+                Gerador gerador => new GeradorViewModel(gerador, _types, _names, _typePropertiesDialogs),
+                Barra barra => new BarraViewModel(barra, _types, _names, _typePropertiesDialogs),
                 _ => null
             };
         }
@@ -38,7 +43,7 @@ namespace Araci.Services
 
         public CaboViewModel CriarCaboVM()
         {
-            return new CaboViewModel(CriarCabo(), _types, _names);
+            return new CaboViewModel(CriarCabo(), _types, _names, _typePropertiesDialogs);
         }
 
         public Carga CriarCarga()
@@ -52,7 +57,7 @@ namespace Araci.Services
 
         public CargaViewModel CriarCargaVM()
         {
-            return new CargaViewModel(CriarCarga(), _types, _names);
+            return new CargaViewModel(CriarCarga(), _types, _names, _typePropertiesDialogs);
         }
 
         public Gerador CriarGerador()
@@ -66,7 +71,7 @@ namespace Araci.Services
 
         public GeradorViewModel CriarGeradorVM()
         {
-            return new GeradorViewModel(CriarGerador(), _types, _names);
+            return new GeradorViewModel(CriarGerador(), _types, _names, _typePropertiesDialogs);
         }
 
         public Barra CriarBarra()
@@ -80,7 +85,7 @@ namespace Araci.Services
 
         public BarraViewModel CriarBarraVM()
         {
-            return new BarraViewModel(CriarBarra(), _types, _names);
+            return new BarraViewModel(CriarBarra(), _types, _names, _typePropertiesDialogs);
         }
     }
 }

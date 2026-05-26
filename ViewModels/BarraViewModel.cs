@@ -8,8 +8,12 @@ namespace Araci.ViewModels
 {
     public class BarraViewModel : ElementoViewModel
     {
-        public BarraViewModel(Barra modelo, TypeLibraryService types, NameService names)
-            : base(modelo, new BarraNode(modelo), types, names)
+        public BarraViewModel(
+            Barra modelo,
+            TypeLibraryService types,
+            NameService names,
+            TypePropertiesDialogService typePropertiesDialogs)
+            : base(modelo, new BarraNode(modelo), types, names, typePropertiesDialogs)
         {
             SelecionarPrimeiroTipoDisponivel();
             AtualizarTerminais();

@@ -9,8 +9,12 @@ namespace Araci.ViewModels
     {
         protected readonly T _equipamento;
 
-        protected EquipamentoViewModelBase(T equipamento, TypeLibraryService types, NameService names)
-            : base(equipamento, new EquipamentoNode(equipamento), types, names)
+        protected EquipamentoViewModelBase(
+            T equipamento,
+            TypeLibraryService types,
+            NameService names,
+            TypePropertiesDialogService typePropertiesDialogs)
+            : base(equipamento, new EquipamentoNode(equipamento), types, names, typePropertiesDialogs)
         {
             _equipamento = equipamento;
         }

@@ -9,7 +9,6 @@ using Araci.Core.Rendering;
 using Araci.Core.SceneNodes;
 using Araci.Models;
 using Araci.Models.Tipos;
-using Araci.Properties;
 using Araci.Services;
 using Araci.ViewModels.Base;
 using Araci.ViewModels.VisualStates;
@@ -20,6 +19,7 @@ namespace Araci.ViewModels
     {
         private readonly ElementoNode _node;
         private readonly NameService _names;
+        private readonly TypePropertiesDialogService _typePropertiesDialogs;
         private ICommand? _abrirPropriedadesTipoCommand;
         private ObservableCollection<ParameterViewModel>? _parametros;
 
@@ -27,12 +27,14 @@ namespace Araci.ViewModels
             Elemento modelo,
             ElementoNode node,
             TypeLibraryService types,
-            NameService names)
+            NameService names,
+            TypePropertiesDialogService typePropertiesDialogs)
         {
             Modelo = modelo ?? throw new ArgumentNullException(nameof(modelo));
             _node = node ?? throw new ArgumentNullException(nameof(node));
             Types = types ?? throw new ArgumentNullException(nameof(types));
             _names = names ?? throw new ArgumentNullException(nameof(names));
+            _typePropertiesDialogs = typePropertiesDialogs ?? throw new ArgumentNullException(nameof(typePropertiesDialogs));
             VisualState = new ElementoVisualState();
             _node.AtualizarGeometria();
         }
@@ -252,13 +254,7 @@ namespace Araci.ViewModels
 
         private void AbrirPropriedadesTipo()
         {
-            var janela = new TypePropertiesWindow
-            {
-                Owner = Application.Current.MainWindow,
-                DataContext = TipoViewModel
-            };
-
-            janela.ShowDialog();
+            _typePropertiesDialogs.Show(TipoViewModel);
         }
     }
 }

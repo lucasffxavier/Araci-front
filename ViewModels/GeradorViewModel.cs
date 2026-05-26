@@ -8,8 +8,12 @@ namespace Araci.ViewModels
 {
     public class GeradorViewModel : ElementoViewModel
     {
-        public GeradorViewModel(Gerador modelo, TypeLibraryService types, NameService names)
-            : base(modelo, new EquipamentoNode(modelo), types, names)
+        public GeradorViewModel(
+            Gerador modelo,
+            TypeLibraryService types,
+            NameService names,
+            TypePropertiesDialogService typePropertiesDialogs)
+            : base(modelo, new EquipamentoNode(modelo), types, names, typePropertiesDialogs)
         {
             SelecionarPrimeiroTipoDisponivel();
             AtualizarTerminais();

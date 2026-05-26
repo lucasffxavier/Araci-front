@@ -7,8 +7,12 @@ namespace Araci.ViewModels
 {
     public class CargaViewModel : ElementoViewModel
     {
-        public CargaViewModel(Carga modelo, TypeLibraryService types, NameService names)
-            : base(modelo, new EquipamentoNode(modelo), types, names)
+        public CargaViewModel(
+            Carga modelo,
+            TypeLibraryService types,
+            NameService names,
+            TypePropertiesDialogService typePropertiesDialogs)
+            : base(modelo, new EquipamentoNode(modelo), types, names, typePropertiesDialogs)
         {
             SelecionarPrimeiroTipoDisponivel();
             AtualizarTerminais();
