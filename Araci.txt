@@ -409,91 +409,6 @@ return new Rect(minX, minY, maxX - minX, maxY - minY);
 
 
 ====================================================================================================
-ARQUIVO: C:\Araci-Engine-Front\Araci Engine\Applications\Editar\Selecionar\SelecionarTool.cs
-====================================================================================================
-
-﻿using System;
-using System.Windows;
-using System.Windows.Input;
-using Araci.Applications.Editar.Base;
-using Araci.Core.SceneQueries;
-using Araci.Services;
-using Araci.ViewModels;
-namespace Araci.Applications.Editar.Selecionar
-{
-public class SelecionarTool : ITool
-{
-private readonly ISceneQueryService _queries;
-private readonly SelectionController _selection;
-private readonly SelectionBoxController _selectionBox;
-private readonly DragMoveController _dragMove;
-private readonly bool _modoSoMover;
-public SelecionarTool(EditorContext context, bool modoSoMover = false, bool mostrarHud = false)
-{
-if (context == null)
-throw new ArgumentNullException(nameof(context));
-_queries = context.SceneQueries;
-_selection = new SelectionController(context.Selection);
-_selectionBox = new SelectionBoxController(context.SelectionBox, _queries, context.Selection);
-_dragMove = new DragMoveController(
-context.Selection,
-context.Move,
-context.MoveHud,
-context.MoveConstraints,
-mostrarHud);
-_modoSoMover = modoSoMover;
-}
-public string Nome => "Selecionar";
-public bool MantemBotaoAtivado => true;
-public bool IsBusy => _dragMove.IsActive || _selectionBox.IsActive;
-public void Ativar() { }
-public void Desativar()
-{
-Cancelar();
-}
-public void Cancelar()
-{
-_dragMove.Cancel();
-_selectionBox.Cancel();
-}
-public void OnMouseDown(ElementoViewModel? vm, Point position, ToolInputState inputState)
-{
-bool ctrl = inputState.IsControlPressed;
-var hit = vm ?? _queries.HitTest(position)?.Elemento;
-if (hit != null)
-{
-if (!_modoSoMover)
-_selection.Select(hit, ctrl);
-_dragMove.Begin(position);
-return;
-}
-if (_modoSoMover)
-return;
-_selectionBox.Begin(position, ctrl);
-}
-public void OnMouseMove(Point position, ToolInputState inputState)
-{
-if (_dragMove.IsActive)
-{
-_dragMove.Update(position, inputState);
-return;
-}
-if (_selectionBox.IsActive)
-_selectionBox.Update(position);
-}
-public void OnMouseUp(Point position, ToolInputState inputState)
-{
-if (_dragMove.IsActive)
-_dragMove.End();
-if (_selectionBox.IsActive)
-_selectionBox.End();
-}
-public void OnKeyDown(Key key) { }
-}
-}
-
-
-====================================================================================================
 ARQUIVO: C:\Araci-Engine-Front\Araci Engine\Service\EditorContext.cs
 ====================================================================================================
 
@@ -578,6 +493,45 @@ return new TransactionScope(Commands);
 
 
 ====================================================================================================
+ARQUIVO: C:\Araci-Engine-Front\Araci Engine\Service\EditorState.cs
+====================================================================================================
+
+﻿using System.ComponentModel;
+using System.Runtime.CompilerServices;
+namespace Araci.ViewModels
+{
+public class EditorState
+: INotifyPropertyChanged
+{
+private object?
+_elementoSelecionado;
+public object?
+ElementoSelecionado
+{
+get => _elementoSelecionado;
+set
+{
+if (_elementoSelecionado == value)
+return;
+_elementoSelecionado = value;
+OnPropertyChanged();
+}
+}
+public event PropertyChangedEventHandler?
+PropertyChanged;
+protected virtual void OnPropertyChanged(
+[CallerMemberName]
+string? propertyName = null)
+{
+PropertyChanged?.Invoke(
+this,
+new PropertyChangedEventArgs(propertyName));
+}
+}
+}
+
+
+====================================================================================================
 ARQUIVO: C:\Araci-Engine-Front\Araci Engine\Service\MoveConstraintService.cs
 ====================================================================================================
 
@@ -588,6 +542,7 @@ namespace Araci.Services
 {
 public class MoveConstraintService
 {
+private const double GridStep = 10.0;
 private Point _start;
 private OrthogonalAxis? _orthogonalAxis;
 public void Begin(Point start)
@@ -597,12 +552,18 @@ _orthogonalAxis = null;
 }
 public Point Apply(Point position, ToolInputState inputState)
 {
+Point result = position;
 if (!inputState.IsShiftPressed)
 {
 _orthogonalAxis = null;
-return position;
 }
-return ApplyOrthogonal(position);
+else
+{
+result = ApplyOrthogonal(position);
+}
+return inputState.IsControlPressed
+? ApplyGrid(result)
+: result;
 }
 public void End()
 {
@@ -626,6 +587,17 @@ _orthogonalAxis = Math.Abs(total.X) >= Math.Abs(total.Y)
 return _orthogonalAxis == OrthogonalAxis.Horizontal
 ? new Point(position.X, _start.Y)
 : new Point(_start.X, position.Y);
+}
+private Point ApplyGrid(Point position)
+{
+Vector delta = position - _start;
+return new Point(
+_start.X + Quantize(delta.X),
+_start.Y + Quantize(delta.Y));
+}
+private static double Quantize(double value)
+{
+return Math.Round(value / GridStep) * GridStep;
 }
 private enum OrthogonalAxis
 {
@@ -841,82 +813,6 @@ private void AtualizarElementoMovido(Elemento elemento)
 {
 _context.Viewport?.AtualizarViewModel(elemento);
 _context.SceneQueries.Invalidate();
-}
-}
-}
-
-
-====================================================================================================
-ARQUIVO: C:\Araci-Engine-Front\Araci Engine\Service\SelectionService.cs
-====================================================================================================
-
-﻿using System.Collections.Generic;
-using System.Collections.ObjectModel;
-using System.Linq;
-using Araci.Core.Events;
-using Araci.ViewModels;
-namespace Araci.Services
-{
-public class SelectionService
-{
-private readonly EditorContext _context;
-private readonly ObservableCollection<ElementoViewModel> _selecionados = new();
-public SelectionService(EditorContext context)
-{
-_context = context ?? throw new ArgumentNullException(nameof(context));
-}
-public IReadOnlyList<ElementoViewModel> Selecionados => _selecionados;
-public ObservableCollection<ElementoViewModel> SelecionadosObservable => _selecionados;
-public bool TemSelecionados => _selecionados.Count > 0;
-public void Selecionar(ElementoViewModel vm, bool adicionarAoExistente = false)
-{
-if (!adicionarAoExistente)
-Limpar();
-if (_selecionados.Contains(vm))
-{
-AtualizarElementoSelecionado();
-return;
-}
-vm.IsSelecionado = true;
-_selecionados.Add(vm);
-AtualizarElementoSelecionado();
-PublicarAlteracao();
-}
-public void Toggle(ElementoViewModel vm)
-{
-if (_selecionados.Contains(vm))
-{
-Deselecionar(vm);
-return;
-}
-Selecionar(vm, true);
-}
-public void Deselecionar(ElementoViewModel vm)
-{
-if (!_selecionados.Contains(vm))
-return;
-vm.IsSelecionado = false;
-_selecionados.Remove(vm);
-AtualizarElementoSelecionado();
-PublicarAlteracao();
-}
-public void Limpar()
-{
-if (_selecionados.Count == 0)
-return;
-foreach (var vm in _selecionados)
-vm.IsSelecionado = false;
-_selecionados.Clear();
-AtualizarElementoSelecionado();
-PublicarAlteracao();
-}
-private void AtualizarElementoSelecionado()
-{
-_context.Editor.ElementoSelecionado = _selecionados.LastOrDefault();
-}
-private void PublicarAlteracao()
-{
-_context.Events.Publish(new SelecaoAlteradaEvent(_selecionados.ToList()));
 }
 }
 }

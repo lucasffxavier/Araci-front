@@ -6,10 +6,17 @@ namespace Araci.Services
 {
     public class MoveConstraintService
     {
-        private const double GridStep = 10.0;
+        private const double DefaultGridStep = 10.0;
+
+        private readonly EditorSettings _settings;
 
         private Point _start;
         private OrthogonalAxis? _orthogonalAxis;
+
+        public MoveConstraintService(EditorSettings settings)
+        {
+            _settings = settings ?? throw new ArgumentNullException(nameof(settings));
+        }
 
         public void Begin(Point start)
         {
@@ -30,7 +37,7 @@ namespace Araci.Services
                 result = ApplyOrthogonal(position);
             }
 
-            return inputState.IsControlPressed
+            return inputState.IsControlPressed && _settings.GridSnapEnabled
                 ? ApplyGrid(result)
                 : result;
         }
@@ -73,9 +80,18 @@ namespace Araci.Services
                 _start.Y + Quantize(delta.Y));
         }
 
-        private static double Quantize(double value)
+        private double Quantize(double value)
         {
-            return Math.Round(value / GridStep) * GridStep;
+            double step = GetGridStep();
+
+            return Math.Round(value / step) * step;
+        }
+
+        private double GetGridStep()
+        {
+            return _settings.GridStep > 0
+                ? _settings.GridStep
+                : DefaultGridStep;
         }
 
         private enum OrthogonalAxis
