@@ -4,6 +4,7 @@ using System.IO;
 using System.Linq;
 using System.Windows;
 using Araci.API;
+using Araci.Applications.Diagrama;
 using Araci.Core.Documents;
 using Araci.Core.Rendering;
 using Araci.DTOs;
@@ -68,7 +69,17 @@ namespace Araci.TechnicalChecks
                 ("TopologyValidator sem fonte slack falha com mensagem clara", TopologyValidatorSemFonteSlackFalhaComMensagemClara),
                 ("TerminalEndpoint identifica conexao por valor", TerminalEndpointIdentificaConexaoPorValor),
                 ("Rotacao recalcula terminal por posicao local", RotacaoRecalculaTerminalPorPosicaoLocal),
-                ("ElectricGraph BFS percorre por conexoes validas", ElectricGraphBfsPercorreConexoesValidas)
+                ("ElectricGraph BFS percorre por conexoes validas", ElectricGraphBfsPercorreConexoesValidas),
+                ("Rotacao +90 atualiza modelo", RotacaoMaisNoventaAtualizaModelo),
+                ("Rotacao cicla quadrantes", RotacaoCiclaQuadrantes),
+                ("Preview preserva rotacao em modelo real", PreviewPreservaRotacaoEmModeloReal),
+                ("Elemento rotacionado persiste apos reload", ElementoRotacionadoPersisteAposReload),
+                ("Terminais mudam posicao e preservam IDs", TerminaisMudamPosicaoEPreservamIds),
+                ("Cabo preserva TerminalId apos rotacao", CaboPreservaTerminalIdAposRotacao),
+                ("Cabo reancora visualmente apos rotacao", CaboReancoraVisualmenteAposRotacao),
+                ("Undo Redo da rotacao restaura elemento e cabos", UndoRedoRotacaoRestauraElementoECabos),
+                ("ElectricGraph build repetido apos rotacao nao altera Document", ElectricGraphBuildAposRotacaoNaoAlteraDocument),
+                ("DTO nao muda por causa da rotacao", DtoNaoMudaPorCausaDaRotacao)
             };
 
             var failures = new List<string>();
@@ -1137,6 +1148,153 @@ namespace Araci.TechnicalChecks
             Assert(visited.All(n => graph.FindNode(n.ElementId) != null), "BFS deve retornar apenas nos do grafo.");
         }
 
+        private static void RotacaoMaisNoventaAtualizaModelo()
+        {
+            EditorContext context = CreateContextWithViewport();
+            Carga load = CreateLoad("CARGA-ROT", 300, 100);
+            context.Document.AdicionarElemento(load);
+            ElementoViewModel vm = GetVm(context, load);
+
+            context.Selection.Selecionar(vm);
+            bool rotated = context.Rotation.RotateSelectionClockwise();
+
+            Assert(rotated, "Rotacao deve ser aplicada.");
+            AssertEqual(90, load.Rotacao, "Rotacao da carga");
+        }
+
+        private static void RotacaoCiclaQuadrantes()
+        {
+            double value = 0;
+
+            value = RotationService.RotateClockwise(value);
+            AssertEqual(90, value, "Rotacao 0 -> 90");
+            value = RotationService.RotateClockwise(value);
+            AssertEqual(180, value, "Rotacao 90 -> 180");
+            value = RotationService.RotateClockwise(value);
+            AssertEqual(270, value, "Rotacao 180 -> 270");
+            value = RotationService.RotateClockwise(value);
+            AssertEqual(0, value, "Rotacao 270 -> 0");
+        }
+
+        private static void PreviewPreservaRotacaoEmModeloReal()
+        {
+            EditorContext context = CreateContextWithViewport();
+            var controller = new InsertPreviewController<CargaViewModel, Carga>(
+                context,
+                context.ElementoFactory.CriarCargaVM,
+                vm => (Carga)vm.Modelo);
+
+            controller.Update(new Point(240, 180));
+            controller.RotateClockwise();
+            controller.RotateClockwise();
+
+            Carga real = context.ElementoFactory.CriarCarga();
+            real.Rotacao = controller.CurrentRotation;
+
+            AssertEqual(180, real.Rotacao, "Rotacao copiada do preview");
+        }
+
+        private static void ElementoRotacionadoPersisteAposReload()
+        {
+            var document = new AraciDocument();
+            Carga load = CreateLoad("CARGA-PERSIST-ROT", 300, 100);
+            load.Rotacao = 270;
+            document.AdicionarElemento(load);
+
+            AraciDocument loaded = SaveAndLoad(document);
+            Carga loadedLoad = FindById<Carga>(loaded, load.Id);
+
+            AssertEqual(270, loadedLoad.Rotacao, "Rotacao apos reload");
+        }
+
+        private static void TerminaisMudamPosicaoEPreservamIds()
+        {
+            Gerador generator = CreateGenerator("GER-TERM-ROT", 1000, 0.95);
+            var before = generator.Terminais
+                .Select(t => (t.Id, t.Posicao))
+                .ToList();
+
+            generator.Rotacao = 90;
+            generator.AtualizarTerminais(80, 80);
+
+            for (int i = 0; i < before.Count; i++)
+                AssertEqual(before[i].Id, generator.Terminais[i].Id, $"Terminal {i}.Id");
+
+            Assert(
+                before.Any(item => generator.Terminais.Single(t => t.Id == item.Id).Posicao != item.Posicao),
+                "Ao menos um terminal deve mudar de posicao apos rotacao.");
+        }
+
+        private static void CaboPreservaTerminalIdAposRotacao()
+        {
+            RotatedCircuit circuit = CreateRotatedCircuit();
+            string origemTerminalId = circuit.Cable.OrigemTerminalId;
+            string destinoTerminalId = circuit.Cable.DestinoTerminalId;
+
+            RotateSelected(circuit.Context, circuit.Generator);
+
+            AssertEqual(origemTerminalId, circuit.Cable.OrigemTerminalId, "OrigemTerminalId");
+            AssertEqual(destinoTerminalId, circuit.Cable.DestinoTerminalId, "DestinoTerminalId");
+        }
+
+        private static void CaboReancoraVisualmenteAposRotacao()
+        {
+            RotatedCircuit circuit = CreateRotatedCircuit();
+            Point before = circuit.Cable.Vertices[0];
+
+            RotateSelected(circuit.Context, circuit.Generator);
+
+            Terminal terminal = GetTerminal(circuit.Generator, 0);
+            Assert(before != circuit.Cable.Vertices[0], "Vertice do cabo deve mudar apos rotacao.");
+            AssertEqual(terminal.Posicao.X, circuit.Cable.Vertices[0].X, "Cabo.Vertices[0].X");
+            AssertEqual(terminal.Posicao.Y, circuit.Cable.Vertices[0].Y, "Cabo.Vertices[0].Y");
+        }
+
+        private static void UndoRedoRotacaoRestauraElementoECabos()
+        {
+            RotatedCircuit circuit = CreateRotatedCircuit();
+            Point beforeVertex = circuit.Cable.Vertices[0];
+
+            RotateSelected(circuit.Context, circuit.Generator);
+            Point afterVertex = circuit.Cable.Vertices[0];
+
+            circuit.Context.Commands.Undo();
+            AssertEqual(0, circuit.Generator.Rotacao, "Rotacao apos undo");
+            AssertEqual(beforeVertex.X, circuit.Cable.Vertices[0].X, "Cabo X apos undo");
+            AssertEqual(beforeVertex.Y, circuit.Cable.Vertices[0].Y, "Cabo Y apos undo");
+
+            circuit.Context.Commands.Redo();
+            AssertEqual(90, circuit.Generator.Rotacao, "Rotacao apos redo");
+            AssertEqual(afterVertex.X, circuit.Cable.Vertices[0].X, "Cabo X apos redo");
+            AssertEqual(afterVertex.Y, circuit.Cable.Vertices[0].Y, "Cabo Y apos redo");
+        }
+
+        private static void ElectricGraphBuildAposRotacaoNaoAlteraDocument()
+        {
+            RotatedCircuit circuit = CreateRotatedCircuit();
+            RotateSelected(circuit.Context, circuit.Generator);
+            int count = circuit.Context.Document.Elementos.Count;
+
+            _ = new ElectricGraphBuilder(circuit.Context.Document).Build();
+            _ = new ElectricGraphBuilder(circuit.Context.Document).Build();
+
+            AssertEqual(count, circuit.Context.Document.Elementos.Count, "Quantidade de elementos apos builds");
+        }
+
+        private static void DtoNaoMudaPorCausaDaRotacao()
+        {
+            RotatedCircuit circuit = CreateRotatedCircuit();
+            CircuitDto before = new CircuitBuilder(new ParameterReader(circuit.Context.Document)).Build();
+
+            RotateSelected(circuit.Context, circuit.Generator);
+            CircuitDto after = new CircuitBuilder(new ParameterReader(circuit.Context.Document)).Build();
+
+            AssertEqual(before.Slack!.Id, after.Slack!.Id, "Slack.Id");
+            AssertEqual(before.Lines.Single().Barra1, after.Lines.Single().Barra1, "Line.Barra1");
+            AssertEqual(before.Lines.Single().Barra2, after.Lines.Single().Barra2, "Line.Barra2");
+            AssertEqual(before.Loads.Single().Barra, after.Loads.Single().Barra, "Load.Barra");
+        }
+
         private static SimpleCircuit CreateSimpleCircuit()
         {
             var document = new AraciDocument();
@@ -1150,6 +1308,47 @@ namespace Araci.TechnicalChecks
             document.AdicionarElemento(cable);
 
             return new SimpleCircuit(document, generator, load, cable);
+        }
+
+        private static RotatedCircuit CreateRotatedCircuit()
+        {
+            EditorContext context = CreateContextWithViewport();
+            Gerador generator = CreateGenerator("GER-ROT-CABO", 1000, 0.95);
+            Carga load = CreateLoad("CARGA-ROT-CABO", 300, 100);
+            Cabo cable = CreateCable(generator, 0, load, 0, "L-ROT-CABO", 1.0);
+
+            context.Document.AdicionarElemento(generator);
+            context.Document.AdicionarElemento(load);
+            context.Document.AdicionarElemento(cable);
+
+            return new RotatedCircuit(context, generator, load, cable);
+        }
+
+        private static EditorContext CreateContextWithViewport()
+        {
+            var context = new EditorContext();
+            var viewport = new ViewportViewModel(context);
+
+            context.InicializarViewport(viewport);
+            return context;
+        }
+
+        private static void RotateSelected(EditorContext context, Elemento elemento)
+        {
+            ElementoViewModel vm = GetVm(context, elemento);
+
+            context.Selection.Selecionar(vm);
+            Assert(context.Rotation.RotateSelectionClockwise(), "Rotacao da selecao deve ser aplicada.");
+        }
+
+        private static ElementoViewModel GetVm(EditorContext context, Elemento elemento)
+        {
+            ElementoViewModel? vm = context.Viewport?.ObterViewModel(elemento);
+
+            if (vm == null)
+                throw new InvalidOperationException($"ViewModel de '{elemento.Nome}' nao encontrado.");
+
+            return vm;
         }
 
         private static AraciDocument CreateBranchDocument()
@@ -1564,6 +1763,12 @@ namespace Araci.TechnicalChecks
 
         private sealed record SimpleCircuit(
             AraciDocument Document,
+            Gerador Generator,
+            Carga Load,
+            Cabo Cable);
+
+        private sealed record RotatedCircuit(
+            EditorContext Context,
             Gerador Generator,
             Carga Load,
             Cabo Cable);

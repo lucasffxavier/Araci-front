@@ -1,7 +1,10 @@
 ﻿using System.Collections.Generic;
 using System.ComponentModel;
+using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Data;
 using System.Windows.Input;
+using System.Windows.Media;
 using Araci.ViewModels;
 
 namespace Araci.Controls.Base
@@ -24,6 +27,7 @@ namespace Araci.Controls.Base
             nameof(ElementoViewModel.Altura),
             nameof(ElementoViewModel.Bounds),
             nameof(ElementoViewModel.Centro),
+            nameof(ElementoViewModel.Rotacao),
             "X2",
             "Y2",
         };
@@ -31,10 +35,22 @@ namespace Araci.Controls.Base
         protected ElementoControlBase()
         {
             Cursor = Cursors.Hand;
+            RenderTransformOrigin = new Point(0.5, 0.5);
+            ConfigurarRotacaoVisual();
             Loaded += OnLoaded;
             DataContextChanged += OnDataContextChanged;
             MouseEnter += OnMouseEnter;
             MouseLeave += OnMouseLeave;
+        }
+
+        private void ConfigurarRotacaoVisual()
+        {
+            var rotate = new RotateTransform();
+            BindingOperations.SetBinding(
+                rotate,
+                RotateTransform.AngleProperty,
+                new Binding(nameof(ElementoViewModel.Rotacao)));
+            RenderTransform = rotate;
         }
 
         private void OnMouseEnter(object sender, MouseEventArgs e)

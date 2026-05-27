@@ -46,6 +46,30 @@ namespace Araci.Applications.Diagrama
             _context.SceneQueries.Invalidate();
         }
 
+        public bool RotateClockwise()
+        {
+            if (Preview == null)
+                return false;
+
+            TModel modelo = _obterModelo(Preview);
+            modelo.Rotacao = RotationService.RotateClockwise(modelo.Rotacao);
+            _context.TerminalLayout.AtualizarTerminais(modelo);
+            Preview.AtualizarAposModeloAlterado();
+            _context.SceneQueries.Invalidate();
+            return true;
+        }
+
+        public double CurrentRotation
+        {
+            get
+            {
+                if (Preview == null)
+                    return 0;
+
+                return _obterModelo(Preview).Rotacao;
+            }
+        }
+
         public void Clear()
         {
             if (Preview == null)

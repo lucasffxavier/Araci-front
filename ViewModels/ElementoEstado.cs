@@ -10,6 +10,7 @@ namespace Araci.ViewModels
         public double Y { get; }
         public double X2 { get; }
         public double Y2 { get; }
+        public double Rotacao { get; }
         public List<Point> Vertices { get; }
 
         public ElementoEstado(
@@ -17,12 +18,14 @@ namespace Araci.ViewModels
             double y,
             double x2 = 0,
             double y2 = 0,
+            double rotacao = 0,
             IEnumerable<Point>? vertices = null)
         {
             X = x;
             Y = y;
             X2 = x2;
             Y2 = y2;
+            Rotacao = rotacao;
 
             Vertices = vertices != null
                 ? new List<Point>(vertices)
@@ -33,6 +36,7 @@ namespace Araci.ViewModels
         {
             elemento.PosicaoX = X;
             elemento.PosicaoY = Y;
+            elemento.Rotacao = Rotacao;
 
             if (elemento is ElementoLinear linear)
             {

@@ -349,7 +349,7 @@ namespace Araci.ViewModels
 
         public override ElementoEstado CapturarEstado()
         {
-            return new ElementoEstado(WorldX, WorldY, vertices: Cabo.Vertices);
+            return new ElementoEstado(WorldX, WorldY, rotacao: Cabo.Rotacao, vertices: Cabo.Vertices);
         }
 
         public override void AplicarEstado(ElementoEstado estado)

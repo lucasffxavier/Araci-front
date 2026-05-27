@@ -46,6 +46,7 @@ namespace Araci.Services
             MoveHud = new MoveHudService(this);
             MoveConstraints = new MoveConstraintService(Settings);
             Move = new MoveService(this);
+            Rotation = new RotationService(this);
             Tools = new ToolService(this);
             Input = new InputRouter(this);
             Navigation = new ViewportNavigationService(this);
@@ -97,6 +98,8 @@ namespace Araci.Services
         public SelectionService Selection { get; }
 
         public MoveService Move { get; }
+
+        public RotationService Rotation { get; }
 
         public SnapService Snap { get; }
 

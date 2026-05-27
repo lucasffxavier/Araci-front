@@ -67,6 +67,7 @@ namespace Araci.Services
                     antes.Y != depois.Y ||
                     antes.X2 != depois.X2 ||
                     antes.Y2 != depois.Y2 ||
+                    antes.Rotacao != depois.Rotacao ||
                     !antes.Vertices.SequenceEqual(depois.Vertices);
 
                 if (!mudou)

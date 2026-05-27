@@ -59,6 +59,8 @@ namespace Araci.Applications.Diagrama
             Point posicao = Context.Geometry.CalcularTopoEsquerdoPorCentro(modelo, pontoSnap);
             modelo.PosicaoX = posicao.X;
             modelo.PosicaoY = posicao.Y;
+            modelo.Rotacao = _preview.CurrentRotation;
+            Context.TerminalLayout.AtualizarTerminais(modelo);
 
             _preview.Clear();
             Context.Commands.Execute(new AddElementoCommand(modelo, Context));
@@ -78,7 +80,11 @@ namespace Araci.Applications.Diagrama
             {
                 _preview.Clear();
                 Context.Tools.VoltarParaSelecao();
+                return;
             }
+
+            if (key == Key.Space)
+                _preview.RotateClockwise();
         }
 
         protected abstract TModel CriarModeloReal();

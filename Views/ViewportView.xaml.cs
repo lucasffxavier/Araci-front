@@ -235,6 +235,14 @@ namespace Araci.Views
 
         private void OnPreviewKeyDown(object sender, KeyEventArgs e)
         {
+            if (_context != null &&
+                e.Key == Key.Space &&
+                _context.Input.KeyDown(e.Key))
+            {
+                e.Handled = true;
+                return;
+            }
+
             if (_context?.Navigation.TryHandleKeyDown(e) == true)
             {
                 AtualizarCursorNavegacao();

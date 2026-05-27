@@ -2,6 +2,7 @@ using System.Windows;
 using System.Windows.Input;
 using Araci.Applications.Editar.Base;
 using Araci.ViewModels;
+using System.Linq;
 
 namespace Araci.Services
 {
@@ -87,6 +88,18 @@ namespace Araci.Services
             {
                 _context.SafeDelete.DeleteActiveHandleOrSelection();
                 return true;
+            }
+
+            if (key == Key.Space)
+            {
+                if (ToolAtual.IsBusy ||
+                    _context.Selection.Selecionados.Any(RotationService.PodeRotacionar))
+                {
+                    ToolAtual.OnKeyDown(key);
+                    return true;
+                }
+
+                return false;
             }
 
             if (key == Key.Escape)

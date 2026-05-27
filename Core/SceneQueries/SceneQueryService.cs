@@ -241,6 +241,7 @@ namespace Araci.Core.SceneQueries
                     nameof(ElementoViewModel.Largura) or
                     nameof(ElementoViewModel.Altura) or
                     nameof(ElementoViewModel.Centro) or
+                    nameof(ElementoViewModel.Rotacao) or
                     nameof(ElementoViewModel.RenderData))
             {
                 Invalidate();

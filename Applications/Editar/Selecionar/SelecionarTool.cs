@@ -15,6 +15,7 @@ namespace Araci.Applications.Editar.Selecionar
         private readonly SelectionBoxController _selectionBox;
         private readonly DragMoveController _dragMove;
         private readonly CableVertexEditService _cableVertexEdit;
+        private readonly EditorContext _context;
         private readonly bool _modoSoMover;
 
         public SelecionarTool(EditorContext context, bool modoSoMover = false, bool mostrarHud = false)
@@ -22,6 +23,7 @@ namespace Araci.Applications.Editar.Selecionar
             if (context == null)
                 throw new ArgumentNullException(nameof(context));
 
+            _context = context;
             _queries = context.SceneQueries;
             _selection = new SelectionController(context.Selection);
             _selectionBox = new SelectionBoxController(context.SelectionBox, _queries, context.Selection);
@@ -131,6 +133,12 @@ namespace Araci.Applications.Editar.Selecionar
 
         public void OnKeyDown(Key key)
         {
+            if (!_modoSoMover && key == Key.Space)
+            {
+                _context.Rotation.RotateSelectionClockwise();
+                return;
+            }
+
             if (!_modoSoMover && key == Key.Delete)
                 _cableVertexEdit.TryRemoveActive();
         }

@@ -133,6 +133,19 @@ namespace Araci.ViewModels
             Stroke,
             StrokeThickness);
 
+        public double Rotacao
+        {
+            get => Modelo.Rotacao;
+            set
+            {
+                if (Math.Abs(Modelo.Rotacao - value) < 0.0001)
+                    return;
+
+                Modelo.Rotacao = value;
+                AtualizarAposModeloAlterado();
+            }
+        }
+
         public virtual double X
         {
             get => Node.X;
@@ -217,7 +230,7 @@ namespace Araci.ViewModels
 
         public virtual ElementoEstado CapturarEstado()
         {
-            return new ElementoEstado(X, Y);
+            return new ElementoEstado(X, Y, rotacao: Modelo.Rotacao);
         }
 
         public virtual void AplicarEstado(ElementoEstado estado)
@@ -264,6 +277,7 @@ namespace Araci.ViewModels
             OnPropertyChanged(nameof(Altura));
             OnPropertyChanged(nameof(Bounds));
             OnPropertyChanged(nameof(Centro));
+            OnPropertyChanged(nameof(Rotacao));
             OnPropertyChanged(nameof(RenderData));
         }
 
