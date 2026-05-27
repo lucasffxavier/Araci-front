@@ -14,10 +14,14 @@ namespace Araci.Services
     public class ProjectPersistenceService
     {
         private const int CurrentVersion = 1;
+        private const string AppName = "Araci Engine";
+        private const string UntitledProjectName = "Sem titulo";
         private const string FileFilter =
             "Projeto Araci (*.araci)|*.araci|JSON (*.json)|*.json|Todos os arquivos (*.*)|*.*";
 
         private readonly EditorContext _context;
+        private ProjectMetadataDto _metadata = ProjectMetadataDto.CreateNew(UntitledProjectName);
+        private string? _currentPath;
         private readonly JsonSerializerOptions _jsonOptions = new()
         {
             WriteIndented = true,
@@ -34,6 +38,8 @@ namespace Araci.Services
             _context.Document.Limpar();
             LimparEstadoTransitorio();
             _context.Commands.Clear();
+            _currentPath = null;
+            _metadata = ProjectMetadataDto.CreateNew(UntitledProjectName);
         }
 
         public void SalvarComDialogo()
@@ -64,37 +70,141 @@ namespace Araci.Services
 
         public void Salvar(string path)
         {
-            var dto = new ProjectFileDto
+            try
             {
-                Version = CurrentVersion,
-                Elements = _context.Document.Elementos
-                    .Select(CriarElementoDto)
-                    .ToList()
-            };
+                DateTimeOffset savedAt = DateTimeOffset.UtcNow;
+                ProjectMetadataDto metadata = PrepararMetadadosParaSalvar(path, savedAt);
 
-            string json = JsonSerializer.Serialize(dto, _jsonOptions);
-            File.WriteAllText(path, json);
+                var dto = new ProjectFileDto
+                {
+                    Version = CurrentVersion,
+                    AppName = metadata.AppName,
+                    ProjectName = metadata.ProjectName,
+                    CreatedAt = metadata.CreatedAt,
+                    SavedAt = metadata.SavedAt,
+                    Generator = metadata.Generator,
+                    Notes = metadata.Notes,
+                    Elements = _context.Document.Elementos
+                        .Select(CriarElementoDto)
+                        .ToList()
+                };
+
+                string json = JsonSerializer.Serialize(dto, _jsonOptions);
+                File.WriteAllText(path, json);
+
+                _currentPath = path;
+                _metadata = metadata;
+            }
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or JsonException or NotSupportedException or ArgumentException)
+            {
+                _context.Dialogs.ShowError(
+                    "Salvar projeto",
+                    $"Nao foi possivel salvar o projeto.{Environment.NewLine}{ex.Message}");
+            }
         }
 
         public void Abrir(string path)
         {
-            string json = File.ReadAllText(path);
-            var dto = JsonSerializer.Deserialize<ProjectFileDto>(json, _jsonOptions)
-                ?? new ProjectFileDto();
+            try
+            {
+                string json = File.ReadAllText(path);
+                var dto = JsonSerializer.Deserialize<ProjectFileDto>(json, _jsonOptions)
+                    ?? new ProjectFileDto();
 
-            var elementos = dto.Elements
-                .Select(CriarElemento)
-                .Where(e => e != null)
-                .Cast<Elemento>()
-                .ToList();
+                int version = ObterVersao(dto);
 
-            _context.Document.Limpar();
+                if (version > CurrentVersion)
+                {
+                    _context.Dialogs.ShowWarning(
+                        "Abrir projeto",
+                        $"Este projeto foi salvo em uma versao futura ({version}). " +
+                        "O Araci tentara abrir de forma conservadora.");
+                }
 
-            foreach (Elemento elemento in elementos)
-                _context.Document.AdicionarElemento(elemento);
+                var elementos = dto.Elements
+                    .Select(CriarElemento)
+                    .Where(e => e != null)
+                    .Cast<Elemento>()
+                    .ToList();
 
-            LimparEstadoTransitorio();
-            _context.Commands.Clear();
+                _context.Document.Limpar();
+
+                foreach (Elemento elemento in elementos)
+                    _context.Document.AdicionarElemento(elemento);
+
+                _metadata = CriarMetadadosDoArquivo(dto, path);
+                _currentPath = path;
+
+                LimparEstadoTransitorio();
+                _context.Commands.Clear();
+            }
+            catch (JsonException ex)
+            {
+                MostrarErroAbrir(ex);
+            }
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or InvalidOperationException or NotSupportedException or ArgumentException)
+            {
+                MostrarErroAbrir(ex);
+            }
+        }
+
+        private ProjectMetadataDto PrepararMetadadosParaSalvar(
+            string path,
+            DateTimeOffset savedAt)
+        {
+            string projectName = NomeProjetoParaSalvar(path);
+
+            return new ProjectMetadataDto
+            {
+                AppName = AppName,
+                ProjectName = projectName,
+                CreatedAt = _metadata.CreatedAt ?? savedAt,
+                SavedAt = savedAt,
+                Generator = AppName,
+                Notes = _metadata.Notes
+            };
+        }
+
+        private string NomeProjetoParaSalvar(string path)
+        {
+            if (!string.IsNullOrWhiteSpace(_metadata.ProjectName) &&
+                !string.Equals(_metadata.ProjectName, UntitledProjectName, StringComparison.OrdinalIgnoreCase))
+            {
+                return _metadata.ProjectName;
+            }
+
+            string name = Path.GetFileNameWithoutExtension(path);
+            return string.IsNullOrWhiteSpace(name) ? UntitledProjectName : name;
+        }
+
+        private static int ObterVersao(ProjectFileDto dto)
+        {
+            return dto.Version <= 0 ? 1 : dto.Version;
+        }
+
+        private static ProjectMetadataDto CriarMetadadosDoArquivo(ProjectFileDto dto, string path)
+        {
+            DateTimeOffset now = DateTimeOffset.UtcNow;
+            string projectName = string.IsNullOrWhiteSpace(dto.ProjectName)
+                ? Path.GetFileNameWithoutExtension(path)
+                : dto.ProjectName;
+
+            return new ProjectMetadataDto
+            {
+                AppName = string.IsNullOrWhiteSpace(dto.AppName) ? AppName : dto.AppName,
+                ProjectName = string.IsNullOrWhiteSpace(projectName) ? UntitledProjectName : projectName,
+                CreatedAt = dto.CreatedAt ?? dto.SavedAt ?? now,
+                SavedAt = dto.SavedAt ?? now,
+                Generator = string.IsNullOrWhiteSpace(dto.Generator) ? AppName : dto.Generator,
+                Notes = dto.Notes
+            };
+        }
+
+        private void MostrarErroAbrir(Exception ex)
+        {
+            _context.Dialogs.ShowError(
+                "Abrir projeto",
+                $"Nao foi possivel abrir o projeto. O projeto atual foi mantido.{Environment.NewLine}{ex.Message}");
         }
 
         private ElementDto CriarElementoDto(Elemento elemento)
@@ -318,7 +428,33 @@ namespace Araci.Services
         public sealed class ProjectFileDto
         {
             public int Version { get; set; }
+            public string? AppName { get; set; }
+            public string? ProjectName { get; set; }
+            public DateTimeOffset? CreatedAt { get; set; }
+            public DateTimeOffset? SavedAt { get; set; }
+            public string? Generator { get; set; }
+            public string? Notes { get; set; }
             public List<ElementDto> Elements { get; set; } = new();
+        }
+
+        private sealed class ProjectMetadataDto
+        {
+            public string AppName { get; set; } = ProjectPersistenceService.AppName;
+            public string ProjectName { get; set; } = UntitledProjectName;
+            public DateTimeOffset? CreatedAt { get; set; }
+            public DateTimeOffset? SavedAt { get; set; }
+            public string Generator { get; set; } = ProjectPersistenceService.AppName;
+            public string? Notes { get; set; }
+
+            public static ProjectMetadataDto CreateNew(string projectName)
+            {
+                return new ProjectMetadataDto
+                {
+                    AppName = ProjectPersistenceService.AppName,
+                    ProjectName = string.IsNullOrWhiteSpace(projectName) ? UntitledProjectName : projectName,
+                    Generator = ProjectPersistenceService.AppName
+                };
+            }
         }
 
         public sealed class ElementDto
