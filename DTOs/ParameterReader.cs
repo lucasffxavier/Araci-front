@@ -133,6 +133,24 @@ namespace Araci.DTOs
                 .ToList();
         }
 
+        public IList<ExternalSourceData> GetSins()
+        {
+            ElectricGraph? graph = _graphBuilder?.Build();
+
+            return _api.ObterElementos<Sin>()
+                .Select(sin => new ExternalSourceData
+                {
+                    Id = sin.Id.ToString(),
+                    Nome = ReadString(sin, "Nome"),
+                    Barra = ResolverBarraEquipamento(sin, graph),
+                    Fases = ReadInt(sin, "Fases"),
+                    Tensao = ReadVoltage(sin, "TensaoKV", "Tensao", "TensaoLinha"),
+                    PotenciaCurtoMVA = ReadDouble(sin, "PotenciaCurtoMVA", "PotenciaCurtoCircuitoMva"),
+                    RelacaoXR = ReadDouble(sin, "RelacaoXR", "X/R")
+                })
+                .ToList();
+        }
+
         private IList<Elemento> GetElementsByTypeName(params string[] typeNames)
         {
             return _api.ObterElementos()
@@ -358,6 +376,23 @@ namespace Araci.DTOs
             public double Potencia { get; set; }
 
             public double FP { get; set; }
+        }
+
+        public class ExternalSourceData
+        {
+            public string Id { get; set; } = string.Empty;
+
+            public string Nome { get; set; } = string.Empty;
+
+            public string Barra { get; set; } = string.Empty;
+
+            public int Fases { get; set; }
+
+            public double Tensao { get; set; }
+
+            public double PotenciaCurtoMVA { get; set; }
+
+            public double RelacaoXR { get; set; }
         }
     }
 }

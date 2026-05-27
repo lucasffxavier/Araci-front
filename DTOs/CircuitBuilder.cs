@@ -20,17 +20,21 @@ namespace Araci.DTOs
         {
             ValidarTopologia();
 
+            IList<ParameterReader.ExternalSourceData> sins = _reader.GetSins();
             IList<ParameterReader.GeneratorData> generators = _reader.GetGenerators();
-            ParameterReader.GeneratorData slackGenerator = generators.FirstOrDefault()
-                ?? throw new InvalidOperationException("Nenhum gerador encontrado para definir a fonte slack.");
+            ParameterReader.ExternalSourceData? slackSin = sins.FirstOrDefault();
+            ParameterReader.GeneratorData? slackGenerator = generators.FirstOrDefault();
+
+            if (slackSin == null && slackGenerator == null)
+                throw new InvalidOperationException("Nenhuma fonte slack encontrada no circuito.");
 
             var dto = new CircuitDto
             {
                 Loads = BuildLoads(),
                 Lines = BuildLines(),
                 Transformers = BuildTransformers(),
-                Generators = BuildGenerators(generators.Skip(1)),
-                Slack = BuildSlack(slackGenerator)
+                Generators = BuildGenerators(slackSin != null ? generators : generators.Skip(1)),
+                Slack = slackSin != null ? BuildSlack(slackSin) : BuildSlack(slackGenerator!)
             };
 
             Validar(dto);
@@ -128,10 +132,24 @@ namespace Araci.DTOs
             };
         }
 
+        private static SlackDto BuildSlack(ParameterReader.ExternalSourceData source)
+        {
+            string nome = SafeName(source.Nome, "SIN-001");
+
+            return new SlackDto
+            {
+                Id = source.Id,
+                Nome = nome,
+                Tensao = SafeKv(source.Tensao),
+                Fases = SafePhases(source.Fases),
+                Barra = SafeBus(source.Barra, nome)
+            };
+        }
+
         private static void Validar(CircuitDto dto)
         {
             if (dto.Slack == null || string.IsNullOrWhiteSpace(dto.Slack.Barra))
-                throw new InvalidOperationException("Nenhum gerador encontrado para definir a fonte slack.");
+                throw new InvalidOperationException("Nenhuma fonte slack encontrada no circuito.");
 
             foreach (LineDto line in dto.Lines)
             {

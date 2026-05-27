@@ -37,7 +37,11 @@ namespace Araci.TechnicalChecks
                 ("SIN aparece no ElectricGraph", SinApareceNoElectricGraph),
                 ("SIN preserva Id apos reload", SinPreservaIdAposReload),
                 ("Cabos conectados aos terminais do SIN preservam conexoes", CabosConectadosAosTerminaisDoSinPreservamConexoes),
-                ("DTOs existentes com gerador continuam funcionando", DtosComGeradorContinuamFuncionando)
+                ("DTOs sem SIN mantem gerador como slack", DtosSemSinMantemGeradorComoSlack),
+                ("SIN com gerador vira slack preferencial", SinComGeradorViraSlackPreferencial),
+                ("SIN com multiplos geradores preserva todos em Generators", SinComMultiplosGeradoresPreservaTodosGenerators),
+                ("Multiplos SIN usam primeiro do Document como slack", MultiplosSinUsamPrimeiroDoDocumentComoSlack),
+                ("Reload com SIN mantem slack baseado no SIN", ReloadComSinMantemSlackBaseadoNoSin)
             };
 
             var failures = new List<string>();
@@ -445,17 +449,95 @@ namespace Araci.TechnicalChecks
             AssertEqual(0, graph.GetInvalidEdges().Count, "Grafo com SIN nao deve ter arestas invalidas");
         }
 
-        private static void DtosComGeradorContinuamFuncionando()
+        private static void DtosSemSinMantemGeradorComoSlack()
         {
             SimpleCircuit circuit = CreateSimpleCircuit();
-            circuit.Document.AdicionarElemento(CreateSin("SIN-COMPAT"));
 
             CircuitDto dto = new CircuitBuilder(new ParameterReader(circuit.Document)).Build();
 
             Assert(dto.Slack != null, "SlackDto deve continuar existindo.");
             AssertEqual(circuit.Generator.Id.ToString(), dto.Slack!.Id, "Slack deve continuar usando gerador");
-            AssertEqual(1, dto.Loads.Count, "Quantidade de cargas com SIN adicional");
-            AssertEqual(1, dto.Lines.Count, "Quantidade de linhas com SIN adicional");
+            AssertEqual(0, dto.Generators.Count, "Primeiro gerador legado nao deve aparecer em Generators.");
+            AssertEqual(1, dto.Loads.Count, "Quantidade de cargas sem SIN");
+            AssertEqual(1, dto.Lines.Count, "Quantidade de linhas sem SIN");
+        }
+
+        private static void SinComGeradorViraSlackPreferencial()
+        {
+            SimpleCircuit circuit = CreateSimpleCircuit();
+            Sin sin = CreateSin("SIN-PREFERENCIAL");
+            circuit.Document.Elementos.Insert(0, sin);
+
+            CircuitDto dto = new CircuitBuilder(new ParameterReader(circuit.Document)).Build();
+
+            AssertEqual(sin.Id.ToString(), dto.Slack.Id, "Slack deve usar SIN");
+            AssertEqual(sin.Nome, dto.Slack.Nome, "Slack.Nome SIN");
+            AssertEqual(sin.Barra, dto.Slack.Barra, "Slack.Barra SIN");
+            AssertEqual(1, dto.Generators.Count, "Gerador deve permanecer em Generators");
+            AssertEqual(circuit.Generator.Id.ToString(), dto.Generators[0].Id, "GeneratorDto.Id com SIN");
+            AssertEqual(1, dto.Loads.Count, "Cargas com SIN");
+            AssertEqual(1, dto.Lines.Count, "Linhas com SIN");
+        }
+
+        private static void SinComMultiplosGeradoresPreservaTodosGenerators()
+        {
+            var document = new AraciDocument();
+            Sin sin = CreateSin("SIN-MULTI-GER");
+            Gerador generatorA = CreateGenerator("GERADOR-SIN-A", 1100, 0.91);
+            Gerador generatorB = CreateGenerator("GERADOR-SIN-B", 730, 0.87);
+            Carga load = CreateLoad("CARGA-SIN-MULTI", 510, 170);
+
+            document.AdicionarElemento(sin);
+            document.AdicionarElemento(generatorA);
+            document.AdicionarElemento(generatorB);
+            document.AdicionarElemento(load);
+            document.AdicionarElemento(CreateCable(sin, 1, load, 0, "L-SIN-M", 1.1));
+            document.AdicionarElemento(CreateCable(generatorA, 0, load, 0, "L-GA-SIN", 1.2));
+            document.AdicionarElemento(CreateCable(generatorB, 0, load, 0, "L-GB-SIN", 1.3));
+
+            CircuitDto dto = new CircuitBuilder(new ParameterReader(document)).Build();
+
+            AssertEqual(sin.Id.ToString(), dto.Slack.Id, "Slack deve usar SIN com multiplos geradores");
+            AssertEqual(2, dto.Generators.Count, "Todos os geradores devem permanecer em Generators");
+            Assert(dto.Generators.Any(g => g.Id == generatorA.Id.ToString()), "Gerador A deve estar em Generators.");
+            Assert(dto.Generators.Any(g => g.Id == generatorB.Id.ToString()), "Gerador B deve estar em Generators.");
+        }
+
+        private static void MultiplosSinUsamPrimeiroDoDocumentComoSlack()
+        {
+            var document = new AraciDocument();
+            Sin sinA = CreateSin("SIN-PRIMEIRO");
+            Sin sinB = CreateSin("SIN-SEGUNDO");
+            Gerador generator = CreateGenerator("GERADOR-COM-SIN", 900, 0.95);
+            Carga load = CreateLoad("CARGA-MULTI-SIN", 250, 80);
+
+            document.AdicionarElemento(sinA);
+            document.AdicionarElemento(generator);
+            document.AdicionarElemento(sinB);
+            document.AdicionarElemento(load);
+            document.AdicionarElemento(CreateCable(sinB, 2, load, 0, "L-MULTI-SIN", 1.4));
+            document.AdicionarElemento(CreateCable(generator, 0, load, 0, "L-G-MULTI-SIN", 1.5));
+
+            CircuitDto dto = new CircuitBuilder(new ParameterReader(document)).Build();
+
+            AssertEqual(sinA.Id.ToString(), dto.Slack.Id, "Primeiro SIN deve virar slack");
+            AssertEqual(sinA.Nome, dto.Slack.Nome, "Nome do primeiro SIN slack");
+            AssertEqual(1, dto.Generators.Count, "Gerador deve permanecer em Generators com multiplos SIN");
+        }
+
+        private static void ReloadComSinMantemSlackBaseadoNoSin()
+        {
+            SimpleCircuit circuit = CreateSimpleCircuit();
+            Sin sin = CreateSin("SIN-RELOAD-SLACK");
+            circuit.Document.Elementos.Insert(0, sin);
+
+            AraciDocument loaded = SaveAndLoad(circuit.Document);
+            CircuitDto dto = new CircuitBuilder(new ParameterReader(loaded)).Build();
+
+            AssertEqual(sin.Id.ToString(), dto.Slack.Id, "Slack SIN apos reload");
+            AssertEqual(sin.Nome, dto.Slack.Nome, "Slack.Nome SIN apos reload");
+            AssertEqual(1, dto.Generators.Count, "Gerador preservado apos reload com SIN");
+            AssertEqual(circuit.Generator.Id.ToString(), dto.Generators[0].Id, "GeneratorDto.Id apos reload com SIN");
         }
 
         private static SimpleCircuit CreateSimpleCircuit()
