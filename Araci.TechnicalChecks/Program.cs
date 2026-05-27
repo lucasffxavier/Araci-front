@@ -21,7 +21,12 @@ namespace Araci.TechnicalChecks
                 ("ParameterReader CoreApi usa fallback sem ElectricGraph", CoreApiUsaFallbackSemElectricGraph),
                 ("Cabo invalido bloqueia DTO final", CaboInvalidoBloqueiaDto),
                 ("Cabo duplicado gera erro topologico", CaboDuplicadoGeraErro),
-                ("ElectricGraph Build nao altera Document", ElectricGraphBuildNaoAlteraDocument)
+                ("ElectricGraph Build nao altera Document", ElectricGraphBuildNaoAlteraDocument),
+                ("Multiplos geradores preservam slack e restantes", MultiplosGeradoresPreservamSlack),
+                ("Cabos em serie preservam orientacao", CabosEmSeriePreservamOrientacao),
+                ("Ramificacao simples valida grafo e DTO", RamificacaoSimplesValidaGrafoEDto),
+                ("Topologia maior nao altera Document", TopologiaMaiorNaoAlteraDocument),
+                ("Ordem de linhas segue ordem do Document", OrdemDeLinhasSegueDocument)
             };
 
             var failures = new List<string>();
@@ -150,40 +155,120 @@ namespace Araci.TechnicalChecks
             AssertEqual(1, graph.Edges.Count, "Quantidade de arestas do grafo");
         }
 
+        private static void MultiplosGeradoresPreservamSlack()
+        {
+            var document = new AraciDocument();
+            Gerador generatorA = CreateGenerator("GERADOR-A", 1100, 0.91);
+            Gerador generatorB = CreateGenerator("GERADOR-B", 730, 0.87);
+            Carga load = CreateLoad("CARGA-MULTI", 510, 170);
+
+            document.AdicionarElemento(generatorA);
+            document.AdicionarElemento(generatorB);
+            document.AdicionarElemento(load);
+            document.AdicionarElemento(CreateCable(generatorA, load, "L-A", 1.1));
+            document.AdicionarElemento(CreateCable(generatorB, load, "L-B", 1.2));
+
+            CircuitDto dto = new CircuitBuilder(new ParameterReader(document)).Build();
+
+            Assert(dto.Slack != null, "SlackDto deve existir.");
+            AssertEqual(generatorA.Id.ToString(), dto.Slack!.Id, "Slack deve usar primeiro gerador");
+            AssertEqual(generatorA.Nome, dto.Slack.Nome, "SlackDto.Nome");
+            AssertEqual(generatorA.Nome, dto.Slack.Barra, "SlackDto.Barra");
+            AssertEqual(1, dto.Generators.Count, "Geradores restantes");
+
+            GeneratorDto generator = dto.Generators[0];
+            AssertEqual(generatorB.Id.ToString(), generator.Id, "GeneratorDto.Id");
+            AssertEqual(generatorB.Nome, generator.Nome, "GeneratorDto.Nome");
+            AssertEqual(generatorB.Nome, generator.Barra, "GeneratorDto.Barra");
+            AssertEqual(730, generator.Potencia, "GeneratorDto.Potencia");
+            AssertEqual(0.87, generator.FP, "GeneratorDto.FP");
+            Assert(!dto.Generators.Any(g => g.Id == generatorA.Id.ToString()), "Slack nao deve aparecer em Generators.");
+        }
+
+        private static void CabosEmSeriePreservamOrientacao()
+        {
+            var document = new AraciDocument();
+            Gerador generator = CreateGenerator("GERADOR-SERIE", 1200, 0.95);
+            Barra bar = CreateBar("BARRA-SERIE");
+            Carga load = CreateLoad("CARGA-SERIE", 430, 140);
+            Cabo line1 = CreateCable(generator, 0, bar, 0, "L-S01", 4.1);
+            Cabo line2 = CreateCable(bar, 1, load, 0, "L-S02", 5.2);
+
+            document.AdicionarElemento(generator);
+            document.AdicionarElemento(bar);
+            document.AdicionarElemento(load);
+            document.AdicionarElemento(line1);
+            document.AdicionarElemento(line2);
+
+            IList<ParameterReader.LineData> lines = new ParameterReader(document).GetLines();
+
+            AssertEqual(2, lines.Count, "Quantidade de linhas em serie");
+            AssertLine(lines[0], line1, generator.Nome, bar.Nome, "Linha serie 1");
+            AssertLine(lines[1], line2, bar.Nome, load.Nome, "Linha serie 2");
+        }
+
+        private static void RamificacaoSimplesValidaGrafoEDto()
+        {
+            var document = new AraciDocument();
+            Gerador generator = CreateGenerator("GERADOR-RAMO", 1300, 0.94);
+            Barra bar = CreateBar("BARRA-RAMO");
+            Carga load1 = CreateLoad("CARGA-R1", 320, 90);
+            Carga load2 = CreateLoad("CARGA-R2", 280, 85);
+
+            document.AdicionarElemento(generator);
+            document.AdicionarElemento(bar);
+            document.AdicionarElemento(load1);
+            document.AdicionarElemento(load2);
+            document.AdicionarElemento(CreateCable(generator, 0, bar, 0, "L-01", 1.0));
+            document.AdicionarElemento(CreateCable(bar, 1, load1, 0, "L-02", 1.1));
+            document.AdicionarElemento(CreateCable(bar, 2, load2, 0, "L-03", 1.2));
+
+            ElectricGraph graph = new ElectricGraphBuilder(document).Build();
+            IReadOnlyList<ElectricGraphNode> neighbors = graph.GetNeighbors(bar.Id.ToString());
+            CircuitDto dto = new CircuitBuilder(new ParameterReader(document)).Build();
+
+            AssertEqual(4, graph.Nodes.Count, "Quantidade de nos da ramificacao");
+            AssertEqual(3, graph.Edges.Count, "Quantidade de arestas da ramificacao");
+            AssertEqual(0, graph.GetInvalidEdges().Count, "Arestas invalidas da ramificacao");
+            AssertContainsNode(neighbors, generator, "Vizinho gerador");
+            AssertContainsNode(neighbors, load1, "Vizinho carga 1");
+            AssertContainsNode(neighbors, load2, "Vizinho carga 2");
+            AssertEqual(2, dto.Loads.Count, "Cargas no DTO ramificado");
+            AssertEqual(3, dto.Lines.Count, "Linhas no DTO ramificado");
+        }
+
+        private static void TopologiaMaiorNaoAlteraDocument()
+        {
+            AraciDocument document = CreateBranchDocument();
+            int countBefore = document.Elementos.Count;
+
+            ElectricGraph graph1 = new ElectricGraphBuilder(document).Build();
+            ElectricGraph graph2 = new ElectricGraphBuilder(document).Build();
+            ElectricGraph graph3 = new ElectricGraphBuilder(document).Build();
+
+            AssertEqual(countBefore, document.Elementos.Count, "Contagem apos builds repetidos");
+            AssertEqual(graph1.Nodes.Count, graph2.Nodes.Count, "Nodes build 1/2");
+            AssertEqual(graph2.Nodes.Count, graph3.Nodes.Count, "Nodes build 2/3");
+            AssertEqual(graph1.Edges.Count, graph2.Edges.Count, "Edges build 1/2");
+            AssertEqual(graph2.Edges.Count, graph3.Edges.Count, "Edges build 2/3");
+        }
+
+        private static void OrdemDeLinhasSegueDocument()
+        {
+            AraciDocument document = CreateBranchDocument();
+            IList<ParameterReader.LineData> lines = new ParameterReader(document).GetLines();
+
+            AssertEqual(3, lines.Count, "Quantidade de linhas ordenadas");
+            AssertEqual("L-01", lines[0].Nome, "Linha 1 por ordem do Document");
+            AssertEqual("L-02", lines[1].Nome, "Linha 2 por ordem do Document");
+            AssertEqual("L-03", lines[2].Nome, "Linha 3 por ordem do Document");
+        }
+
         private static SimpleCircuit CreateSimpleCircuit()
         {
             var document = new AraciDocument();
-            var generator = new Gerador
-            {
-                Nome = "GERADOR-TESTE",
-                Barra = "GERADOR-TESTE",
-                Tipo = new TipoGerador
-                {
-                    TensaoKV = 13.8,
-                    FatorPotencia = 0.93
-                },
-                PosicaoX = 100,
-                PosicaoY = 100,
-                PotenciaAtiva = 1250,
-                TensaoLinha = "13.8"
-            };
-
-            var load = new Carga
-            {
-                Nome = "CARGA-TESTE",
-                Barra = "CARGA-TESTE",
-                Tipo = new TipoCarga
-                {
-                    Tensao = "13.8",
-                    Conexao = "Wye",
-                    ModeloCarga = 1
-                },
-                PosicaoX = 300,
-                PosicaoY = 100,
-                PotenciaAtiva = 650,
-                PotenciaReativa = 210,
-                TensaoLinha = "13.8"
-            };
+            Gerador generator = CreateGenerator("GERADOR-TESTE", 1250, 0.93);
+            Carga load = CreateLoad("CARGA-TESTE", 650, 210);
 
             Cabo cable = CreateCable(generator, load, "L-TESTE", 2.75);
 
@@ -194,30 +279,140 @@ namespace Araci.TechnicalChecks
             return new SimpleCircuit(document, generator, load, cable);
         }
 
+        private static AraciDocument CreateBranchDocument()
+        {
+            var document = new AraciDocument();
+            Gerador generator = CreateGenerator("GERADOR-BRANCH", 1300, 0.94);
+            Barra bar = CreateBar("BARRA-BRANCH");
+            Carga load1 = CreateLoad("CARGA-B1", 320, 90);
+            Carga load2 = CreateLoad("CARGA-B2", 280, 85);
+
+            document.AdicionarElemento(generator);
+            document.AdicionarElemento(bar);
+            document.AdicionarElemento(load1);
+            document.AdicionarElemento(load2);
+            document.AdicionarElemento(CreateCable(generator, 0, bar, 0, "L-01", 1.0));
+            document.AdicionarElemento(CreateCable(bar, 1, load1, 0, "L-02", 1.1));
+            document.AdicionarElemento(CreateCable(bar, 2, load2, 0, "L-03", 1.2));
+
+            return document;
+        }
+
+        private static Gerador CreateGenerator(string name, double power, double fp)
+        {
+            return new Gerador
+            {
+                Nome = name,
+                Barra = name,
+                Tipo = new TipoGerador
+                {
+                    TensaoKV = 13.8,
+                    FatorPotencia = fp
+                },
+                PosicaoX = 100,
+                PosicaoY = 100,
+                PotenciaAtiva = power,
+                TensaoLinha = "13.8"
+            };
+        }
+
+        private static Carga CreateLoad(string name, double activePower, double reactivePower)
+        {
+            return new Carga
+            {
+                Nome = name,
+                Barra = name,
+                Tipo = new TipoCarga
+                {
+                    Tensao = "13.8",
+                    Conexao = "Wye",
+                    ModeloCarga = 1
+                },
+                PosicaoX = 300,
+                PosicaoY = 100,
+                PotenciaAtiva = activePower,
+                PotenciaReativa = reactivePower,
+                TensaoLinha = "13.8"
+            };
+        }
+
+        private static Barra CreateBar(string name)
+        {
+            return new Barra
+            {
+                Nome = name,
+                PosicaoX = 200,
+                PosicaoY = 100
+            };
+        }
+
         private static Cabo CreateCable(
             Gerador generator,
             Carga load,
             string name,
             double length)
         {
-            Terminal generatorTerminal = generator.Terminais[0];
-            Terminal loadTerminal = load.Terminais[0];
+            return CreateCable(generator, 0, load, 0, name, length);
+        }
+
+        private static Cabo CreateCable(
+            Elemento from,
+            int fromTerminalIndex,
+            Elemento to,
+            int toTerminalIndex,
+            string name,
+            double length)
+        {
+            Terminal fromTerminal = GetTerminal(from, fromTerminalIndex);
+            Terminal toTerminal = GetTerminal(to, toTerminalIndex);
             var cable = new Cabo
             {
                 Nome = name,
-                OrigemId = generator.Id.ToString(),
-                OrigemTerminalId = generatorTerminal.Id,
-                DestinoId = load.Id.ToString(),
-                DestinoTerminalId = loadTerminal.Id,
+                OrigemId = from.Id.ToString(),
+                OrigemTerminalId = fromTerminal.Id,
+                DestinoId = to.Id.ToString(),
+                DestinoTerminalId = toTerminal.Id,
                 Comprimento = length
             };
 
-            cable.DefinirOrigem(new Point(100, 100));
-            cable.DefinirDestino(new Point(300, 100));
-            cable.Vertices.Add(new Point(100, 100));
-            cable.Vertices.Add(new Point(300, 100));
+            cable.DefinirOrigem(fromTerminal.Posicao);
+            cable.DefinirDestino(toTerminal.Posicao);
+            cable.Vertices.Add(fromTerminal.Posicao);
+            cable.Vertices.Add(toTerminal.Posicao);
 
             return cable;
+        }
+
+        private static Terminal GetTerminal(Elemento elemento, int index)
+        {
+            if (elemento is not ITerminalOwner owner)
+                throw new InvalidOperationException($"Elemento '{elemento.Nome}' nao possui terminais.");
+
+            return owner.Terminais[index];
+        }
+
+        private static void AssertLine(
+            ParameterReader.LineData line,
+            Cabo cable,
+            string expectedFrom,
+            string expectedTo,
+            string name)
+        {
+            AssertEqual(cable.Id.ToString(), line.Id, $"{name}.Id");
+            AssertEqual(cable.Nome, line.Nome, $"{name}.Nome");
+            AssertEqual(expectedFrom, line.Barra1, $"{name}.Barra1");
+            AssertEqual(expectedTo, line.Barra2, $"{name}.Barra2");
+        }
+
+        private static void AssertContainsNode(
+            IEnumerable<ElectricGraphNode> nodes,
+            Elemento expected,
+            string name)
+        {
+            bool contains = nodes.Any(n =>
+                string.Equals(n.ElementId, expected.Id.ToString(), StringComparison.OrdinalIgnoreCase));
+
+            Assert(contains, $"{name}: no '{expected.Nome}' nao encontrado.");
         }
 
         private static void Assert(bool condition, string message)
