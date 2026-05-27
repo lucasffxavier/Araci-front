@@ -47,6 +47,11 @@ namespace Araci.Services
                     sin.AtualizarTerminais(tamanhoSin.Width, tamanhoSin.Height);
                     break;
 
+                case Transformador transformador:
+                    var tamanhoTransformador = _geometry.ObterTamanho(transformador);
+                    transformador.AtualizarTerminais(tamanhoTransformador.Width, tamanhoTransformador.Height);
+                    break;
+
                 case Cabo cabo:
                     AtualizarTerminaisCabo(cabo);
                     break;

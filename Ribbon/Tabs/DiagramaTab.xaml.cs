@@ -7,6 +7,7 @@ using Araci.Applications.Diagrama.InserirCarga;
 using Araci.Applications.Diagrama.InserirGerador;
 using Araci.Applications.Diagrama.InserirBarra;
 using Araci.Applications.Diagrama.InserirSin;
+using Araci.Applications.Diagrama.InserirTransformador;
 
 using Araci.Services;
 
@@ -89,6 +90,22 @@ namespace Araci.Ribbon.Tabs
             if (Context == null) return;
 
             InserirSinApplication app =
+                new(Context);
+
+            app.Executar();
+        }
+
+        // =========================
+        // TRANSFORMADOR
+        // =========================
+
+        private void TransformadorButton_Click(
+            object sender,
+            RoutedEventArgs e)
+        {
+            if (Context == null) return;
+
+            InserirTransformadorApplication app =
                 new(Context);
 
             app.Executar();

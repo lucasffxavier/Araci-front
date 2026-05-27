@@ -42,6 +42,7 @@ namespace Araci.ViewModels
                 TipoCarga carga => new TipoCargaViewModel(carga),
                 TipoGerador gerador => new TipoGeradorViewModel(gerador),
                 TipoSin sin => new TipoSinViewModel(sin),
+                TipoTransformador transformador => new TipoTransformadorViewModel(transformador),
                 _ => null
             };
         }

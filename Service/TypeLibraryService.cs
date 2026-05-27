@@ -12,6 +12,7 @@ namespace Araci.Services
             InicializarCargas();
             InicializarGeradores();
             InicializarSin();
+            InicializarTransformadores();
             InicializarBarras();
         }
 
@@ -23,6 +24,8 @@ namespace Araci.Services
 
         public ObservableCollection<TipoSin> TiposSin { get; } = new();
 
+        public ObservableCollection<TipoTransformador> TiposTransformadores { get; } = new();
+
         public ObservableCollection<TipoBarra> TiposBarras { get; } = new();
 
         public TipoCabo? TipoCaboPadrao => TiposCabos.FirstOrDefault();
@@ -32,6 +35,8 @@ namespace Araci.Services
         public TipoGerador? TipoGeradorPadrao => TiposGeradores.FirstOrDefault();
 
         public TipoSin? TipoSinPadrao => TiposSin.FirstOrDefault();
+
+        public TipoTransformador? TipoTransformadorPadrao => TiposTransformadores.FirstOrDefault();
 
         public TipoBarra? TipoBarraPadrao => TiposBarras.FirstOrDefault();
 
@@ -97,6 +102,22 @@ namespace Araci.Services
                     TensaoKV = 12.47,
                     PotenciaCurtoMVA = 500,
                     RelacaoXR = 10
+                });
+        }
+
+        private void InicializarTransformadores()
+        {
+            TiposTransformadores.Add(
+                new TipoTransformador
+                {
+                    NomeTipo = "Transformador 2 Enrolamentos",
+                    Familia = "Transformadores",
+                    Categoria = "Transformadores",
+                    Fases = 3,
+                    Enrolamentos = 2,
+                    TensaoPrimarioKV = 13.8,
+                    TensaoSecundarioKV = 0.38,
+                    PotenciaKVA = 500
                 });
         }
 

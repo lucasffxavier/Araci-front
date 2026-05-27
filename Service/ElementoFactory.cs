@@ -72,6 +72,16 @@ namespace Araci.Services
             return (SinViewModel)CriarViewModel(CriarSin())!;
         }
 
+        public Transformador CriarTransformador()
+        {
+            return _registry.CreateModel<Transformador>();
+        }
+
+        public TransformadorViewModel CriarTransformadorVM()
+        {
+            return (TransformadorViewModel)CriarViewModel(CriarTransformador())!;
+        }
+
         public Barra CriarBarra()
         {
             return _registry.CreateModel<Barra>();

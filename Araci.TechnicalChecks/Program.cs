@@ -49,7 +49,11 @@ namespace Araci.TechnicalChecks
                 ("OperationalGraph usa gerador como fallback sem SIN", OperationalGraphUsaGeradorComoFallbackSemSin),
                 ("OperationalGraph sem fonte nao energiza nos", OperationalGraphSemFonteNaoEnergizaNos),
                 ("OperationalGraph rebuild repetido nao altera Document", OperationalGraphRebuildRepetidoNaoAlteraDocument),
-                ("OperationalGraph apos reload preserva resultado", OperationalGraphAposReloadPreservaResultado)
+                ("OperationalGraph apos reload preserva resultado", OperationalGraphAposReloadPreservaResultado),
+                ("Transformador minimo possui terminais primario e secundario", TransformadorMinimoPossuiTerminais),
+                ("Transformador aparece no ElectricGraph", TransformadorApareceNoElectricGraph),
+                ("Transformador preserva conexoes apos reload", TransformadorPreservaConexoesAposReload),
+                ("Transformador entra no DTO minimo", TransformadorEntraNoDtoMinimo)
             };
 
             var failures = new List<string>();
@@ -699,6 +703,85 @@ namespace Araci.TechnicalChecks
             Assert(state.IsEdgeEnergized(cable.Id.ToString()), "Cabo deve continuar energizado apos reload.");
         }
 
+        private static void TransformadorMinimoPossuiTerminais()
+        {
+            Transformador transformador = CreateTransformador("TR-TESTE");
+
+            AssertTransformadorTerminals(transformador, "Transformador minimo");
+            AssertEqual(120, transformador.Terminais[0].Posicao.X, "Primario.X");
+            AssertEqual(80, transformador.Terminais[0].Posicao.Y, "Primario.Y");
+            AssertEqual(120, transformador.Terminais[1].Posicao.X, "Secundario.X");
+            AssertEqual(160, transformador.Terminais[1].Posicao.Y, "Secundario.Y");
+        }
+
+        private static void TransformadorApareceNoElectricGraph()
+        {
+            var document = new AraciDocument();
+            Transformador transformador = CreateTransformador("TR-GRAFO");
+
+            document.AdicionarElemento(transformador);
+
+            ElectricGraph graph = new ElectricGraphBuilder(document).Build();
+            ElectricGraphNode? node = graph.FindNode(transformador.Id.ToString());
+
+            Assert(node != null, "Transformador deve aparecer como no do ElectricGraph.");
+            AssertEqual(2, node!.Terminals.Count, "Terminais do transformador no grafo");
+            AssertGraphTerminal(node, Transformador.TERMINAL_PRIMARIO, "Terminal PRIMARIO no grafo");
+            AssertGraphTerminal(node, Transformador.TERMINAL_SECUNDARIO, "Terminal SECUNDARIO no grafo");
+        }
+
+        private static void TransformadorPreservaConexoesAposReload()
+        {
+            var document = new AraciDocument();
+            Sin sin = CreateSin("SIN-TR");
+            Transformador transformador = CreateTransformador("TR-RELOAD");
+            Carga load = CreateLoad("CARGA-TR", 300, 100);
+            Cabo primaryCable = CreateCable(sin, 1, transformador, 0, "L-TR-P", 1.0);
+            Cabo secondaryCable = CreateCable(transformador, 1, load, 0, "L-TR-S", 1.1);
+
+            document.AdicionarElemento(sin);
+            document.AdicionarElemento(transformador);
+            document.AdicionarElemento(load);
+            document.AdicionarElemento(primaryCable);
+            document.AdicionarElemento(secondaryCable);
+
+            AraciDocument loaded = SaveAndLoad(document);
+            Transformador loadedTransformador = FindById<Transformador>(loaded, transformador.Id);
+            Cabo loadedPrimary = FindById<Cabo>(loaded, primaryCable.Id);
+            Cabo loadedSecondary = FindById<Cabo>(loaded, secondaryCable.Id);
+            ElectricGraph graph = new ElectricGraphBuilder(loaded).Build();
+
+            AssertTransformadorTerminals(loadedTransformador, "Transformador apos reload");
+            AssertEqual(Transformador.TERMINAL_PRIMARIO, loadedPrimary.DestinoTerminalId, "Primario apos reload");
+            AssertEqual(Transformador.TERMINAL_SECUNDARIO, loadedSecondary.OrigemTerminalId, "Secundario apos reload");
+            AssertEqual(0, graph.GetInvalidEdges().Count, "Grafo com transformador nao deve ter arestas invalidas");
+        }
+
+        private static void TransformadorEntraNoDtoMinimo()
+        {
+            var document = new AraciDocument();
+            Sin sin = CreateSin("SIN-DTO-TR");
+            Transformador transformador = CreateTransformador("TR-DTO");
+            Gerador generator = CreateGenerator("GERADOR-DTO-TR", 900, 0.95);
+            Carga load = CreateLoad("CARGA-DTO-TR", 300, 100);
+
+            document.AdicionarElemento(sin);
+            document.AdicionarElemento(transformador);
+            document.AdicionarElemento(generator);
+            document.AdicionarElemento(load);
+            document.AdicionarElemento(CreateCable(sin, 1, transformador, 0, "L-DTO-TR-P", 1.0));
+            document.AdicionarElemento(CreateCable(transformador, 1, load, 0, "L-DTO-TR-S", 1.1));
+            document.AdicionarElemento(CreateCable(generator, 0, load, 0, "L-DTO-TR-G", 1.2));
+
+            CircuitDto dto = new CircuitBuilder(new ParameterReader(document)).Build();
+
+            AssertEqual(1, dto.Transformers.Count, "Quantidade de transformadores no DTO");
+            AssertEqual(transformador.Id.ToString(), dto.Transformers[0].Id, "TransformerDto.Id");
+            AssertEqual(transformador.Nome, dto.Transformers[0].Nome, "TransformerDto.Nome");
+            AssertEqual(3, dto.Transformers[0].Fases, "TransformerDto.Fases");
+            AssertEqual(2, dto.Transformers[0].Enrolamentos, "TransformerDto.Enrolamentos");
+        }
+
         private static SimpleCircuit CreateSimpleCircuit()
         {
             var document = new AraciDocument();
@@ -812,6 +895,30 @@ namespace Araci.TechnicalChecks
             return sin;
         }
 
+        private static Transformador CreateTransformador(string name)
+        {
+            var transformador = new Transformador
+            {
+                Nome = name,
+                Barra = name,
+                Tipo = new TipoTransformador
+                {
+                    Fases = 3,
+                    Enrolamentos = 2,
+                    TensaoPrimarioKV = 13.8,
+                    TensaoSecundarioKV = 0.38,
+                    PotenciaKVA = 500
+                },
+                PosicaoX = 80,
+                PosicaoY = 80,
+                TensaoLinha = "13.8"
+            };
+
+            transformador.AtualizarTerminais(80, 80);
+
+            return transformador;
+        }
+
         private static Cabo CreateCable(
             Gerador generator,
             Carga load,
@@ -891,6 +998,16 @@ namespace Araci.TechnicalChecks
 
             foreach (Terminal terminal in sin.Terminais)
                 AssertEqual(sin.Barra, terminal.Barra ?? string.Empty, $"{name}.{terminal.Id}.Barra");
+        }
+
+        private static void AssertTransformadorTerminals(Transformador transformador, string name)
+        {
+            AssertEqual(2, transformador.Terminais.Count, $"{name}.Terminais.Count");
+            AssertEqual(Transformador.TERMINAL_PRIMARIO, transformador.Terminais[0].Id, $"{name}.Terminal[0]");
+            AssertEqual(Transformador.TERMINAL_SECUNDARIO, transformador.Terminais[1].Id, $"{name}.Terminal[1]");
+
+            foreach (Terminal terminal in transformador.Terminais)
+                AssertEqual(transformador.Barra, terminal.Barra ?? string.Empty, $"{name}.{terminal.Id}.Barra");
         }
 
         private static void AssertGraphTerminal(ElectricGraphNode node, string terminalId, string name)

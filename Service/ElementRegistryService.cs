@@ -207,6 +207,22 @@ namespace Araci.Services
                     ElementGeometryDefaults.EquipamentoAltura)));
 
             Register(new ElementDefinition(
+                "Transformador",
+                "Transformador",
+                "TR",
+                typeof(Transformador),
+                typeof(TransformadorViewModel),
+                typeof(TipoTransformador),
+                CriarTransformador,
+                (m, n, d, l) => new TransformadorViewModel((Transformador)m, Types, n, d, l),
+                () => Types.TipoTransformadorPadrao,
+                () => Types.TiposTransformadores,
+                _ => EquipamentoSize(),
+                e => ((Transformador)e).AtualizarTerminais(
+                    ElementGeometryDefaults.EquipamentoLargura,
+                    ElementGeometryDefaults.EquipamentoAltura)));
+
+            Register(new ElementDefinition(
                 "Cabo",
                 "Cabo",
                 "CABO",
@@ -263,6 +279,17 @@ namespace Araci.Services
             };
 
             return sin;
+        }
+
+        private Transformador CriarTransformador()
+        {
+            var transformador = new Transformador
+            {
+                Tipo = Types.TipoTransformadorPadrao
+                    ?? throw new InvalidOperationException("Nenhum tipo de transformador cadastrado.")
+            };
+
+            return transformador;
         }
 
         private Cabo CriarCabo()
