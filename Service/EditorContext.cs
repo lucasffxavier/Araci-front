@@ -22,7 +22,6 @@ namespace Araci.Services
             SceneQueries = new SceneQueryService(Scene);
             Hover = new HoverService(SceneQueries);
             Snap = new SnapService(SceneQueries);
-            Names = new NameService(Document);
             Connectivity = new ConnectivityService(this);
             Topology = new TopologyValidator(this);
             SimulationResults = new SimulationResultApplier(this);
@@ -33,8 +32,10 @@ namespace Araci.Services
             Dialogs = new DialogService();
             Geometry = new ElementGeometryService();
             TerminalLayout = new TerminalLayoutService(Geometry);
+            Elements = new ElementRegistryService(Types, TerminalLayout);
+            Names = new NameService(Document, Elements);
 
-            ElementoFactory = new ElementoFactory(Types, Names, TypePropertiesDialogs, TerminalLayout);
+            ElementoFactory = new ElementoFactory(Elements, Names, TypePropertiesDialogs);
             CableVertexEdit = new CableVertexEditService(this);
             Selection = new SelectionService(this);
             Selection.SelectionChanged += CableVertexEdit.Refresh;
@@ -118,6 +119,8 @@ namespace Araci.Services
         public ElementGeometryService Geometry { get; }
 
         public TerminalLayoutService TerminalLayout { get; }
+
+        public ElementRegistryService Elements { get; }
 
         public TypeLibraryService Types { get; } = new TypeLibraryService();
 

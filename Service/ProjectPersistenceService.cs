@@ -232,14 +232,7 @@ namespace Araci.Services
 
         private Elemento? CriarElemento(ElementDto dto)
         {
-            Elemento? elemento = dto.Kind switch
-            {
-                "Barra" => _context.ElementoFactory.CriarBarra(),
-                "Carga" => _context.ElementoFactory.CriarCarga(),
-                "Gerador" => _context.ElementoFactory.CriarGerador(),
-                "Cabo" => _context.ElementoFactory.CriarCabo(),
-                _ => null
-            };
+            Elemento? elemento = _context.Elements.CreateModel(dto.Kind);
 
             if (elemento == null)
                 return null;
@@ -333,33 +326,11 @@ namespace Araci.Services
 
         private TipoElemento? ResolverTipo(string kind, TypeRefDto? dto)
         {
-            IEnumerable<TipoElemento> candidatos = kind switch
-            {
-                "Barra" => _context.Types.TiposBarras,
-                "Carga" => _context.Types.TiposCargas,
-                "Gerador" => _context.Types.TiposGeradores,
-                "Cabo" => _context.Types.TiposCabos,
-                _ => Enumerable.Empty<TipoElemento>()
-            };
-
-            TipoElemento? tipo = null;
-
-            if (dto != null)
-            {
-                tipo = candidatos.FirstOrDefault(t =>
-                    string.Equals(t.NomeTipo, dto.NomeTipo, StringComparison.OrdinalIgnoreCase) &&
-                    string.Equals(t.Familia, dto.Familia, StringComparison.OrdinalIgnoreCase) &&
-                    string.Equals(t.Categoria, dto.Categoria, StringComparison.OrdinalIgnoreCase));
-            }
-
-            return tipo ?? kind switch
-            {
-                "Barra" => _context.Types.TipoBarraPadrao,
-                "Carga" => _context.Types.TipoCargaPadrao,
-                "Gerador" => _context.Types.TipoGeradorPadrao,
-                "Cabo" => _context.Types.TipoCaboPadrao,
-                _ => null
-            };
+            return _context.Elements.ResolveType(
+                kind,
+                dto?.NomeTipo,
+                dto?.Familia,
+                dto?.Categoria);
         }
 
         private void LimparEstadoTransitorio()
@@ -375,16 +346,9 @@ namespace Araci.Services
             _context.Tools.VoltarParaSelecao();
         }
 
-        private static string ObterKind(Elemento elemento)
+        private string ObterKind(Elemento elemento)
         {
-            return elemento switch
-            {
-                Barra => "Barra",
-                Carga => "Carga",
-                Gerador => "Gerador",
-                Cabo => "Cabo",
-                _ => elemento.GetType().Name
-            };
+            return _context.Elements.GetKind(elemento);
         }
 
         private static TypeRefDto? CriarTypeRef(TipoElemento? tipo)

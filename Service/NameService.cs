@@ -8,22 +8,24 @@ namespace Araci.Services
     public class NameService
     {
         private readonly AraciDocument _document;
+        private readonly ElementRegistryService? _registry;
 
         public NameService(AraciDocument document)
+            : this(document, null)
+        {
+        }
+
+        public NameService(
+            AraciDocument document,
+            ElementRegistryService? registry)
         {
             _document = document ?? throw new ArgumentNullException(nameof(document));
+            _registry = registry;
         }
 
         public string ObterPrefixo(Elemento elemento)
         {
-            return elemento switch
-            {
-                Cabo => "CABO",
-                Carga => "CARGA",
-                Gerador => "GERADOR",
-                Barra => "BARRA",
-                _ => "ELM"
-            };
+            return _registry?.GetNamePrefix(elemento) ?? "ELM";
         }
 
         public string GerarNomeUnico(Elemento elemento)
