@@ -1,6 +1,8 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Windows;
+using Araci.Core.Rendering;
 using Araci.Models;
 using Araci.Models.Tipos;
 using Araci.ViewModels;
@@ -14,18 +16,14 @@ namespace Araci.Services
 
         private readonly List<ElementDefinition> _definitions = new();
 
-        public ElementRegistryService(
-            TypeLibraryService types,
-            TerminalLayoutService terminalLayout)
+        public ElementRegistryService(TypeLibraryService types)
         {
             Types = types ?? throw new ArgumentNullException(nameof(types));
-            TerminalLayout = terminalLayout ?? throw new ArgumentNullException(nameof(terminalLayout));
 
             RegistrarElementosPadrao();
         }
 
         private TypeLibraryService Types { get; }
-        private TerminalLayoutService TerminalLayout { get; }
 
         public IReadOnlyList<ElementDefinition> Definitions => _definitions;
 
@@ -64,7 +62,8 @@ namespace Araci.Services
 
         public Elemento? CreateModel(string kind)
         {
-            return FindByKind(kind)?.CriarModelo();
+            ElementDefinition? definition = FindByKind(kind);
+            return definition == null ? null : CreateModel(definition);
         }
 
         public T CreateModel<T>() where T : Elemento
@@ -75,19 +74,20 @@ namespace Araci.Services
             if (definition == null)
                 throw new InvalidOperationException($"Elemento nao registrado: {typeof(T).Name}.");
 
-            return (T)definition.CriarModelo();
+            return (T)CreateModel(definition);
         }
 
         public ElementoViewModel? CreateViewModel(
             Elemento modelo,
             NameService names,
-            TypePropertiesDialogService typePropertiesDialogs)
+            TypePropertiesDialogService typePropertiesDialogs,
+            TerminalLayoutService terminalLayout)
         {
             return FindByModel(modelo)?.CriarViewModel(
                 modelo,
                 names,
                 typePropertiesDialogs,
-                TerminalLayout);
+                terminalLayout);
         }
 
         public IEnumerable<TipoElemento> GetTypes(string kind)
@@ -120,6 +120,30 @@ namespace Araci.Services
             return tipo ?? GetDefaultType(kind);
         }
 
+        public Size GetSize(Elemento elemento)
+        {
+            ElementDefinition? definition = FindByModel(elemento);
+            return definition?.ObterTamanho(elemento) ?? GetFallbackSize(elemento);
+        }
+
+        public bool UpdateTerminals(Elemento elemento)
+        {
+            ElementDefinition? definition = FindByModel(elemento);
+
+            if (definition == null)
+                return false;
+
+            definition.AtualizarTerminais(elemento);
+            return true;
+        }
+
+        private static Elemento CreateModel(ElementDefinition definition)
+        {
+            Elemento elemento = definition.CriarModelo();
+            definition.AtualizarTerminais(elemento);
+            return elemento;
+        }
+
         private void RegistrarElementosPadrao()
         {
             Register(new ElementDefinition(
@@ -132,7 +156,9 @@ namespace Araci.Services
                 CriarBarra,
                 (m, n, d, l) => new BarraViewModel((Barra)m, Types, n, d, l),
                 () => Types.TipoBarraPadrao,
-                () => Types.TiposBarras));
+                () => Types.TiposBarras,
+                e => new Size(ElementGeometryDefaults.BarraLargura, ((Barra)e).Altura),
+                e => ((Barra)e).AtualizarTerminais()));
 
             Register(new ElementDefinition(
                 "Carga",
@@ -144,7 +170,9 @@ namespace Araci.Services
                 CriarCarga,
                 (m, n, d, l) => new CargaViewModel((Carga)m, Types, n, d, l),
                 () => Types.TipoCargaPadrao,
-                () => Types.TiposCargas));
+                () => Types.TiposCargas,
+                _ => EquipamentoSize(),
+                e => ((Carga)e).AtualizarTerminais(ElementGeometryDefaults.EquipamentoLargura)));
 
             Register(new ElementDefinition(
                 "Gerador",
@@ -156,7 +184,11 @@ namespace Araci.Services
                 CriarGerador,
                 (m, n, d, l) => new GeradorViewModel((Gerador)m, Types, n, d, l),
                 () => Types.TipoGeradorPadrao,
-                () => Types.TiposGeradores));
+                () => Types.TiposGeradores,
+                _ => EquipamentoSize(),
+                e => ((Gerador)e).AtualizarTerminais(
+                    ElementGeometryDefaults.EquipamentoLargura,
+                    ElementGeometryDefaults.EquipamentoAltura)));
 
             Register(new ElementDefinition(
                 "Cabo",
@@ -168,7 +200,9 @@ namespace Araci.Services
                 CriarCabo,
                 (m, n, d, l) => new CaboViewModel((Cabo)m, Types, n, d),
                 () => Types.TipoCaboPadrao,
-                () => Types.TiposCabos));
+                () => Types.TiposCabos,
+                _ => Size.Empty,
+                e => AtualizarTerminaisCabo((Cabo)e)));
         }
 
         private Barra CriarBarra()
@@ -179,7 +213,6 @@ namespace Araci.Services
                     ?? throw new InvalidOperationException("Nenhum tipo de barra cadastrado.")
             };
 
-            TerminalLayout.AtualizarTerminais(barra);
             return barra;
         }
 
@@ -191,7 +224,6 @@ namespace Araci.Services
                     ?? throw new InvalidOperationException("Nenhum tipo de carga cadastrado.")
             };
 
-            TerminalLayout.AtualizarTerminais(carga);
             return carga;
         }
 
@@ -203,7 +235,6 @@ namespace Araci.Services
                     ?? throw new InvalidOperationException("Nenhum tipo de gerador cadastrado.")
             };
 
-            TerminalLayout.AtualizarTerminais(gerador);
             return gerador;
         }
 
@@ -214,6 +245,33 @@ namespace Araci.Services
                 Tipo = Types.TipoCaboPadrao
                     ?? throw new InvalidOperationException("Nenhum tipo de cabo cadastrado.")
             };
+        }
+
+        private static Size EquipamentoSize()
+        {
+            return new Size(
+                ElementGeometryDefaults.EquipamentoLargura,
+                ElementGeometryDefaults.EquipamentoAltura);
+        }
+
+        private static Size GetFallbackSize(Elemento elemento)
+        {
+            return elemento switch
+            {
+                Barra barra => new Size(ElementGeometryDefaults.BarraLargura, barra.Altura),
+                ElementoEquipamento => EquipamentoSize(),
+                ElementoLinear => Size.Empty,
+                _ => EquipamentoSize()
+            };
+        }
+
+        private static void AtualizarTerminaisCabo(Cabo cabo)
+        {
+            if (cabo.Vertices.Count > 0)
+                cabo.DefinirOrigem(cabo.Vertices[0]);
+
+            if (cabo.Vertices.Count > 1)
+                cabo.DefinirDestino(cabo.Vertices[^1]);
         }
     }
 }

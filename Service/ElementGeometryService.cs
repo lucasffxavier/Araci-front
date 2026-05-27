@@ -6,8 +6,22 @@ namespace Araci.Services
 {
     public class ElementGeometryService
     {
+        private readonly ElementRegistryService? _registry;
+
+        public ElementGeometryService()
+        {
+        }
+
+        public ElementGeometryService(ElementRegistryService registry)
+        {
+            _registry = registry ?? throw new ArgumentNullException(nameof(registry));
+        }
+
         public Size ObterTamanho(Elemento elemento)
         {
+            if (_registry != null)
+                return _registry.GetSize(elemento);
+
             return elemento switch
             {
                 Barra barra => new Size(ElementGeometryDefaults.BarraLargura, barra.Altura),

@@ -9,20 +9,27 @@ namespace Araci.Services
         private readonly ElementRegistryService _registry;
         private readonly NameService _names;
         private readonly TypePropertiesDialogService _typePropertiesDialogs;
+        private readonly TerminalLayoutService _terminalLayout;
 
         public ElementoFactory(
             ElementRegistryService registry,
             NameService names,
-            TypePropertiesDialogService typePropertiesDialogs)
+            TypePropertiesDialogService typePropertiesDialogs,
+            TerminalLayoutService terminalLayout)
         {
             _registry = registry ?? throw new ArgumentNullException(nameof(registry));
             _names = names ?? throw new ArgumentNullException(nameof(names));
             _typePropertiesDialogs = typePropertiesDialogs ?? throw new ArgumentNullException(nameof(typePropertiesDialogs));
+            _terminalLayout = terminalLayout ?? throw new ArgumentNullException(nameof(terminalLayout));
         }
 
         public ElementoViewModel? CriarViewModel(Elemento modelo)
         {
-            return _registry.CreateViewModel(modelo, _names, _typePropertiesDialogs);
+            return _registry.CreateViewModel(
+                modelo,
+                _names,
+                _typePropertiesDialogs,
+                _terminalLayout);
         }
 
         public Cabo CriarCabo()

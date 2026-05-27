@@ -30,12 +30,12 @@ namespace Araci.Services
             SimulationMessages = new SimulationMessageBuilder();
             TypePropertiesDialogs = new TypePropertiesDialogService();
             Dialogs = new DialogService();
-            Geometry = new ElementGeometryService();
-            TerminalLayout = new TerminalLayoutService(Geometry);
-            Elements = new ElementRegistryService(Types, TerminalLayout);
+            Elements = new ElementRegistryService(Types);
+            Geometry = new ElementGeometryService(Elements);
+            TerminalLayout = new TerminalLayoutService(Elements, Geometry);
             Names = new NameService(Document, Elements);
 
-            ElementoFactory = new ElementoFactory(Elements, Names, TypePropertiesDialogs);
+            ElementoFactory = new ElementoFactory(Elements, Names, TypePropertiesDialogs, TerminalLayout);
             CableVertexEdit = new CableVertexEditService(this);
             Selection = new SelectionService(this);
             Selection.SelectionChanged += CableVertexEdit.Refresh;

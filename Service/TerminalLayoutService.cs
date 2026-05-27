@@ -4,6 +4,7 @@ namespace Araci.Services
 {
     public class TerminalLayoutService
     {
+        private readonly ElementRegistryService? _registry;
         private readonly ElementGeometryService _geometry;
 
         public TerminalLayoutService(ElementGeometryService geometry)
@@ -12,8 +13,20 @@ namespace Araci.Services
                 ?? throw new ArgumentNullException(nameof(geometry));
         }
 
+        public TerminalLayoutService(
+            ElementRegistryService registry,
+            ElementGeometryService geometry)
+            : this(geometry)
+        {
+            _registry = registry
+                ?? throw new ArgumentNullException(nameof(registry));
+        }
+
         public void AtualizarTerminais(Elemento elemento)
         {
+            if (_registry?.UpdateTerminals(elemento) == true)
+                return;
+
             switch (elemento)
             {
                 case Barra barra:
