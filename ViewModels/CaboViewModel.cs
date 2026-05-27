@@ -271,7 +271,6 @@ namespace Araci.ViewModels
             Cabo.Vertices.Clear();
             Cabo.Vertices.Add(p);
             Cabo.DefinirOrigem(p);
-            Cabo.PreviewDobra = null;
             Cabo.PreviewPonto = p;
             _possuiPreview = true;
             Atualizar();
@@ -279,24 +278,14 @@ namespace Araci.ViewModels
 
         public void AtualizarPreview(Point p)
         {
-            AtualizarPreview(p, null);
-        }
-
-        public void AtualizarPreview(Point p, Point? dobra)
-        {
             if (!_possuiPreview && Cabo.Vertices.Count == 0)
                 return;
 
             _possuiPreview = true;
 
-            if (Cabo.PreviewPonto.HasValue &&
-                Cabo.PreviewPonto.Value == p &&
-                Cabo.PreviewDobra == dobra)
-            {
+            if (Cabo.PreviewPonto.HasValue && Cabo.PreviewPonto.Value == p)
                 return;
-            }
 
-            Cabo.PreviewDobra = dobra;
             Cabo.PreviewPonto = p;
             Atualizar();
         }
@@ -307,7 +296,6 @@ namespace Araci.ViewModels
                 return;
 
             Cabo.PreviewPonto = null;
-            Cabo.PreviewDobra = null;
             _possuiPreview = false;
 
             var ultimo = Cabo.Vertices[^1];
@@ -330,7 +318,6 @@ namespace Araci.ViewModels
                 return;
 
             Cabo.Vertices.Add(p);
-            Cabo.PreviewDobra = null;
             Cabo.PreviewPonto = p;
             _possuiPreview = true;
             Atualizar();
@@ -338,16 +325,11 @@ namespace Araci.ViewModels
 
         public void RemoverPreview()
         {
-            if (!_possuiPreview &&
-                Cabo.PreviewPonto == null &&
-                Cabo.PreviewDobra == null)
-            {
+            if (!_possuiPreview && Cabo.PreviewPonto == null)
                 return;
-            }
 
             _possuiPreview = false;
             Cabo.PreviewPonto = null;
-            Cabo.PreviewDobra = null;
             Atualizar();
         }
 

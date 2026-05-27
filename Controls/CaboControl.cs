@@ -135,15 +135,10 @@ namespace Araci.Controls
                 _hitArea.Points.Add(local);
             }
 
-            if (cabo.PreviewDobra.HasValue)
-                AdicionarPonto(cabo.PreviewDobra.Value, offsetX, offsetY);
-
             if (cabo.PreviewPonto.HasValue)
             {
                 var preview = cabo.PreviewPonto.Value;
-                var ultimo =
-                    cabo.PreviewDobra
-                    ?? (cabo.Vertices.Count > 0 ? cabo.Vertices[^1] : preview);
+                var ultimo = cabo.Vertices.Count > 0 ? cabo.Vertices[^1] : preview;
 
                 if (preview != ultimo)
                     AdicionarPonto(preview, offsetX, offsetY);

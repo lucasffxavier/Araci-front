@@ -133,7 +133,6 @@ namespace Araci.Applications.Diagrama.InserirCabo
             }
 
             AtualizarTerminalCapturado(terminal);
-            AdicionarDobraOrtogonalSeNecessaria(pontoSnap, inputState);
             _caboAtual.FinalizarNoPonto(pontoSnap);
 
             ConectarDestino(terminal);
@@ -173,12 +172,7 @@ namespace Araci.Applications.Diagrama.InserirCabo
                     ? AplicarOrtogonalizacao(pontoSnap, inputState)
                     : pontoSnap;
 
-            Point? dobraPreview =
-                terminal != null
-                    ? CalcularDobraOrtogonal(pontoSnap, inputState)
-                    : null;
-
-            _caboAtual.AtualizarPreview(pontoPreview, dobraPreview);
+            _caboAtual.AtualizarPreview(pontoPreview);
         }
 
         public void OnMouseUp(Point position, ToolInputState inputState)
@@ -380,64 +374,6 @@ namespace Araci.Applications.Diagrama.InserirCabo
             return Math.Abs(delta.X) >= Math.Abs(delta.Y)
                 ? new Point(ponto.X, origem.Y)
                 : new Point(origem.X, ponto.Y);
-        }
-
-        private Point? CalcularDobraOrtogonal(
-            Point destino,
-            ToolInputState inputState)
-        {
-            if (!inputState.IsShiftPressed ||
-                _caboAtual == null ||
-                _caboAtual.Cabo.Vertices.Count == 0)
-            {
-                return null;
-            }
-
-            Point origem = _caboAtual.Cabo.Vertices[^1];
-
-            if (EstaAlinhado(origem, destino))
-                return null;
-
-            Vector delta = destino - origem;
-
-            Point dobra =
-                Math.Abs(delta.X) >= Math.Abs(delta.Y)
-                    ? new Point(destino.X, origem.Y)
-                    : new Point(origem.X, destino.Y);
-
-            if (PontosIguais(dobra, origem) || PontosIguais(dobra, destino))
-                return null;
-
-            return dobra;
-        }
-
-        private void AdicionarDobraOrtogonalSeNecessaria(
-            Point destino,
-            ToolInputState inputState)
-        {
-            if (_caboAtual == null)
-                return;
-
-            Point? dobra = CalcularDobraOrtogonal(destino, inputState);
-
-            if (!dobra.HasValue)
-                return;
-
-            _caboAtual.AdicionarVerticeIntermediario(dobra.Value);
-        }
-
-        private static bool EstaAlinhado(Point a, Point b)
-        {
-            return Math.Abs(a.X - b.X) < 0.0001 ||
-                Math.Abs(a.Y - b.Y) < 0.0001;
-        }
-
-        private static bool PontosIguais(Point a, Point b)
-        {
-            double dx = a.X - b.X;
-            double dy = a.Y - b.Y;
-
-            return dx * dx + dy * dy < 0.0001;
         }
 
         private bool OrigemValida(Terminal terminal)

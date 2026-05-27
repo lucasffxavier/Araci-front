@@ -54,8 +54,6 @@ namespace Araci.Models
 
         public Point? PreviewPonto { get; set; }
 
-        public Point? PreviewDobra { get; set; }
-
         public TipoCabo TipoCabo => (TipoCabo)Tipo!;
 
         public Terminal? Origem => _terminais.Count > 0 ? _terminais[0] : null;
@@ -184,7 +182,6 @@ namespace Araci.Models
                 clone.Vertices.Add(p);
 
             clone.PreviewPonto = PreviewPonto;
-            clone.PreviewDobra = PreviewDobra;
             clone._terminais.Clear();
 
             foreach (Terminal t in _terminais)
