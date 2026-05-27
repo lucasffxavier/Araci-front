@@ -37,6 +37,7 @@ namespace Araci.Services
             CableVertexEdit = new CableVertexEditService(this);
             Selection = new SelectionService(this);
             Selection.SelectionChanged += CableVertexEdit.Refresh;
+            SafeDelete = new SafeDeleteService(this);
             MoveHud = new MoveHudService(this);
             MoveConstraints = new MoveConstraintService(Settings);
             Move = new MoveService(this);
@@ -83,6 +84,8 @@ namespace Araci.Services
         public CableVertexEditService CableVertexEdit { get; }
 
         public CommandManager Commands { get; } = new CommandManager();
+
+        public SafeDeleteService SafeDelete { get; }
 
         public SelectionService Selection { get; }
 

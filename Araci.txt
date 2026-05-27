@@ -201,6 +201,7 @@ Araci Engine
 │   ├── MoveHudState.cs
 │   ├── MoveService.cs
 │   ├── NameService.cs
+│   ├── SafeDeleteService.cs
 │   ├── SelectionService.cs
 │   ├── SimulationExportService.cs
 │   ├── SimulationMessageBuilder.cs
@@ -369,6 +370,7 @@ MostrarTerminalInvalido(terminal, inputState.ScreenPosition);
 return;
 }
 AtualizarTerminalCapturado(terminal);
+AdicionarDobraOrtogonalSeNecessaria(pontoSnap, inputState);
 _caboAtual.FinalizarNoPonto(pontoSnap);
 ConectarDestino(terminal);
 Finalizar();
@@ -398,7 +400,11 @@ Point pontoPreview =
 terminal == null
 ? AplicarOrtogonalizacao(pontoSnap, inputState)
 : pontoSnap;
-_caboAtual.AtualizarPreview(pontoPreview);
+Point? dobraPreview =
+terminal != null
+? CalcularDobraOrtogonal(pontoSnap, inputState)
+: null;
+_caboAtual.AtualizarPreview(pontoPreview, dobraPreview);
 }
 public void OnMouseUp(Point position, ToolInputState inputState)
 {
@@ -558,6 +564,50 @@ return origem;
 return Math.Abs(delta.X) >= Math.Abs(delta.Y)
 ? new Point(ponto.X, origem.Y)
 : new Point(origem.X, ponto.Y);
+}
+private Point? CalcularDobraOrtogonal(
+Point destino,
+ToolInputState inputState)
+{
+if (!inputState.IsShiftPressed ||
+_caboAtual == null ||
+_caboAtual.Cabo.Vertices.Count == 0)
+{
+return null;
+}
+Point origem = _caboAtual.Cabo.Vertices[^1];
+if (EstaAlinhado(origem, destino))
+return null;
+Vector delta = destino - origem;
+Point dobra =
+Math.Abs(delta.X) >= Math.Abs(delta.Y)
+? new Point(destino.X, origem.Y)
+: new Point(origem.X, destino.Y);
+if (PontosIguais(dobra, origem) || PontosIguais(dobra, destino))
+return null;
+return dobra;
+}
+private void AdicionarDobraOrtogonalSeNecessaria(
+Point destino,
+ToolInputState inputState)
+{
+if (_caboAtual == null)
+return;
+Point? dobra = CalcularDobraOrtogonal(destino, inputState);
+if (!dobra.HasValue)
+return;
+_caboAtual.AdicionarVerticeIntermediario(dobra.Value);
+}
+private static bool EstaAlinhado(Point a, Point b)
+{
+return Math.Abs(a.X - b.X) < 0.0001 ||
+Math.Abs(a.Y - b.Y) < 0.0001;
+}
+private static bool PontosIguais(Point a, Point b)
+{
+double dx = a.X - b.X;
+double dy = a.Y - b.Y;
+return dx * dx + dy * dy < 0.0001;
 }
 private bool OrigemValida(Terminal terminal)
 {
@@ -930,6 +980,7 @@ Nome = "L1";
 public IReadOnlyList<Terminal> Terminais => _terminais;
 public ObservableCollection<Point> Vertices { get; } = new();
 public Point? PreviewPonto { get; set; }
+public Point? PreviewDobra { get; set; }
 public TipoCabo TipoCabo => (TipoCabo)Tipo!;
 public Terminal? Origem => _terminais.Count > 0 ? _terminais[0] : null;
 public Terminal? Destino => _terminais.Count > 1 ? _terminais[1] : null;
@@ -1034,6 +1085,7 @@ CopiarLinearPara(clone);
 foreach (Point p in Vertices)
 clone.Vertices.Add(p);
 clone.PreviewPonto = PreviewPonto;
+clone.PreviewDobra = PreviewDobra;
 clone._terminais.Clear();
 foreach (Terminal t in _terminais)
 {
@@ -1412,6 +1464,7 @@ ElementoFactory = new ElementoFactory(Types, Names, TypePropertiesDialogs);
 CableVertexEdit = new CableVertexEditService(this);
 Selection = new SelectionService(this);
 Selection.SelectionChanged += CableVertexEdit.Refresh;
+SafeDelete = new SafeDeleteService(this);
 MoveHud = new MoveHudService(this);
 MoveConstraints = new MoveConstraintService(Settings);
 Move = new MoveService(this);
@@ -1440,6 +1493,7 @@ public SelectionBoxViewModel SelectionBox { get; } = new SelectionBoxViewModel()
 public TerminalSnapState TerminalSnap { get; } = new TerminalSnapState();
 public CableVertexEditService CableVertexEdit { get; }
 public CommandManager Commands { get; } = new CommandManager();
+public SafeDeleteService SafeDelete { get; }
 public SelectionService Selection { get; }
 public MoveService Move { get; }
 public SnapService Snap { get; }
@@ -1699,17 +1753,27 @@ public void Iniciar(Point p)
 Cabo.Vertices.Clear();
 Cabo.Vertices.Add(p);
 Cabo.DefinirOrigem(p);
+Cabo.PreviewDobra = null;
 Cabo.PreviewPonto = p;
 _possuiPreview = true;
 Atualizar();
 }
 public void AtualizarPreview(Point p)
 {
+AtualizarPreview(p, null);
+}
+public void AtualizarPreview(Point p, Point? dobra)
+{
 if (!_possuiPreview && Cabo.Vertices.Count == 0)
 return;
 _possuiPreview = true;
-if (Cabo.PreviewPonto.HasValue && Cabo.PreviewPonto.Value == p)
+if (Cabo.PreviewPonto.HasValue &&
+Cabo.PreviewPonto.Value == p &&
+Cabo.PreviewDobra == dobra)
+{
 return;
+}
+Cabo.PreviewDobra = dobra;
 Cabo.PreviewPonto = p;
 Atualizar();
 }
@@ -1718,6 +1782,7 @@ public void FinalizarNoPonto(Point p)
 if (Cabo.Vertices.Count == 0)
 return;
 Cabo.PreviewPonto = null;
+Cabo.PreviewDobra = null;
 _possuiPreview = false;
 var ultimo = Cabo.Vertices[^1];
 if (ultimo != p)
@@ -1733,16 +1798,22 @@ var ultimo = Cabo.Vertices[^1];
 if (DistanciaQuadrada(ultimo, p) < 0.0001)
 return;
 Cabo.Vertices.Add(p);
+Cabo.PreviewDobra = null;
 Cabo.PreviewPonto = p;
 _possuiPreview = true;
 Atualizar();
 }
 public void RemoverPreview()
 {
-if (!_possuiPreview && Cabo.PreviewPonto == null)
+if (!_possuiPreview &&
+Cabo.PreviewPonto == null &&
+Cabo.PreviewDobra == null)
+{
 return;
+}
 _possuiPreview = false;
 Cabo.PreviewPonto = null;
+Cabo.PreviewDobra = null;
 Atualizar();
 }
 public override void Mover(Vector delta)
@@ -1790,6 +1861,271 @@ private static double DistanciaQuadrada(Point a, Point b)
 double dx = a.X - b.X;
 double dy = a.Y - b.Y;
 return dx * dx + dy * dy;
+}
+}
+}
+
+
+====================================================================================================
+ARQUIVO: C:\Araci-Engine-Front\Araci Engine\Views\ViewportView.xaml.cs
+====================================================================================================
+
+using System;
+using System.ComponentModel;
+using System.Windows;
+using System.Windows.Controls;
+using System.Windows.Input;
+using System.Windows.Media;
+using Araci.Applications.Editar.Base;
+using Araci.Services;
+using Araci.ViewModels;
+namespace Araci.Views
+{
+public partial class ViewportView : UserControl
+{
+private readonly MatrixTransform _cameraTransform = new();
+private ViewportViewModel? _viewportViewModel;
+private EditorContext? _context;
+public ViewportView()
+{
+InitializeComponent();
+}
+public void Inicializar(EditorContext context)
+{
+_context = context ?? throw new ArgumentNullException(nameof(context));
+_viewportViewModel = new ViewportViewModel(_context);
+DataContext = _viewportViewModel;
+_context.InicializarViewport(_viewportViewModel);
+ConfigurarCamera();
+Unloaded += OnUnloaded;
+}
+private void ConfigurarCamera()
+{
+if (_context?.Viewport == null)
+return;
+WorldLayer.RenderTransform = _cameraTransform;
+SelectionLayer.RenderTransform = _cameraTransform;
+CableVertexHandleLayer.RenderTransform = _cameraTransform;
+TerminalSnapLayer.RenderTransform = _cameraTransform;
+_context.Viewport.Camera.PropertyChanged += OnCameraChanged;
+AtualizarCameraTransform();
+}
+private void OnCameraChanged(object? sender, PropertyChangedEventArgs e)
+{
+AtualizarCameraTransform();
+}
+private void AtualizarCameraTransform()
+{
+if (_context?.Viewport == null)
+return;
+var camera = _context.Viewport.Camera;
+_cameraTransform.Matrix = new Matrix(
+camera.Zoom,
+0,
+0,
+camera.Zoom,
+camera.Offset.X,
+camera.Offset.Y);
+_viewportViewModel?.AtualizarZoomVisual(camera.Zoom);
+}
+private void OnLoaded(object sender, RoutedEventArgs e)
+{
+Focus();
+Keyboard.Focus(this);
+AtualizarViewport();
+SizeChanged += (_, _) => AtualizarViewport();
+}
+private void AtualizarViewport()
+{
+if (_context?.Viewport == null)
+return;
+double largura = ActualWidth;
+double altura = ActualHeight;
+if (RootBorder != null)
+{
+largura -= RootBorder.BorderThickness.Left + RootBorder.BorderThickness.Right;
+altura -= RootBorder.BorderThickness.Top + RootBorder.BorderThickness.Bottom;
+}
+largura = Math.Max(0, largura);
+altura = Math.Max(0, altura);
+_context.Viewport.AtualizarTamanho(new Size(largura, altura));
+}
+private Point GetWorldPos(MouseEventArgs e)
+{
+Point screen = e.GetPosition(this);
+return _context?.Viewport?.ScreenToWorld(screen) ?? screen;
+}
+private void OnPreviewMouseDown(object sender, MouseButtonEventArgs e)
+{
+if (_context == null)
+return;
+if (_context.Navigation.TryHandleMiddleDoubleClick(e))
+{
+AtualizarCursorNavegacao();
+LiberarCapturaMouse();
+e.Handled = true;
+return;
+}
+if (_context.Navigation.TryBeginMiddlePan(e, this))
+{
+Focus();
+Keyboard.Focus(this);
+AtualizarCursorNavegacao();
+CaptureMouse();
+e.Handled = true;
+}
+}
+private void OnPreviewMouseLeftButtonDown(object sender, MouseButtonEventArgs e)
+{
+if (_context == null)
+return;
+if (_context.Navigation.TryBeginSpaceLeftPan(e, this))
+{
+Focus();
+Keyboard.Focus(this);
+AtualizarCursorNavegacao();
+CaptureMouse();
+e.Handled = true;
+return;
+}
+if (_context.Navigation.IsPanning)
+{
+e.Handled = true;
+return;
+}
+Focus();
+Keyboard.Focus(this);
+var vm = EncontrarElemento(e.OriginalSource as DependencyObject);
+Point worldPosition = GetWorldPos(e);
+ToolInputState inputState = CriarInputState(e, e.ChangedButton, e.ClickCount);
+_context.Input.MouseDown(vm, worldPosition, inputState);
+CaptureMouse();
+}
+private void OnPreviewMouseMove(object sender, MouseEventArgs e)
+{
+if (_context?.Navigation.TryUpdatePan(e, this) == true)
+{
+AtualizarCursorNavegacao();
+e.Handled = true;
+return;
+}
+if (_context == null)
+return;
+Point worldPosition = GetWorldPos(e);
+_context.Input.MouseMove(worldPosition, CriarInputState(e));
+}
+private void OnPreviewMouseUp(object sender, MouseButtonEventArgs e)
+{
+if (_context?.Navigation.TryEndMiddlePan(e) != true)
+return;
+AtualizarCursorNavegacao();
+LiberarCapturaMouse();
+e.Handled = true;
+}
+private void OnPreviewMouseLeftButtonUp(object sender, MouseButtonEventArgs e)
+{
+if (_context?.Navigation.TryEndSpaceLeftPan(e) == true)
+{
+AtualizarCursorNavegacao();
+LiberarCapturaMouse();
+e.Handled = true;
+return;
+}
+if (_context?.Navigation.ConsumeSuppressNextLeftButtonUp() == true)
+{
+e.Handled = true;
+return;
+}
+if (_context?.Navigation.IsPanning == true)
+{
+e.Handled = true;
+return;
+}
+if (_context != null)
+{
+Point worldPosition = GetWorldPos(e);
+_context.Input.MouseUp(worldPosition, CriarInputState(e, e.ChangedButton, e.ClickCount));
+}
+LiberarCapturaMouse();
+}
+private void OnPreviewMouseWheel(object sender, MouseWheelEventArgs e)
+{
+if (_context?.Navigation.TryHandleMouseWheel(e, this) != true)
+return;
+e.Handled = true;
+}
+private void OnPreviewKeyDown(object sender, KeyEventArgs e)
+{
+if (_context?.Navigation.TryHandleKeyDown(e) == true)
+{
+AtualizarCursorNavegacao();
+e.Handled = true;
+return;
+}
+if (_context == null)
+return;
+e.Handled = _context.Input.KeyDown(e.Key);
+if (e.Handled && e.Key == Key.Escape)
+LiberarCapturaMouse();
+}
+private void OnPreviewKeyUp(object sender, KeyEventArgs e)
+{
+if (_context?.Navigation.TryHandleKeyUp(e) != true)
+return;
+AtualizarCursorNavegacao();
+LiberarCapturaMouse();
+e.Handled = true;
+}
+private void OnMouseLeave(object sender, MouseEventArgs e)
+{
+_context?.Hover.Clear();
+_context?.TerminalSnap.Limpar();
+_context?.Navigation.CancelPan();
+AtualizarCursorNavegacao();
+}
+private void OnUnloaded(object sender, RoutedEventArgs e)
+{
+_context?.Navigation.Reset();
+LiberarCapturaMouse();
+Cursor = Cursors.Arrow;
+if (_context?.Viewport != null)
+_context.Viewport.Camera.PropertyChanged -= OnCameraChanged;
+}
+private void AtualizarCursorNavegacao()
+{
+if (_context?.Navigation.IsPanning == true || _context?.Navigation.IsSpacePressed == true)
+Cursor = Cursors.ScrollAll;
+else
+Cursor = Cursors.Arrow;
+}
+private void LiberarCapturaMouse()
+{
+if (IsMouseCaptured)
+ReleaseMouseCapture();
+}
+private ToolInputState CriarInputState(
+MouseEventArgs e,
+MouseButton? button = null,
+int clickCount = 0)
+{
+Point screenPosition = e.GetPosition(this);
+Point worldPosition = _context?.Viewport?.ScreenToWorld(screenPosition) ?? screenPosition;
+return new ToolInputState(
+Keyboard.Modifiers,
+button,
+clickCount,
+worldPosition,
+screenPosition);
+}
+private static ElementoViewModel? EncontrarElemento(DependencyObject? origem)
+{
+while (origem != null)
+{
+if (origem is FrameworkElement fe && fe.DataContext is ElementoViewModel vm)
+return vm;
+origem = VisualTreeHelper.GetParent(origem);
+}
+return null;
 }
 }
 }

@@ -3,7 +3,6 @@ using System.Windows;
 using System.Windows.Input;
 
 using Araci.Applications.Editar.Base;
-using Araci.Core.Commands;
 using Araci.Services;
 using Araci.ViewModels;
 
@@ -36,27 +35,7 @@ namespace Araci.Applications.Editar.Deletar
             Point position,
             ToolInputState inputState)
         {
-            var selecionados =
-                _context.Selection
-                    .Selecionados
-                    .ToList();
-
-            if (selecionados.Count == 0)
-                return;
-
-            using var tx =
-                _context.BeginTransaction();
-
-            foreach (var item in selecionados)
-            {
-                tx.Add(
-                    new DeleteElementCommand(
-                        item.Modelo,
-                        _context));
-            }
-
-            tx.Commit();
-            _context.Selection.Limpar();
+            _context.SafeDelete.DeleteSelection();
         }
 
         public void OnMouseMove(Point position, ToolInputState inputState) { }

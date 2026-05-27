@@ -83,6 +83,12 @@ namespace Araci.Services
                 return true;
             }
 
+            if (key == Key.Delete)
+            {
+                _context.SafeDelete.DeleteActiveHandleOrSelection();
+                return true;
+            }
+
             if (key == Key.Escape)
             {
                 if (ToolAtual.IsBusy)
