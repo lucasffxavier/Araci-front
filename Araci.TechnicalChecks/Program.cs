@@ -41,7 +41,10 @@ namespace Araci.TechnicalChecks
                 ("Cabos conectados aos terminais do SIN preservam conexoes", CabosConectadosAosTerminaisDoSinPreservamConexoes),
                 ("DTOs sem SIN mantem gerador como slack", DtosSemSinMantemGeradorComoSlack),
                 ("SIN com gerador vira slack preferencial", SinComGeradorViraSlackPreferencial),
+                ("SIN com gerador preserva GeneratorDto real", SinComGeradorPreservaGeneratorDtoReal),
                 ("SIN com multiplos geradores preserva todos em Generators", SinComMultiplosGeradoresPreservaTodosGenerators),
+                ("Reload preserva GeneratorDto real com SIN", ReloadPreservaGeneratorDtoRealComSin),
+                ("Circuito eolico simplificado preserva GeneratorDto", CircuitoEolicoSimplificadoPreservaGeneratorDto),
                 ("Multiplos SIN usam primeiro do Document como slack", MultiplosSinUsamPrimeiroDoDocumentComoSlack),
                 ("Reload com SIN mantem slack baseado no SIN", ReloadComSinMantemSlackBaseadoNoSin),
                 ("OperationalGraph energiza SIN cabo e carga", OperationalGraphEnergizaSinCaboECarga),
@@ -496,8 +499,40 @@ namespace Araci.TechnicalChecks
             AssertEqual(sin.Barra, dto.Slack.Barra, "Slack.Barra SIN");
             AssertEqual(1, dto.Generators.Count, "Gerador deve permanecer em Generators");
             AssertEqual(circuit.Generator.Id.ToString(), dto.Generators[0].Id, "GeneratorDto.Id com SIN");
+            AssertEqual(13.8, dto.Generators[0].Tensao, "GeneratorDto.Tensao com SIN");
+            AssertEqual(circuit.Generator.PotenciaAtiva, dto.Generators[0].Potencia, "GeneratorDto.Potencia com SIN");
+            AssertEqual(0.93, dto.Generators[0].FP, "GeneratorDto.FP com SIN");
             AssertEqual(1, dto.Loads.Count, "Cargas com SIN");
             AssertEqual(1, dto.Lines.Count, "Linhas com SIN");
+        }
+
+        private static void SinComGeradorPreservaGeneratorDtoReal()
+        {
+            var document = new AraciDocument();
+            Sin sin = CreateSin("SIN-GER-REAL");
+            Gerador generator = CreateGenerator("GERADOR-REAL", 2750, 0.96);
+            Carga load = CreateLoad("CARGA-GER-REAL", 300, 100);
+
+            generator.TensaoLinha = "0.69";
+            generator.TipoGerador.TensaoKV = 34.5;
+
+            document.AdicionarElemento(sin);
+            document.AdicionarElemento(generator);
+            document.AdicionarElemento(load);
+            document.AdicionarElemento(CreateCable(sin, 1, load, 0, "L-SIN-LOAD-REAL", 1.0));
+            document.AdicionarElemento(CreateCable(generator, 0, load, 0, "L-GER-LOAD-REAL", 1.0));
+
+            CircuitDto dto = new CircuitBuilder(new ParameterReader(document)).Build();
+            GeneratorDto generatorDto = dto.Generators.Single();
+
+            AssertEqual(sin.Id.ToString(), dto.Slack.Id, "Slack deve usar SIN no circuito com gerador real");
+            AssertEqual(generator.Id.ToString(), generatorDto.Id, "GeneratorDto real.Id");
+            AssertEqual(generator.Nome, generatorDto.Nome, "GeneratorDto real.Nome");
+            AssertEqual(generator.Nome, generatorDto.Barra, "GeneratorDto real.Barra");
+            AssertEqual(3, generatorDto.Fases, "GeneratorDto real.Fases");
+            AssertEqual(0.69, generatorDto.Tensao, "GeneratorDto real.Tensao");
+            AssertEqual(2750, generatorDto.Potencia, "GeneratorDto real.Potencia");
+            AssertEqual(0.96, generatorDto.FP, "GeneratorDto real.FP");
         }
 
         private static void SinComMultiplosGeradoresPreservaTodosGenerators()
@@ -522,6 +557,78 @@ namespace Araci.TechnicalChecks
             AssertEqual(2, dto.Generators.Count, "Todos os geradores devem permanecer em Generators");
             Assert(dto.Generators.Any(g => g.Id == generatorA.Id.ToString()), "Gerador A deve estar em Generators.");
             Assert(dto.Generators.Any(g => g.Id == generatorB.Id.ToString()), "Gerador B deve estar em Generators.");
+            AssertEqual(1100, dto.Generators.Single(g => g.Id == generatorA.Id.ToString()).Potencia, "GeneratorDto A.Potencia");
+            AssertEqual(730, dto.Generators.Single(g => g.Id == generatorB.Id.ToString()).Potencia, "GeneratorDto B.Potencia");
+        }
+
+        private static void ReloadPreservaGeneratorDtoRealComSin()
+        {
+            var document = new AraciDocument();
+            Sin sin = CreateSin("SIN-RELOAD-GER-REAL");
+            Gerador generator = CreateGenerator("GERADOR-RELOAD-REAL", 3150, 0.94);
+            Carga load = CreateLoad("CARGA-RELOAD-GER-REAL", 300, 100);
+
+            generator.TensaoLinha = "34.5";
+
+            document.AdicionarElemento(sin);
+            document.AdicionarElemento(generator);
+            document.AdicionarElemento(load);
+            document.AdicionarElemento(CreateCable(sin, 1, load, 0, "L-SIN-LOAD-RELOAD-GER", 1.0));
+            document.AdicionarElemento(CreateCable(generator, 0, load, 0, "L-GER-LOAD-RELOAD-GER", 1.0));
+
+            CircuitDto dto = new CircuitBuilder(new ParameterReader(SaveAndLoad(document))).Build();
+            GeneratorDto generatorDto = dto.Generators.Single();
+
+            AssertEqual(sin.Id.ToString(), dto.Slack.Id, "Slack SIN apos reload com gerador real");
+            AssertEqual(generator.Id.ToString(), generatorDto.Id, "GeneratorDto reload.Id");
+            AssertEqual(34.5, generatorDto.Tensao, "GeneratorDto reload.Tensao");
+            AssertEqual(3150, generatorDto.Potencia, "GeneratorDto reload.Potencia");
+            AssertEqual(0.94, generatorDto.FP, "GeneratorDto reload.FP");
+        }
+
+        private static void CircuitoEolicoSimplificadoPreservaGeneratorDto()
+        {
+            var document = new AraciDocument();
+            Sin sin = CreateSin("SIN-EOLICO");
+            Transformador trSe = CreateTransformador("TR-SE-EOLICO");
+            Transformador trAerogerador = CreateTransformador("TR-AERO-EOLICO");
+            Gerador generator = CreateGenerator("AEROGERADOR-001", 4200, 0.97);
+            Carga load = CreateLoad("CARGA-AUX-EOLICA", 120, 40);
+
+            sin.TensaoLinha = "138";
+
+            trSe.Definir(TipoTransformador.PARAM_TENSAO_PRIMARIO_KV, 138.0);
+            trSe.Definir(TipoTransformador.PARAM_TENSAO_SECUNDARIO_KV, 34.5);
+            trSe.Definir(TipoTransformador.PARAM_POTENCIA_MVA, 65.0);
+
+            trAerogerador.Definir(TipoTransformador.PARAM_TENSAO_PRIMARIO_KV, 34.5);
+            trAerogerador.Definir(TipoTransformador.PARAM_TENSAO_SECUNDARIO_KV, 0.69);
+            trAerogerador.Definir(TipoTransformador.PARAM_POTENCIA_KVA, 5000.0);
+
+            generator.TensaoLinha = "0.69";
+            load.TensaoLinha = "0.69";
+
+            document.AdicionarElemento(sin);
+            document.AdicionarElemento(trSe);
+            document.AdicionarElemento(trAerogerador);
+            document.AdicionarElemento(generator);
+            document.AdicionarElemento(load);
+            document.AdicionarElemento(CreateCable(sin, 1, trSe, 0, "L-EOLICO-138", 1.0));
+            document.AdicionarElemento(CreateCable(trSe, 1, trAerogerador, 0, "L-EOLICO-34", 1.0));
+            document.AdicionarElemento(CreateCable(trAerogerador, 1, generator, 0, "L-EOLICO-069", 1.0));
+            document.AdicionarElemento(CreateCable(generator, 1, load, 0, "L-EOLICO-AUX", 0.1));
+
+            CircuitDto dto = new CircuitBuilder(new ParameterReader(document)).Build();
+            GeneratorDto generatorDto = dto.Generators.Single();
+
+            AssertEqual(sin.Id.ToString(), dto.Slack.Id, "Slack eolico deve usar SIN");
+            AssertEqual(2, dto.Transformers.Count, "Circuito eolico deve preservar dois transformadores");
+            AssertEqual(generator.Id.ToString(), generatorDto.Id, "GeneratorDto eolico.Id");
+            AssertEqual(generator.Nome, generatorDto.Nome, "GeneratorDto eolico.Nome");
+            AssertEqual(generator.Nome, generatorDto.Barra, "GeneratorDto eolico.Barra");
+            AssertEqual(0.69, generatorDto.Tensao, "GeneratorDto eolico.Tensao");
+            AssertEqual(4200, generatorDto.Potencia, "GeneratorDto eolico.Potencia");
+            AssertEqual(0.97, generatorDto.FP, "GeneratorDto eolico.FP");
         }
 
         private static void MultiplosSinUsamPrimeiroDoDocumentComoSlack()
@@ -1029,6 +1136,7 @@ namespace Araci.TechnicalChecks
                 PosicaoX = 100,
                 PosicaoY = 100,
                 PotenciaAtiva = power,
+                FatorPotencia = fp,
                 TensaoLinha = "13.8"
             };
 

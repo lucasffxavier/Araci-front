@@ -158,10 +158,10 @@ namespace Araci.DTOs
                     Id = gerador.Id.ToString(),
                     Nome = ReadString(gerador, "Nome"),
                     Barra = ResolverBarraEquipamento(gerador, graph),
-                    Fases = ReadInt(gerador, "Fases"),
-                    Tensao = ReadKv(gerador, "TensaoKV", "Tensao", "TensaoLinha"),
-                    Potencia = ReadDouble(gerador, "PotenciaAtiva", "Potencia", "PotenciaAparente"),
-                    FP = ReadDouble(gerador, "FP", "FatorPotencia")
+                    Fases = ReadIntWithDefault(gerador, 3, "Fases"),
+                    Tensao = ReadKvWithDefault(gerador, 12.47, "TensaoKV", "Tensao", "TensaoLinha"),
+                    Potencia = ReadPositiveDoubleByPriority(gerador, "PotenciaAtiva", "Potencia", "PotenciaAparente"),
+                    FP = ReadDoubleWithDefault(gerador, 0.98, "FP", "FatorPotencia")
                 })
                 .ToList();
         }
@@ -414,6 +414,18 @@ namespace Araci.DTOs
             return defaultValue;
         }
 
+        private static double ReadPositiveDoubleByPriority(Elemento elemento, params string[] names)
+        {
+            double modelValue = ReadPositiveDoubleFrom(elemento.Parametros, names);
+
+            if (modelValue > 0)
+                return modelValue;
+
+            return elemento.Tipo == null
+                ? 0
+                : ReadPositiveDoubleFrom(elemento.Tipo.Parametros, names);
+        }
+
         private static double ReadKvWithDefault(
             Elemento elemento,
             double defaultValue,
@@ -495,6 +507,21 @@ namespace Araci.DTOs
 
             if (value is string text)
                 return ElectricalValueParser.ToNumber(text);
+
+            return 0;
+        }
+
+        private static double ReadPositiveDoubleFrom(
+            IReadOnlyDictionary<string, Parameter> parametros,
+            params string[] names)
+        {
+            foreach (string name in names)
+            {
+                double value = ReadDoubleFrom(parametros, name);
+
+                if (value > 0)
+                    return value;
+            }
 
             return 0;
         }

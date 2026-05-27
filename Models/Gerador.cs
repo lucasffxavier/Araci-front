@@ -6,6 +6,7 @@ namespace Araci.Models
     public class Gerador : ElementoEquipamento
     {
         public const string PARAM_POTENCIA_APARENTE = "PotenciaAparente";
+        public const string PARAM_FATOR_POTENCIA = "FatorPotencia";
 
         public TipoGerador TipoGerador => (TipoGerador)Tipo!;
 
@@ -15,9 +16,16 @@ namespace Araci.Models
             set => Definir(PARAM_POTENCIA_APARENTE, value);
         }
 
+        public double FatorPotencia
+        {
+            get => Obter<double>(PARAM_FATOR_POTENCIA);
+            set => Definir(PARAM_FATOR_POTENCIA, value);
+        }
+
         public Gerador()
         {
             DefinirParametro(new Parameter<double>(PARAM_POTENCIA_APARENTE, 0));
+            DefinirParametro(new Parameter<double>(PARAM_FATOR_POTENCIA, 0));
 
             Nome = "GERADOR-001";
             Barra = "GERADOR-001";
