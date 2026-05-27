@@ -19,6 +19,7 @@ namespace Araci.DTOs
         public ParameterReader(CoreApi api)
         {
             _api = api ?? throw new ArgumentNullException(nameof(api));
+            _connectivity = new ConnectivityService(api.Document);
         }
 
         public ParameterReader(EditorContext context)

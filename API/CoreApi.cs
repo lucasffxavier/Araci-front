@@ -24,6 +24,8 @@ namespace Araci.API
             _document = document ?? throw new ArgumentNullException(nameof(document));
         }
 
+        public AraciDocument Document => _document;
+
         public IList<Elemento> ObterElementos()
         {
             return _document.Elementos.ToList();

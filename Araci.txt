@@ -270,6 +270,41 @@ Araci Engine
 
 
 ====================================================================================================
+ARQUIVO: C:\Araci-Engine-Front\Araci Engine\Core\Documents\AraciDocument.cs
+====================================================================================================
+
+using System.Collections.ObjectModel;
+using Araci.Models;
+namespace Araci.Core.Documents
+{
+public class AraciDocument
+{
+public AraciDocument()
+{
+Elementos = new ObservableCollection<Elemento>();
+}
+public ObservableCollection<Elemento> Elementos { get; }
+public void AdicionarElemento(Elemento elemento)
+{
+if (Elementos.Contains(elemento))
+return;
+Elementos.Add(elemento);
+}
+public void RemoverElemento(Elemento elemento)
+{
+if (!Elementos.Contains(elemento))
+return;
+Elementos.Remove(elemento);
+}
+public void Limpar()
+{
+Elementos.Clear();
+}
+}
+}
+
+
+====================================================================================================
 ARQUIVO: C:\Araci-Engine-Front\Araci Engine\DTOs\CircuitBuilder.cs
 ====================================================================================================
 
@@ -488,12 +523,13 @@ return _topology?.Validate();
 }
 public IList<LoadData> GetLoads()
 {
+ElectricGraph? graph = _graphBuilder?.Build();
 return _api.ObterElementos<Carga>()
 .Select(carga => new LoadData
 {
 Id = carga.Id.ToString(),
 Nome = ReadString(carga, "Nome"),
-Barra = ResolverBarraEquipamento(carga),
+Barra = ResolverBarraEquipamento(carga, graph),
 Fases = ReadInt(carga, "Fases"),
 R = ReadDouble(carga, "Carga resistencia", "Carga resistência"),
 X = ReadDouble(carga, "Carga reatancia", "Carga reatância"),
@@ -540,12 +576,13 @@ Enrolamentos = ReadInt(transformador, "Enrolamentos")
 }
 public IList<GeneratorData> GetGenerators()
 {
+ElectricGraph? graph = _graphBuilder?.Build();
 return _api.ObterElementos<Gerador>()
 .Select(gerador => new GeneratorData
 {
 Id = gerador.Id.ToString(),
 Nome = ReadString(gerador, "Nome"),
-Barra = ResolverBarraEquipamento(gerador),
+Barra = ResolverBarraEquipamento(gerador, graph),
 Fases = ReadInt(gerador, "Fases"),
 Tensao = ReadVoltage(gerador, "TensaoKV", "Tensao", "TensaoLinha"),
 Potencia = ReadDouble(gerador, "PotenciaAtiva", "Potencia", "PotenciaAparente"),
@@ -593,6 +630,19 @@ return graph?.FindNode(elementId)?.Name ?? string.Empty;
 private string ResolverBarraEquipamento(ElementoEquipamento equipamento)
 {
 return _connectivity?.ResolverBusNameParaEquipamentoEstrito(equipamento) ?? string.Empty;
+}
+private string ResolverBarraEquipamento(
+ElementoEquipamento equipamento,
+ElectricGraph? graph)
+{
+return ResolverBarraPorGrafo(equipamento, graph) ??
+ResolverBarraEquipamento(equipamento);
+}
+private static string? ResolverBarraPorGrafo(
+ElementoEquipamento equipamento,
+ElectricGraph? graph)
+{
+return graph?.FindNodeByElement(equipamento)?.Name;
 }
 private static string ReadBarra(Elemento elemento, params string[] names)
 {
@@ -1058,20 +1108,6 @@ _ => $"T{index + 1}"
 
 
 ====================================================================================================
-ARQUIVO: C:\Araci-Engine-Front\Araci Engine\Models\ITerminalOwner.cs
-====================================================================================================
-
-﻿using System.Collections.Generic;
-namespace Araci.Models
-{
-public interface ITerminalOwner
-{
-IReadOnlyList<Terminal> Terminais { get; }
-}
-}
-
-
-====================================================================================================
 ARQUIVO: C:\Araci-Engine-Front\Araci Engine\Models\Terminal.cs
 ====================================================================================================
 
@@ -1527,6 +1563,14 @@ return string.IsNullOrWhiteSpace(elementId)
 : _nodesById.TryGetValue(elementId.Trim(), out ElectricGraphNode? node)
 ? node
 : null;
+}
+public ElectricGraphNode? FindNodeByElementId(string elementId)
+{
+return FindNode(elementId);
+}
+public ElectricGraphNode? FindNodeByElement(Elemento elemento)
+{
+return elemento == null ? null : FindNodeByElementId(elemento.Id.ToString());
 }
 public ElectricGraphTerminal? FindTerminal(string elementId, string terminalId)
 {
