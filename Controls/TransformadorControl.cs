@@ -11,6 +11,9 @@ namespace Araci.Controls
 {
     public class TransformadorControl : ElementoControlBase
     {
+        private static readonly Uri SvgSource =
+            new("pack://application:,,,/Assets/Svg/transformador.svg");
+
         private readonly Grid _root;
         private readonly SvgViewbox _svg;
         private readonly Border _overlay;
@@ -23,14 +26,7 @@ namespace Araci.Controls
             _svg = new SvgViewbox
             {
                 Stretch = Stretch.Uniform,
-                Source = new Uri("pack://application:,,,/Assets/Svg/transformador.svg")
-            };
-
-            _overlay = new Border
-            {
-                Background = Brushes.DeepSkyBlue,
-                Opacity = 0.6,
-                Visibility = Visibility.Collapsed
+                Source = SvgSource
             };
 
             _previewOverlay = new Border
@@ -38,7 +34,19 @@ namespace Araci.Controls
                 Background = Brushes.DeepSkyBlue,
                 Opacity = 0.35,
                 Visibility = Visibility.Collapsed,
-                IsHitTestVisible = false
+                IsHitTestVisible = false,
+                HorizontalAlignment = HorizontalAlignment.Stretch,
+                VerticalAlignment = VerticalAlignment.Stretch
+            };
+
+            _overlay = new Border
+            {
+                Background = Brushes.DeepSkyBlue,
+                Opacity = 0.6,
+                Visibility = Visibility.Collapsed,
+                IsHitTestVisible = false,
+                HorizontalAlignment = HorizontalAlignment.Stretch,
+                VerticalAlignment = VerticalAlignment.Stretch
             };
 
             _root = new Grid();
@@ -47,17 +55,11 @@ namespace Araci.Controls
             _root.Children.Add(_overlay);
             Content = _root;
 
-            Loaded += OnLoaded;
             ConfigurarBindings();
+            ConfigurarMascaras();
         }
 
         protected override bool UsaBindings => true;
-
-        private void OnLoaded(object sender, RoutedEventArgs e)
-        {
-            _overlay.OpacityMask = new VisualBrush(_svg);
-            _previewOverlay.OpacityMask = new VisualBrush(_svg);
-        }
 
         private void ConfigurarBindings()
         {
@@ -78,6 +80,9 @@ namespace Araci.Controls
                 Converter = new BooleanToVisibilityConverter()
             });
 
+            _overlay.SetBinding(WidthProperty, new Binding("RenderData.Largura"));
+            _overlay.SetBinding(HeightProperty, new Binding("RenderData.Altura"));
+
             var multi = new MultiBinding
             {
                 Converter = new SelectionOrHoverToVisibilityConverter()
@@ -87,6 +92,22 @@ namespace Araci.Controls
             multi.Bindings.Add(new Binding("IsHover"));
 
             _overlay.SetBinding(VisibilityProperty, multi);
+        }
+
+        private void ConfigurarMascaras()
+        {
+            _previewOverlay.OpacityMask = CriarMascara();
+            _overlay.OpacityMask = CriarMascara();
+        }
+
+        private VisualBrush CriarMascara()
+        {
+            return new VisualBrush(_svg)
+            {
+                Stretch = Stretch.Uniform,
+                AlignmentX = AlignmentX.Center,
+                AlignmentY = AlignmentY.Center
+            };
         }
     }
 }

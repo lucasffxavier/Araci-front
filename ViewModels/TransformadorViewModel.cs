@@ -1,5 +1,6 @@
 using System.Collections;
 using System.Windows;
+using Araci.Core.Rendering;
 using Araci.Core.SceneNodes;
 using Araci.Models;
 using Araci.Services;
@@ -16,7 +17,15 @@ namespace Araci.ViewModels
             NameService names,
             TypePropertiesDialogService typePropertiesDialogs,
             TerminalLayoutService terminalLayout)
-            : base(modelo, new EquipamentoNode(modelo), types, names, typePropertiesDialogs)
+            : base(
+                modelo,
+                new EquipamentoNode(
+                    modelo,
+                    ElementGeometryDefaults.TransformadorLargura,
+                    ElementGeometryDefaults.TransformadorAltura),
+                types,
+                names,
+                typePropertiesDialogs)
         {
             _terminalLayout = terminalLayout;
             SelecionarPrimeiroTipoDisponivel();

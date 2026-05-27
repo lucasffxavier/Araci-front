@@ -10,6 +10,7 @@ using Araci.DTOs;
 using Araci.Models;
 using Araci.Models.Tipos;
 using Araci.Services;
+using Araci.ViewModels;
 
 namespace Araci.TechnicalChecks
 {
@@ -54,7 +55,8 @@ namespace Araci.TechnicalChecks
                 ("Transformador minimo possui terminais primario e secundario", TransformadorMinimoPossuiTerminais),
                 ("Transformador aparece no ElectricGraph", TransformadorApareceNoElectricGraph),
                 ("Transformador preserva conexoes apos reload", TransformadorPreservaConexoesAposReload),
-                ("Transformador entra no DTO minimo", TransformadorEntraNoDtoMinimo)
+                ("Transformador entra no DTO minimo", TransformadorEntraNoDtoMinimo),
+                ("Transformador usa centro com geometria propria", TransformadorUsaCentroComGeometriaPropria)
             };
 
             var failures = new List<string>();
@@ -781,6 +783,20 @@ namespace Araci.TechnicalChecks
             AssertEqual(transformador.Nome, dto.Transformers[0].Nome, "TransformerDto.Nome");
             AssertEqual(3, dto.Transformers[0].Fases, "TransformerDto.Fases");
             AssertEqual(2, dto.Transformers[0].Enrolamentos, "TransformerDto.Enrolamentos");
+        }
+
+        private static void TransformadorUsaCentroComGeometriaPropria()
+        {
+            var context = new EditorContext();
+            Transformador transformador = context.ElementoFactory.CriarTransformador();
+            Point centro = new Point(500, 400);
+            Point topoEsquerdo = context.Geometry.CalcularTopoEsquerdoPorCentro(transformador, centro);
+            TransformadorViewModel vm = context.ElementoFactory.CriarTransformadorVM();
+
+            AssertEqual(460, topoEsquerdo.X, "Transformador.PosicaoX por centro");
+            AssertEqual(330, topoEsquerdo.Y, "Transformador.PosicaoY por centro");
+            AssertEqual(ElementGeometryDefaults.TransformadorLargura, vm.Largura, "TransformadorViewModel.Largura");
+            AssertEqual(ElementGeometryDefaults.TransformadorAltura, vm.Altura, "TransformadorViewModel.Altura");
         }
 
         private static SimpleCircuit CreateSimpleCircuit()
