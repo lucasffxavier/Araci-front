@@ -79,7 +79,21 @@ namespace Araci.TechnicalChecks
                 ("Cabo reancora visualmente apos rotacao", CaboReancoraVisualmenteAposRotacao),
                 ("Undo Redo da rotacao restaura elemento e cabos", UndoRedoRotacaoRestauraElementoECabos),
                 ("ElectricGraph build repetido apos rotacao nao altera Document", ElectricGraphBuildAposRotacaoNaoAlteraDocument),
-                ("DTO nao muda por causa da rotacao", DtoNaoMudaPorCausaDaRotacao)
+                ("DTO nao muda por causa da rotacao", DtoNaoMudaPorCausaDaRotacao),
+                ("RotationService aceita Barra", RotationServiceAceitaBarra),
+                ("Barra selecionada rotaciona 0 para 90", BarraSelecionadaRotacionaZeroParaNoventa),
+                ("Barra cicla quadrantes", BarraCiclaQuadrantes),
+                ("Preview de Barra preserva rotacao", PreviewDeBarraPreservaRotacao),
+                ("Barra preserva 24 TerminalIds apos rotacao", BarraPreservaVinteQuatroTerminalIdsAposRotacao),
+                ("Terminais da Barra mudam posicao visual apos rotacao", TerminaisDaBarraMudamPosicaoVisualAposRotacao),
+                ("Cabo conectado a Barra preserva TerminalId apos rotacao", CaboConectadoABarraPreservaTerminalIdAposRotacao),
+                ("Cabo conectado a Barra reancora visualmente apos rotacao", CaboConectadoABarraReancoraVisualmenteAposRotacao),
+                ("Undo Redo da rotacao da Barra restaura cabos", UndoRedoRotacaoDaBarraRestauraCabos),
+                ("Barra rotacionada persiste apos reload", BarraRotacionadaPersisteAposReload),
+                ("ElectricGraph apos rotacao da Barra mantem arestas validas", ElectricGraphAposRotacaoDaBarraMantemArestasValidas),
+                ("DTO nao muda por causa da rotacao da Barra", DtoNaoMudaPorCausaDaRotacaoDaBarra),
+                ("Hit-test encontra Barra rotacionada", HitTestEncontraBarraRotacionada),
+                ("Snap encontra terminal de Barra rotacionada", SnapEncontraTerminalDeBarraRotacionada)
             };
 
             var failures = new List<string>();
@@ -1295,6 +1309,211 @@ namespace Araci.TechnicalChecks
             AssertEqual(before.Loads.Single().Barra, after.Loads.Single().Barra, "Load.Barra");
         }
 
+        private static void RotationServiceAceitaBarra()
+        {
+            EditorContext context = CreateContextWithViewport();
+            Barra bar = CreateBar("BARRA-PODE-ROT");
+            context.Document.AdicionarElemento(bar);
+
+            Assert(RotationService.PodeRotacionar(GetVm(context, bar)), "Barra deve ser aceita para rotacao.");
+        }
+
+        private static void BarraSelecionadaRotacionaZeroParaNoventa()
+        {
+            BarRotationCircuit circuit = CreateBarRotationCircuit();
+
+            RotateSelected(circuit.Context, circuit.Bar);
+
+            AssertEqual(90, circuit.Bar.Rotacao, "Rotacao da Barra");
+        }
+
+        private static void BarraCiclaQuadrantes()
+        {
+            BarRotationCircuit circuit = CreateBarRotationCircuit();
+
+            RotateSelected(circuit.Context, circuit.Bar);
+            AssertEqual(90, circuit.Bar.Rotacao, "Rotacao 0 -> 90");
+            RotateSelected(circuit.Context, circuit.Bar);
+            AssertEqual(180, circuit.Bar.Rotacao, "Rotacao 90 -> 180");
+            RotateSelected(circuit.Context, circuit.Bar);
+            AssertEqual(270, circuit.Bar.Rotacao, "Rotacao 180 -> 270");
+            RotateSelected(circuit.Context, circuit.Bar);
+            AssertEqual(0, circuit.Bar.Rotacao, "Rotacao 270 -> 0");
+        }
+
+        private static void PreviewDeBarraPreservaRotacao()
+        {
+            EditorContext context = CreateContextWithViewport();
+            var controller = new InsertPreviewController<BarraViewModel, Barra>(
+                context,
+                context.ElementoFactory.CriarBarraVM,
+                vm => vm.Barra);
+
+            controller.Update(new Point(240, 180));
+            controller.RotateClockwise();
+
+            Barra real = context.ElementoFactory.CriarBarra();
+            real.Rotacao = controller.CurrentRotation;
+
+            AssertEqual(90, real.Rotacao, "Rotacao copiada do preview da Barra");
+        }
+
+        private static void BarraPreservaVinteQuatroTerminalIdsAposRotacao()
+        {
+            BarRotationCircuit circuit = CreateBarRotationCircuit();
+            var before = circuit.Bar.Terminais.Select(t => t.Id).ToList();
+
+            RotateSelected(circuit.Context, circuit.Bar);
+
+            AssertEqual(24, circuit.Bar.Terminais.Count, "Quantidade de terminais");
+
+            for (int i = 0; i < 24; i++)
+            {
+                string expected = $"BARRA-{i + 1:00}";
+                AssertEqual(expected, circuit.Bar.Terminais[i].Id, $"Terminal {i}.Id padrao");
+                AssertEqual(before[i], circuit.Bar.Terminais[i].Id, $"Terminal {i}.Id preservado");
+            }
+        }
+
+        private static void TerminaisDaBarraMudamPosicaoVisualAposRotacao()
+        {
+            BarRotationCircuit circuit = CreateBarRotationCircuit();
+            var before = circuit.Bar.Terminais
+                .Select(t => (t.Id, t.Posicao))
+                .ToList();
+
+            RotateSelected(circuit.Context, circuit.Bar);
+
+            Assert(
+                before.Any(item => circuit.Bar.Terminais.Single(t => t.Id == item.Id).Posicao != item.Posicao),
+                "Ao menos um terminal da Barra deve mudar de posicao visual apos rotacao.");
+        }
+
+        private static void CaboConectadoABarraPreservaTerminalIdAposRotacao()
+        {
+            BarRotationCircuit circuit = CreateBarRotationCircuit();
+            string origemTerminalId = circuit.Outgoing.OrigemTerminalId;
+            string destinoTerminalId = circuit.Incoming.DestinoTerminalId;
+
+            RotateSelected(circuit.Context, circuit.Bar);
+
+            AssertEqual(origemTerminalId, circuit.Outgoing.OrigemTerminalId, "Cabo saida OrigemTerminalId");
+            AssertEqual(destinoTerminalId, circuit.Incoming.DestinoTerminalId, "Cabo entrada DestinoTerminalId");
+        }
+
+        private static void CaboConectadoABarraReancoraVisualmenteAposRotacao()
+        {
+            BarRotationCircuit circuit = CreateBarRotationCircuit();
+            Point before = circuit.Outgoing.Vertices[0];
+            Point middle = new Point(230, 150);
+            circuit.Outgoing.Vertices.Insert(1, middle);
+
+            RotateSelected(circuit.Context, circuit.Bar);
+
+            Terminal terminal = GetTerminal(circuit.Bar, 1);
+            Assert(before != circuit.Outgoing.Vertices[0], "Vertice inicial deve mudar apos rotacao da Barra.");
+            AssertEqual(terminal.Posicao.X, circuit.Outgoing.Vertices[0].X, "Cabo.Vertices[0].X");
+            AssertEqual(terminal.Posicao.Y, circuit.Outgoing.Vertices[0].Y, "Cabo.Vertices[0].Y");
+            AssertEqual(middle.X, circuit.Outgoing.Vertices[1].X, "Vertice intermediario X preservado");
+            AssertEqual(middle.Y, circuit.Outgoing.Vertices[1].Y, "Vertice intermediario Y preservado");
+        }
+
+        private static void UndoRedoRotacaoDaBarraRestauraCabos()
+        {
+            BarRotationCircuit circuit = CreateBarRotationCircuit();
+            Point beforeVertex = circuit.Outgoing.Vertices[0];
+
+            RotateSelected(circuit.Context, circuit.Bar);
+            Point afterVertex = circuit.Outgoing.Vertices[0];
+
+            circuit.Context.Commands.Undo();
+            AssertEqual(0, circuit.Bar.Rotacao, "Rotacao da Barra apos undo");
+            AssertEqual(beforeVertex.X, circuit.Outgoing.Vertices[0].X, "Cabo X apos undo");
+            AssertEqual(beforeVertex.Y, circuit.Outgoing.Vertices[0].Y, "Cabo Y apos undo");
+
+            circuit.Context.Commands.Redo();
+            AssertEqual(90, circuit.Bar.Rotacao, "Rotacao da Barra apos redo");
+            AssertEqual(afterVertex.X, circuit.Outgoing.Vertices[0].X, "Cabo X apos redo");
+            AssertEqual(afterVertex.Y, circuit.Outgoing.Vertices[0].Y, "Cabo Y apos redo");
+        }
+
+        private static void BarraRotacionadaPersisteAposReload()
+        {
+            BarRotationCircuit circuit = CreateBarRotationCircuit();
+
+            RotateSelected(circuit.Context, circuit.Bar);
+            AraciDocument loaded = SaveAndLoad(circuit.Context.Document);
+
+            Barra loadedBar = FindById<Barra>(loaded, circuit.Bar.Id);
+            Cabo loadedOutgoing = FindById<Cabo>(loaded, circuit.Outgoing.Id);
+
+            AssertEqual(90, loadedBar.Rotacao, "Rotacao da Barra apos reload");
+            AssertEqual(circuit.Outgoing.OrigemTerminalId, loadedOutgoing.OrigemTerminalId, "OrigemTerminalId apos reload");
+            AssertEqual(circuit.Outgoing.Vertices[0].X, loadedOutgoing.Vertices[0].X, "Vertice X apos reload");
+            AssertEqual(circuit.Outgoing.Vertices[0].Y, loadedOutgoing.Vertices[0].Y, "Vertice Y apos reload");
+        }
+
+        private static void ElectricGraphAposRotacaoDaBarraMantemArestasValidas()
+        {
+            BarRotationCircuit circuit = CreateBarRotationCircuit();
+
+            RotateSelected(circuit.Context, circuit.Bar);
+            ElectricGraph graph = new ElectricGraphBuilder(circuit.Context.Document).Build();
+
+            AssertEqual(2, graph.Edges.Count, "Quantidade de arestas");
+            AssertEqual(0, graph.GetInvalidEdges().Count, "Arestas invalidas");
+            AssertEqual(2, graph.GetEdgesForElement(circuit.Bar.Id.ToString()).Count, "Arestas da Barra");
+        }
+
+        private static void DtoNaoMudaPorCausaDaRotacaoDaBarra()
+        {
+            BarRotationCircuit circuit = CreateBarRotationCircuit();
+            CircuitDto before = new CircuitBuilder(new ParameterReader(circuit.Context.Document)).Build();
+
+            RotateSelected(circuit.Context, circuit.Bar);
+            CircuitDto after = new CircuitBuilder(new ParameterReader(circuit.Context.Document)).Build();
+
+            AssertEqual(before.Slack!.Id, after.Slack!.Id, "Slack.Id");
+            AssertEqual(before.Lines.Count, after.Lines.Count, "Lines.Count");
+            AssertEqual(before.Loads.Count, after.Loads.Count, "Loads.Count");
+            AssertEqual(before.Lines[0].Barra1, after.Lines[0].Barra1, "Line[0].Barra1");
+            AssertEqual(before.Lines[0].Barra2, after.Lines[0].Barra2, "Line[0].Barra2");
+            AssertEqual(before.Lines[1].Barra1, after.Lines[1].Barra1, "Line[1].Barra1");
+            AssertEqual(before.Lines[1].Barra2, after.Lines[1].Barra2, "Line[1].Barra2");
+            AssertEqual(before.Loads.Single().Barra, after.Loads.Single().Barra, "Load.Barra");
+        }
+
+        private static void HitTestEncontraBarraRotacionada()
+        {
+            BarRotationCircuit circuit = CreateBarRotationCircuit();
+            ElementoViewModel vm = GetVm(circuit.Context, circuit.Bar);
+
+            RotateSelected(circuit.Context, circuit.Bar);
+
+            Point visualPoint = RotateAround(
+                new Point(circuit.Bar.PosicaoX + 5, circuit.Bar.PosicaoY + 8),
+                vm.Centro,
+                circuit.Bar.Rotacao);
+
+            ElementoViewModel? hit = circuit.Context.SceneQueries.HitTest(visualPoint)?.Elemento;
+
+            Assert(ReferenceEquals(vm, hit), "Hit-test deve retornar a Barra rotacionada.");
+        }
+
+        private static void SnapEncontraTerminalDeBarraRotacionada()
+        {
+            BarRotationCircuit circuit = CreateBarRotationCircuit();
+
+            RotateSelected(circuit.Context, circuit.Bar);
+
+            Terminal expected = GetTerminal(circuit.Bar, 23);
+            Terminal? snapped = circuit.Context.Snap.ObterTerminalMaisProximo(expected.Posicao);
+
+            Assert(snapped != null, "Snap deve encontrar terminal da Barra rotacionada.");
+            AssertEqual(expected.Id, snapped!.Id, "TerminalId do snap");
+            AssertEqual(circuit.Bar.Id, snapped.Dono.Id, "Dono do terminal do snap");
+        }
+
         private static SimpleCircuit CreateSimpleCircuit()
         {
             var document = new AraciDocument();
@@ -1322,6 +1541,24 @@ namespace Araci.TechnicalChecks
             context.Document.AdicionarElemento(cable);
 
             return new RotatedCircuit(context, generator, load, cable);
+        }
+
+        private static BarRotationCircuit CreateBarRotationCircuit()
+        {
+            EditorContext context = CreateContextWithViewport();
+            Gerador generator = CreateGenerator("GER-BARRA-ROT", 1000, 0.95);
+            Barra bar = CreateBar("BARRA-ROT");
+            Carga load = CreateLoad("CARGA-BARRA-ROT", 300, 100);
+            Cabo incoming = CreateCable(generator, 0, bar, 0, "L-BARRA-IN", 1.0);
+            Cabo outgoing = CreateCable(bar, 1, load, 0, "L-BARRA-OUT", 1.0);
+
+            context.Document.AdicionarElemento(generator);
+            context.Document.AdicionarElemento(bar);
+            context.Document.AdicionarElemento(load);
+            context.Document.AdicionarElemento(incoming);
+            context.Document.AdicionarElemento(outgoing);
+
+            return new BarRotationCircuit(context, generator, bar, load, incoming, outgoing);
         }
 
         private static EditorContext CreateContextWithViewport()
@@ -1761,6 +1998,19 @@ namespace Araci.TechnicalChecks
             throw new InvalidOperationException($"{name}: excecao {typeof(TException).Name} nao foi lancada.");
         }
 
+        private static Point RotateAround(Point point, Point center, double angle)
+        {
+            double radians = angle * Math.PI / 180.0;
+            double cos = Math.Cos(radians);
+            double sin = Math.Sin(radians);
+            double x = point.X - center.X;
+            double y = point.Y - center.Y;
+
+            return new Point(
+                center.X + x * cos - y * sin,
+                center.Y + x * sin + y * cos);
+        }
+
         private sealed record SimpleCircuit(
             AraciDocument Document,
             Gerador Generator,
@@ -1772,5 +2022,13 @@ namespace Araci.TechnicalChecks
             Gerador Generator,
             Carga Load,
             Cabo Cable);
+
+        private sealed record BarRotationCircuit(
+            EditorContext Context,
+            Gerador Generator,
+            Barra Bar,
+            Carga Load,
+            Cabo Incoming,
+            Cabo Outgoing);
     }
 }

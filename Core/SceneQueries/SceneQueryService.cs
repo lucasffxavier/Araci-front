@@ -6,6 +6,7 @@ using System.Linq;
 using System.Windows;
 using Araci.Core.Scenes;
 using Araci.Core.Spatial;
+using Araci.Models;
 using Araci.ViewModels;
 
 namespace Araci.Core.SceneQueries
@@ -45,7 +46,7 @@ namespace Araci.Core.SceneQueries
             GarantirIndex();
 
             double effectiveTolerance = Math.Max(6, tolerance);
-            var candidatos = _index.Nearby(point, Math.Max(10, effectiveTolerance))
+            var candidatos = Nearby(point, Math.Max(10, effectiveTolerance))
                 .Where(e => !e.IsPreview)
                 .ToList();
             HitCandidate? melhor = null;
@@ -66,13 +67,55 @@ namespace Araci.Core.SceneQueries
         public IEnumerable<ElementoViewModel> Query(Rect area)
         {
             GarantirIndex();
-            return _index.Query(area).Where(e => !e.IsPreview);
+
+            var result = _index.Query(area)
+                .Where(e => !e.IsPreview)
+                .ToList();
+
+            foreach (ElementoViewModel vm in _scene.Elementos)
+            {
+                if (vm.IsPreview ||
+                    result.Contains(vm) ||
+                    !UsaGeometriaExpandida(vm))
+                {
+                    continue;
+                }
+
+                if (IntersectsWith(vm, area))
+                    result.Add(vm);
+            }
+
+            return result;
         }
 
         public IEnumerable<ElementoViewModel> Nearby(Point point, double radius)
         {
             GarantirIndex();
-            return _index.Nearby(point, radius).Where(e => !e.IsPreview);
+
+            var result = _index.Nearby(point, radius)
+                .Where(e => !e.IsPreview)
+                .ToList();
+
+            var area = new Rect(
+                point.X - radius,
+                point.Y - radius,
+                radius * 2,
+                radius * 2);
+
+            foreach (ElementoViewModel vm in _scene.Elementos)
+            {
+                if (vm.IsPreview ||
+                    result.Contains(vm) ||
+                    !UsaGeometriaExpandida(vm))
+                {
+                    continue;
+                }
+
+                if (IntersectsWith(vm, area))
+                    result.Add(vm);
+            }
+
+            return result;
         }
 
         private void GarantirIndex()
@@ -89,9 +132,71 @@ namespace Araci.Core.SceneQueries
             if (vm is CaboViewModel cabo)
                 return CriarCandidatoCabo(cabo, point, tolerance, order);
 
-            return vm.Bounds.Contains(point)
+            return ContemPontoElemento(vm, point)
                 ? new HitCandidate(vm, 0, 0, order)
                 : null;
+        }
+
+        private static bool ContemPontoElemento(ElementoViewModel vm, Point point)
+        {
+            Rect bounds = vm.Bounds;
+
+            if (Math.Abs(vm.Rotacao) <= 0.000001)
+                return bounds.Contains(point);
+
+            Point localPoint = RotateAround(point, vm.Centro, -vm.Rotacao);
+            return bounds.Contains(localPoint);
+        }
+
+        private static bool IntersectsWith(ElementoViewModel vm, Rect area)
+        {
+            if (ObterBoundsRotacionado(vm).IntersectsWith(area))
+                return true;
+
+            if (vm.Modelo is not ITerminalOwner owner)
+                return false;
+
+            return owner.Terminais.Any(t => area.Contains(t.Posicao));
+        }
+
+        private static Rect ObterBoundsRotacionado(ElementoViewModel vm)
+        {
+            Rect bounds = vm.Bounds;
+
+            if (Math.Abs(vm.Rotacao) <= 0.000001)
+                return bounds;
+
+            Point center = vm.Centro;
+            Point p1 = RotateAround(new Point(bounds.Left, bounds.Top), center, vm.Rotacao);
+            Point p2 = RotateAround(new Point(bounds.Right, bounds.Top), center, vm.Rotacao);
+            Point p3 = RotateAround(new Point(bounds.Right, bounds.Bottom), center, vm.Rotacao);
+            Point p4 = RotateAround(new Point(bounds.Left, bounds.Bottom), center, vm.Rotacao);
+
+            double minX = Math.Min(Math.Min(p1.X, p2.X), Math.Min(p3.X, p4.X));
+            double minY = Math.Min(Math.Min(p1.Y, p2.Y), Math.Min(p3.Y, p4.Y));
+            double maxX = Math.Max(Math.Max(p1.X, p2.X), Math.Max(p3.X, p4.X));
+            double maxY = Math.Max(Math.Max(p1.Y, p2.Y), Math.Max(p3.Y, p4.Y));
+
+            return new Rect(new Point(minX, minY), new Point(maxX, maxY));
+        }
+
+        private static bool UsaGeometriaExpandida(ElementoViewModel vm)
+        {
+            return Math.Abs(vm.Rotacao) > 0.000001 ||
+                vm.Modelo is ITerminalOwner;
+        }
+
+        private static Point RotateAround(Point point, Point center, double angle)
+        {
+            double radians = angle * Math.PI / 180.0;
+            double cos = Math.Cos(radians);
+            double sin = Math.Sin(radians);
+            double x = point.X - center.X;
+            double y = point.Y - center.Y;
+
+            return new Point(
+                center.X + x * cos - y * sin,
+                center.Y + x * sin + y * cos);
         }
 
         private static HitCandidate? CriarCandidatoCabo(CaboViewModel cabo, Point point, double tolerance, int order)
