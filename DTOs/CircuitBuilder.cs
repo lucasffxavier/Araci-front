@@ -97,7 +97,16 @@ namespace Araci.DTOs
                     Id = transformer.Id,
                     Nome = transformer.Nome,
                     Fases = SafePhases(transformer.Fases),
-                    Enrolamentos = transformer.Enrolamentos
+                    Enrolamentos = transformer.Enrolamentos > 0 ? transformer.Enrolamentos : 2,
+                    BarraPrimario = transformer.BarraPrimario?.Trim() ?? string.Empty,
+                    BarraSecundario = transformer.BarraSecundario?.Trim() ?? string.Empty,
+                    TensaoPrimarioKV = SafeKv(transformer.TensaoPrimarioKV),
+                    TensaoSecundarioKV = SafeKv(transformer.TensaoSecundarioKV),
+                    PotenciaKVA = transformer.PotenciaKVA > 0 ? transformer.PotenciaKVA : 500,
+                    RPercentual = transformer.RPercentual >= 0 ? transformer.RPercentual : 1,
+                    XPercentual = transformer.XPercentual >= 0 ? transformer.XPercentual : 5,
+                    LigacaoPrimario = string.IsNullOrWhiteSpace(transformer.LigacaoPrimario) ? "Wye" : transformer.LigacaoPrimario,
+                    LigacaoSecundario = string.IsNullOrWhiteSpace(transformer.LigacaoSecundario) ? "Wye" : transformer.LigacaoSecundario
                 })
                 .ToList();
         }

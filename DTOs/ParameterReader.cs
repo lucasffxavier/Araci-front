@@ -104,13 +104,44 @@ namespace Araci.DTOs
 
         public IList<TransformerData> GetTransformers()
         {
-            return GetElementsByTypeName("Transformador", "Transformer")
+            ElectricGraph? graph = _graphBuilder?.Build();
+
+            return _api.ObterElementos<Transformador>()
                 .Select(transformador => new TransformerData
                 {
                     Id = transformador.Id.ToString(),
                     Nome = ReadString(transformador, "Nome"),
                     Fases = ReadInt(transformador, "Fases"),
-                    Enrolamentos = ReadInt(transformador, "Enrolamentos")
+                    Enrolamentos = ReadInt(transformador, "Enrolamentos"),
+                    BarraPrimario = ResolverBarraTransformador(transformador, Transformador.TERMINAL_PRIMARIO, graph),
+                    BarraSecundario = ResolverBarraTransformador(transformador, Transformador.TERMINAL_SECUNDARIO, graph),
+                    TensaoPrimarioKV = ReadVoltage(
+                        transformador,
+                        "TensaoPrimarioKV",
+                        "TensaoPrimariaKV",
+                        "TensaoAltaKV",
+                        "TensaoATKV"),
+                    TensaoSecundarioKV = ReadVoltage(
+                        transformador,
+                        "TensaoSecundarioKV",
+                        "TensaoSecundariaKV",
+                        "TensaoBaixaKV",
+                        "TensaoBTKV"),
+                    PotenciaKVA = ReadPowerKva(transformador),
+                    RPercentual = ReadDouble(transformador, "RPercentual", "ResistenciaPercentual", "PercentR"),
+                    XPercentual = ReadDouble(transformador, "XPercentual", "ReatanciaPercentual", "PercentX"),
+                    LigacaoPrimario = ReadString(
+                        transformador,
+                        "LigacaoPrimario",
+                        "LigacaoPrimaria",
+                        "ConexaoPrimario",
+                        "ConexaoPrimaria"),
+                    LigacaoSecundario = ReadString(
+                        transformador,
+                        "LigacaoSecundario",
+                        "LigacaoSecundaria",
+                        "ConexaoSecundario",
+                        "ConexaoSecundaria")
                 })
                 .ToList();
         }
@@ -218,6 +249,29 @@ namespace Araci.DTOs
             return graph?.FindNodeByElement(equipamento)?.Name;
         }
 
+        private static string ResolverBarraTransformador(
+            Transformador transformador,
+            string terminalId,
+            ElectricGraph? graph)
+        {
+            if (graph == null)
+                return string.Empty;
+
+            string elementId = transformador.Id.ToString();
+            ElectricGraphEdge? edge = graph
+                .GetEdgesForTerminal(elementId, terminalId)
+                .FirstOrDefault(e => e.IsValid);
+
+            if (edge == null)
+                return string.Empty;
+
+            string otherId = string.Equals(edge.FromElementId, elementId, StringComparison.OrdinalIgnoreCase)
+                ? edge.ToElementId
+                : edge.FromElementId;
+
+            return graph.FindNode(otherId)?.Name ?? string.Empty;
+        }
+
         private static string ReadBarra(Elemento elemento, params string[] names)
         {
             string valor = ReadString(elemento, names);
@@ -271,6 +325,17 @@ namespace Araci.DTOs
                 return ElectricalValueParser.ToVoltageKv(text);
 
             return 0;
+        }
+
+        private static double ReadPowerKva(Elemento elemento)
+        {
+            double kva = ReadDouble(elemento, "PotenciaKVA", "PotenciaNominalKVA");
+
+            if (kva > 0)
+                return kva;
+
+            double mva = ReadDouble(elemento, "PotenciaMVA", "PotenciaNominalMVA");
+            return mva > 0 ? mva * 1000 : 0;
         }
 
         private static string? ReadValueAsString(Elemento elemento, params string[] names)
@@ -359,6 +424,24 @@ namespace Araci.DTOs
             public int Fases { get; set; }
 
             public int Enrolamentos { get; set; }
+
+            public string BarraPrimario { get; set; } = string.Empty;
+
+            public string BarraSecundario { get; set; } = string.Empty;
+
+            public double TensaoPrimarioKV { get; set; }
+
+            public double TensaoSecundarioKV { get; set; }
+
+            public double PotenciaKVA { get; set; }
+
+            public double RPercentual { get; set; }
+
+            public double XPercentual { get; set; }
+
+            public string LigacaoPrimario { get; set; } = string.Empty;
+
+            public string LigacaoSecundario { get; set; } = string.Empty;
         }
 
         public class GeneratorData
