@@ -217,10 +217,10 @@ namespace Araci.Services
                 (m, n, d, l) => new TransformadorViewModel((Transformador)m, Types, n, d, l),
                 () => Types.TipoTransformadorPadrao,
                 () => Types.TiposTransformadores,
-                _ => EquipamentoSize(),
+                _ => TransformadorSize(),
                 e => ((Transformador)e).AtualizarTerminais(
-                    ElementGeometryDefaults.EquipamentoLargura,
-                    ElementGeometryDefaults.EquipamentoAltura)));
+                    ElementGeometryDefaults.TransformadorLargura,
+                    ElementGeometryDefaults.TransformadorAltura)));
 
             Register(new ElementDefinition(
                 "Cabo",
@@ -306,6 +306,13 @@ namespace Araci.Services
             return new Size(
                 ElementGeometryDefaults.EquipamentoLargura,
                 ElementGeometryDefaults.EquipamentoAltura);
+        }
+
+        private static Size TransformadorSize()
+        {
+            return new Size(
+                ElementGeometryDefaults.TransformadorLargura,
+                ElementGeometryDefaults.TransformadorAltura);
         }
 
         private static Size GetFallbackSize(Elemento elemento)

@@ -5,6 +5,7 @@ using System.Linq;
 using System.Windows;
 using Araci.API;
 using Araci.Core.Documents;
+using Araci.Core.Rendering;
 using Araci.DTOs;
 using Araci.Models;
 using Araci.Models.Tipos;
@@ -711,7 +712,7 @@ namespace Araci.TechnicalChecks
             AssertEqual(120, transformador.Terminais[0].Posicao.X, "Primario.X");
             AssertEqual(80, transformador.Terminais[0].Posicao.Y, "Primario.Y");
             AssertEqual(120, transformador.Terminais[1].Posicao.X, "Secundario.X");
-            AssertEqual(160, transformador.Terminais[1].Posicao.Y, "Secundario.Y");
+            AssertEqual(220, transformador.Terminais[1].Posicao.Y, "Secundario.Y");
         }
 
         private static void TransformadorApareceNoElectricGraph()
@@ -914,7 +915,9 @@ namespace Araci.TechnicalChecks
                 TensaoLinha = "13.8"
             };
 
-            transformador.AtualizarTerminais(80, 80);
+            transformador.AtualizarTerminais(
+                ElementGeometryDefaults.TransformadorLargura,
+                ElementGeometryDefaults.TransformadorAltura);
 
             return transformador;
         }

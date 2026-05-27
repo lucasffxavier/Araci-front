@@ -22,7 +22,7 @@ namespace Araci.Controls
 
             _svg = new SvgViewbox
             {
-                Stretch = Stretch.Fill,
+                Stretch = Stretch.Uniform,
                 Source = new Uri("pack://application:,,,/Assets/Svg/transformador.svg")
             };
 

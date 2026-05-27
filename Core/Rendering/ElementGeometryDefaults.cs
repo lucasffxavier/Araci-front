@@ -4,6 +4,8 @@ namespace Araci.Core.Rendering
     {
         public const double EquipamentoLargura = 70;
         public const double EquipamentoAltura = 70;
+        public const double TransformadorLargura = 80;
+        public const double TransformadorAltura = 140;
         public const double BarraLargura = 10;
     }
 }
