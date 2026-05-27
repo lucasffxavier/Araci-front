@@ -43,5 +43,11 @@ namespace Araci
 
             ArquivoPopup.IsOpen = true;
         }
+
+        public void FocarViewport()
+        {
+            Viewport.Focus();
+            System.Windows.Input.Keyboard.Focus(Viewport);
+        }
     }
 }

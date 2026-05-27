@@ -2,6 +2,7 @@
 using System.Windows;
 using System.Windows.Controls;
 
+using Araci;
 using Araci.Applications.Diagrama.InserirCabo;
 using Araci.Applications.Diagrama.InserirCarga;
 using Araci.Applications.Diagrama.InserirGerador;
@@ -45,6 +46,7 @@ namespace Araci.Ribbon.Tabs
                 new(Context);
 
             app.Executar();
+            FocarViewport();
         }
 
         // =========================
@@ -61,6 +63,7 @@ namespace Araci.Ribbon.Tabs
                 new(Context);
 
             app.Executar();
+            FocarViewport();
         }
 
         // =========================
@@ -77,6 +80,7 @@ namespace Araci.Ribbon.Tabs
                 new(Context);
 
             app.Executar();
+            FocarViewport();
         }
 
         // =========================
@@ -93,6 +97,7 @@ namespace Araci.Ribbon.Tabs
                 new(Context);
 
             app.Executar();
+            FocarViewport();
         }
 
         // =========================
@@ -109,6 +114,7 @@ namespace Araci.Ribbon.Tabs
                 new(Context);
 
             app.Executar();
+            FocarViewport();
         }
 
         // =========================
@@ -125,6 +131,13 @@ namespace Araci.Ribbon.Tabs
                 new(Context);
 
             app.Executar();
+            FocarViewport();
+        }
+
+        private void FocarViewport()
+        {
+            if (Window.GetWindow(this) is MainWindow window)
+                window.FocarViewport();
         }
 
         // =========================

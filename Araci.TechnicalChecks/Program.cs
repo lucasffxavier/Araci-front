@@ -2,9 +2,12 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Threading;
 using System.Windows;
+using System.Windows.Input;
 using Araci.API;
 using Araci.Applications.Diagrama;
+using Araci.Applications.Diagrama.InserirCarga;
 using Araci.Core.Documents;
 using Araci.Core.Rendering;
 using Araci.DTOs;
@@ -73,6 +76,13 @@ namespace Araci.TechnicalChecks
                 ("Rotacao +90 atualiza modelo", RotacaoMaisNoventaAtualizaModelo),
                 ("Rotacao cicla quadrantes", RotacaoCiclaQuadrantes),
                 ("Preview preserva rotacao em modelo real", PreviewPreservaRotacaoEmModeloReal),
+                ("Preview armazena rotacao antes de existir", PreviewArmazenaRotacaoAntesDeExistir),
+                ("Preview existente rotaciona visualmente", PreviewExistenteRotacionaVisualmente),
+                ("Update do preview nao reseta rotacao", UpdateDoPreviewNaoResetaRotacao),
+                ("Modelo real recebe rotacao do preview", ModeloRealRecebeRotacaoDoPreview),
+                ("InputRouter envia Space para insercao sem preview", InputRouterEnviaSpaceParaInsercaoSemPreview),
+                ("Botoes da Ribbon nao capturam foco", BotoesDaRibbonNaoCapturamFoco),
+                ("Viewport continua focavel", ViewportContinuaFocavel),
                 ("Elemento rotacionado persiste apos reload", ElementoRotacionadoPersisteAposReload),
                 ("Terminais mudam posicao e preservam IDs", TerminaisMudamPosicaoEPreservamIds),
                 ("Cabo preserva TerminalId apos rotacao", CaboPreservaTerminalIdAposRotacao),
@@ -1208,6 +1218,199 @@ namespace Araci.TechnicalChecks
             AssertEqual(180, real.Rotacao, "Rotacao copiada do preview");
         }
 
+        private static void PreviewArmazenaRotacaoAntesDeExistir()
+        {
+            AssertPreviewArmazenaRotacaoAntesDeExistir<CargaViewModel, Carga>(
+                "Carga",
+                context => context.ElementoFactory.CriarCargaVM(),
+                vm => (Carga)vm.Modelo);
+
+            AssertPreviewArmazenaRotacaoAntesDeExistir<TransformadorViewModel, Transformador>(
+                "Transformador",
+                context => context.ElementoFactory.CriarTransformadorVM(),
+                vm => (Transformador)vm.Modelo);
+
+            AssertPreviewArmazenaRotacaoAntesDeExistir<BarraViewModel, Barra>(
+                "Barra",
+                context => context.ElementoFactory.CriarBarraVM(),
+                vm => vm.Barra);
+        }
+
+        private static void PreviewExistenteRotacionaVisualmente()
+        {
+            AssertPreviewExistenteRotacionaVisualmente<CargaViewModel, Carga>(
+                "Carga",
+                context => context.ElementoFactory.CriarCargaVM(),
+                vm => (Carga)vm.Modelo);
+
+            AssertPreviewExistenteRotacionaVisualmente<TransformadorViewModel, Transformador>(
+                "Transformador",
+                context => context.ElementoFactory.CriarTransformadorVM(),
+                vm => (Transformador)vm.Modelo);
+
+            AssertPreviewExistenteRotacionaVisualmente<BarraViewModel, Barra>(
+                "Barra",
+                context => context.ElementoFactory.CriarBarraVM(),
+                vm => vm.Barra);
+        }
+
+        private static void UpdateDoPreviewNaoResetaRotacao()
+        {
+            AssertUpdateDoPreviewNaoResetaRotacao<CargaViewModel, Carga>(
+                "Carga",
+                context => context.ElementoFactory.CriarCargaVM(),
+                vm => (Carga)vm.Modelo);
+
+            AssertUpdateDoPreviewNaoResetaRotacao<TransformadorViewModel, Transformador>(
+                "Transformador",
+                context => context.ElementoFactory.CriarTransformadorVM(),
+                vm => (Transformador)vm.Modelo);
+
+            AssertUpdateDoPreviewNaoResetaRotacao<BarraViewModel, Barra>(
+                "Barra",
+                context => context.ElementoFactory.CriarBarraVM(),
+                vm => vm.Barra);
+        }
+
+        private static void ModeloRealRecebeRotacaoDoPreview()
+        {
+            AssertModeloRealRecebeRotacaoDoPreview<CargaViewModel, Carga>(
+                "Carga",
+                context => context.ElementoFactory.CriarCargaVM(),
+                context => context.ElementoFactory.CriarCarga(),
+                vm => (Carga)vm.Modelo);
+
+            AssertModeloRealRecebeRotacaoDoPreview<TransformadorViewModel, Transformador>(
+                "Transformador",
+                context => context.ElementoFactory.CriarTransformadorVM(),
+                context => context.ElementoFactory.CriarTransformador(),
+                vm => (Transformador)vm.Modelo);
+
+            AssertModeloRealRecebeRotacaoDoPreview<BarraViewModel, Barra>(
+                "Barra",
+                context => context.ElementoFactory.CriarBarraVM(),
+                context => context.ElementoFactory.CriarBarra(),
+                vm => vm.Barra);
+        }
+
+        private static void InputRouterEnviaSpaceParaInsercaoSemPreview()
+        {
+            RunSta(() =>
+            {
+                EditorContext context = CreateContextWithViewport();
+                context.Input.ToolAtual = new InserirCargaTool(context);
+
+                Assert(context.Input.KeyDown(Key.Space), "InputRouter deve consumir Space na ferramenta de insercao sem preview.");
+            });
+        }
+
+        private static void BotoesDaRibbonNaoCapturamFoco()
+        {
+            AssertButtonsNotFocusable("Ribbon/Tabs/DiagramaTab.xaml", "DiagramaTab");
+            AssertButtonsNotFocusable("Ribbon/Tabs/EditarTab.xaml", "EditarTab");
+            AssertButtonsNotFocusable("Ribbon/RibbonView.xaml", "RibbonView");
+        }
+
+        private static void ViewportContinuaFocavel()
+        {
+            string xaml = File.ReadAllText(FindProjectFile("Views/ViewportView.xaml"));
+
+            AssertContains(xaml, "Focusable=\"True\"", "ViewportView.Focusable");
+        }
+
+        private static void AssertPreviewArmazenaRotacaoAntesDeExistir<TViewModel, TModel>(
+            string name,
+            Func<EditorContext, TViewModel> criarPreview,
+            Func<TViewModel, TModel> obterModelo)
+            where TViewModel : ElementoViewModel
+            where TModel : Elemento
+        {
+            EditorContext context = CreateContextWithViewport();
+            var controller = new InsertPreviewController<TViewModel, TModel>(
+                context,
+                () => criarPreview(context),
+                obterModelo);
+
+            Assert(controller.RotateClockwise(), $"{name}: RotateClockwise antes do preview");
+            AssertEqual(90, controller.CurrentRotation, $"{name}: CurrentRotation antes do preview");
+
+            controller.Update(new Point(240, 180));
+
+            Assert(controller.Preview != null, $"{name}: preview deve existir apos Update.");
+            AssertEqual(90, obterModelo(controller.Preview!).Rotacao, $"{name}: Modelo.Rotacao do preview");
+        }
+
+        private static void AssertPreviewExistenteRotacionaVisualmente<TViewModel, TModel>(
+            string name,
+            Func<EditorContext, TViewModel> criarPreview,
+            Func<TViewModel, TModel> obterModelo)
+            where TViewModel : ElementoViewModel
+            where TModel : Elemento
+        {
+            EditorContext context = CreateContextWithViewport();
+            var controller = new InsertPreviewController<TViewModel, TModel>(
+                context,
+                () => criarPreview(context),
+                obterModelo);
+
+            controller.Update(new Point(240, 180));
+            Assert(controller.RotateClockwise(), $"{name}: RotateClockwise com preview");
+
+            Assert(controller.Preview != null, $"{name}: preview deve existir.");
+            AssertEqual(90, controller.CurrentRotation, $"{name}: CurrentRotation");
+            AssertEqual(90, controller.Preview!.Rotacao, $"{name}: Preview.Rotacao");
+            AssertEqual(90, obterModelo(controller.Preview).Rotacao, $"{name}: Preview.Modelo.Rotacao");
+        }
+
+        private static void AssertUpdateDoPreviewNaoResetaRotacao<TViewModel, TModel>(
+            string name,
+            Func<EditorContext, TViewModel> criarPreview,
+            Func<TViewModel, TModel> obterModelo)
+            where TViewModel : ElementoViewModel
+            where TModel : Elemento
+        {
+            EditorContext context = CreateContextWithViewport();
+            var controller = new InsertPreviewController<TViewModel, TModel>(
+                context,
+                () => criarPreview(context),
+                obterModelo);
+
+            controller.RotateClockwise();
+            controller.RotateClockwise();
+            controller.Update(new Point(240, 180));
+            controller.Update(new Point(260, 190));
+            controller.Update(new Point(280, 200));
+
+            Assert(controller.Preview != null, $"{name}: preview deve existir.");
+            AssertEqual(180, controller.CurrentRotation, $"{name}: CurrentRotation apos Updates");
+            AssertEqual(180, obterModelo(controller.Preview!).Rotacao, $"{name}: Modelo.Rotacao apos Updates");
+        }
+
+        private static void AssertModeloRealRecebeRotacaoDoPreview<TViewModel, TModel>(
+            string name,
+            Func<EditorContext, TViewModel> criarPreview,
+            Func<EditorContext, TModel> criarModeloReal,
+            Func<TViewModel, TModel> obterModelo)
+            where TViewModel : ElementoViewModel
+            where TModel : Elemento
+        {
+            EditorContext context = CreateContextWithViewport();
+            var controller = new InsertPreviewController<TViewModel, TModel>(
+                context,
+                () => criarPreview(context),
+                obterModelo);
+
+            controller.RotateClockwise();
+            controller.RotateClockwise();
+            controller.RotateClockwise();
+
+            TModel real = criarModeloReal(context);
+            real.Rotacao = controller.CurrentRotation;
+
+            AssertEqual(270, controller.CurrentRotation, $"{name}: CurrentRotation");
+            AssertEqual(270, real.Rotacao, $"{name}: Rotacao do modelo real");
+        }
+
         private static void ElementoRotacionadoPersisteAposReload()
         {
             var document = new AraciDocument();
@@ -1983,6 +2186,64 @@ namespace Araci.TechnicalChecks
                 throw new InvalidOperationException($"{name}: texto nao contem '{expected}'. Texto: {text}");
         }
 
+        private static void AssertButtonsNotFocusable(string relativePath, string name)
+        {
+            string xaml = File.ReadAllText(FindProjectFile(relativePath));
+            IReadOnlyList<string> buttons = ExtractButtonTags(xaml);
+
+            Assert(buttons.Count > 0, $"{name}: nenhum Button encontrado.");
+
+            for (int i = 0; i < buttons.Count; i++)
+            {
+                string button = buttons[i];
+
+                AssertContains(button, "Focusable=\"False\"", $"{name}.Button[{i}].Focusable");
+                AssertContains(button, "IsTabStop=\"False\"", $"{name}.Button[{i}].IsTabStop");
+            }
+        }
+
+        private static IReadOnlyList<string> ExtractButtonTags(string xaml)
+        {
+            var buttons = new List<string>();
+            int index = 0;
+
+            while (index < xaml.Length)
+            {
+                int start = xaml.IndexOf("<Button", index, StringComparison.OrdinalIgnoreCase);
+
+                if (start < 0)
+                    break;
+
+                int end = xaml.IndexOf('>', start);
+
+                if (end < 0)
+                    break;
+
+                buttons.Add(xaml[start..(end + 1)]);
+                index = end + 1;
+            }
+
+            return buttons;
+        }
+
+        private static string FindProjectFile(string relativePath)
+        {
+            string normalized = relativePath.Replace('/', Path.DirectorySeparatorChar);
+            DirectoryInfo? directory = new(Directory.GetCurrentDirectory());
+
+            while (directory != null)
+            {
+                string candidate = Path.Combine(directory.FullName, normalized);
+
+                if (File.Exists(candidate))
+                    return candidate;
+
+                directory = directory.Parent;
+            }
+
+            throw new FileNotFoundException($"Arquivo de projeto nao encontrado: {relativePath}");
+        }
+
         private static void AssertThrows<TException>(Action action, string name)
             where TException : Exception
         {
@@ -1996,6 +2257,29 @@ namespace Araci.TechnicalChecks
             }
 
             throw new InvalidOperationException($"{name}: excecao {typeof(TException).Name} nao foi lancada.");
+        }
+
+        private static void RunSta(Action action)
+        {
+            Exception? exception = null;
+            var thread = new Thread(() =>
+            {
+                try
+                {
+                    action();
+                }
+                catch (Exception ex)
+                {
+                    exception = ex;
+                }
+            });
+
+            thread.SetApartmentState(ApartmentState.STA);
+            thread.Start();
+            thread.Join();
+
+            if (exception != null)
+                throw exception;
         }
 
         private static Point RotateAround(Point point, Point center, double angle)

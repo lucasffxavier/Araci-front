@@ -93,6 +93,7 @@ namespace Araci.Services
             if (key == Key.Space)
             {
                 if (ToolAtual.IsBusy ||
+                    ToolAtual.HandlesKey(key) ||
                     _context.Selection.Selecionados.Any(RotationService.PodeRotacionar))
                 {
                     ToolAtual.OnKeyDown(key);

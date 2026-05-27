@@ -13,6 +13,7 @@ namespace Araci.Applications.Diagrama
         private readonly EditorContext _context;
         private readonly Func<TViewModel> _criarPreview;
         private readonly Func<TViewModel, TModel> _obterModelo;
+        private double _currentRotation;
 
         public InsertPreviewController(
             EditorContext context,
@@ -42,42 +43,40 @@ namespace Araci.Applications.Diagrama
 
             modelo.PosicaoX = posicao.X;
             modelo.PosicaoY = posicao.Y;
+            preview.Rotacao = _currentRotation;
+            _context.TerminalLayout.AtualizarTerminais(modelo);
             preview.AtualizarAposModeloAlterado();
             _context.SceneQueries.Invalidate();
         }
 
         public bool RotateClockwise()
         {
-            if (Preview == null)
-                return false;
+            _currentRotation = RotationService.RotateClockwise(_currentRotation);
 
+            if (Preview == null)
+                return true;
+
+            Preview.Rotacao = _currentRotation;
             TModel modelo = _obterModelo(Preview);
-            modelo.Rotacao = RotationService.RotateClockwise(modelo.Rotacao);
             _context.TerminalLayout.AtualizarTerminais(modelo);
-            Preview.AtualizarAposModeloAlterado();
             _context.SceneQueries.Invalidate();
             return true;
         }
 
-        public double CurrentRotation
-        {
-            get
-            {
-                if (Preview == null)
-                    return 0;
-
-                return _obterModelo(Preview).Rotacao;
-            }
-        }
+        public double CurrentRotation => _currentRotation;
 
         public void Clear()
         {
             if (Preview == null)
+            {
+                _currentRotation = 0;
                 return;
+            }
 
             Preview.IsPreview = false;
             _context.Scene.Elementos.Remove(Preview);
             Preview = null;
+            _currentRotation = 0;
             _context.SceneQueries.Invalidate();
         }
 
@@ -87,6 +86,9 @@ namespace Araci.Applications.Diagrama
                 return Preview;
 
             Preview = _criarPreview();
+            Preview.Rotacao = _currentRotation;
+            TModel modelo = _obterModelo(Preview);
+            _context.TerminalLayout.AtualizarTerminais(modelo);
             Preview.IsPreview = true;
             _context.Scene.Elementos.Add(Preview);
             _context.SceneQueries.Invalidate();

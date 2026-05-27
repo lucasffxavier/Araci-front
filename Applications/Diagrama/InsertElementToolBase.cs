@@ -74,6 +74,11 @@ namespace Araci.Applications.Diagrama
 
         public void OnMouseUp(Point position, ToolInputState inputState) { }
 
+        public bool HandlesKey(Key key)
+        {
+            return key is Key.Escape or Key.Space;
+        }
+
         public void OnKeyDown(Key key)
         {
             if (key == Key.Escape)

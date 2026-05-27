@@ -17,6 +17,7 @@ namespace Araci.Applications.Editar.Base
         void OnMouseDown(ElementoViewModel? vm, Point position, ToolInputState inputState);
         void OnMouseMove(Point position, ToolInputState inputState);
         void OnMouseUp(Point position, ToolInputState inputState);
+        bool HandlesKey(Key key) => false;
         void OnKeyDown(Key key);
     }
 }

@@ -2,6 +2,7 @@
 using System.Windows.Controls;
 using System.Windows.Media;
 
+using Araci;
 using Araci.Applications.Editar.Base;
 using Araci.Applications.Editar.Deletar;
 using Araci.Applications.Editar.Mover;
@@ -179,6 +180,7 @@ namespace Araci.Ribbon.Tabs
             if (Context == null) return;
             Context.Tools.AtivarFerramenta(
                 new SelecionarTool(Context));
+            FocarViewport();
         }
 
         private void MoverButton_Click(
@@ -188,6 +190,7 @@ namespace Araci.Ribbon.Tabs
             if (Context == null) return;
             Context.Tools.AtivarFerramenta(
                 new MoverTool(Context));
+            FocarViewport();
         }
 
         private void CopiarButton_Click(
@@ -197,6 +200,7 @@ namespace Araci.Ribbon.Tabs
             if (Context == null) return;
             ClipboardService.CopiarSelecionados(
                 Context);
+            FocarViewport();
         }
 
         private void ColarButton_Click(
@@ -206,6 +210,7 @@ namespace Araci.Ribbon.Tabs
             if (Context == null) return;
             ClipboardService.Colar(
                 Context);
+            FocarViewport();
         }
 
         private void DeletarButton_Click(
@@ -215,6 +220,7 @@ namespace Araci.Ribbon.Tabs
             if (Context == null) return;
             Context.Tools.AtivarFerramenta(
                 new DeletarTool(Context));
+            FocarViewport();
         }
 
         // =========================
@@ -226,6 +232,7 @@ namespace Araci.Ribbon.Tabs
             RoutedEventArgs e)
         {
             Context?.Commands.Undo();
+            FocarViewport();
         }
 
         // =========================
@@ -237,6 +244,13 @@ namespace Araci.Ribbon.Tabs
             RoutedEventArgs e)
         {
             Context?.Commands.Redo();
+            FocarViewport();
+        }
+
+        private void FocarViewport()
+        {
+            if (Window.GetWindow(this) is MainWindow window)
+                window.FocarViewport();
         }
     }
 }
