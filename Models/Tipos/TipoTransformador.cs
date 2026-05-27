@@ -7,6 +7,7 @@ namespace Araci.Models.Tipos
         public const string PARAM_TENSAO_PRIMARIO_KV = "TensaoPrimarioKV";
         public const string PARAM_TENSAO_SECUNDARIO_KV = "TensaoSecundarioKV";
         public const string PARAM_POTENCIA_KVA = "PotenciaKVA";
+        public const string PARAM_POTENCIA_MVA = "PotenciaMVA";
         public const string PARAM_R_PERCENTUAL = "RPercentual";
         public const string PARAM_X_PERCENTUAL = "XPercentual";
         public const string PARAM_LIGACAO_PRIMARIO = "LigacaoPrimario";
@@ -23,6 +24,7 @@ namespace Araci.Models.Tipos
             DefinirParametro(new Parameter<double>(PARAM_TENSAO_PRIMARIO_KV, 13.8));
             DefinirParametro(new Parameter<double>(PARAM_TENSAO_SECUNDARIO_KV, 0.38));
             DefinirParametro(new Parameter<double>(PARAM_POTENCIA_KVA, 500));
+            DefinirParametro(new Parameter<double>(PARAM_POTENCIA_MVA, 0));
             DefinirParametro(new Parameter<double>(PARAM_R_PERCENTUAL, 1));
             DefinirParametro(new Parameter<double>(PARAM_X_PERCENTUAL, 5));
             DefinirParametro(new Parameter<string>(PARAM_LIGACAO_PRIMARIO, "Wye"));
@@ -57,6 +59,12 @@ namespace Araci.Models.Tipos
         {
             get => Obter<double>(PARAM_POTENCIA_KVA);
             set => Definir(PARAM_POTENCIA_KVA, value < 0 ? 0 : value);
+        }
+
+        public double PotenciaMVA
+        {
+            get => Obter<double>(PARAM_POTENCIA_MVA);
+            set => Definir(PARAM_POTENCIA_MVA, value < 0 ? 0 : value);
         }
 
         public double RPercentual

@@ -100,8 +100,11 @@ namespace Araci.Services
         {
             int equipamentos = _document.Elementos.OfType<ElementoEquipamento>().Count();
 
-            if (!_document.Elementos.OfType<Gerador>().Any())
-                result.AddError("Circuito sem gerador.");
+            if (!_document.Elementos.OfType<Sin>().Any() &&
+                !_document.Elementos.OfType<Gerador>().Any())
+            {
+                result.AddError("Circuito sem fonte slack.");
+            }
 
             if (!_document.Elementos.OfType<Carga>().Any())
                 result.AddError("Circuito sem carga.");

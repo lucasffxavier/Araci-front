@@ -3,6 +3,7 @@ using System.Windows;
 using Araci.Core.Rendering;
 using Araci.Core.SceneNodes;
 using Araci.Models;
+using Araci.Models.Tipos;
 using Araci.Services;
 
 namespace Araci.ViewModels
@@ -92,6 +93,66 @@ namespace Araci.ViewModels
             }
         }
 
+        public int Fases
+        {
+            get => Transformador.Obter<int>(TipoTransformador.PARAM_FASES);
+            set => DefinirParametro(TipoTransformador.PARAM_FASES, value <= 0 ? 1 : value);
+        }
+
+        public int Enrolamentos
+        {
+            get => Transformador.Obter<int>(TipoTransformador.PARAM_ENROLAMENTOS);
+            set => DefinirParametro(TipoTransformador.PARAM_ENROLAMENTOS, value <= 0 ? 2 : value);
+        }
+
+        public double TensaoPrimarioKV
+        {
+            get => Transformador.Obter<double>(TipoTransformador.PARAM_TENSAO_PRIMARIO_KV);
+            set => DefinirParametro(TipoTransformador.PARAM_TENSAO_PRIMARIO_KV, value);
+        }
+
+        public double TensaoSecundarioKV
+        {
+            get => Transformador.Obter<double>(TipoTransformador.PARAM_TENSAO_SECUNDARIO_KV);
+            set => DefinirParametro(TipoTransformador.PARAM_TENSAO_SECUNDARIO_KV, value);
+        }
+
+        public double PotenciaKVA
+        {
+            get => Transformador.Obter<double>(TipoTransformador.PARAM_POTENCIA_KVA);
+            set => DefinirParametro(TipoTransformador.PARAM_POTENCIA_KVA, value);
+        }
+
+        public double PotenciaMVA
+        {
+            get => Transformador.Obter<double>(TipoTransformador.PARAM_POTENCIA_MVA);
+            set => DefinirParametro(TipoTransformador.PARAM_POTENCIA_MVA, value);
+        }
+
+        public double RPercentual
+        {
+            get => Transformador.Obter<double>(TipoTransformador.PARAM_R_PERCENTUAL);
+            set => DefinirParametro(TipoTransformador.PARAM_R_PERCENTUAL, value);
+        }
+
+        public double XPercentual
+        {
+            get => Transformador.Obter<double>(TipoTransformador.PARAM_X_PERCENTUAL);
+            set => DefinirParametro(TipoTransformador.PARAM_X_PERCENTUAL, value);
+        }
+
+        public string LigacaoPrimario
+        {
+            get => Transformador.Obter<string>(TipoTransformador.PARAM_LIGACAO_PRIMARIO);
+            set => DefinirParametro(TipoTransformador.PARAM_LIGACAO_PRIMARIO, value);
+        }
+
+        public string LigacaoSecundario
+        {
+            get => Transformador.Obter<string>(TipoTransformador.PARAM_LIGACAO_SECUNDARIO);
+            set => DefinirParametro(TipoTransformador.PARAM_LIGACAO_SECUNDARIO, value);
+        }
+
         protected override void AtualizarNode()
         {
             base.AtualizarNode();
@@ -107,6 +168,13 @@ namespace Araci.ViewModels
         private void AtualizarTerminais()
         {
             _terminalLayout.AtualizarTerminais(Transformador);
+        }
+
+        private void DefinirParametro<T>(string nome, T valor)
+        {
+            Transformador.Definir(nome, valor);
+            OnPropertyChanged();
+            NotificarParametros();
         }
     }
 }

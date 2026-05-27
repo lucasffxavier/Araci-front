@@ -31,7 +31,7 @@ namespace Araci.DTOs
 
         public static double ToVoltageKv(double value)
         {
-            return value > 100 ? value / 1000 : value;
+            return value >= 1000 ? value / 1000 : value;
         }
 
         public static double ToVoltageKv(string? value, double fallback = DefaultKv)

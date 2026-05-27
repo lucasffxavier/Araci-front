@@ -72,9 +72,9 @@ namespace Araci.DTOs
                     X = ReadDouble(carga, "Carga reatancia", "Carga reatância"),
                     PotenciaAtiva = ReadDouble(carga, "PotenciaAtiva"),
                     PotenciaReativa = ReadDouble(carga, "PotenciaReativa"),
-                    Tensao = ReadVoltage(carga, "TensaoKV", "Tensao", "TensaoLinha"),
+                    Tensao = ReadKvWithDefault(carga, 12.47, "TensaoKV", "Tensao", "TensaoLinha"),
                     Conexao = ReadString(carga, "Carga conexao", "Conexao"),
-                    Modelo = ReadInt(carga, "Carga modelo", "ModeloCarga")
+                    Modelo = ReadInt(carga, "Carga modelo", "ModeloCarga", "Modelo")
                 })
                 .ToList();
         }
@@ -104,40 +104,42 @@ namespace Araci.DTOs
 
         public IList<TransformerData> GetTransformers()
         {
-            ElectricGraph? graph = _graphBuilder?.Build();
-
             return _api.ObterElementos<Transformador>()
                 .Select(transformador => new TransformerData
                 {
                     Id = transformador.Id.ToString(),
                     Nome = ReadString(transformador, "Nome"),
-                    Fases = ReadInt(transformador, "Fases"),
-                    Enrolamentos = ReadInt(transformador, "Enrolamentos"),
-                    BarraPrimario = ResolverBarraTransformador(transformador, Transformador.TERMINAL_PRIMARIO, graph),
-                    BarraSecundario = ResolverBarraTransformador(transformador, Transformador.TERMINAL_SECUNDARIO, graph),
-                    TensaoPrimarioKV = ReadVoltage(
+                    Fases = ReadIntWithDefault(transformador, 3, "Fases"),
+                    Enrolamentos = ReadIntWithDefault(transformador, 2, "Enrolamentos"),
+                    BarraPrimario = ResolverBarraTransformador(transformador, Transformador.TERMINAL_PRIMARIO),
+                    BarraSecundario = ResolverBarraTransformador(transformador, Transformador.TERMINAL_SECUNDARIO),
+                    TensaoPrimarioKV = ReadKvWithDefault(
                         transformador,
+                        13.8,
                         "TensaoPrimarioKV",
                         "TensaoPrimariaKV",
                         "TensaoAltaKV",
                         "TensaoATKV"),
-                    TensaoSecundarioKV = ReadVoltage(
+                    TensaoSecundarioKV = ReadKvWithDefault(
                         transformador,
+                        0.38,
                         "TensaoSecundarioKV",
                         "TensaoSecundariaKV",
                         "TensaoBaixaKV",
                         "TensaoBTKV"),
                     PotenciaKVA = ReadPowerKva(transformador),
-                    RPercentual = ReadDouble(transformador, "RPercentual", "ResistenciaPercentual", "PercentR"),
-                    XPercentual = ReadDouble(transformador, "XPercentual", "ReatanciaPercentual", "PercentX"),
-                    LigacaoPrimario = ReadString(
+                    RPercentual = ReadDoubleWithDefault(transformador, 1, "RPercentual", "ResistenciaPercentual", "PercentR"),
+                    XPercentual = ReadDoubleWithDefault(transformador, 5, "XPercentual", "ReatanciaPercentual", "PercentX"),
+                    LigacaoPrimario = ReadStringWithDefault(
                         transformador,
+                        "Wye",
                         "LigacaoPrimario",
                         "LigacaoPrimaria",
                         "ConexaoPrimario",
                         "ConexaoPrimaria"),
-                    LigacaoSecundario = ReadString(
+                    LigacaoSecundario = ReadStringWithDefault(
                         transformador,
+                        "Wye",
                         "LigacaoSecundario",
                         "LigacaoSecundaria",
                         "ConexaoSecundario",
@@ -157,7 +159,7 @@ namespace Araci.DTOs
                     Nome = ReadString(gerador, "Nome"),
                     Barra = ResolverBarraEquipamento(gerador, graph),
                     Fases = ReadInt(gerador, "Fases"),
-                    Tensao = ReadVoltage(gerador, "TensaoKV", "Tensao", "TensaoLinha"),
+                    Tensao = ReadKv(gerador, "TensaoKV", "Tensao", "TensaoLinha"),
                     Potencia = ReadDouble(gerador, "PotenciaAtiva", "Potencia", "PotenciaAparente"),
                     FP = ReadDouble(gerador, "FP", "FatorPotencia")
                 })
@@ -174,8 +176,8 @@ namespace Araci.DTOs
                     Id = sin.Id.ToString(),
                     Nome = ReadString(sin, "Nome"),
                     Barra = ResolverBarraEquipamento(sin, graph),
-                    Fases = ReadInt(sin, "Fases"),
-                    Tensao = ReadVoltage(sin, "TensaoKV", "Tensao", "TensaoLinha"),
+                    Fases = ReadIntWithDefault(sin, 3, "Fases"),
+                    Tensao = ReadKvWithDefault(sin, 12.47, "TensaoKV", "Tensao", "TensaoLinha", "TensaoBaseKV"),
                     PotenciaCurtoMVA = ReadDouble(sin, "PotenciaCurtoMVA", "PotenciaCurtoCircuitoMva"),
                     RelacaoXR = ReadDouble(sin, "RelacaoXR", "X/R")
                 })
@@ -193,7 +195,9 @@ namespace Araci.DTOs
 
         private string ResolverBus1(Cabo cabo)
         {
-            return _connectivity?.ResolverBus1Estrito(cabo) ?? string.Empty;
+            return ResolverBusPorElementoETerminal(cabo.OrigemId, cabo.OrigemTerminalId) ??
+                _connectivity?.ResolverBus1Estrito(cabo) ??
+                string.Empty;
         }
 
         private string ResolverBus1(Cabo cabo, ElectricGraph? graph)
@@ -203,7 +207,9 @@ namespace Araci.DTOs
 
         private string ResolverBus2(Cabo cabo)
         {
-            return _connectivity?.ResolverBus2Estrito(cabo) ?? string.Empty;
+            return ResolverBusPorElementoETerminal(cabo.DestinoId, cabo.DestinoTerminalId) ??
+                _connectivity?.ResolverBus2Estrito(cabo) ??
+                string.Empty;
         }
 
         private string ResolverBus2(Cabo cabo, ElectricGraph? graph)
@@ -225,8 +231,12 @@ namespace Araci.DTOs
                 return string.Empty;
 
             string elementId = origem ? edge.FromElementId : edge.ToElementId;
+            string terminalId = origem ? edge.FromTerminalId : edge.ToTerminalId;
+            ElectricGraphNode? node = graph?.FindNode(elementId);
 
-            return graph?.FindNode(elementId)?.Name ?? string.Empty;
+            return ResolverBarraPorTerminal(node?.SourceElement, terminalId) ??
+                node?.Name ??
+                string.Empty;
         }
 
         private string ResolverBarraEquipamento(ElementoEquipamento equipamento)
@@ -251,25 +261,50 @@ namespace Araci.DTOs
 
         private static string ResolverBarraTransformador(
             Transformador transformador,
-            string terminalId,
-            ElectricGraph? graph)
+            string terminalId)
         {
-            if (graph == null)
-                return string.Empty;
+            return ResolverBarraTerminalTransformador(transformador, terminalId);
+        }
 
-            string elementId = transformador.Id.ToString();
-            ElectricGraphEdge? edge = graph
-                .GetEdgesForTerminal(elementId, terminalId)
-                .FirstOrDefault(e => e.IsValid);
+        private string? ResolverBusPorElementoETerminal(string elementId, string terminalId)
+        {
+            Elemento? elemento = _connectivity?.ObterElementoPorId(elementId);
+            return ResolverBarraPorTerminal(elemento, terminalId);
+        }
 
-            if (edge == null)
-                return string.Empty;
+        private static string? ResolverBarraPorTerminal(Elemento? elemento, string terminalId)
+        {
+            return elemento is Transformador transformador &&
+                EhTerminalTransformador(terminalId)
+                    ? ResolverBarraTerminalTransformador(transformador, terminalId)
+                    : null;
+        }
 
-            string otherId = string.Equals(edge.FromElementId, elementId, StringComparison.OrdinalIgnoreCase)
-                ? edge.ToElementId
-                : edge.FromElementId;
+        private static string ResolverBarraTerminalTransformador(
+            Transformador transformador,
+            string terminalId)
+        {
+            string nome = NomeBarramento(transformador);
+            string terminal = string.Equals(terminalId, Transformador.TERMINAL_PRIMARIO, StringComparison.OrdinalIgnoreCase)
+                ? Transformador.TERMINAL_PRIMARIO
+                : Transformador.TERMINAL_SECUNDARIO;
 
-            return graph.FindNode(otherId)?.Name ?? string.Empty;
+            return $"{nome}_{terminal}";
+        }
+
+        private static bool EhTerminalTransformador(string terminalId)
+        {
+            return string.Equals(terminalId, Transformador.TERMINAL_PRIMARIO, StringComparison.OrdinalIgnoreCase) ||
+                string.Equals(terminalId, Transformador.TERMINAL_SECUNDARIO, StringComparison.OrdinalIgnoreCase);
+        }
+
+        private static string NomeBarramento(Elemento elemento)
+        {
+            if (!string.IsNullOrWhiteSpace(elemento.Nome))
+                return elemento.Nome.Trim();
+
+            string id = elemento.Id.ToString("N");
+            return id.Length >= 8 ? $"BUS-{id[..8]}" : $"BUS-{id}";
         }
 
         private static string ReadBarra(Elemento elemento, params string[] names)
@@ -311,31 +346,110 @@ namespace Araci.DTOs
             return 0;
         }
 
-        private static double ReadVoltage(Elemento elemento, params string[] names)
+        private static double ReadKv(Elemento elemento, params string[] names)
         {
             object? value = ReadValueObject(elemento, names);
 
             if (value is double doubleValue)
-                return ElectricalValueParser.ToVoltageKv(doubleValue);
+                return ElectricalValueParser.ToNumber(doubleValue);
 
             if (value is int intValue)
-                return ElectricalValueParser.ToVoltageKv(intValue);
+                return intValue;
 
             if (value is string text)
-                return ElectricalValueParser.ToVoltageKv(text);
+                return ElectricalValueParser.ToNumber(text);
 
             return 0;
         }
 
         private static double ReadPowerKva(Elemento elemento)
         {
-            double kva = ReadDouble(elemento, "PotenciaKVA", "PotenciaNominalKVA");
+            double modelMva = ReadDoubleFrom(elemento.Parametros, "PotenciaMVA", "PotenciaNominalMVA");
 
-            if (kva > 0)
-                return kva;
+            if (modelMva > 0)
+                return modelMva * 1000;
 
-            double mva = ReadDouble(elemento, "PotenciaMVA", "PotenciaNominalMVA");
-            return mva > 0 ? mva * 1000 : 0;
+            double typeMva = elemento.Tipo == null
+                ? 0
+                : ReadDoubleFrom(elemento.Tipo.Parametros, "PotenciaMVA", "PotenciaNominalMVA");
+
+            if (typeMva > 0)
+                return typeMva * 1000;
+
+            double modelKva = ReadDoubleFrom(elemento.Parametros, "PotenciaKVA", "PotenciaNominalKVA");
+            double typeKva = elemento.Tipo == null
+                ? 0
+                : ReadDoubleFrom(elemento.Tipo.Parametros, "PotenciaKVA", "PotenciaNominalKVA");
+
+            if (modelKva > 0 && !NearlyEqual(modelKva, 500))
+                return modelKva;
+
+            if (typeKva > 0)
+                return typeKva;
+
+            return modelKva;
+        }
+
+        private static int ReadIntWithDefault(Elemento elemento, int defaultValue, params string[] names)
+        {
+            return (int)ReadDoubleWithDefault(elemento, defaultValue, names);
+        }
+
+        private static double ReadDoubleWithDefault(
+            Elemento elemento,
+            double defaultValue,
+            params string[] names)
+        {
+            double modelValue = ReadDoubleFrom(elemento.Parametros, names);
+            double typeValue = elemento.Tipo == null
+                ? 0
+                : ReadDoubleFrom(elemento.Tipo.Parametros, names);
+
+            if (modelValue > 0)
+                return modelValue;
+
+            if (typeValue > 0)
+                return typeValue;
+
+            return defaultValue;
+        }
+
+        private static double ReadKvWithDefault(
+            Elemento elemento,
+            double defaultValue,
+            params string[] names)
+        {
+            double modelValue = ReadKvFrom(elemento.Parametros, names);
+            double typeValue = elemento.Tipo == null
+                ? 0
+                : ReadKvFrom(elemento.Tipo.Parametros, names);
+
+            if (modelValue > 0)
+                return modelValue;
+
+            if (typeValue > 0)
+                return typeValue;
+
+            return defaultValue;
+        }
+
+        private static string ReadStringWithDefault(
+            Elemento elemento,
+            string defaultValue,
+            params string[] names)
+        {
+            string modelValue = ReadStringFrom(elemento.Parametros, names);
+            string typeValue = elemento.Tipo == null
+                ? string.Empty
+                : ReadStringFrom(elemento.Tipo.Parametros, names);
+
+            if (!string.IsNullOrWhiteSpace(modelValue))
+                return modelValue;
+
+            if (!string.IsNullOrWhiteSpace(typeValue))
+                return typeValue;
+
+            return defaultValue;
         }
 
         private static string? ReadValueAsString(Elemento elemento, params string[] names)
@@ -355,12 +469,83 @@ namespace Araci.DTOs
             {
                 if (elemento.Parametros.TryGetValue(name, out Parameter? parametro))
                     return parametro.ValorObjeto;
+            }
 
+            foreach (string name in names)
+            {
+                Parameter? parametro;
                 if (elemento.Tipo?.Parametros.TryGetValue(name, out parametro) == true)
                     return parametro.ValorObjeto;
             }
 
             return null;
+        }
+
+        private static double ReadDoubleFrom(
+            IReadOnlyDictionary<string, Parameter> parametros,
+            params string[] names)
+        {
+            object? value = ReadValueObjectFrom(parametros, names);
+
+            if (value is double doubleValue)
+                return ElectricalValueParser.ToNumber(doubleValue);
+
+            if (value is int intValue)
+                return intValue;
+
+            if (value is string text)
+                return ElectricalValueParser.ToNumber(text);
+
+            return 0;
+        }
+
+        private static double ReadKvFrom(
+            IReadOnlyDictionary<string, Parameter> parametros,
+            params string[] names)
+        {
+            object? value = ReadValueObjectFrom(parametros, names);
+
+            if (value is double doubleValue)
+                return ElectricalValueParser.ToNumber(doubleValue);
+
+            if (value is int intValue)
+                return intValue;
+
+            if (value is string text)
+                return ElectricalValueParser.ToNumber(text);
+
+            return 0;
+        }
+
+        private static string ReadStringFrom(
+            IReadOnlyDictionary<string, Parameter> parametros,
+            params string[] names)
+        {
+            object? value = ReadValueObjectFrom(parametros, names);
+
+            return value switch
+            {
+                IFormattable formattable => formattable.ToString(null, CultureInfo.InvariantCulture),
+                _ => value?.ToString() ?? string.Empty
+            };
+        }
+
+        private static object? ReadValueObjectFrom(
+            IReadOnlyDictionary<string, Parameter> parametros,
+            params string[] names)
+        {
+            foreach (string name in names)
+            {
+                if (parametros.TryGetValue(name, out Parameter? parametro))
+                    return parametro.ValorObjeto;
+            }
+
+            return null;
+        }
+
+        private static bool NearlyEqual(double left, double right)
+        {
+            return Math.Abs(left - right) < 0.000001;
         }
 
         public class LoadData

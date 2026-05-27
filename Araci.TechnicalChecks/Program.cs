@@ -57,7 +57,12 @@ namespace Araci.TechnicalChecks
                 ("Transformador preserva conexoes apos reload", TransformadorPreservaConexoesAposReload),
                 ("Transformador entra no DTO minimo", TransformadorEntraNoDtoMinimo),
                 ("Transformador usa centro com geometria propria", TransformadorUsaCentroComGeometriaPropria),
-                ("Reload preserva DTO detalhado do transformador", ReloadPreservaDtoDetalhadoTransformador)
+                ("Reload preserva DTO detalhado do transformador", ReloadPreservaDtoDetalhadoTransformador),
+                ("CircuitDto preserva parametros reais de SIN transformador e carga", CircuitDtoPreservaParametrosReaisSinTransformadorCarga),
+                ("DTOs antigos/default preservam SIN e carga", DtosAntigosDefaultPreservamSinECarga),
+                ("TopologyValidator aceita SIN transformador e carga sem gerador", TopologyValidatorAceitaSinTransformadorCargaSemGerador),
+                ("TopologyValidator aceita gerador legado sem SIN", TopologyValidatorAceitaGeradorLegadoSemSin),
+                ("TopologyValidator sem fonte slack falha com mensagem clara", TopologyValidatorSemFonteSlackFalhaComMensagemClara)
             };
 
             var failures = new List<string>();
@@ -779,13 +784,15 @@ namespace Araci.TechnicalChecks
 
             CircuitDto dto = new CircuitBuilder(new ParameterReader(document)).Build();
 
+            AssertEqual(sin.Id.ToString(), dto.Slack.Id, "SlackDto.Id");
+            AssertEqual(13.8, dto.Slack.Tensao, "SlackDto.Tensao");
             AssertEqual(1, dto.Transformers.Count, "Quantidade de transformadores no DTO");
             AssertEqual(transformador.Id.ToString(), dto.Transformers[0].Id, "TransformerDto.Id");
             AssertEqual(transformador.Nome, dto.Transformers[0].Nome, "TransformerDto.Nome");
             AssertEqual(3, dto.Transformers[0].Fases, "TransformerDto.Fases");
             AssertEqual(2, dto.Transformers[0].Enrolamentos, "TransformerDto.Enrolamentos");
-            AssertEqual(sin.Nome, dto.Transformers[0].BarraPrimario, "TransformerDto.BarraPrimario");
-            AssertEqual(load.Nome, dto.Transformers[0].BarraSecundario, "TransformerDto.BarraSecundario");
+            AssertEqual($"{transformador.Nome}_PRIMARIO", dto.Transformers[0].BarraPrimario, "TransformerDto.BarraPrimario");
+            AssertEqual($"{transformador.Nome}_SECUNDARIO", dto.Transformers[0].BarraSecundario, "TransformerDto.BarraSecundario");
             AssertEqual(13.8, dto.Transformers[0].TensaoPrimarioKV, "TransformerDto.TensaoPrimarioKV");
             AssertEqual(0.38, dto.Transformers[0].TensaoSecundarioKV, "TransformerDto.TensaoSecundarioKV");
             AssertEqual(500, dto.Transformers[0].PotenciaKVA, "TransformerDto.PotenciaKVA");
@@ -793,6 +800,10 @@ namespace Araci.TechnicalChecks
             AssertEqual(5, dto.Transformers[0].XPercentual, "TransformerDto.XPercentual");
             AssertEqual("Wye", dto.Transformers[0].LigacaoPrimario, "TransformerDto.LigacaoPrimario");
             AssertEqual("Wye", dto.Transformers[0].LigacaoSecundario, "TransformerDto.LigacaoSecundario");
+            AssertEqual(sin.Nome, dto.Lines[0].Barra1, "LineDto primario.Barra1");
+            AssertEqual($"{transformador.Nome}_PRIMARIO", dto.Lines[0].Barra2, "LineDto primario.Barra2");
+            AssertEqual($"{transformador.Nome}_SECUNDARIO", dto.Lines[1].Barra1, "LineDto secundario.Barra1");
+            AssertEqual(load.Nome, dto.Lines[1].Barra2, "LineDto secundario.Barra2");
         }
 
         private static void TransformadorUsaCentroComGeometriaPropria()
@@ -836,8 +847,8 @@ namespace Araci.TechnicalChecks
             CircuitDto dto = new CircuitBuilder(new ParameterReader(SaveAndLoad(document))).Build();
             TransformerDto transformerDto = dto.Transformers.Single();
 
-            AssertEqual(sin.Nome, transformerDto.BarraPrimario, "Reload TransformerDto.BarraPrimario");
-            AssertEqual(load.Nome, transformerDto.BarraSecundario, "Reload TransformerDto.BarraSecundario");
+            AssertEqual($"{transformador.Nome}_PRIMARIO", transformerDto.BarraPrimario, "Reload TransformerDto.BarraPrimario");
+            AssertEqual($"{transformador.Nome}_SECUNDARIO", transformerDto.BarraSecundario, "Reload TransformerDto.BarraSecundario");
             AssertEqual(34.5, transformerDto.TensaoPrimarioKV, "Reload TransformerDto.TensaoPrimarioKV");
             AssertEqual(0.69, transformerDto.TensaoSecundarioKV, "Reload TransformerDto.TensaoSecundarioKV");
             AssertEqual(1500, transformerDto.PotenciaKVA, "Reload TransformerDto.PotenciaKVA");
@@ -846,6 +857,128 @@ namespace Araci.TechnicalChecks
             AssertEqual("Delta", transformerDto.LigacaoPrimario, "Reload TransformerDto.LigacaoPrimario");
             AssertEqual("Wye", transformerDto.LigacaoSecundario, "Reload TransformerDto.LigacaoSecundario");
             AssertEqual(sin.Id.ToString(), dto.Slack.Id, "SIN deve continuar slack preferencial");
+            AssertEqual(sin.Nome, dto.Lines[0].Barra1, "Reload LineDto primario.Barra1");
+            AssertEqual($"{transformador.Nome}_PRIMARIO", dto.Lines[0].Barra2, "Reload LineDto primario.Barra2");
+            AssertEqual($"{transformador.Nome}_SECUNDARIO", dto.Lines[1].Barra1, "Reload LineDto secundario.Barra1");
+            AssertEqual(load.Nome, dto.Lines[1].Barra2, "Reload LineDto secundario.Barra2");
+        }
+
+        private static void CircuitDtoPreservaParametrosReaisSinTransformadorCarga()
+        {
+            var document = new AraciDocument();
+            Sin sin = CreateSin("SIN-138");
+            Transformador transformador = CreateTransformador("TR-65MVA");
+            Carga load = CreateLoad("CARGA-34KV", 5000, 1000);
+
+            sin.TensaoLinha = "138";
+
+            transformador.Definir(TipoTransformador.PARAM_TENSAO_PRIMARIO_KV, 138.0);
+            transformador.Definir(TipoTransformador.PARAM_TENSAO_SECUNDARIO_KV, 34.5);
+            transformador.Definir(TipoTransformador.PARAM_POTENCIA_MVA, 65.0);
+            transformador.Definir(TipoTransformador.PARAM_R_PERCENTUAL, 1.0);
+            transformador.Definir(TipoTransformador.PARAM_X_PERCENTUAL, 8.0);
+            transformador.Definir(TipoTransformador.PARAM_LIGACAO_PRIMARIO, "Wye");
+            transformador.Definir(TipoTransformador.PARAM_LIGACAO_SECUNDARIO, "Wye");
+
+            load.TensaoLinha = "34.5";
+
+            document.AdicionarElemento(sin);
+            document.AdicionarElemento(transformador);
+            document.AdicionarElemento(load);
+            document.AdicionarElemento(CreateCable(sin, 1, transformador, 0, "L-REAL-P", 1.0));
+            document.AdicionarElemento(CreateCable(transformador, 1, load, 0, "L-REAL-S", 1.0));
+
+            CircuitDto dto = new CircuitBuilder(new ParameterReader(document)).Build();
+            AssertCircuitDtoParametrosReais(dto, sin, transformador, load, "DTO real");
+
+            CircuitDto reloadedDto = new CircuitBuilder(new ParameterReader(SaveAndLoad(document))).Build();
+            AssertCircuitDtoParametrosReais(reloadedDto, sin, transformador, load, "DTO real apos reload");
+        }
+
+        private static void DtosAntigosDefaultPreservamSinECarga()
+        {
+            var document = new AraciDocument();
+            Sin sin = new Sin
+            {
+                Nome = "SIN-DEFAULT",
+                Barra = "SIN-DEFAULT",
+                PosicaoX = 80,
+                PosicaoY = 80,
+                Tipo = new TipoSin()
+            };
+            Carga load = new Carga
+            {
+                Nome = "CARGA-DEFAULT",
+                Barra = "CARGA-DEFAULT",
+                PosicaoX = 300,
+                PosicaoY = 100,
+                Tipo = new TipoCarga()
+            };
+
+            sin.AtualizarTerminais(80, 80);
+            load.AtualizarTerminais(80);
+
+            document.AdicionarElemento(sin);
+            document.AdicionarElemento(load);
+            document.AdicionarElemento(CreateCable(sin, 1, load, 0, "L-DEFAULT", 1.0));
+
+            CircuitDto dto = new CircuitBuilder(new ParameterReader(document)).Build();
+
+            AssertEqual(12.47, dto.Slack.Tensao, "Default Slack.Tensao");
+            AssertEqual(12.47, dto.Loads.Single().Tensao, "Default Load.Tensao");
+            AssertEqual(800, dto.Loads.Single().PotenciaAtiva, "Default Load.PotenciaAtiva");
+            AssertEqual(300, dto.Loads.Single().PotenciaReativa, "Default Load.PotenciaReativa");
+        }
+
+        private static void TopologyValidatorAceitaSinTransformadorCargaSemGerador()
+        {
+            var document = new AraciDocument();
+            Sin sin = CreateSin("SIN-TOPO-TR");
+            Transformador transformador = CreateTransformador("TR-TOPO");
+            Carga load = CreateLoad("CARGA-TOPO-TR", 300, 100);
+
+            document.AdicionarElemento(sin);
+            document.AdicionarElemento(transformador);
+            document.AdicionarElemento(load);
+            document.AdicionarElemento(CreateCable(sin, 1, transformador, 0, "L-TOPO-TR-P", 1.0));
+            document.AdicionarElemento(CreateCable(transformador, 1, load, 0, "L-TOPO-TR-S", 1.1));
+
+            TopologyValidationResult result = new TopologyValidator(document).Validate();
+            CircuitDto dto = new CircuitBuilder(new ParameterReader(document)).Build();
+
+            Assert(result.IsValid, $"Topologia com SIN deve ser valida. Erros: {result.FormatErrors()}");
+            AssertEqual(sin.Id.ToString(), dto.Slack.Id, "SIN deve virar SlackDto sem gerador");
+            AssertEqual(0, dto.Generators.Count, "Sem geradores no DTO");
+        }
+
+        private static void TopologyValidatorAceitaGeradorLegadoSemSin()
+        {
+            SimpleCircuit circuit = CreateSimpleCircuit();
+            TopologyValidationResult result = new TopologyValidator(circuit.Document).Validate();
+            CircuitDto dto = new CircuitBuilder(new ParameterReader(circuit.Document)).Build();
+
+            Assert(result.IsValid, $"Topologia com gerador legado deve ser valida. Erros: {result.FormatErrors()}");
+            AssertEqual(circuit.Generator.Id.ToString(), dto.Slack.Id, "Gerador legado deve virar SlackDto sem SIN");
+        }
+
+        private static void TopologyValidatorSemFonteSlackFalhaComMensagemClara()
+        {
+            var document = new AraciDocument();
+            Transformador transformador = CreateTransformador("TR-SEM-FONTE");
+            Carga load = CreateLoad("CARGA-SEM-FONTE", 300, 100);
+
+            document.AdicionarElemento(transformador);
+            document.AdicionarElemento(load);
+            document.AdicionarElemento(CreateCable(transformador, 1, load, 0, "L-SEM-FONTE", 1.0));
+
+            TopologyValidationResult result = new TopologyValidator(document).Validate();
+            string errors = result.FormatErrors();
+
+            Assert(!result.IsValid, "Topologia sem SIN e sem gerador deve falhar.");
+            AssertContains(errors, "fonte slack", "Erro sem fonte slack");
+            Assert(
+                !errors.Contains("sem gerador", StringComparison.OrdinalIgnoreCase),
+                $"Erro sem fonte nao deve mencionar apenas gerador. Texto: {errors}");
         }
 
         private static SimpleCircuit CreateSimpleCircuit()
@@ -1148,6 +1281,36 @@ namespace Araci.TechnicalChecks
                 !state.IsEdgeEnergized(cabo.Id.ToString()) &&
                 state.DeenergizedEdgeIds.Contains(cabo.Id.ToString()),
                 $"{name}: cabo deveria estar desenergizado.");
+        }
+
+        private static void AssertCircuitDtoParametrosReais(
+            CircuitDto dto,
+            Sin sin,
+            Transformador transformador,
+            Carga load,
+            string name)
+        {
+            TransformerDto transformerDto = dto.Transformers.Single();
+            LoadDto loadDto = dto.Loads.Single();
+
+            AssertEqual(sin.Id.ToString(), dto.Slack.Id, $"{name}.Slack.Id");
+            AssertEqual(138, dto.Slack.Tensao, $"{name}.Slack.Tensao");
+            AssertEqual($"{transformador.Nome}_PRIMARIO", transformerDto.BarraPrimario, $"{name}.Transformer.BarraPrimario");
+            AssertEqual($"{transformador.Nome}_SECUNDARIO", transformerDto.BarraSecundario, $"{name}.Transformer.BarraSecundario");
+            AssertEqual(138, transformerDto.TensaoPrimarioKV, $"{name}.Transformer.TensaoPrimarioKV");
+            AssertEqual(34.5, transformerDto.TensaoSecundarioKV, $"{name}.Transformer.TensaoSecundarioKV");
+            AssertEqual(65000, transformerDto.PotenciaKVA, $"{name}.Transformer.PotenciaKVA");
+            AssertEqual(1, transformerDto.RPercentual, $"{name}.Transformer.RPercentual");
+            AssertEqual(8, transformerDto.XPercentual, $"{name}.Transformer.XPercentual");
+            AssertEqual("Wye", transformerDto.LigacaoPrimario, $"{name}.Transformer.LigacaoPrimario");
+            AssertEqual("Wye", transformerDto.LigacaoSecundario, $"{name}.Transformer.LigacaoSecundario");
+            AssertEqual(34.5, loadDto.Tensao, $"{name}.Load.Tensao");
+            AssertEqual(5000, loadDto.PotenciaAtiva, $"{name}.Load.PotenciaAtiva");
+            AssertEqual(1000, loadDto.PotenciaReativa, $"{name}.Load.PotenciaReativa");
+            AssertEqual(sin.Nome, dto.Lines[0].Barra1, $"{name}.LinePrimario.Barra1");
+            AssertEqual($"{transformador.Nome}_PRIMARIO", dto.Lines[0].Barra2, $"{name}.LinePrimario.Barra2");
+            AssertEqual($"{transformador.Nome}_SECUNDARIO", dto.Lines[1].Barra1, $"{name}.LineSecundario.Barra1");
+            AssertEqual(load.Nome, dto.Lines[1].Barra2, $"{name}.LineSecundario.Barra2");
         }
 
         private static AraciDocument SaveAndLoad(AraciDocument document)

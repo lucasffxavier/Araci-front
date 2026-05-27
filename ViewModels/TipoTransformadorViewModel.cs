@@ -75,5 +75,18 @@ namespace Araci.ViewModels
                 OnPropertyChanged();
             }
         }
+
+        public double PotenciaMVA
+        {
+            get => TipoTransformador.PotenciaMVA;
+            set
+            {
+                if (TipoTransformador.PotenciaMVA == value)
+                    return;
+
+                TipoTransformador.PotenciaMVA = value;
+                OnPropertyChanged();
+            }
+        }
     }
 }
