@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Linq;
 using System.Windows;
 using Araci.API;
@@ -26,7 +27,12 @@ namespace Araci.TechnicalChecks
                 ("Cabos em serie preservam orientacao", CabosEmSeriePreservamOrientacao),
                 ("Ramificacao simples valida grafo e DTO", RamificacaoSimplesValidaGrafoEDto),
                 ("Topologia maior nao altera Document", TopologiaMaiorNaoAlteraDocument),
-                ("Ordem de linhas segue ordem do Document", OrdemDeLinhasSegueDocument)
+                ("Ordem de linhas segue ordem do Document", OrdemDeLinhasSegueDocument),
+                ("Persistencia preserva topologia simples", PersistenciaPreservaTopologiaSimples),
+                ("Persistencia preserva ramificacao", PersistenciaPreservaRamificacao),
+                ("DTO permanece equivalente apos reload", DtoPermaneceEquivalenteAposReload),
+                ("IDs permanecem estaveis apos reload", IdsPermanecemEstaveisAposReload),
+                ("Builds repetidos apos reload nao alteram Document", BuildsRepetidosAposReloadNaoAlteramDocument)
             };
 
             var failures = new List<string>();
@@ -264,6 +270,93 @@ namespace Araci.TechnicalChecks
             AssertEqual("L-03", lines[2].Nome, "Linha 3 por ordem do Document");
         }
 
+        private static void PersistenciaPreservaTopologiaSimples()
+        {
+            SimpleCircuit circuit = CreateSimpleCircuit();
+            AraciDocument loaded = SaveAndLoad(circuit.Document);
+
+            AssertEqual(3, loaded.Elementos.Count, "Quantidade de elementos recarregados");
+
+            Gerador generator = FindById<Gerador>(loaded, circuit.Generator.Id);
+            Carga load = FindById<Carga>(loaded, circuit.Load.Id);
+            Cabo cable = FindById<Cabo>(loaded, circuit.Cable.Id);
+
+            AssertEqual(circuit.Generator.Nome, generator.Nome, "Nome do gerador");
+            AssertEqual(circuit.Load.Nome, load.Nome, "Nome da carga");
+            AssertCablePersisted(circuit.Cable, cable, "Cabo simples");
+            AssertEqual(circuit.Load.PotenciaAtiva, load.PotenciaAtiva, "Potencia ativa da carga");
+            AssertEqual(circuit.Load.PotenciaReativa, load.PotenciaReativa, "Potencia reativa da carga");
+            AssertEqual(circuit.Generator.PotenciaAtiva, generator.PotenciaAtiva, "Potencia ativa do gerador");
+        }
+
+        private static void PersistenciaPreservaRamificacao()
+        {
+            AraciDocument loaded = SaveAndLoad(CreateBranchDocument());
+            Barra bar = loaded.Elementos.OfType<Barra>().Single();
+            ElectricGraph graph = new ElectricGraphBuilder(loaded).Build();
+            IReadOnlyList<ElectricGraphNode> neighbors = graph.GetNeighbors(bar.Id.ToString());
+
+            AssertEqual(4, graph.Nodes.Count, "Nodes apos reload");
+            AssertEqual(3, graph.Edges.Count, "Edges apos reload");
+            AssertEqual(0, graph.GetInvalidEdges().Count, "Edges invalidas apos reload");
+            AssertContainsNode(neighbors, loaded.Elementos.OfType<Gerador>().Single(), "Vizinho gerador apos reload");
+
+            foreach (Carga load in loaded.Elementos.OfType<Carga>())
+                AssertContainsNode(neighbors, load, $"Vizinho {load.Nome} apos reload");
+        }
+
+        private static void DtoPermaneceEquivalenteAposReload()
+        {
+            SimpleCircuit circuit = CreateSimpleCircuit();
+            CircuitDto before = new CircuitBuilder(new ParameterReader(circuit.Document)).Build();
+            CircuitDto after = new CircuitBuilder(new ParameterReader(SaveAndLoad(circuit.Document))).Build();
+
+            AssertEqual(before.Slack!.Id, after.Slack!.Id, "Slack.Id apos reload");
+            AssertEqual(before.Slack.Nome, after.Slack.Nome, "Slack.Nome apos reload");
+            AssertEqual(before.Slack.Barra, after.Slack.Barra, "Slack.Barra apos reload");
+            AssertEqual(before.Loads.Count, after.Loads.Count, "Quantidade de cargas apos reload");
+            AssertEqual(before.Lines.Count, after.Lines.Count, "Quantidade de linhas apos reload");
+            AssertEqual(before.Loads[0].Id, after.Loads[0].Id, "Load.Id apos reload");
+            AssertEqual(before.Loads[0].Nome, after.Loads[0].Nome, "Load.Nome apos reload");
+            AssertEqual(before.Loads[0].Barra, after.Loads[0].Barra, "Load.Barra apos reload");
+            AssertEqual(before.Lines[0].Id, after.Lines[0].Id, "Line.Id apos reload");
+            AssertEqual(before.Lines[0].Nome, after.Lines[0].Nome, "Line.Nome apos reload");
+            AssertEqual(before.Lines[0].Barra1, after.Lines[0].Barra1, "Line.Barra1 apos reload");
+            AssertEqual(before.Lines[0].Barra2, after.Lines[0].Barra2, "Line.Barra2 apos reload");
+            AssertEqual(before.Lines[0].Comprimento, after.Lines[0].Comprimento, "Line.Comprimento apos reload");
+        }
+
+        private static void IdsPermanecemEstaveisAposReload()
+        {
+            SimpleCircuit circuit = CreateSimpleCircuit();
+            AraciDocument loaded = SaveAndLoad(circuit.Document);
+            Cabo cable = FindById<Cabo>(loaded, circuit.Cable.Id);
+
+            AssertEqual(circuit.Cable.Id, cable.Id, "Id do cabo");
+            AssertEqual(circuit.Generator.Id.ToString(), cable.OrigemId, "OrigemId apos reload");
+            AssertEqual(circuit.Load.Id.ToString(), cable.DestinoId, "DestinoId apos reload");
+            AssertEqual(circuit.Cable.OrigemTerminalId, cable.OrigemTerminalId, "OrigemTerminalId apos reload");
+            AssertEqual(circuit.Cable.DestinoTerminalId, cable.DestinoTerminalId, "DestinoTerminalId apos reload");
+            _ = FindById<Gerador>(loaded, circuit.Generator.Id);
+            _ = FindById<Carga>(loaded, circuit.Load.Id);
+        }
+
+        private static void BuildsRepetidosAposReloadNaoAlteramDocument()
+        {
+            AraciDocument loaded = SaveAndLoad(CreateBranchDocument());
+            int countBefore = loaded.Elementos.Count;
+
+            ElectricGraph graph1 = new ElectricGraphBuilder(loaded).Build();
+            ElectricGraph graph2 = new ElectricGraphBuilder(loaded).Build();
+            ElectricGraph graph3 = new ElectricGraphBuilder(loaded).Build();
+
+            AssertEqual(countBefore, loaded.Elementos.Count, "Contagem apos reload e builds");
+            AssertEqual(graph1.Nodes.Count, graph2.Nodes.Count, "Nodes reload build 1/2");
+            AssertEqual(graph2.Nodes.Count, graph3.Nodes.Count, "Nodes reload build 2/3");
+            AssertEqual(graph1.Edges.Count, graph2.Edges.Count, "Edges reload build 1/2");
+            AssertEqual(graph2.Edges.Count, graph3.Edges.Count, "Edges reload build 2/3");
+        }
+
         private static SimpleCircuit CreateSimpleCircuit()
         {
             var document = new AraciDocument();
@@ -300,7 +393,7 @@ namespace Araci.TechnicalChecks
 
         private static Gerador CreateGenerator(string name, double power, double fp)
         {
-            return new Gerador
+            var generator = new Gerador
             {
                 Nome = name,
                 Barra = name,
@@ -314,11 +407,15 @@ namespace Araci.TechnicalChecks
                 PotenciaAtiva = power,
                 TensaoLinha = "13.8"
             };
+
+            generator.AtualizarTerminais(80, 80);
+
+            return generator;
         }
 
         private static Carga CreateLoad(string name, double activePower, double reactivePower)
         {
-            return new Carga
+            var load = new Carga
             {
                 Nome = name,
                 Barra = name,
@@ -334,6 +431,10 @@ namespace Araci.TechnicalChecks
                 PotenciaReativa = reactivePower,
                 TensaoLinha = "13.8"
             };
+
+            load.AtualizarTerminais(80);
+
+            return load;
         }
 
         private static Barra CreateBar(string name)
@@ -413,6 +514,59 @@ namespace Araci.TechnicalChecks
                 string.Equals(n.ElementId, expected.Id.ToString(), StringComparison.OrdinalIgnoreCase));
 
             Assert(contains, $"{name}: no '{expected.Nome}' nao encontrado.");
+        }
+
+        private static AraciDocument SaveAndLoad(AraciDocument document)
+        {
+            string path = Path.Combine(Path.GetTempPath(), $"araci-check-{Guid.NewGuid():N}.araci");
+
+            try
+            {
+                var source = new EditorContext();
+
+                foreach (Elemento elemento in document.Elementos)
+                    source.Document.AdicionarElemento(elemento);
+
+                source.Projects.Salvar(path);
+
+                var target = new EditorContext();
+                target.Projects.Abrir(path);
+
+                return target.Document;
+            }
+            finally
+            {
+                if (File.Exists(path))
+                    File.Delete(path);
+            }
+        }
+
+        private static T FindById<T>(AraciDocument document, Guid id)
+            where T : Elemento
+        {
+            T? elemento = document.Elementos.OfType<T>().FirstOrDefault(e => e.Id == id);
+
+            if (elemento == null)
+                throw new InvalidOperationException($"Elemento {typeof(T).Name} '{id}' nao encontrado.");
+
+            return elemento;
+        }
+
+        private static void AssertCablePersisted(Cabo expected, Cabo actual, string name)
+        {
+            AssertEqual(expected.Nome, actual.Nome, $"{name}.Nome");
+            AssertEqual(expected.OrigemId, actual.OrigemId, $"{name}.OrigemId");
+            AssertEqual(expected.DestinoId, actual.DestinoId, $"{name}.DestinoId");
+            AssertEqual(expected.OrigemTerminalId, actual.OrigemTerminalId, $"{name}.OrigemTerminalId");
+            AssertEqual(expected.DestinoTerminalId, actual.DestinoTerminalId, $"{name}.DestinoTerminalId");
+            AssertEqual(expected.Comprimento, actual.Comprimento, $"{name}.Comprimento");
+            AssertEqual(expected.Vertices.Count, actual.Vertices.Count, $"{name}.Vertices.Count");
+
+            for (int i = 0; i < expected.Vertices.Count; i++)
+            {
+                AssertEqual(expected.Vertices[i].X, actual.Vertices[i].X, $"{name}.Vertices[{i}].X");
+                AssertEqual(expected.Vertices[i].Y, actual.Vertices[i].Y, $"{name}.Vertices[{i}].Y");
+            }
         }
 
         private static void Assert(bool condition, string message)
