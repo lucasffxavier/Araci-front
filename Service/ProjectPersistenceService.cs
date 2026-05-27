@@ -319,7 +319,7 @@ namespace Araci.Services
                 if (terminal == null)
                     continue;
 
-                terminal.Posicao = new Point(dto.X, dto.Y);
+                terminal.DefinirPosicaoVisual(new Point(dto.X, dto.Y));
                 terminal.Barra = dto.Barra;
             }
         }

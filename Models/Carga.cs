@@ -35,7 +35,8 @@ namespace Araci.Models
                 return;
 
             terminais[0].Barra = Barra;
-            terminais[0].Posicao = new Point(PosicaoX + largura / 2, PosicaoY);
+            terminais[0].Direction = TerminalDirection.North;
+            terminais[0].DefinirPosicaoLocal(new Point(largura / 2, 0));
         }
 
         public override Elemento Clonar()

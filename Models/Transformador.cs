@@ -47,12 +47,12 @@ namespace Araci.Models
             if (!TerminaisPadraoPresentes())
             {
                 terminais.Clear();
-                terminais.Add(new Terminal(this, new Point(), TERMINAL_PRIMARIO));
-                terminais.Add(new Terminal(this, new Point(), TERMINAL_SECUNDARIO));
+                terminais.Add(new Terminal(this, new Point(), TERMINAL_PRIMARIO, TerminalKind.Electrical, TerminalDirection.North));
+                terminais.Add(new Terminal(this, new Point(), TERMINAL_SECUNDARIO, TerminalKind.Electrical, TerminalDirection.South));
             }
 
-            AtualizarTerminal(TERMINAL_PRIMARIO, new Point(PosicaoX + largura / 2, PosicaoY));
-            AtualizarTerminal(TERMINAL_SECUNDARIO, new Point(PosicaoX + largura / 2, PosicaoY + altura));
+            AtualizarTerminal(TERMINAL_PRIMARIO, new Point(largura / 2, 0));
+            AtualizarTerminal(TERMINAL_SECUNDARIO, new Point(largura / 2, altura));
         }
 
         private bool TerminaisPadraoPresentes()
@@ -68,7 +68,7 @@ namespace Araci.Models
         {
             var terminal = ObterTerminaisInternos().First(t => t.Id == id);
             terminal.Barra = Barra;
-            terminal.Posicao = posicao;
+            terminal.DefinirPosicaoLocal(posicao);
         }
 
         public override Elemento Clonar()

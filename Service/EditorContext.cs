@@ -21,7 +21,7 @@ namespace Araci.Services
             Scene = new Scene();
             SceneQueries = new SceneQueryService(Scene);
             Hover = new HoverService(SceneQueries);
-            Snap = new SnapService(SceneQueries);
+            Snap = new SnapService(SceneQueries, Settings);
             Connectivity = new ConnectivityService(this);
             ElectricGraph = new ElectricGraphBuilder(this);
             OperationalState = new OperationalGraphStateBuilder();

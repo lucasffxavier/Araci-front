@@ -89,45 +89,39 @@ namespace Araci.Services
             IReadOnlyDictionary<string, ElectricGraphNode> nodeById,
             ISet<string> usedPairs)
         {
-            string fromElementId = Normalize(cabo.OrigemId);
-            string fromTerminalId = Normalize(cabo.OrigemTerminalId);
-            string toElementId = Normalize(cabo.DestinoId);
-            string toTerminalId = Normalize(cabo.DestinoTerminalId);
+            TerminalEndpoint from = cabo.OrigemEndpoint;
+            TerminalEndpoint to = cabo.DestinoEndpoint;
             var errors = new List<string>();
 
             ValidateEndpoint(
                 "Origem",
-                fromElementId,
-                fromTerminalId,
+                from,
                 nodeById,
                 errors);
 
             ValidateEndpoint(
                 "Destino",
-                toElementId,
-                toTerminalId,
+                to,
                 nodeById,
                 errors);
 
-            if (!string.IsNullOrWhiteSpace(fromElementId) &&
-                !string.IsNullOrWhiteSpace(toElementId) &&
-                string.Equals(fromElementId, toElementId, StringComparison.OrdinalIgnoreCase))
+            if (!string.IsNullOrWhiteSpace(from.ElementId) &&
+                !string.IsNullOrWhiteSpace(to.ElementId) &&
+                string.Equals(from.ElementId, to.ElementId, StringComparison.OrdinalIgnoreCase))
             {
                 errors.Add("Origem e destino pertencem ao mesmo elemento.");
             }
 
-            if (!string.IsNullOrWhiteSpace(fromElementId) &&
-                !string.IsNullOrWhiteSpace(toElementId) &&
-                !string.IsNullOrWhiteSpace(fromTerminalId) &&
-                !string.IsNullOrWhiteSpace(toTerminalId) &&
-                SameTerminal(fromElementId, fromTerminalId, toElementId, toTerminalId))
+            if (from.IsComplete &&
+                to.IsComplete &&
+                from == to)
             {
                 errors.Add("Origem e destino usam o mesmo terminal.");
             }
 
-            if (EndpointComplete(fromElementId, fromTerminalId, toElementId, toTerminalId))
+            if (from.IsComplete && to.IsComplete)
             {
-                string key = PairKey(fromElementId, fromTerminalId, toElementId, toTerminalId);
+                string key = TerminalEndpoint.PairKey(from, to);
 
                 if (!usedPairs.Add(key))
                     errors.Add("Cabo duplicado entre os mesmos terminais.");
@@ -136,85 +130,43 @@ namespace Araci.Services
             return new ElectricGraphEdge(
                 cabo.Id.ToString(),
                 cabo,
-                fromElementId,
-                fromTerminalId,
-                toElementId,
-                toTerminalId,
+                from.ElementId,
+                from.TerminalId,
+                to.ElementId,
+                to.TerminalId,
                 errors.Count == 0,
                 errors.Count == 0 ? null : string.Join(" ", errors));
         }
 
         private static void ValidateEndpoint(
             string label,
-            string elementId,
-            string terminalId,
+            TerminalEndpoint endpoint,
             IReadOnlyDictionary<string, ElectricGraphNode> nodeById,
             ICollection<string> errors)
         {
-            if (string.IsNullOrWhiteSpace(elementId))
+            if (string.IsNullOrWhiteSpace(endpoint.ElementId))
             {
                 errors.Add($"Cabo sem {label}Id.");
                 return;
             }
 
-            if (!nodeById.TryGetValue(elementId, out ElectricGraphNode? node))
+            if (!nodeById.TryGetValue(endpoint.ElementId, out ElectricGraphNode? node))
             {
-                errors.Add($"Cabo com {label}Id inexistente: {elementId}.");
+                errors.Add($"Cabo com {label}Id inexistente: {endpoint.ElementId}.");
                 return;
             }
 
-            if (string.IsNullOrWhiteSpace(terminalId))
+            if (string.IsNullOrWhiteSpace(endpoint.TerminalId))
             {
                 errors.Add($"Cabo sem {label}TerminalId.");
                 return;
             }
 
             bool terminalExiste = node.Terminals.Any(t =>
-                string.Equals(t.TerminalId, terminalId, StringComparison.OrdinalIgnoreCase));
+                t.Endpoint == endpoint);
 
             if (!terminalExiste)
-                errors.Add($"Cabo com {label}TerminalId inexistente: {terminalId}.");
-        }
-
-        private static bool EndpointComplete(
-            string fromElementId,
-            string fromTerminalId,
-            string toElementId,
-            string toTerminalId)
-        {
-            return !string.IsNullOrWhiteSpace(fromElementId) &&
-                !string.IsNullOrWhiteSpace(fromTerminalId) &&
-                !string.IsNullOrWhiteSpace(toElementId) &&
-                !string.IsNullOrWhiteSpace(toTerminalId);
-        }
-
-        private static string PairKey(
-            string fromElementId,
-            string fromTerminalId,
-            string toElementId,
-            string toTerminalId)
-        {
-            string a = $"{fromElementId.Trim()}:{fromTerminalId.Trim()}";
-            string b = $"{toElementId.Trim()}:{toTerminalId.Trim()}";
-
-            return string.Compare(a, b, StringComparison.OrdinalIgnoreCase) <= 0
-                ? $"{a}|{b}"
-                : $"{b}|{a}";
-        }
-
-        private static bool SameTerminal(
-            string elementA,
-            string terminalA,
-            string elementB,
-            string terminalB)
-        {
-            return string.Equals(elementA, elementB, StringComparison.OrdinalIgnoreCase) &&
-                string.Equals(terminalA, terminalB, StringComparison.OrdinalIgnoreCase);
-        }
-
-        private static string Normalize(string value)
-        {
-            return value?.Trim() ?? string.Empty;
+                errors.Add($"Cabo com {label}TerminalId inexistente: {endpoint.TerminalId}.");
         }
 
         private static string ResolveBusName(Elemento elemento)

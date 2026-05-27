@@ -55,14 +55,25 @@ namespace Araci.Models
                 terminais.Clear();
 
                 for (int i = 0; i < 4; i++)
-                    terminais.Add(new Terminal(this, new Point(), IdTerminal(i)) { Barra = Barra });
+                {
+                    terminais.Add(
+                        new Terminal(
+                            this,
+                            new Point(),
+                            IdTerminal(i),
+                            TerminalKind.Electrical,
+                            DirecaoTerminal(i))
+                        {
+                            Barra = Barra
+                        });
+                }
             }
 
             terminais[0].Barra = Barra;
-            terminais[0].Posicao = new Point(PosicaoX + largura / 2, PosicaoY);
-            terminais[1].Posicao = new Point(PosicaoX + largura / 2, PosicaoY + altura);
-            terminais[2].Posicao = new Point(PosicaoX, PosicaoY + altura / 2);
-            terminais[3].Posicao = new Point(PosicaoX + largura, PosicaoY + altura / 2);
+            terminais[0].DefinirPosicaoLocal(new Point(largura / 2, 0));
+            terminais[1].DefinirPosicaoLocal(new Point(largura / 2, altura));
+            terminais[2].DefinirPosicaoLocal(new Point(0, altura / 2));
+            terminais[3].DefinirPosicaoLocal(new Point(largura, altura / 2));
         }
 
         public override Elemento Clonar()
@@ -83,6 +94,18 @@ namespace Araci.Models
                 2 => "ESQUERDA",
                 3 => "DIREITA",
                 _ => $"T{index + 1}"
+            };
+        }
+
+        private static TerminalDirection DirecaoTerminal(int index)
+        {
+            return index switch
+            {
+                0 => TerminalDirection.North,
+                1 => TerminalDirection.South,
+                2 => TerminalDirection.West,
+                3 => TerminalDirection.East,
+                _ => TerminalDirection.None
             };
         }
     }

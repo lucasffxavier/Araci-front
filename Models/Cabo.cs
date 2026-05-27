@@ -84,6 +84,12 @@ namespace Araci.Models
             set => Definir(PARAM_DESTINO_TERMINAL_ID, value);
         }
 
+        public TerminalEndpoint OrigemEndpoint =>
+            new(OrigemId, OrigemTerminalId);
+
+        public TerminalEndpoint DestinoEndpoint =>
+            new(DestinoId, DestinoTerminalId);
+
         public string BarraOrigem
         {
             get => Obter<string>(PARAM_BARRA_ORIGEM);
@@ -159,17 +165,43 @@ namespace Araci.Models
         public void DefinirOrigem(Point p)
         {
             if (_terminais.Count == 0)
-                _terminais.Add(new Terminal(this, p, "ORIGEM") { Barra = BarraOrigem });
+            {
+                _terminais.Add(
+                    new Terminal(
+                        this,
+                        p,
+                        "ORIGEM",
+                        TerminalKind.CableEnd,
+                        TerminalDirection.West)
+                    {
+                        Barra = BarraOrigem
+                    });
+            }
             else
-                _terminais[0].Posicao = p;
+            {
+                _terminais[0].DefinirPosicaoVisual(p);
+            }
         }
 
         public void DefinirDestino(Point p)
         {
             if (_terminais.Count < 2)
-                _terminais.Add(new Terminal(this, p, "DESTINO") { Barra = BarraDestino });
+            {
+                _terminais.Add(
+                    new Terminal(
+                        this,
+                        p,
+                        "DESTINO",
+                        TerminalKind.CableEnd,
+                        TerminalDirection.East)
+                    {
+                        Barra = BarraDestino
+                    });
+            }
             else
-                _terminais[1].Posicao = p;
+            {
+                _terminais[1].DefinirPosicaoVisual(p);
+            }
         }
 
         public override Elemento Clonar()
@@ -187,7 +219,7 @@ namespace Araci.Models
             foreach (Terminal t in _terminais)
             {
                 clone._terminais.Add(
-                    new Terminal(clone, t.Posicao, t.Id)
+                    new Terminal(clone, t.Posicao, t.Id, t.Kind, t.Direction)
                     {
                         Barra = t.Barra
                     });

@@ -43,11 +43,11 @@ namespace Araci.Models
             if (_terminais.Count == 0)
                 return;
 
-            double centroX = PosicaoX + 5;
+            double centroX = 5;
             double espacamento = Altura / (_terminais.Count - 1);
 
             for (int i = 0; i < _terminais.Count; i++)
-                _terminais[i].Posicao = new Point(centroX, PosicaoY + i * espacamento);
+                _terminais[i].DefinirPosicaoLocal(new Point(centroX, i * espacamento));
         }
 
         public override Elemento Clonar()
@@ -69,7 +69,15 @@ namespace Araci.Models
             int quantidade = 24;
 
             for (int i = 0; i < quantidade; i++)
-                _terminais.Add(new Terminal(this, new Point(), $"BARRA-{i + 1:00}"));
+            {
+                _terminais.Add(
+                    new Terminal(
+                        this,
+                        new Point(),
+                        $"BARRA-{i + 1:00}",
+                        TerminalKind.Electrical,
+                        TerminalDirection.East));
+            }
         }
     }
 }

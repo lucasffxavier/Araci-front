@@ -13,16 +13,36 @@ namespace Araci.Services
     public class SnapService
     {
         private readonly ISceneQueryService _queries;
+        private readonly EditorSettings? _settings;
+        private double _terminalTolerance = 15;
 
         public SnapService(ISceneQueryService queries)
+            : this(queries, null)
+        {
+        }
+
+        public SnapService(
+            ISceneQueryService queries,
+            EditorSettings? settings)
         {
             _queries = queries
                 ?? throw new ArgumentNullException(nameof(queries));
+            _settings = settings;
         }
 
         public bool Habilitado { get; set; } = true;
 
-        public double TerminalTolerance { get; set; } = 15;
+        public double TerminalTolerance
+        {
+            get => _settings?.ElectricalSnapTolerance ?? _terminalTolerance;
+            set
+            {
+                if (_settings != null)
+                    _settings.ElectricalSnapTolerance = value;
+                else
+                    _terminalTolerance = value;
+            }
+        }
 
         public Point Snap(Point point)
         {

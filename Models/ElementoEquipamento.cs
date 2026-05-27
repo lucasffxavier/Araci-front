@@ -141,7 +141,7 @@ namespace Araci.Models
             foreach (var t in _terminais)
             {
                 destino._terminais.Add(
-                    new Terminal(destino, t.Posicao, t.Id)
+                    new Terminal(destino, t.Posicao, t.Id, t.Kind, t.Direction)
                     {
                         Barra = t.Barra
                     });
@@ -151,7 +151,13 @@ namespace Araci.Models
         private void CriarTerminalInicial()
         {
             _terminais.Clear();
-            _terminais.Add(new Terminal(this, new Point(PosicaoX, PosicaoY), "PRINCIPAL"));
+            _terminais.Add(
+                new Terminal(
+                    this,
+                    new Point(PosicaoX, PosicaoY),
+                    "PRINCIPAL",
+                    TerminalKind.Electrical,
+                    TerminalDirection.None));
         }
     }
 }

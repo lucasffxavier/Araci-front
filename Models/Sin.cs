@@ -38,16 +38,16 @@ namespace Araci.Models
             if (!TerminaisPadraoPresentes())
             {
                 terminais.Clear();
-                terminais.Add(new Terminal(this, new Point(), TERMINAL_NORTE));
-                terminais.Add(new Terminal(this, new Point(), TERMINAL_SUL));
-                terminais.Add(new Terminal(this, new Point(), TERMINAL_LESTE));
-                terminais.Add(new Terminal(this, new Point(), TERMINAL_OESTE));
+                terminais.Add(new Terminal(this, new Point(), TERMINAL_NORTE, TerminalKind.Electrical, TerminalDirection.North));
+                terminais.Add(new Terminal(this, new Point(), TERMINAL_SUL, TerminalKind.Electrical, TerminalDirection.South));
+                terminais.Add(new Terminal(this, new Point(), TERMINAL_LESTE, TerminalKind.Electrical, TerminalDirection.East));
+                terminais.Add(new Terminal(this, new Point(), TERMINAL_OESTE, TerminalKind.Electrical, TerminalDirection.West));
             }
 
-            AtualizarTerminal(TERMINAL_NORTE, new Point(PosicaoX + largura / 2, PosicaoY));
-            AtualizarTerminal(TERMINAL_SUL, new Point(PosicaoX + largura / 2, PosicaoY + altura));
-            AtualizarTerminal(TERMINAL_LESTE, new Point(PosicaoX + largura, PosicaoY + altura / 2));
-            AtualizarTerminal(TERMINAL_OESTE, new Point(PosicaoX, PosicaoY + altura / 2));
+            AtualizarTerminal(TERMINAL_NORTE, new Point(largura / 2, 0));
+            AtualizarTerminal(TERMINAL_SUL, new Point(largura / 2, altura));
+            AtualizarTerminal(TERMINAL_LESTE, new Point(largura, altura / 2));
+            AtualizarTerminal(TERMINAL_OESTE, new Point(0, altura / 2));
         }
 
         private bool TerminaisPadraoPresentes()
@@ -65,7 +65,7 @@ namespace Araci.Models
         {
             var terminal = ObterTerminaisInternos().First(t => t.Id == id);
             terminal.Barra = Barra;
-            terminal.Posicao = posicao;
+            terminal.DefinirPosicaoLocal(posicao);
         }
 
         public override Elemento Clonar()

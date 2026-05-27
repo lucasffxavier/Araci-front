@@ -44,11 +44,16 @@ namespace Araci.Services
 
         public ElectricGraphTerminal? FindTerminal(string elementId, string terminalId)
         {
-            if (string.IsNullOrWhiteSpace(terminalId))
+            return FindTerminal(new TerminalEndpoint(elementId, terminalId));
+        }
+
+        public ElectricGraphTerminal? FindTerminal(TerminalEndpoint endpoint)
+        {
+            if (!endpoint.IsComplete)
                 return null;
 
-            return FindNode(elementId)?.Terminals.FirstOrDefault(t =>
-                string.Equals(t.TerminalId, terminalId.Trim(), StringComparison.OrdinalIgnoreCase));
+            return FindNode(endpoint.ElementId)?.Terminals.FirstOrDefault(t =>
+                t.Endpoint == endpoint);
         }
 
         public IReadOnlyList<ElectricGraphEdge> GetEdgesForElement(string elementId)
@@ -68,18 +73,17 @@ namespace Araci.Services
             string elementId,
             string terminalId)
         {
-            if (string.IsNullOrWhiteSpace(elementId) ||
-                string.IsNullOrWhiteSpace(terminalId))
-            {
-                return Array.Empty<ElectricGraphEdge>();
-            }
+            return GetEdgesForTerminal(new TerminalEndpoint(elementId, terminalId));
+        }
 
-            string element = elementId.Trim();
-            string terminal = terminalId.Trim();
+        public IReadOnlyList<ElectricGraphEdge> GetEdgesForTerminal(TerminalEndpoint endpoint)
+        {
+            if (!endpoint.IsComplete)
+                return Array.Empty<ElectricGraphEdge>();
 
             return Edges.Where(e =>
-                SameTerminal(e.FromElementId, e.FromTerminalId, element, terminal) ||
-                SameTerminal(e.ToElementId, e.ToTerminalId, element, terminal))
+                e.From == endpoint ||
+                e.To == endpoint)
                 .ToList();
         }
 
@@ -128,14 +132,33 @@ namespace Araci.Services
             return cabo == null ? null : FindEdgeByCableId(cabo.Id.ToString());
         }
 
-        private static bool SameTerminal(
-            string elementA,
-            string terminalA,
-            string elementB,
-            string terminalB)
+        public IReadOnlyList<ElectricGraphNode> BreadthFirst(string startElementId)
         {
-            return string.Equals(elementA, elementB, StringComparison.OrdinalIgnoreCase) &&
-                string.Equals(terminalA, terminalB, StringComparison.OrdinalIgnoreCase);
+            ElectricGraphNode? start = FindNode(startElementId);
+
+            if (start == null)
+                return Array.Empty<ElectricGraphNode>();
+
+            var visited = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            var queue = new Queue<ElectricGraphNode>();
+            var result = new List<ElectricGraphNode>();
+
+            visited.Add(start.ElementId);
+            queue.Enqueue(start);
+
+            while (queue.Count > 0)
+            {
+                ElectricGraphNode current = queue.Dequeue();
+                result.Add(current);
+
+                foreach (ElectricGraphNode neighbor in GetNeighbors(current.ElementId))
+                {
+                    if (visited.Add(neighbor.ElementId))
+                        queue.Enqueue(neighbor);
+                }
+            }
+
+            return result;
         }
     }
 }

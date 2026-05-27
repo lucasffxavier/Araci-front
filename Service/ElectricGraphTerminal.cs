@@ -14,11 +14,13 @@ namespace Araci.Services
             TerminalId = terminalId;
             BusName = busName;
             SourceTerminal = sourceTerminal;
+            Endpoint = new TerminalEndpoint(elementId, terminalId);
         }
 
         public string ElementId { get; }
         public string TerminalId { get; }
         public string? BusName { get; }
+        public TerminalEndpoint Endpoint { get; }
         public Terminal SourceTerminal { get; }
     }
 }

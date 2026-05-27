@@ -339,9 +339,9 @@ namespace Araci.ViewModels
 
             foreach (var t in Cabo.Terminais)
             {
-                t.Posicao = new Point(
+                t.DefinirPosicaoVisual(new Point(
                     t.Posicao.X + delta.X,
-                    t.Posicao.Y + delta.Y);
+                    t.Posicao.Y + delta.Y));
             }
 
             Atualizar();

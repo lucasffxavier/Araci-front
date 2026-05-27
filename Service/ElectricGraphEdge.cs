@@ -20,6 +20,8 @@ namespace Araci.Services
             FromTerminalId = fromTerminalId;
             ToElementId = toElementId;
             ToTerminalId = toTerminalId;
+            From = new TerminalEndpoint(fromElementId, fromTerminalId);
+            To = new TerminalEndpoint(toElementId, toTerminalId);
             IsValid = isValid;
             Error = error;
         }
@@ -30,6 +32,8 @@ namespace Araci.Services
         public string FromTerminalId { get; }
         public string ToElementId { get; }
         public string ToTerminalId { get; }
+        public TerminalEndpoint From { get; }
+        public TerminalEndpoint To { get; }
         public bool IsValid { get; }
         public string? Error { get; }
     }

@@ -65,7 +65,10 @@ namespace Araci.TechnicalChecks
                 ("DTOs antigos/default preservam SIN e carga", DtosAntigosDefaultPreservamSinECarga),
                 ("TopologyValidator aceita SIN transformador e carga sem gerador", TopologyValidatorAceitaSinTransformadorCargaSemGerador),
                 ("TopologyValidator aceita gerador legado sem SIN", TopologyValidatorAceitaGeradorLegadoSemSin),
-                ("TopologyValidator sem fonte slack falha com mensagem clara", TopologyValidatorSemFonteSlackFalhaComMensagemClara)
+                ("TopologyValidator sem fonte slack falha com mensagem clara", TopologyValidatorSemFonteSlackFalhaComMensagemClara),
+                ("TerminalEndpoint identifica conexao por valor", TerminalEndpointIdentificaConexaoPorValor),
+                ("Rotacao recalcula terminal por posicao local", RotacaoRecalculaTerminalPorPosicaoLocal),
+                ("ElectricGraph BFS percorre por conexoes validas", ElectricGraphBfsPercorreConexoesValidas)
             };
 
             var failures = new List<string>();
@@ -1086,6 +1089,52 @@ namespace Araci.TechnicalChecks
             Assert(
                 !errors.Contains("sem gerador", StringComparison.OrdinalIgnoreCase),
                 $"Erro sem fonte nao deve mencionar apenas gerador. Texto: {errors}");
+        }
+
+        private static void TerminalEndpointIdentificaConexaoPorValor()
+        {
+            SimpleCircuit circuit = CreateSimpleCircuit();
+            Terminal origem = GetTerminal(circuit.Generator, 0);
+            Terminal destino = GetTerminal(circuit.Load, 0);
+            TerminalEndpoint endpointOrigem = TerminalEndpoint.FromTerminal(origem);
+            TerminalEndpoint endpointDestino = new(circuit.Load.Id.ToString(), destino.Id);
+            ConnectivityService connectivity = new(circuit.Document);
+
+            Assert(endpointOrigem.IsComplete, "Endpoint de origem deve estar completo.");
+            AssertEqual(origem.Id, endpointOrigem.TerminalId, "Endpoint.TerminalId");
+            AssertEqual(origem, connectivity.ObterTerminal(endpointOrigem), "Resolver endpoint origem");
+            AssertEqual(circuit.Cable, connectivity.ObterCabosConectados(endpointOrigem).Single(), "Cabo conectado ao endpoint origem");
+            AssertEqual(circuit.Cable, connectivity.ObterCabosConectados(endpointDestino).Single(), "Cabo conectado ao endpoint destino");
+        }
+
+        private static void RotacaoRecalculaTerminalPorPosicaoLocal()
+        {
+            var generator = new Gerador
+            {
+                PosicaoX = 100,
+                PosicaoY = 100,
+                Rotacao = 90
+            };
+
+            generator.AtualizarTerminais(80, 80);
+            Terminal topo = generator.Terminais.Single(t => t.Id == "TOPO");
+            Terminal direita = generator.Terminais.Single(t => t.Id == "DIREITA");
+
+            AssertEqual(100, topo.Posicao.X, "Topo rotacionado X");
+            AssertEqual(140, topo.Posicao.Y, "Topo rotacionado Y");
+            AssertEqual(60, direita.Posicao.X, "Direita rotacionada X");
+            AssertEqual(180, direita.Posicao.Y, "Direita rotacionada Y");
+        }
+
+        private static void ElectricGraphBfsPercorreConexoesValidas()
+        {
+            AraciDocument document = CreateBranchDocument();
+            Gerador generator = document.Elementos.OfType<Gerador>().Single();
+            ElectricGraph graph = new ElectricGraphBuilder(document).Build();
+            IReadOnlyList<ElectricGraphNode> visited = graph.BreadthFirst(generator.Id.ToString());
+
+            AssertEqual(4, visited.Count, "Quantidade de nos no BFS");
+            Assert(visited.All(n => graph.FindNode(n.ElementId) != null), "BFS deve retornar apenas nos do grafo.");
         }
 
         private static SimpleCircuit CreateSimpleCircuit()
