@@ -260,435 +260,1114 @@ Araci Engine
 
 
 ====================================================================================================
-ARQUIVO: C:\Araci-Engine-Front\Araci Engine\Core\Viewport\Camera.cs
+ARQUIVO: C:\Araci-Engine-Front\Araci Engine\Applications\Diagrama\InserirCabo\InserirCabo.cs
 ====================================================================================================
 
-using System;
-using System.ComponentModel;
-using System.Runtime.CompilerServices;
 using System.Windows;
-namespace Araci.Core.Viewport
-{
-public class Camera : INotifyPropertyChanged
-{
-public const double DefaultZoom = 1.0;
-public const double DefaultWheelZoomFactor = 1.1;
-public const double MinZoom = 0.1;
-public const double MaxZoom = 8.0;
-private double _zoom = DefaultZoom;
-private Point _offset;
-public event PropertyChangedEventHandler? PropertyChanged;
-public double Zoom
-{
-get => _zoom;
-set
-{
-double zoom = ClampZoom(value);
-if (Math.Abs(_zoom - zoom) < 0.0001)
-return;
-_zoom = zoom;
-OnPropertyChanged();
-}
-}
-public Point Offset
-{
-get => _offset;
-set
-{
-if (_offset == value)
-return;
-_offset = value;
-OnPropertyChanged();
-}
-}
-public void Pan(Vector delta)
-{
-Offset = new Point(Offset.X + delta.X, Offset.Y + delta.Y);
-}
-public void ZoomAt(Point screenPoint, double factor)
-{
-if (factor <= 0)
-return;
-Point worldBefore = ScreenToWorld(screenPoint);
-Zoom = ClampZoom(Zoom * factor);
-Offset = new Point(
-screenPoint.X - worldBefore.X * Zoom,
-screenPoint.Y - worldBefore.Y * Zoom);
-}
-public void SetZoomAt(Point screenPoint, double zoom)
-{
-Point worldBefore = ScreenToWorld(screenPoint);
-Zoom = ClampZoom(zoom);
-Offset = new Point(
-screenPoint.X - worldBefore.X * Zoom,
-screenPoint.Y - worldBefore.Y * Zoom);
-}
-public void ZoomInAt(Point screenPoint)
-{
-ZoomAt(screenPoint, DefaultWheelZoomFactor);
-}
-public void ZoomOutAt(Point screenPoint)
-{
-ZoomAt(screenPoint, 1 / DefaultWheelZoomFactor);
-}
-public void Zoom100At(Point screenPoint)
-{
-SetZoomAt(screenPoint, DefaultZoom);
-}
-public void Fit(Rect worldBounds, Size viewportSize, double margin)
-{
-if (worldBounds.IsEmpty || viewportSize.Width <= 0 || viewportSize.Height <= 0)
-{
-Reset();
-return;
-}
-double safeMargin = Math.Max(0, margin);
-double availableWidth = Math.Max(1, viewportSize.Width - safeMargin * 2);
-double availableHeight = Math.Max(1, viewportSize.Height - safeMargin * 2);
-double boundsWidth = Math.Max(1, worldBounds.Width);
-double boundsHeight = Math.Max(1, worldBounds.Height);
-Zoom = ClampZoom(Math.Min(availableWidth / boundsWidth, availableHeight / boundsHeight));
-Point worldCenter = new(
-worldBounds.X + worldBounds.Width / 2,
-worldBounds.Y + worldBounds.Height / 2);
-Point screenCenter = new(
-viewportSize.Width / 2,
-viewportSize.Height / 2);
-Offset = new Point(
-screenCenter.X - worldCenter.X * Zoom,
-screenCenter.Y - worldCenter.Y * Zoom);
-}
-public void Reset()
-{
-Zoom = DefaultZoom;
-Offset = new Point(0, 0);
-}
-public Point WorldToScreen(Point point)
-{
-return new Point(
-point.X * Zoom + Offset.X,
-point.Y * Zoom + Offset.Y);
-}
-public Point ScreenToWorld(Point point)
-{
-return new Point(
-(point.X - Offset.X) / Zoom,
-(point.Y - Offset.Y) / Zoom);
-}
-private static double ClampZoom(double value)
-{
-return Math.Max(MinZoom, Math.Min(MaxZoom, value));
-}
-private void OnPropertyChanged([CallerMemberName] string? propertyName = null)
-{
-PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
-}
-}
-}
-
-
-====================================================================================================
-ARQUIVO: C:\Araci-Engine-Front\Araci Engine\Service\CableVertexEditService.cs
-====================================================================================================
-
-using System;
-using System.Collections.ObjectModel;
-using System.Linq;
-using System.Windows;
+using System.Windows.Input;
 using Araci.Applications.Editar.Base;
 using Araci.Core.Commands;
 using Araci.Models;
+using Araci.Services;
 using Araci.ViewModels;
-namespace Araci.Services
+namespace Araci.Applications.Diagrama.InserirCabo
 {
-public class CableVertexEditService
+public class InserirCaboApplication
 {
-private const double HandleTolerance = 8.0;
 private readonly EditorContext _context;
-private CaboViewModel? _caboAtivo;
-private int _indiceAtivo = -1;
-private ElementoEstado? _estadoInicial;
-private CaboViewModel? _handleAtivoCabo;
-private int _handleAtivoIndice = -1;
-private Point _pontoInicialArrasto;
-private OrthogonalAxis? _eixoOrtogonal;
-public CableVertexEditService(EditorContext context)
+public InserirCaboApplication(EditorContext context)
 {
-_context = context ?? throw new ArgumentNullException(nameof(context));
+_context = context
+?? throw new System.ArgumentNullException(nameof(context));
 }
-public ObservableCollection<CableVertexHandleViewModel> Handles { get; } = new();
-public bool IsEditing => _caboAtivo != null;
-public void Refresh()
+public void Executar()
 {
-if (IsEditing)
+_context.Input.ToolAtual =
+new InserirCaboTool(_context);
+}
+}
+public class InserirCaboTool : ITool
+{
+private readonly EditorContext _context;
+private CaboViewModel? _caboAtual;
+private CaboViewModel? _previewInicial;
+private Terminal? _terminalPreviewInicial;
+private Terminal? _terminalPreviewFinal;
+private Terminal? _terminalOrigem;
+private bool _inserindo;
+public InserirCaboTool(EditorContext context)
+{
+_context = context;
+}
+public string Nome => "Inserir Cabo";
+public bool MantemBotaoAtivado => true;
+public bool IsBusy => _inserindo || _previewInicial != null;
+public void Ativar()
+{
+}
+public void Desativar()
+{
+Cancelar();
+}
+public void Cancelar()
+{
+if (_caboAtual != null)
+_context.Commands.Undo();
+LimparTerminalCapturado();
+LimparPreviewInicial();
+LimparEstado();
+}
+public void OnMouseDown(
+ElementoViewModel? vm,
+Point position,
+ToolInputState inputState)
+{
+if (ReferenceEquals(vm, _caboAtual) ||
+ReferenceEquals(vm, _previewInicial))
+{
+vm = null;
+}
+Terminal? terminal =
+ObterTerminalParaClique(vm, position);
+Point pontoSnap =
+terminal?.Posicao
+?? _context.Snap.SnapFromElemento(vm, position, _caboAtual);
+if (!_inserindo)
+{
+if (terminal == null)
 return;
-RebuildHandles();
-}
-public bool TryBegin(Point position)
+if (!OrigemValida(terminal))
 {
-var handle = HitTest(position);
-if (handle == null)
-return false;
-_caboAtivo = handle.Cabo;
-_indiceAtivo = handle.Indice;
-_estadoInicial = _caboAtivo.CapturarEstado();
-_pontoInicialArrasto = new Point(handle.X, handle.Y);
-_eixoOrtogonal = null;
-DefinirHandleAtivo(handle.Cabo, handle.Indice);
-return true;
-}
-public bool TryInsertVertex(Point position)
-{
-var hit = HitTestSegment(position);
-if (hit == null)
-return false;
-var cabo = hit.Cabo;
-var antes = cabo.CapturarEstado();
-cabo.Cabo.Vertices.Insert(hit.InsertIndex, hit.Point);
-cabo.AtualizarAposModeloAlterado();
-DefinirHandleAtivo(cabo, hit.InsertIndex);
-ExecutarAlteracao(cabo, antes);
-return true;
-}
-public bool TryRemoveHandle(Point position)
-{
-var handle = HitTest(position);
-if (handle == null)
-return false;
-return RemoveHandle(handle.Cabo, handle.Indice);
-}
-public bool TryRemoveActive()
-{
-if (_handleAtivoCabo == null)
-return false;
-return RemoveHandle(_handleAtivoCabo, _handleAtivoIndice);
-}
-public void Update(Point position, ToolInputState inputState)
-{
-if (_caboAtivo == null || !IndiceIntermediarioValido(_caboAtivo, _indiceAtivo))
+LimparTerminalCapturado();
 return;
-Point pontoEfetivo = AplicarRestricaoOrtogonal(position, inputState);
-_caboAtivo.Cabo.Vertices[_indiceAtivo] = pontoEfetivo;
-_caboAtivo.AtualizarAposModeloAlterado();
+}
+AtualizarTerminalCapturado(terminal);
+LimparPreviewInicial();
+_caboAtual =
+_context.ElementoFactory.CriarCaboVM();
+_caboAtual.Iniciar(pontoSnap);
+_context.Commands.Execute(
+new AddElementoCommand(
+_caboAtual.Modelo,
+_context));
+UsarViewModelDaCena();
+ConectarOrigem(terminal);
+_inserindo = true;
+return;
+}
+if (_caboAtual == null)
+return;
+if (terminal == null)
+{
+AdicionarVerticeIntermediario(
+AplicarOrtogonalizacao(pontoSnap, inputState));
+return;
+}
+if (!DestinoValido(terminal))
+{
+MostrarTerminalInvalido(terminal, inputState.ScreenPosition);
+return;
+}
+AtualizarTerminalCapturado(terminal);
+_caboAtual.FinalizarNoPonto(pontoSnap);
+ConectarDestino(terminal);
+Finalizar();
+}
+public void OnMouseMove(Point position, ToolInputState inputState)
+{
+if (!_inserindo)
+{
+AtualizarPreviewInicial(position);
+return;
+}
+if (_caboAtual == null)
+return;
+Terminal? terminal =
+ObterTerminalConexao(null, position);
+_terminalPreviewFinal = terminal;
+if (terminal == null)
+LimparTerminalCapturado();
+else if (DestinoValido(terminal))
+AtualizarTerminalCapturado(terminal);
+else
+MostrarTerminalInvalido(terminal, inputState.ScreenPosition);
+Point pontoSnap =
+terminal?.Posicao
+?? _context.Snap.Snap(position, _caboAtual);
+Point pontoPreview =
+terminal == null
+? AplicarOrtogonalizacao(pontoSnap, inputState)
+: pontoSnap;
+_caboAtual.AtualizarPreview(pontoPreview);
+}
+public void OnMouseUp(Point position, ToolInputState inputState)
+{
+}
+public void OnKeyDown(Key key)
+{
+if (key == Key.Enter)
+return;
+if (key == Key.Escape)
+Cancelar();
+}
+private static bool EhElementoConectavel(
+Elemento? elemento)
+{
+return elemento is ElementoEquipamento
+|| elemento is Barra;
+}
+private Terminal? ObterTerminalConexao(
+ElementoViewModel? vm,
+Point position)
+{
+Terminal? terminal =
+_context.Snap.ObterTerminalMaisProximo(vm, position);
+if (terminal != null && EhElementoConectavel(terminal.Dono))
+return terminal;
+terminal =
+_context.Snap.ObterTerminalMaisProximo(
+position,
+_caboAtual ?? _previewInicial,
+t => EhElementoConectavel(t.Dono));
+return terminal;
+}
+private Terminal? ObterTerminalParaClique(
+ElementoViewModel? vm,
+Point position)
+{
+Terminal? terminal =
+ObterTerminalConexao(vm, position);
+if (terminal != null)
+return terminal;
+Terminal? terminalPreview =
+_inserindo
+? _terminalPreviewFinal
+: _terminalPreviewInicial;
+return TerminalAindaValido(terminalPreview, position)
+? terminalPreview
+: null;
+}
+private bool TerminalAindaValido(
+Terminal? terminal,
+Point position)
+{
+if (terminal == null)
+return false;
+double dx = terminal.Posicao.X - position.X;
+double dy = terminal.Posicao.Y - position.Y;
+double tolerancia = _context.Snap.TerminalTolerance;
+return dx * dx + dy * dy <= tolerancia * tolerancia;
+}
+private void AtualizarPreviewInicial(Point position)
+{
+Terminal? terminal =
+ObterTerminalConexao(null, position);
+_terminalPreviewInicial = terminal;
+AtualizarTerminalCapturado(terminal);
+if (terminal == null)
+{
+LimparPreviewInicial();
+return;
+}
+CaboViewModel preview = ObterPreviewInicial();
+preview.Cabo.Vertices.Clear();
+preview.Cabo.Vertices.Add(terminal.Posicao);
+preview.Cabo.DefinirOrigem(terminal.Posicao);
+preview.Cabo.PreviewPonto = position;
+preview.AtualizarAposModeloAlterado();
 _context.SceneQueries.Invalidate();
-RebuildHandles();
 }
-public void End()
+private CaboViewModel ObterPreviewInicial()
 {
-if (_caboAtivo == null)
-return;
-var cabo = _caboAtivo;
-var antes = _estadoInicial;
-var depois = cabo.CapturarEstado();
-LimparEdicao();
-if (antes != null && !VerticesIguais(antes, depois))
-ExecutarAlteracao(cabo, antes);
-RebuildHandles();
-}
-public void Cancel()
-{
-if (_caboAtivo != null && _estadoInicial != null)
-_caboAtivo.AplicarEstado(_estadoInicial);
-LimparEdicao();
+if (_previewInicial != null)
+return _previewInicial;
+_previewInicial =
+_context.ElementoFactory.CriarCaboVM();
+_previewInicial.IsPreview = true;
+_context.Scene.Elementos.Add(_previewInicial);
 _context.SceneQueries.Invalidate();
-RebuildHandles();
+return _previewInicial;
 }
-public void Clear()
+private void LimparPreviewInicial()
 {
-LimparEdicao();
-LimparHandleAtivo();
-Handles.Clear();
+if (_previewInicial == null)
+return;
+_previewInicial.IsPreview = false;
+_context.Scene.Elementos.Remove(_previewInicial);
+_previewInicial = null;
+_terminalPreviewInicial = null;
+_context.SceneQueries.Invalidate();
 }
-private CableVertexHandleViewModel? HitTest(Point position)
+private void AtualizarTerminalCapturado(Terminal? terminal)
 {
-double tolerance2 = HandleTolerance * HandleTolerance;
-return Handles
-.Where(h => DistanciaQuadrada(new Point(h.X, h.Y), position) <= tolerance2)
-.OrderBy(h => DistanciaQuadrada(new Point(h.X, h.Y), position))
-.FirstOrDefault();
+if (terminal == null)
+{
+LimparTerminalCapturado();
+return;
 }
-private void RebuildHandles()
+_context.TerminalSnap.Mostrar(terminal);
+}
+private void MostrarTerminalInvalido(Terminal terminal, Point cursor)
 {
-Handles.Clear();
-foreach (var cabo in _context.Selection.Selecionados.OfType<CaboViewModel>())
+_context.TerminalSnap.MostrarInvalido(
+terminal,
+cursor,
+"Conexão inválida");
+}
+private void LimparTerminalCapturado()
 {
-if (cabo.IsPreview || cabo.Cabo.Vertices.Count < 3)
-continue;
-for (int i = 1; i < cabo.Cabo.Vertices.Count - 1; i++)
+_context.TerminalSnap.Limpar();
+}
+private void ConectarOrigem(
+Terminal? terminal)
 {
-Point p = cabo.Cabo.Vertices[i];
-bool isActive = ReferenceEquals(cabo, _handleAtivoCabo) && i == _handleAtivoIndice;
-Handles.Add(new CableVertexHandleViewModel(cabo, i, p.X, p.Y, isActive));
+if (_caboAtual == null || terminal == null)
+return;
+Elemento elemento = terminal.Dono;
+_caboAtual.OrigemId =
+elemento.Id.ToString();
+_caboAtual.OrigemTerminalId =
+terminal.Id;
+_caboAtual.BarraOrigem =
+ObterRotuloTerminal(terminal);
+_caboAtual.Cabo.DefinirOrigem(terminal.Posicao);
+_terminalOrigem = terminal;
+_caboAtual.NotificarParametros();
+}
+private void AdicionarVerticeIntermediario(Point ponto)
+{
+if (_caboAtual == null)
+return;
+_caboAtual.AdicionarVerticeIntermediario(ponto);
+_context.SceneQueries.Invalidate();
+}
+private Point AplicarOrtogonalizacao(
+Point ponto,
+ToolInputState inputState)
+{
+if (!inputState.IsShiftPressed ||
+_caboAtual == null ||
+_caboAtual.Cabo.Vertices.Count == 0)
+{
+return ponto;
+}
+Point origem = _caboAtual.Cabo.Vertices[^1];
+Vector delta = ponto - origem;
+if (Math.Abs(delta.X) < 0.0001 && Math.Abs(delta.Y) < 0.0001)
+return origem;
+return Math.Abs(delta.X) >= Math.Abs(delta.Y)
+? new Point(ponto.X, origem.Y)
+: new Point(origem.X, ponto.Y);
+}
+private bool OrigemValida(Terminal terminal)
+{
+return !string.IsNullOrWhiteSpace(terminal.Dono.Id.ToString()) &&
+!string.IsNullOrWhiteSpace(terminal.Id);
+}
+private bool DestinoValido(Terminal terminal)
+{
+if (_caboAtual == null || _terminalOrigem == null)
+{
+return false;
+}
+return _context.Connectivity.ValidarConexaoCabo(
+_caboAtual.Cabo,
+_terminalOrigem,
+terminal).IsValid;
+}
+private void UsarViewModelDaCena()
+{
+if (_caboAtual == null)
+return;
+if (_context.Viewport?.ObterViewModel(_caboAtual.Modelo)
+is CaboViewModel caboNaCena)
+{
+_caboAtual = caboNaCena;
+}
+}
+private void ConectarDestino(
+Terminal? terminal)
+{
+if (_caboAtual == null || terminal == null)
+return;
+Elemento elemento = terminal.Dono;
+_caboAtual.DestinoId =
+elemento.Id.ToString();
+_caboAtual.DestinoTerminalId =
+terminal.Id;
+_caboAtual.BarraDestino =
+ObterRotuloTerminal(terminal);
+_caboAtual.Cabo.DefinirDestino(terminal.Posicao);
+_caboAtual.NotificarParametros();
+}
+private static string ObterRotuloTerminal(Terminal terminal)
+{
+return string.IsNullOrWhiteSpace(terminal.Barra)
+? terminal.Dono.Nome
+: terminal.Barra;
+}
+private void Finalizar()
+{
+LimparTerminalCapturado();
+LimparPreviewInicial();
+LimparEstado();
+_context.Tools.VoltarParaSelecao();
+}
+private void LimparEstado()
+{
+_caboAtual?.RemoverPreview();
+_caboAtual = null;
+_terminalPreviewFinal = null;
+_terminalOrigem = null;
+LimparTerminalCapturado();
+_inserindo = false;
 }
 }
 }
-private SegmentHit? HitTestSegment(Point position)
+
+
+====================================================================================================
+ARQUIVO: C:\Araci-Engine-Front\Araci Engine\Applications\Editar\Base\ToolInputState.cs
+====================================================================================================
+
+using System.Windows;
+using System.Windows.Input;
+namespace Araci.Applications.Editar.Base
 {
-double tolerance2 = HandleTolerance * HandleTolerance;
-SegmentHit? melhor = null;
-foreach (var cabo in _context.Selection.Selecionados.OfType<CaboViewModel>())
+public readonly struct ToolInputState
+{
+public ToolInputState(bool isControlPressed)
+: this(
+isControlPressed ? ModifierKeys.Control : ModifierKeys.None,
+null,
+0,
+default,
+default)
+{
+}
+public ToolInputState(
+ModifierKeys modifiers,
+MouseButton? button = null,
+int clickCount = 0,
+Point worldPosition = default,
+Point screenPosition = default)
+{
+Modifiers = modifiers;
+Button = button;
+ClickCount = clickCount;
+WorldPosition = worldPosition;
+ScreenPosition = screenPosition;
+}
+public ModifierKeys Modifiers { get; }
+public MouseButton? Button { get; }
+public int ClickCount { get; }
+public Point WorldPosition { get; }
+public Point ScreenPosition { get; }
+public bool IsControlPressed => Modifiers.HasFlag(ModifierKeys.Control);
+public bool IsShiftPressed => Modifiers.HasFlag(ModifierKeys.Shift);
+public bool IsAltPressed => Modifiers.HasFlag(ModifierKeys.Alt);
+public bool IsDoubleClick => ClickCount >= 2;
+public bool IsLeftButton => Button == MouseButton.Left;
+public bool IsMiddleButton => Button == MouseButton.Middle;
+public bool IsRightButton => Button == MouseButton.Right;
+public static ToolInputState Empty => new(ModifierKeys.None);
+}
+}
+
+
+====================================================================================================
+ARQUIVO: C:\Araci-Engine-Front\Araci Engine\Core\SceneQueries\SceneQueryService.cs
+====================================================================================================
+
+using System;
+using System.Collections.Generic;
+using System.Collections.Specialized;
+using System.ComponentModel;
+using System.Linq;
+using System.Windows;
+using Araci.Core.Scenes;
+using Araci.Core.Spatial;
+using Araci.ViewModels;
+namespace Araci.Core.SceneQueries
+{
+public class SceneQueryService : ISceneQueryService
+{
+private readonly Scene _scene;
+private readonly ISpatialIndex _index;
+private readonly HashSet<ElementoViewModel> _observados = new();
+private bool _indexValido;
+public SceneQueryService(Scene scene)
+{
+_scene = scene ?? throw new ArgumentNullException(nameof(scene));
+_index = new SpatialHashGrid();
+_scene.Elementos.CollectionChanged += OnElementosChanged;
+foreach (ElementoViewModel elemento in _scene.Elementos)
+Observar(elemento);
+Invalidate();
+}
+public void Invalidate()
+{
+_indexValido = false;
+}
+public SceneHitResult? HitTest(Point point)
+{
+return HitTest(point, 6);
+}
+public SceneHitResult? HitTest(Point point, double tolerance)
+{
+GarantirIndex();
+double effectiveTolerance = Math.Max(6, tolerance);
+var candidatos = _index.Nearby(point, Math.Max(10, effectiveTolerance))
+.Where(e => !e.IsPreview)
+.ToList();
+HitCandidate? melhor = null;
+for (int i = 0; i < candidatos.Count; i++)
+{
+HitCandidate? candidato = CriarCandidato(candidatos[i], point, effectiveTolerance, i);
+if (candidato.HasValue && EhMelhor(candidato.Value, melhor))
+melhor = candidato.Value;
+}
+return melhor.HasValue
+? new SceneHitResult(melhor.Value.Elemento, point)
+: null;
+}
+public IEnumerable<ElementoViewModel> Query(Rect area)
+{
+GarantirIndex();
+return _index.Query(area).Where(e => !e.IsPreview);
+}
+public IEnumerable<ElementoViewModel> Nearby(Point point, double radius)
+{
+GarantirIndex();
+return _index.Nearby(point, radius).Where(e => !e.IsPreview);
+}
+private void GarantirIndex()
+{
+if (_indexValido)
+return;
+_index.Build(_scene.Elementos);
+_indexValido = true;
+}
+private static HitCandidate? CriarCandidato(ElementoViewModel vm, Point point, double tolerance, int order)
+{
+if (vm is CaboViewModel cabo)
+return CriarCandidatoCabo(cabo, point, tolerance, order);
+return vm.Bounds.Contains(point)
+? new HitCandidate(vm, 0, 0, order)
+: null;
+}
+private static HitCandidate? CriarCandidatoCabo(CaboViewModel cabo, Point point, double tolerance, int order)
 {
 var vertices = cabo.Cabo.Vertices;
-if (cabo.IsPreview || vertices.Count < 2)
-continue;
-for (int i = 0; i < vertices.Count - 1; i++)
+if (vertices.Count < 2)
 {
-Point projection = ProjetarNoSegmento(position, vertices[i], vertices[i + 1]);
-double distance2 = DistanciaQuadrada(position, projection);
-if (distance2 > tolerance2)
-continue;
-if (melhor == null || distance2 < melhor.DistanceSquared)
-melhor = new SegmentHit(cabo, i + 1, projection, distance2);
+return cabo.Bounds.Contains(point)
+? new HitCandidate(cabo, 0, 3, order)
+: null;
 }
+double distancia = MenorDistanciaCabo(cabo, point);
+return distancia <= tolerance
+? new HitCandidate(cabo, distancia, 2, order)
+: null;
 }
-return melhor;
-}
-private bool RemoveHandle(CaboViewModel cabo, int indice)
+private static bool EhMelhor(HitCandidate candidato, HitCandidate? atual)
 {
-if (!IndiceIntermediarioValido(cabo, indice))
-return false;
-var antes = cabo.CapturarEstado();
-cabo.Cabo.Vertices.RemoveAt(indice);
-cabo.AtualizarAposModeloAlterado();
-AjustarHandleAtivoAposRemocao(cabo, indice);
-ExecutarAlteracao(cabo, antes);
+if (!atual.HasValue)
 return true;
+HitCandidate existente = atual.Value;
+if (candidato.Priority != existente.Priority)
+return candidato.Priority < existente.Priority;
+if (Math.Abs(candidato.Distance - existente.Distance) > 0.000001)
+return candidato.Distance < existente.Distance;
+return candidato.Order > existente.Order;
 }
-private void ExecutarAlteracao(CaboViewModel cabo, ElementoEstado antes)
+private static double MenorDistanciaCabo(CaboViewModel cabo, Point point)
 {
-var depois = cabo.CapturarEstado();
-if (VerticesIguais(antes, depois))
-{
-RebuildHandles();
-return;
+var vertices = cabo.Cabo.Vertices;
+double menor = double.MaxValue;
+for (int i = 0; i < vertices.Count - 1; i++)
+menor = Math.Min(menor, DistanciaPontoSegmento(point, vertices[i], vertices[i + 1]));
+return menor;
 }
-_context.Commands.Execute(
-new MoveElementoCommand(
-cabo.Modelo,
-antes,
-depois,
-AtualizarCabo));
-_context.SceneQueries.Invalidate();
-RebuildHandles();
-}
-private void AtualizarCabo(Elemento elemento)
-{
-_context.Viewport?.AtualizarViewModel(elemento);
-_context.SceneQueries.Invalidate();
-RebuildHandles();
-}
-private void LimparEdicao()
-{
-_caboAtivo = null;
-_indiceAtivo = -1;
-_estadoInicial = null;
-_eixoOrtogonal = null;
-}
-private void DefinirHandleAtivo(CaboViewModel cabo, int indice)
-{
-_handleAtivoCabo = cabo;
-_handleAtivoIndice = indice;
-RebuildHandles();
-}
-private void LimparHandleAtivo()
-{
-_handleAtivoCabo = null;
-_handleAtivoIndice = -1;
-}
-private void AjustarHandleAtivoAposRemocao(CaboViewModel cabo, int indiceRemovido)
-{
-if (!ReferenceEquals(cabo, _handleAtivoCabo))
-return;
-if (cabo.Cabo.Vertices.Count < 3)
-{
-LimparHandleAtivo();
-return;
-}
-int novoIndice = Math.Min(indiceRemovido, cabo.Cabo.Vertices.Count - 2);
-DefinirHandleAtivo(cabo, novoIndice);
-}
-private static bool IndiceIntermediarioValido(CaboViewModel cabo, int indice)
-{
-return indice > 0 && indice < cabo.Cabo.Vertices.Count - 1;
-}
-private static bool VerticesIguais(ElementoEstado a, ElementoEstado b)
-{
-return a.Vertices.SequenceEqual(b.Vertices);
-}
-private static Point ProjetarNoSegmento(Point p, Point a, Point b)
+private static double DistanciaPontoSegmento(Point p, Point a, Point b)
 {
 double dx = b.X - a.X;
 double dy = b.Y - a.Y;
 double lengthSquared = dx * dx + dy * dy;
 if (lengthSquared <= double.Epsilon)
-return a;
+return Distancia(p, a);
 double t = ((p.X - a.X) * dx + (p.Y - a.Y) * dy) / lengthSquared;
 t = Math.Max(0, Math.Min(1, t));
-return new Point(
+var projection = new Point(
 a.X + t * dx,
 a.Y + t * dy);
+return Distancia(p, projection);
 }
-private static double DistanciaQuadrada(Point a, Point b)
+private static double Distancia(Point a, Point b)
 {
 double dx = a.X - b.X;
 double dy = a.Y - b.Y;
-return dx * dx + dy * dy;
+return Math.Sqrt(dx * dx + dy * dy);
 }
-private Point AplicarRestricaoOrtogonal(Point position, ToolInputState inputState)
+private readonly struct HitCandidate
 {
-if (!inputState.IsShiftPressed)
+public HitCandidate(ElementoViewModel elemento, double distance, int priority, int order)
 {
-_eixoOrtogonal = null;
-return position;
+Elemento = elemento;
+Distance = distance;
+Priority = priority;
+Order = order;
 }
-Vector total = position - _pontoInicialArrasto;
-if (!_eixoOrtogonal.HasValue)
+public ElementoViewModel Elemento { get; }
+public double Distance { get; }
+public int Priority { get; }
+public int Order { get; }
+}
+private void OnElementosChanged(object? sender, NotifyCollectionChangedEventArgs e)
 {
-if (Math.Abs(total.X) < 0.0001 && Math.Abs(total.Y) < 0.0001)
-return _pontoInicialArrasto;
-_eixoOrtogonal = Math.Abs(total.X) >= Math.Abs(total.Y)
-? OrthogonalAxis.Horizontal
-: OrthogonalAxis.Vertical;
-}
-return _eixoOrtogonal == OrthogonalAxis.Horizontal
-? new Point(position.X, _pontoInicialArrasto.Y)
-: new Point(_pontoInicialArrasto.X, position.Y);
-}
-private enum OrthogonalAxis
+if (e.Action == NotifyCollectionChangedAction.Reset)
+ReobservarTodos();
+if (e.OldItems != null)
 {
-Horizontal,
-Vertical
+foreach (ElementoViewModel vm in e.OldItems)
+Desobservar(vm);
 }
-}
-public class CableVertexHandleViewModel
+if (e.NewItems != null)
 {
-public CableVertexHandleViewModel(CaboViewModel cabo, int indice, double x, double y, bool isActive)
-{
-Cabo = cabo;
-Indice = indice;
-X = x;
-Y = y;
-IsActive = isActive;
+foreach (ElementoViewModel vm in e.NewItems)
+Observar(vm);
 }
-public CaboViewModel Cabo { get; }
-public int Indice { get; }
-public double X { get; }
-public double Y { get; }
-public bool IsActive { get; }
+Invalidate();
 }
-internal sealed class SegmentHit
+private void Observar(ElementoViewModel vm)
 {
-public SegmentHit(CaboViewModel cabo, int insertIndex, Point point, double distanceSquared)
-{
-Cabo = cabo;
-InsertIndex = insertIndex;
-Point = point;
-DistanceSquared = distanceSquared;
+if (!_observados.Add(vm))
+return;
+vm.PropertyChanged += OnElementoPropertyChanged;
 }
-public CaboViewModel Cabo { get; }
-public int InsertIndex { get; }
-public Point Point { get; }
-public double DistanceSquared { get; }
+private void Desobservar(ElementoViewModel vm)
+{
+if (!_observados.Remove(vm))
+return;
+vm.PropertyChanged -= OnElementoPropertyChanged;
+}
+private void ReobservarTodos()
+{
+foreach (ElementoViewModel vm in _observados.ToList())
+Desobservar(vm);
+foreach (ElementoViewModel vm in _scene.Elementos)
+Observar(vm);
+}
+private void OnElementoPropertyChanged(object? sender, PropertyChangedEventArgs e)
+{
+if (string.IsNullOrEmpty(e.PropertyName) ||
+e.PropertyName is nameof(ElementoViewModel.Bounds) or
+nameof(ElementoViewModel.X) or
+nameof(ElementoViewModel.Y) or
+nameof(ElementoViewModel.WorldX) or
+nameof(ElementoViewModel.WorldY) or
+nameof(ElementoViewModel.Largura) or
+nameof(ElementoViewModel.Altura) or
+nameof(ElementoViewModel.Centro) or
+nameof(ElementoViewModel.RenderData))
+{
+Invalidate();
+}
+}
+}
+}
+
+
+====================================================================================================
+ARQUIVO: C:\Araci-Engine-Front\Araci Engine\Models\Cabo.cs
+====================================================================================================
+
+using System.Collections.Generic;
+using System.Collections.ObjectModel;
+using System.Windows;
+using Araci.Models.Tipos;
+namespace Araci.Models
+{
+public class Cabo : ElementoLinear, ITerminalOwner
+{
+public const string PARAM_ORIGEM_ID = "OrigemId";
+public const string PARAM_DESTINO_ID = "DestinoId";
+public const string PARAM_ORIGEM_TERMINAL_ID = "OrigemTerminalId";
+public const string PARAM_DESTINO_TERMINAL_ID = "DestinoTerminalId";
+public const string PARAM_BARRA_ORIGEM = "BarraOrigem";
+public const string PARAM_BARRA_DESTINO = "BarraDestino";
+public const string PARAM_COMPRIMENTO = "Comprimento";
+public const string PARAM_AMPACIDADE = "Ampacidade";
+public const string PARAM_TENSAO_LINHA = "TensaoLinha";
+public const string PARAM_TENSAO_FASE_A = "TensaoFaseA";
+public const string PARAM_TENSAO_FASE_B = "TensaoFaseB";
+public const string PARAM_TENSAO_FASE_C = "TensaoFaseC";
+public const string PARAM_CORRENTE_LINHA = "CorrenteLinha";
+public const string PARAM_CORRENTE_FASE_A = "CorrenteFaseA";
+public const string PARAM_CORRENTE_FASE_B = "CorrenteFaseB";
+public const string PARAM_CORRENTE_FASE_C = "CorrenteFaseC";
+private readonly List<Terminal> _terminais = new();
+public Cabo()
+{
+DefinirParametro(new Parameter<string>(PARAM_ORIGEM_ID, string.Empty));
+DefinirParametro(new Parameter<string>(PARAM_DESTINO_ID, string.Empty));
+DefinirParametro(new Parameter<string>(PARAM_ORIGEM_TERMINAL_ID, string.Empty));
+DefinirParametro(new Parameter<string>(PARAM_DESTINO_TERMINAL_ID, string.Empty));
+DefinirParametro(new Parameter<string>(PARAM_BARRA_ORIGEM, "GERADOR-001"));
+DefinirParametro(new Parameter<string>(PARAM_BARRA_DESTINO, "CARGA-001"));
+DefinirParametro(new Parameter<double>(PARAM_COMPRIMENTO, 1));
+DefinirParametro(new Parameter<double>(PARAM_AMPACIDADE, 520));
+DefinirParametro(new Parameter<string>(PARAM_TENSAO_LINHA, "12.47∠0°"));
+DefinirParametro(new Parameter<string>(PARAM_TENSAO_FASE_A, "7.2∠0°"));
+DefinirParametro(new Parameter<string>(PARAM_TENSAO_FASE_B, "7.2∠-120°"));
+DefinirParametro(new Parameter<string>(PARAM_TENSAO_FASE_C, "7.2∠120°"));
+DefinirParametro(new Parameter<string>(PARAM_CORRENTE_LINHA, "0∠0°"));
+DefinirParametro(new Parameter<string>(PARAM_CORRENTE_FASE_A, "0∠0°"));
+DefinirParametro(new Parameter<string>(PARAM_CORRENTE_FASE_B, "0∠-120°"));
+DefinirParametro(new Parameter<string>(PARAM_CORRENTE_FASE_C, "0∠120°"));
+Nome = "L1";
+}
+public IReadOnlyList<Terminal> Terminais => _terminais;
+public ObservableCollection<Point> Vertices { get; } = new();
+public Point? PreviewPonto { get; set; }
+public TipoCabo TipoCabo => (TipoCabo)Tipo!;
+public Terminal? Origem => _terminais.Count > 0 ? _terminais[0] : null;
+public Terminal? Destino => _terminais.Count > 1 ? _terminais[1] : null;
+public string OrigemId
+{
+get => Obter<string>(PARAM_ORIGEM_ID);
+set => Definir(PARAM_ORIGEM_ID, value);
+}
+public string DestinoId
+{
+get => Obter<string>(PARAM_DESTINO_ID);
+set => Definir(PARAM_DESTINO_ID, value);
+}
+public string OrigemTerminalId
+{
+get => Obter<string>(PARAM_ORIGEM_TERMINAL_ID);
+set => Definir(PARAM_ORIGEM_TERMINAL_ID, value);
+}
+public string DestinoTerminalId
+{
+get => Obter<string>(PARAM_DESTINO_TERMINAL_ID);
+set => Definir(PARAM_DESTINO_TERMINAL_ID, value);
+}
+public string BarraOrigem
+{
+get => Obter<string>(PARAM_BARRA_ORIGEM);
+set => Definir(PARAM_BARRA_ORIGEM, value);
+}
+public string BarraDestino
+{
+get => Obter<string>(PARAM_BARRA_DESTINO);
+set => Definir(PARAM_BARRA_DESTINO, value);
+}
+public new double Comprimento
+{
+get => Obter<double>(PARAM_COMPRIMENTO);
+set => Definir(PARAM_COMPRIMENTO, value);
+}
+public double Ampacidade
+{
+get => Obter<double>(PARAM_AMPACIDADE);
+set => Definir(PARAM_AMPACIDADE, value);
+}
+public string TensaoLinha
+{
+get => Obter<string>(PARAM_TENSAO_LINHA);
+set => Definir(PARAM_TENSAO_LINHA, value);
+}
+public string TensaoFaseA
+{
+get => Obter<string>(PARAM_TENSAO_FASE_A);
+set => Definir(PARAM_TENSAO_FASE_A, value);
+}
+public string TensaoFaseB
+{
+get => Obter<string>(PARAM_TENSAO_FASE_B);
+set => Definir(PARAM_TENSAO_FASE_B, value);
+}
+public string TensaoFaseC
+{
+get => Obter<string>(PARAM_TENSAO_FASE_C);
+set => Definir(PARAM_TENSAO_FASE_C, value);
+}
+public string CorrenteLinha
+{
+get => Obter<string>(PARAM_CORRENTE_LINHA);
+set => Definir(PARAM_CORRENTE_LINHA, value);
+}
+public string CorrenteFaseA
+{
+get => Obter<string>(PARAM_CORRENTE_FASE_A);
+set => Definir(PARAM_CORRENTE_FASE_A, value);
+}
+public string CorrenteFaseB
+{
+get => Obter<string>(PARAM_CORRENTE_FASE_B);
+set => Definir(PARAM_CORRENTE_FASE_B, value);
+}
+public string CorrenteFaseC
+{
+get => Obter<string>(PARAM_CORRENTE_FASE_C);
+set => Definir(PARAM_CORRENTE_FASE_C, value);
+}
+public void DefinirOrigem(Point p)
+{
+if (_terminais.Count == 0)
+_terminais.Add(new Terminal(this, p, "ORIGEM") { Barra = BarraOrigem });
+else
+_terminais[0].Posicao = p;
+}
+public void DefinirDestino(Point p)
+{
+if (_terminais.Count < 2)
+_terminais.Add(new Terminal(this, p, "DESTINO") { Barra = BarraDestino });
+else
+_terminais[1].Posicao = p;
+}
+public override Elemento Clonar()
+{
+var clone = new Cabo();
+CopiarLinearPara(clone);
+foreach (Point p in Vertices)
+clone.Vertices.Add(p);
+clone.PreviewPonto = PreviewPonto;
+clone._terminais.Clear();
+foreach (Terminal t in _terminais)
+{
+clone._terminais.Add(
+new Terminal(clone, t.Posicao, t.Id)
+{
+Barra = t.Barra
+});
+}
+return clone;
+}
+}
+}
+
+
+====================================================================================================
+ARQUIVO: C:\Araci-Engine-Front\Araci Engine\Models\Terminal.cs
+====================================================================================================
+
+﻿using System.Windows;
+namespace Araci.Models
+{
+public class Terminal
+{
+public Elemento Dono { get; }
+public string Id { get; }
+public Point Posicao { get; set; }
+public string? Barra { get; set; }
+public Terminal(Elemento dono, Point posicao, string? id = null)
+{
+Dono = dono;
+Id = string.IsNullOrWhiteSpace(id)
+? System.Guid.NewGuid().ToString("N")
+: id;
+Posicao = posicao;
+}
+}
+}
+
+
+====================================================================================================
+ARQUIVO: C:\Araci-Engine-Front\Araci Engine\Service\ConnectivityService.cs
+====================================================================================================
+
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using Araci.Core.Documents;
+using Araci.Models;
+namespace Araci.Services
+{
+public class ConnectivityService
+{
+private readonly AraciDocument _document;
+public ConnectivityService(EditorContext context)
+: this(context?.Document ?? throw new ArgumentNullException(nameof(context)))
+{
+}
+public ConnectivityService(AraciDocument document)
+{
+_document = document ?? throw new ArgumentNullException(nameof(document));
+}
+public Elemento? ObterElementoPorId(string id)
+{
+if (string.IsNullOrWhiteSpace(id))
+return null;
+return _document.Elementos.FirstOrDefault(e =>
+string.Equals(e.Id.ToString(), id.Trim(), StringComparison.OrdinalIgnoreCase));
+}
+public string ResolverBusName(Elemento elemento)
+{
+if (!string.IsNullOrWhiteSpace(elemento.Nome))
+return elemento.Nome.Trim();
+string id = elemento.Id.ToString("N");
+return id.Length >= 8 ? $"BUS-{id[..8]}" : $"BUS-{id}";
+}
+public string ResolverBusNamePorId(string id)
+{
+Elemento? elemento = ObterElementoPorId(id);
+return elemento == null ? string.Empty : ResolverBusName(elemento);
+}
+public string ResolverBusNamePorIdEstrito(string id, string contexto)
+{
+if (string.IsNullOrWhiteSpace(id))
+throw new InvalidOperationException($"{contexto} sem Id de conexao.");
+Elemento? elemento = ObterElementoPorId(id);
+if (elemento == null)
+throw new InvalidOperationException($"{contexto} aponta para Id inexistente: {id}.");
+return ResolverBusName(elemento);
+}
+public string ResolverBusNameParaEquipamento(ElementoEquipamento equipamento)
+{
+if (!string.IsNullOrWhiteSpace(equipamento.BarraId))
+{
+string busPorId = ResolverBusNamePorId(equipamento.BarraId);
+if (!string.IsNullOrWhiteSpace(busPorId))
+return busPorId;
+}
+if (!string.IsNullOrWhiteSpace(equipamento.Barra))
+return equipamento.Barra.Trim();
+return ResolverBusName(equipamento);
+}
+public string ResolverBusNameParaEquipamentoEstrito(ElementoEquipamento equipamento)
+{
+if (!string.IsNullOrWhiteSpace(equipamento.BarraId))
+return ResolverBusNamePorIdEstrito(
+equipamento.BarraId,
+$"Equipamento '{ResolverBusName(equipamento)}'");
+return ResolverBusName(equipamento);
+}
+public string ResolverBus1(Cabo cabo)
+{
+if (!string.IsNullOrWhiteSpace(cabo.OrigemId))
+{
+string busPorId = ResolverBusNamePorId(cabo.OrigemId);
+if (!string.IsNullOrWhiteSpace(busPorId))
+return busPorId;
+}
+return cabo.BarraOrigem?.Trim() ?? string.Empty;
+}
+public string ResolverBus1Estrito(Cabo cabo)
+{
+return ResolverBusNamePorIdEstrito(
+cabo.OrigemId,
+$"Cabo '{ResolverBusName(cabo)}' origem");
+}
+public string ResolverBus2(Cabo cabo)
+{
+if (!string.IsNullOrWhiteSpace(cabo.DestinoId))
+{
+string busPorId = ResolverBusNamePorId(cabo.DestinoId);
+if (!string.IsNullOrWhiteSpace(busPorId))
+return busPorId;
+}
+return cabo.BarraDestino?.Trim() ?? string.Empty;
+}
+public string ResolverBus2Estrito(Cabo cabo)
+{
+return ResolverBusNamePorIdEstrito(
+cabo.DestinoId,
+$"Cabo '{ResolverBusName(cabo)}' destino");
+}
+public IReadOnlyList<Cabo> ObterCabosConectados(Elemento elemento)
+{
+string id = elemento.Id.ToString();
+return _document.Elementos
+.OfType<Cabo>()
+.Where(c =>
+string.Equals(c.OrigemId, id, StringComparison.OrdinalIgnoreCase) ||
+string.Equals(c.DestinoId, id, StringComparison.OrdinalIgnoreCase))
+.ToList();
+}
+public IReadOnlyList<Cabo> ReancorarCabosConectados(Elemento elemento)
+{
+var alterados = new List<Cabo>();
+foreach (Cabo cabo in ObterCabosConectados(elemento))
+{
+bool alterou = false;
+if (EhMesmoElemento(cabo.OrigemId, elemento) &&
+ReancorarOrigem(cabo, elemento))
+{
+alterou = true;
+}
+if (EhMesmoElemento(cabo.DestinoId, elemento) &&
+ReancorarDestino(cabo, elemento))
+{
+alterou = true;
+}
+if (alterou)
+alterados.Add(cabo);
+}
+return alterados;
+}
+public ConnectionValidationResult ValidarConexaoCabo(
+Cabo? caboAtual,
+Terminal? origem,
+Terminal? destino)
+{
+if (origem == null)
+return ConnectionValidationResult.Invalid("Origem sem terminal valido.");
+if (destino == null)
+return ConnectionValidationResult.Invalid("Destino sem terminal valido.");
+if (string.IsNullOrWhiteSpace(origem.Dono.Id.ToString()) ||
+string.IsNullOrWhiteSpace(origem.Id) ||
+string.IsNullOrWhiteSpace(destino.Dono.Id.ToString()) ||
+string.IsNullOrWhiteSpace(destino.Id))
+{
+return ConnectionValidationResult.Invalid("Conexao sem ElementoId ou TerminalId valido.");
+}
+if (MesmoElemento(origem, destino))
+return ConnectionValidationResult.Invalid("Origem e destino pertencem ao mesmo elemento.");
+if (MesmoTerminal(origem, destino))
+return ConnectionValidationResult.Invalid("Origem e destino usam o mesmo terminal.");
+if (ExisteCaboDuplicado(caboAtual, origem, destino))
+return ConnectionValidationResult.Invalid("Ja existe cabo entre estes terminais.");
+return ConnectionValidationResult.Valid();
+}
+public bool EhCaboDuplicado(Cabo cabo, IEnumerable<Cabo> anteriores)
+{
+foreach (Cabo anterior in anteriores)
+{
+if (MesmoParDeTerminais(
+cabo.OrigemId,
+cabo.OrigemTerminalId,
+cabo.DestinoId,
+cabo.DestinoTerminalId,
+anterior.OrigemId,
+anterior.OrigemTerminalId,
+anterior.DestinoId,
+anterior.DestinoTerminalId))
+{
+return true;
+}
+}
+return false;
+}
+private static bool EhMesmoElemento(string id, Elemento elemento)
+{
+return string.Equals(
+id,
+elemento.Id.ToString(),
+StringComparison.OrdinalIgnoreCase);
+}
+private bool ExisteCaboDuplicado(
+Cabo? caboAtual,
+Terminal origem,
+Terminal destino)
+{
+string origemId = origem.Dono.Id.ToString();
+string destinoId = destino.Dono.Id.ToString();
+return _document.Elementos.OfType<Cabo>().Any(c =>
+!ReferenceEquals(c, caboAtual) &&
+MesmoParDeTerminais(
+origemId,
+origem.Id,
+destinoId,
+destino.Id,
+c.OrigemId,
+c.OrigemTerminalId,
+c.DestinoId,
+c.DestinoTerminalId));
+}
+private static bool MesmoElemento(Terminal origem, Terminal destino)
+{
+return string.Equals(
+origem.Dono.Id.ToString(),
+destino.Dono.Id.ToString(),
+StringComparison.OrdinalIgnoreCase);
+}
+private static bool MesmoTerminal(Terminal origem, Terminal destino)
+{
+return MesmoElemento(origem, destino) &&
+string.Equals(origem.Id, destino.Id, StringComparison.OrdinalIgnoreCase);
+}
+private static bool MesmoParDeTerminais(
+string origemA,
+string origemTerminalA,
+string destinoA,
+string destinoTerminalA,
+string origemB,
+string origemTerminalB,
+string destinoB,
+string destinoTerminalB)
+{
+if (string.IsNullOrWhiteSpace(origemA) ||
+string.IsNullOrWhiteSpace(origemTerminalA) ||
+string.IsNullOrWhiteSpace(destinoA) ||
+string.IsNullOrWhiteSpace(destinoTerminalA) ||
+string.IsNullOrWhiteSpace(origemB) ||
+string.IsNullOrWhiteSpace(origemTerminalB) ||
+string.IsNullOrWhiteSpace(destinoB) ||
+string.IsNullOrWhiteSpace(destinoTerminalB))
+{
+return false;
+}
+bool direto =
+MesmoPonto(origemA, origemTerminalA, origemB, origemTerminalB) &&
+MesmoPonto(destinoA, destinoTerminalA, destinoB, destinoTerminalB);
+bool invertido =
+MesmoPonto(origemA, origemTerminalA, destinoB, destinoTerminalB) &&
+MesmoPonto(destinoA, destinoTerminalA, origemB, origemTerminalB);
+return direto || invertido;
+}
+private static bool MesmoPonto(
+string elementoA,
+string terminalA,
+string elementoB,
+string terminalB)
+{
+return string.Equals(elementoA, elementoB, StringComparison.OrdinalIgnoreCase) &&
+string.Equals(terminalA, terminalB, StringComparison.OrdinalIgnoreCase);
+}
+private static bool ReancorarOrigem(Cabo cabo, Elemento elemento)
+{
+Terminal? terminal = ObterTerminal(elemento, cabo.OrigemTerminalId);
+if (terminal == null)
+return false;
+if (cabo.Vertices.Count == 0)
+cabo.Vertices.Add(terminal.Posicao);
+else
+cabo.Vertices[0] = terminal.Posicao;
+cabo.DefinirOrigem(terminal.Posicao);
+return true;
+}
+private static bool ReancorarDestino(Cabo cabo, Elemento elemento)
+{
+Terminal? terminal = ObterTerminal(elemento, cabo.DestinoTerminalId);
+if (terminal == null)
+return false;
+if (cabo.Vertices.Count == 0)
+{
+cabo.Vertices.Add(terminal.Posicao);
+}
+else if (cabo.Vertices.Count == 1)
+{
+cabo.Vertices.Add(terminal.Posicao);
+}
+else
+{
+cabo.Vertices[^1] = terminal.Posicao;
+}
+cabo.DefinirDestino(terminal.Posicao);
+return true;
+}
+private static Terminal? ObterTerminal(Elemento elemento, string terminalId)
+{
+if (elemento is not ITerminalOwner owner ||
+string.IsNullOrWhiteSpace(terminalId))
+{
+return null;
+}
+return owner.Terminais.FirstOrDefault(t =>
+string.Equals(t.Id, terminalId, StringComparison.OrdinalIgnoreCase));
+}
 }
 }
 
@@ -785,779 +1464,332 @@ return new TransactionScope(Commands);
 
 
 ====================================================================================================
-ARQUIVO: C:\Araci-Engine-Front\Araci Engine\ViewModels\TerminalSnapState.cs
+ARQUIVO: C:\Araci-Engine-Front\Araci Engine\ViewModels\CaboViewModel.cs
 ====================================================================================================
 
-using System.ComponentModel;
-using System.Runtime.CompilerServices;
-using Araci.Models;
-namespace Araci.ViewModels
-{
-public class TerminalSnapState : INotifyPropertyChanged
-{
-private bool _visivel;
-private bool _invalido;
-private bool _mensagemVisivel;
-private double _x;
-private double _y;
-private double _mensagemX;
-private double _mensagemY;
-private string? _terminalId;
-private string? _elementoId;
-private string _mensagem = string.Empty;
-public bool Visivel
-{
-get => _visivel;
-private set
-{
-if (_visivel == value)
-return;
-_visivel = value;
-OnPropertyChanged();
-OnPropertyChanged(nameof(MarcadorValidoVisivel));
-OnPropertyChanged(nameof(MarcadorInvalidoVisivel));
-}
-}
-public double X
-{
-get => _x;
-private set
-{
-if (System.Math.Abs(_x - value) < 0.0001)
-return;
-_x = value;
-OnPropertyChanged();
-}
-}
-public double Y
-{
-get => _y;
-private set
-{
-if (System.Math.Abs(_y - value) < 0.0001)
-return;
-_y = value;
-OnPropertyChanged();
-}
-}
-public bool Invalido
-{
-get => _invalido;
-private set
-{
-if (_invalido == value)
-return;
-_invalido = value;
-OnPropertyChanged();
-OnPropertyChanged(nameof(MarcadorValidoVisivel));
-OnPropertyChanged(nameof(MarcadorInvalidoVisivel));
-}
-}
-public bool MarcadorValidoVisivel => Visivel && !Invalido;
-public bool MarcadorInvalidoVisivel => Visivel && Invalido;
-public bool MensagemVisivel
-{
-get => _mensagemVisivel;
-private set
-{
-if (_mensagemVisivel == value)
-return;
-_mensagemVisivel = value;
-OnPropertyChanged();
-}
-}
-public string Mensagem
-{
-get => _mensagem;
-private set
-{
-if (_mensagem == value)
-return;
-_mensagem = value;
-OnPropertyChanged();
-}
-}
-public double MensagemX
-{
-get => _mensagemX;
-private set
-{
-if (System.Math.Abs(_mensagemX - value) < 0.0001)
-return;
-_mensagemX = value;
-OnPropertyChanged();
-}
-}
-public double MensagemY
-{
-get => _mensagemY;
-private set
-{
-if (System.Math.Abs(_mensagemY - value) < 0.0001)
-return;
-_mensagemY = value;
-OnPropertyChanged();
-}
-}
-public string? TerminalId
-{
-get => _terminalId;
-private set
-{
-if (_terminalId == value)
-return;
-_terminalId = value;
-OnPropertyChanged();
-}
-}
-public string? ElementoId
-{
-get => _elementoId;
-private set
-{
-if (_elementoId == value)
-return;
-_elementoId = value;
-OnPropertyChanged();
-}
-}
-public void Mostrar(Terminal terminal)
-{
-X = terminal.Posicao.X;
-Y = terminal.Posicao.Y;
-TerminalId = terminal.Id;
-ElementoId = terminal.Dono.Id.ToString();
-Invalido = false;
-MensagemVisivel = false;
-Mensagem = string.Empty;
-Visivel = true;
-}
-public void MostrarInvalido(Terminal terminal, System.Windows.Point cursor, string mensagem)
-{
-X = terminal.Posicao.X;
-Y = terminal.Posicao.Y;
-TerminalId = terminal.Id;
-ElementoId = terminal.Dono.Id.ToString();
-Invalido = true;
-Mensagem = mensagem;
-MensagemX = cursor.X + 14;
-MensagemY = cursor.Y + 14;
-MensagemVisivel = true;
-Visivel = true;
-}
-public void Limpar()
-{
-Visivel = false;
-Invalido = false;
-MensagemVisivel = false;
-Mensagem = string.Empty;
-TerminalId = null;
-ElementoId = null;
-}
-public event PropertyChangedEventHandler? PropertyChanged;
-private void OnPropertyChanged([CallerMemberName] string? propertyName = null)
-{
-PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
-}
-}
-}
-
-
-====================================================================================================
-ARQUIVO: C:\Araci-Engine-Front\Araci Engine\ViewModels\ViewportViewModel.cs
-====================================================================================================
-
-using System;
-using System.Collections.Generic;
-using System.Collections.ObjectModel;
-using System.Collections.Specialized;
-using System.ComponentModel;
-using System.Runtime.CompilerServices;
-using Araci.Core.Documents;
-using Araci.Core.Scenes;
-using Araci.Models;
-using Araci.Services;
-namespace Araci.ViewModels
-{
-public class ViewportViewModel : INotifyPropertyChanged
-{
-private readonly EditorContext _context;
-private readonly Dictionary<Elemento, ElementoViewModel> _viewModelsPorModelo = new();
-public ViewportViewModel(EditorContext context)
-{
-_context = context ?? throw new ArgumentNullException(nameof(context));
-Document = context.Document;
-Scene = context.Scene;
-SelectionBox = context.SelectionBox;
-TerminalSnap = context.TerminalSnap;
-CableVertexEdit = context.CableVertexEdit;
-MoveHud = context.MoveHud;
-Document.Elementos.CollectionChanged += OnDocumentElementosChanged;
-SincronizarComDocumento();
-}
-public AraciDocument Document { get; }
-public Scene Scene { get; }
-public SelectionBoxViewModel SelectionBox { get; }
-public TerminalSnapState TerminalSnap { get; }
-public CableVertexEditService CableVertexEdit { get; }
-public MoveHudService MoveHud { get; }
-public ObservableCollection<ElementoViewModel> Elementos => Scene.Elementos;
-public void RegistrarViewModel(ElementoViewModel vm)
-{
-_viewModelsPorModelo[vm.Modelo] = vm;
-}
-public ElementoViewModel? ObterViewModel(Elemento modelo)
-{
-return _viewModelsPorModelo.TryGetValue(modelo, out var vm)
-? vm
-: null;
-}
-public void AtualizarViewModel(Elemento modelo)
-{
-ObterViewModel(modelo)?.AtualizarAposModeloAlterado();
-}
-private void OnDocumentElementosChanged(object? sender, NotifyCollectionChangedEventArgs e)
-{
-if (e.Action == NotifyCollectionChangedAction.Reset)
-{
-Elementos.Clear();
-return;
-}
-if (e.OldItems != null)
-{
-foreach (Elemento modelo in e.OldItems)
-RemoverViewModel(modelo);
-}
-if (e.NewItems != null)
-{
-foreach (Elemento modelo in e.NewItems)
-AdicionarViewModel(modelo);
-}
-}
-private void SincronizarComDocumento()
-{
-Elementos.Clear();
-foreach (Elemento modelo in Document.Elementos)
-AdicionarViewModel(modelo);
-}
-private void AdicionarViewModel(Elemento modelo)
-{
-var vm = ObterOuCriarViewModel(modelo);
-if (vm == null || Elementos.Contains(vm))
-return;
-Elementos.Add(vm);
-}
-private void RemoverViewModel(Elemento modelo)
-{
-if (!_viewModelsPorModelo.TryGetValue(modelo, out var vm))
-return;
-_context.Selection.Deselecionar(vm);
-Elementos.Remove(vm);
-}
-private ElementoViewModel? ObterOuCriarViewModel(Elemento modelo)
-{
-if (_viewModelsPorModelo.TryGetValue(modelo, out var existente))
-return existente;
-var vm = _context.ElementoFactory.CriarViewModel(modelo);
-if (vm != null)
-_viewModelsPorModelo[modelo] = vm;
-return vm;
-}
-public event PropertyChangedEventHandler? PropertyChanged;
-protected virtual void OnPropertyChanged([CallerMemberName] string? nome = null)
-{
-PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nome));
-}
-}
-}
-
-
-====================================================================================================
-ARQUIVO: C:\Araci-Engine-Front\Araci Engine\Views\ViewportView.xaml
-====================================================================================================
-
-<UserControl x:Class="Araci.Views.ViewportView"
-xmlns="http:
-xmlns:x="http:
-xmlns:controls="clr-namespace:Araci.Controls"
-xmlns:viewModels="clr-namespace:Araci.ViewModels"
-Focusable="True"
-PreviewMouseDown="OnPreviewMouseDown"
-PreviewMouseLeftButtonDown="OnPreviewMouseLeftButtonDown"
-PreviewMouseMove="OnPreviewMouseMove"
-PreviewMouseUp="OnPreviewMouseUp"
-PreviewMouseLeftButtonUp="OnPreviewMouseLeftButtonUp"
-PreviewMouseWheel="OnPreviewMouseWheel"
-PreviewKeyDown="OnPreviewKeyDown"
-PreviewKeyUp="OnPreviewKeyUp"
-MouseLeave="OnMouseLeave"
-Loaded="OnLoaded">
-<UserControl.Resources>
-<BooleanToVisibilityConverter
-x:Key="BooleanToVisibilityConverter"/>
-</UserControl.Resources>
-<Border x:Name="RootBorder"
-BorderThickness="1"
-BorderBrush="#252526"
-Background="#F4F4F4"
-ClipToBounds="True"
-SnapsToDevicePixels="True"
-UseLayoutRounding="True">
-<Grid ClipToBounds="True">
-<!-- ========================= -->
-<!-- ELEMENTOS -->
-<!-- ========================= -->
-<ItemsControl x:Name="WorldLayer"
-ItemsSource="{Binding Elementos}"
-ClipToBounds="False"
-SnapsToDevicePixels="True"
-HorizontalContentAlignment="Left"
-VerticalContentAlignment="Top">
-<ItemsControl.ItemsPanel>
-<ItemsPanelTemplate>
-<Canvas x:Name="ViewportCanvas"
-Background="#F4F4F4"
-ClipToBounds="False"
-SnapsToDevicePixels="True"
-UseLayoutRounding="True"/>
-</ItemsPanelTemplate>
-</ItemsControl.ItemsPanel>
-<ItemsControl.ItemContainerStyle>
-<Style TargetType="ContentPresenter">
-<Setter Property="Canvas.Left"
-Value="{Binding WorldX}"/>
-<Setter Property="Canvas.Top"
-Value="{Binding WorldY}"/>
-</Style>
-</ItemsControl.ItemContainerStyle>
-<ItemsControl.Resources>
-<DataTemplate DataType="{x:Type viewModels:CaboViewModel}">
-<controls:CaboControl/>
-</DataTemplate>
-<DataTemplate DataType="{x:Type viewModels:CargaViewModel}">
-<controls:CargaControl/>
-</DataTemplate>
-<DataTemplate DataType="{x:Type viewModels:GeradorViewModel}">
-<controls:GeradorControl/>
-</DataTemplate>
-<DataTemplate DataType="{x:Type viewModels:BarraViewModel}">
-<controls:BarraControl/>
-</DataTemplate>
-</ItemsControl.Resources>
-</ItemsControl>
-<!-- ========================= -->
-<!-- JANELA DE SELECAO -->
-<!-- ========================= -->
-<Canvas x:Name="SelectionLayer"
-IsHitTestVisible="False">
-<Rectangle
-Stroke="#007ACC"
-StrokeThickness="1.5"
-Fill="#22007ACC"
-StrokeDashArray="3 2"
-Canvas.Left="{Binding SelectionBox.X}"
-Canvas.Top="{Binding SelectionBox.Y}"
-Width="{Binding SelectionBox.Largura}"
-Height="{Binding SelectionBox.Altura}"
-Visibility="{Binding SelectionBox.Visivel,
-Converter={StaticResource BooleanToVisibilityConverter}}"/>
-</Canvas>
-<!-- ========================= -->
-<!-- VERTICES DO CABO -->
-<!-- ========================= -->
-<ItemsControl x:Name="CableVertexHandleLayer"
-ItemsSource="{Binding CableVertexEdit.Handles}"
-IsHitTestVisible="False">
-<ItemsControl.ItemsPanel>
-<ItemsPanelTemplate>
-<Canvas IsHitTestVisible="False"/>
-</ItemsPanelTemplate>
-</ItemsControl.ItemsPanel>
-<ItemsControl.ItemContainerStyle>
-<Style TargetType="ContentPresenter">
-<Setter Property="Canvas.Left"
-Value="{Binding X}"/>
-<Setter Property="Canvas.Top"
-Value="{Binding Y}"/>
-</Style>
-</ItemsControl.ItemContainerStyle>
-<ItemsControl.ItemTemplate>
-<DataTemplate>
-<Ellipse
-Width="10"
-Height="10"
-IsHitTestVisible="False">
-<Ellipse.Style>
-<Style TargetType="Ellipse">
-<Setter Property="Stroke"
-Value="#007ACC"/>
-<Setter Property="StrokeThickness"
-Value="2"/>
-<Setter Property="Fill"
-Value="White"/>
-<Style.Triggers>
-<DataTrigger Binding="{Binding IsActive}"
-Value="True">
-<Setter Property="Fill"
-Value="#DDEEFF"/>
-<Setter Property="Stroke"
-Value="#005A9E"/>
-<Setter Property="StrokeThickness"
-Value="3"/>
-</DataTrigger>
-</Style.Triggers>
-</Style>
-</Ellipse.Style>
-<Ellipse.RenderTransform>
-<TranslateTransform X="-5" Y="-5"/>
-</Ellipse.RenderTransform>
-</Ellipse>
-</DataTemplate>
-</ItemsControl.ItemTemplate>
-</ItemsControl>
-<!-- ========================= -->
-<!-- TERMINAL SNAP -->
-<!-- ========================= -->
-<Canvas x:Name="TerminalSnapLayer"
-IsHitTestVisible="False">
-<Ellipse
-Width="14"
-Height="14"
-Stroke="#007ACC"
-StrokeThickness="2"
-Fill="#33007ACC"
-Canvas.Left="{Binding TerminalSnap.X}"
-Canvas.Top="{Binding TerminalSnap.Y}"
-Visibility="{Binding TerminalSnap.MarcadorValidoVisivel,
-Converter={StaticResource BooleanToVisibilityConverter}}">
-<Ellipse.RenderTransform>
-<TranslateTransform X="-7" Y="-7"/>
-</Ellipse.RenderTransform>
-</Ellipse>
-<Ellipse
-Width="14"
-Height="14"
-Stroke="#D93025"
-StrokeThickness="2"
-Fill="#33D93025"
-Canvas.Left="{Binding TerminalSnap.X}"
-Canvas.Top="{Binding TerminalSnap.Y}"
-Visibility="{Binding TerminalSnap.MarcadorInvalidoVisivel,
-Converter={StaticResource BooleanToVisibilityConverter}}">
-<Ellipse.RenderTransform>
-<TranslateTransform X="-7" Y="-7"/>
-</Ellipse.RenderTransform>
-</Ellipse>
-</Canvas>
-<Canvas IsHitTestVisible="False"
-ClipToBounds="True">
-<Border
-Background="#DD2A1E1E"
-BorderBrush="#D93025"
-BorderThickness="1"
-CornerRadius="4"
-Padding="6,3"
-Canvas.Left="{Binding TerminalSnap.MensagemX}"
-Canvas.Top="{Binding TerminalSnap.MensagemY}"
-Visibility="{Binding TerminalSnap.MensagemVisivel,
-Converter={StaticResource BooleanToVisibilityConverter}}">
-<TextBlock
-Foreground="White"
-FontSize="12"
-Text="{Binding TerminalSnap.Mensagem}"/>
-</Border>
-</Canvas>
-<!-- ========================= -->
-<!-- HUD -->
-<!-- ========================= -->
-<Canvas IsHitTestVisible="False"
-ClipToBounds="True">
-<Border
-Background="#AA1E1E1E"
-CornerRadius="6"
-Padding="8"
-Canvas.Left="{Binding MoveHud.X}"
-Canvas.Top="{Binding MoveHud.Y}"
-Visibility="{Binding MoveHud.Visivel,
-Converter={StaticResource BooleanToVisibilityConverter}}">
-<StackPanel>
-<TextBlock
-Foreground="White"
-FontSize="12"
-Text="{Binding MoveHud.DeltaX,
-StringFormat=ΔX: {0:F1}}"/>
-<TextBlock
-Foreground="White"
-FontSize="12"
-Text="{Binding MoveHud.DeltaY,
-StringFormat=ΔY: {0:F1}}"/>
-</StackPanel>
-</Border>
-</Canvas>
-</Grid>
-</Border>
-</UserControl>
-
-
-====================================================================================================
-ARQUIVO: C:\Araci-Engine-Front\Araci Engine\Views\ViewportView.xaml.cs
-====================================================================================================
-
-using System;
-using System.ComponentModel;
+using System.Collections;
 using System.Windows;
-using System.Windows.Controls;
-using System.Windows.Input;
-using System.Windows.Media;
-using Araci.Applications.Editar.Base;
+using Araci.Core.SceneNodes;
+using Araci.Models;
 using Araci.Services;
-using Araci.ViewModels;
-namespace Araci.Views
+namespace Araci.ViewModels
 {
-public partial class ViewportView : UserControl
+public class CaboViewModel : ElementoViewModel
 {
-private readonly MatrixTransform _cameraTransform = new();
-private ViewportViewModel? _viewportViewModel;
-private EditorContext? _context;
-public ViewportView()
+private bool _possuiPreview;
+public CaboViewModel(
+Cabo modelo,
+TypeLibraryService types,
+NameService names,
+TypePropertiesDialogService typePropertiesDialogs)
+: base(modelo, new CaboNode(modelo), types, names, typePropertiesDialogs)
 {
-InitializeComponent();
+SelecionarPrimeiroTipoDisponivel();
 }
-public void Inicializar(EditorContext context)
+public Cabo Cabo => (Cabo)Modelo;
+public override IEnumerable TiposDisponiveis => Types.TiposCabos;
+public string OrigemId
 {
-_context = context ?? throw new ArgumentNullException(nameof(context));
-_viewportViewModel = new ViewportViewModel(_context);
-DataContext = _viewportViewModel;
-_context.InicializarViewport(_viewportViewModel);
-ConfigurarCamera();
-Unloaded += OnUnloaded;
-}
-private void ConfigurarCamera()
+get => Cabo.OrigemId;
+set
 {
-if (_context?.Viewport == null)
+if (Cabo.OrigemId == value)
 return;
-WorldLayer.RenderTransform = _cameraTransform;
-SelectionLayer.RenderTransform = _cameraTransform;
-CableVertexHandleLayer.RenderTransform = _cameraTransform;
-TerminalSnapLayer.RenderTransform = _cameraTransform;
-_context.Viewport.Camera.PropertyChanged += OnCameraChanged;
-AtualizarCameraTransform();
+Cabo.OrigemId = value;
+OnPropertyChanged();
+NotificarParametros();
 }
-private void OnCameraChanged(object? sender, PropertyChangedEventArgs e)
-{
-AtualizarCameraTransform();
 }
-private void AtualizarCameraTransform()
+public string DestinoId
 {
-if (_context?.Viewport == null)
+get => Cabo.DestinoId;
+set
+{
+if (Cabo.DestinoId == value)
 return;
-var camera = _context.Viewport.Camera;
-_cameraTransform.Matrix = new Matrix(
-camera.Zoom,
-0,
-0,
-camera.Zoom,
-camera.Offset.X,
-camera.Offset.Y);
+Cabo.DestinoId = value;
+OnPropertyChanged();
+NotificarParametros();
 }
-private void OnLoaded(object sender, RoutedEventArgs e)
-{
-Focus();
-Keyboard.Focus(this);
-AtualizarViewport();
-SizeChanged += (_, _) => AtualizarViewport();
 }
-private void AtualizarViewport()
+public string OrigemTerminalId
 {
-if (_context?.Viewport == null)
+get => Cabo.OrigemTerminalId;
+set
+{
+if (Cabo.OrigemTerminalId == value)
 return;
-double largura = ActualWidth;
-double altura = ActualHeight;
-if (RootBorder != null)
-{
-largura -= RootBorder.BorderThickness.Left + RootBorder.BorderThickness.Right;
-altura -= RootBorder.BorderThickness.Top + RootBorder.BorderThickness.Bottom;
+Cabo.OrigemTerminalId = value;
+OnPropertyChanged();
+NotificarParametros();
 }
-largura = Math.Max(0, largura);
-altura = Math.Max(0, altura);
-_context.Viewport.AtualizarTamanho(new Size(largura, altura));
 }
-private Point GetWorldPos(MouseEventArgs e)
+public string DestinoTerminalId
 {
-Point screen = e.GetPosition(this);
-return _context?.Viewport?.ScreenToWorld(screen) ?? screen;
-}
-private void OnPreviewMouseDown(object sender, MouseButtonEventArgs e)
+get => Cabo.DestinoTerminalId;
+set
 {
-if (_context == null)
+if (Cabo.DestinoTerminalId == value)
 return;
-if (_context.Navigation.TryHandleMiddleDoubleClick(e))
+Cabo.DestinoTerminalId = value;
+OnPropertyChanged();
+NotificarParametros();
+}
+}
+public string Nome
 {
-AtualizarCursorNavegacao();
-LiberarCapturaMouse();
-e.Handled = true;
+get => Cabo.Nome;
+set
+{
+if (Cabo.Nome == value)
 return;
+RenomearModelo(value);
+OnPropertyChanged();
+NotificarParametros();
 }
-if (_context.Navigation.TryBeginMiddlePan(e, this))
+}
+public string BarraOrigem
 {
-Focus();
-Keyboard.Focus(this);
-AtualizarCursorNavegacao();
-CaptureMouse();
-e.Handled = true;
-}
-}
-private void OnPreviewMouseLeftButtonDown(object sender, MouseButtonEventArgs e)
+get => Cabo.BarraOrigem;
+set
 {
-if (_context == null)
+if (Cabo.BarraOrigem == value)
 return;
-if (_context.Navigation.TryBeginSpaceLeftPan(e, this))
+Cabo.BarraOrigem = value;
+OnPropertyChanged();
+NotificarParametros();
+}
+}
+public string BarraDestino
 {
-Focus();
-Keyboard.Focus(this);
-AtualizarCursorNavegacao();
-CaptureMouse();
-e.Handled = true;
+get => Cabo.BarraDestino;
+set
+{
+if (Cabo.BarraDestino == value)
 return;
+Cabo.BarraDestino = value;
+OnPropertyChanged();
+NotificarParametros();
 }
-if (_context.Navigation.IsPanning)
+}
+public double Comprimento
 {
-e.Handled = true;
+get => Cabo.Comprimento;
+set
+{
+if (Cabo.Comprimento == value)
 return;
+Cabo.Comprimento = value;
+OnPropertyChanged();
+NotificarParametros();
 }
-Focus();
-Keyboard.Focus(this);
-var vm = EncontrarElemento(e.OriginalSource as DependencyObject);
-Point worldPosition = GetWorldPos(e);
-ToolInputState inputState = CriarInputState(e, e.ChangedButton, e.ClickCount);
-_context.Input.MouseDown(vm, worldPosition, inputState);
-CaptureMouse();
 }
-private void OnPreviewMouseMove(object sender, MouseEventArgs e)
+public double Ampacidade
 {
-if (_context?.Navigation.TryUpdatePan(e, this) == true)
+get => Cabo.Ampacidade;
+set
 {
-AtualizarCursorNavegacao();
-e.Handled = true;
+if (Cabo.Ampacidade == value)
 return;
+Cabo.Ampacidade = value;
+OnPropertyChanged();
+NotificarParametros();
 }
-if (_context == null)
+}
+public string TensaoLinha
+{
+get => Cabo.TensaoLinha;
+set
+{
+if (Cabo.TensaoLinha == value)
 return;
-Point worldPosition = GetWorldPos(e);
-_context.Input.MouseMove(worldPosition, CriarInputState(e));
+Cabo.TensaoLinha = value;
+OnPropertyChanged();
+NotificarParametros();
 }
-private void OnPreviewMouseUp(object sender, MouseButtonEventArgs e)
+}
+public string TensaoFaseA
 {
-if (_context?.Navigation.TryEndMiddlePan(e) != true)
+get => Cabo.TensaoFaseA;
+set
+{
+if (Cabo.TensaoFaseA == value)
 return;
-AtualizarCursorNavegacao();
-LiberarCapturaMouse();
-e.Handled = true;
+Cabo.TensaoFaseA = value;
+OnPropertyChanged();
+NotificarParametros();
 }
-private void OnPreviewMouseLeftButtonUp(object sender, MouseButtonEventArgs e)
+}
+public string TensaoFaseB
 {
-if (_context?.Navigation.TryEndSpaceLeftPan(e) == true)
+get => Cabo.TensaoFaseB;
+set
 {
-AtualizarCursorNavegacao();
-LiberarCapturaMouse();
-e.Handled = true;
+if (Cabo.TensaoFaseB == value)
 return;
+Cabo.TensaoFaseB = value;
+OnPropertyChanged();
+NotificarParametros();
 }
-if (_context?.Navigation.ConsumeSuppressNextLeftButtonUp() == true)
+}
+public string TensaoFaseC
 {
-e.Handled = true;
+get => Cabo.TensaoFaseC;
+set
+{
+if (Cabo.TensaoFaseC == value)
 return;
+Cabo.TensaoFaseC = value;
+OnPropertyChanged();
+NotificarParametros();
 }
-if (_context?.Navigation.IsPanning == true)
+}
+public string CorrenteLinha
 {
-e.Handled = true;
+get => Cabo.CorrenteLinha;
+set
+{
+if (Cabo.CorrenteLinha == value)
 return;
+Cabo.CorrenteLinha = value;
+OnPropertyChanged();
+NotificarParametros();
 }
-if (_context != null)
+}
+public string CorrenteFaseA
 {
-Point worldPosition = GetWorldPos(e);
-_context.Input.MouseUp(worldPosition, CriarInputState(e, e.ChangedButton, e.ClickCount));
-}
-LiberarCapturaMouse();
-}
-private void OnPreviewMouseWheel(object sender, MouseWheelEventArgs e)
+get => Cabo.CorrenteFaseA;
+set
 {
-if (_context?.Navigation.TryHandleMouseWheel(e, this) != true)
+if (Cabo.CorrenteFaseA == value)
 return;
-e.Handled = true;
+Cabo.CorrenteFaseA = value;
+OnPropertyChanged();
+NotificarParametros();
 }
-private void OnPreviewKeyDown(object sender, KeyEventArgs e)
+}
+public string CorrenteFaseB
 {
-if (_context?.Navigation.TryHandleKeyDown(e) == true)
+get => Cabo.CorrenteFaseB;
+set
 {
-AtualizarCursorNavegacao();
-e.Handled = true;
+if (Cabo.CorrenteFaseB == value)
 return;
+Cabo.CorrenteFaseB = value;
+OnPropertyChanged();
+NotificarParametros();
 }
-if (_context == null)
+}
+public string CorrenteFaseC
+{
+get => Cabo.CorrenteFaseC;
+set
+{
+if (Cabo.CorrenteFaseC == value)
 return;
-e.Handled = _context.Input.KeyDown(e.Key);
-if (e.Handled && e.Key == Key.Escape)
-LiberarCapturaMouse();
+Cabo.CorrenteFaseC = value;
+OnPropertyChanged();
+NotificarParametros();
 }
-private void OnPreviewKeyUp(object sender, KeyEventArgs e)
+}
+public override double WorldX => Bounds.X;
+public override double WorldY => Bounds.Y;
+public void Iniciar(Point p)
 {
-if (_context?.Navigation.TryHandleKeyUp(e) != true)
+Cabo.Vertices.Clear();
+Cabo.Vertices.Add(p);
+Cabo.DefinirOrigem(p);
+Cabo.PreviewPonto = p;
+_possuiPreview = true;
+Atualizar();
+}
+public void AtualizarPreview(Point p)
+{
+if (!_possuiPreview && Cabo.Vertices.Count == 0)
 return;
-AtualizarCursorNavegacao();
-LiberarCapturaMouse();
-e.Handled = true;
+_possuiPreview = true;
+if (Cabo.PreviewPonto.HasValue && Cabo.PreviewPonto.Value == p)
+return;
+Cabo.PreviewPonto = p;
+Atualizar();
 }
-private void OnMouseLeave(object sender, MouseEventArgs e)
+public void FinalizarNoPonto(Point p)
 {
-_context?.Hover.Clear();
-_context?.TerminalSnap.Limpar();
-_context?.Navigation.CancelPan();
-AtualizarCursorNavegacao();
+if (Cabo.Vertices.Count == 0)
+return;
+Cabo.PreviewPonto = null;
+_possuiPreview = false;
+var ultimo = Cabo.Vertices[^1];
+if (ultimo != p)
+Cabo.Vertices.Add(p);
+Cabo.DefinirDestino(p);
+Atualizar();
 }
-private void OnUnloaded(object sender, RoutedEventArgs e)
+public void AdicionarVerticeIntermediario(Point p)
 {
-_context?.Navigation.Reset();
-LiberarCapturaMouse();
-Cursor = Cursors.Arrow;
-if (_context?.Viewport != null)
-_context.Viewport.Camera.PropertyChanged -= OnCameraChanged;
+if (Cabo.Vertices.Count == 0)
+return;
+var ultimo = Cabo.Vertices[^1];
+if (DistanciaQuadrada(ultimo, p) < 0.0001)
+return;
+Cabo.Vertices.Add(p);
+Cabo.PreviewPonto = p;
+_possuiPreview = true;
+Atualizar();
 }
-private void AtualizarCursorNavegacao()
+public void RemoverPreview()
 {
-if (_context?.Navigation.IsPanning == true || _context?.Navigation.IsSpacePressed == true)
-Cursor = Cursors.ScrollAll;
-else
-Cursor = Cursors.Arrow;
+if (!_possuiPreview && Cabo.PreviewPonto == null)
+return;
+_possuiPreview = false;
+Cabo.PreviewPonto = null;
+Atualizar();
 }
-private void LiberarCapturaMouse()
+public override void Mover(Vector delta)
 {
-if (IsMouseCaptured)
-ReleaseMouseCapture();
+CaboNode.Mover(delta);
+foreach (var t in Cabo.Terminais)
+{
+t.Posicao = new Point(
+t.Posicao.X + delta.X,
+t.Posicao.Y + delta.Y);
 }
-private ToolInputState CriarInputState(
-MouseEventArgs e,
-MouseButton? button = null,
-int clickCount = 0)
-{
-Point screenPosition = e.GetPosition(this);
-Point worldPosition = _context?.Viewport?.ScreenToWorld(screenPosition) ?? screenPosition;
-return new ToolInputState(
-Keyboard.Modifiers,
-button,
-clickCount,
-worldPosition,
-screenPosition);
+Atualizar();
 }
-private static ElementoViewModel? EncontrarElemento(DependencyObject? origem)
+public override ElementoEstado CapturarEstado()
 {
-while (origem != null)
-{
-if (origem is FrameworkElement fe && fe.DataContext is ElementoViewModel vm)
-return vm;
-origem = VisualTreeHelper.GetParent(origem);
+return new ElementoEstado(WorldX, WorldY, vertices: Cabo.Vertices);
 }
-return null;
+public override void AplicarEstado(ElementoEstado estado)
+{
+Cabo.Vertices.Clear();
+foreach (var p in estado.Vertices)
+Cabo.Vertices.Add(p);
+if (Cabo.Vertices.Count > 0)
+{
+Cabo.DefinirOrigem(Cabo.Vertices[0]);
+Cabo.DefinirDestino(Cabo.Vertices[^1]);
+}
+Atualizar();
+}
+public override void AtualizarAposModeloAlterado()
+{
+Atualizar();
+}
+private CaboNode CaboNode => (CaboNode)Node;
+private void Atualizar()
+{
+CaboNode.AtualizarGeometria();
+OnPropertyChanged(nameof(WorldX));
+OnPropertyChanged(nameof(WorldY));
+OnPropertyChanged(nameof(Bounds));
+NotificarGeometria();
+}
+private static double DistanciaQuadrada(Point a, Point b)
+{
+double dx = a.X - b.X;
+double dy = a.Y - b.Y;
+return dx * dx + dy * dy;
 }
 }
 }

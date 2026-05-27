@@ -135,21 +135,29 @@ namespace Araci.Controls
                 _hitArea.Points.Add(local);
             }
 
+            if (cabo.PreviewDobra.HasValue)
+                AdicionarPonto(cabo.PreviewDobra.Value, offsetX, offsetY);
+
             if (cabo.PreviewPonto.HasValue)
             {
                 var preview = cabo.PreviewPonto.Value;
-                var ultimo = cabo.Vertices.Count > 0 ? cabo.Vertices[^1] : preview;
+                var ultimo =
+                    cabo.PreviewDobra
+                    ?? (cabo.Vertices.Count > 0 ? cabo.Vertices[^1] : preview);
 
                 if (preview != ultimo)
-                {
-                    var local = new Point(preview.X - offsetX, preview.Y - offsetY);
-
-                    _polyline.Points.Add(local);
-                    _hitArea.Points.Add(local);
-                }
+                    AdicionarPonto(preview, offsetX, offsetY);
             }
 
             InvalidateVisual();
+        }
+
+        private void AdicionarPonto(Point ponto, double offsetX, double offsetY)
+        {
+            var local = new Point(ponto.X - offsetX, ponto.Y - offsetY);
+
+            _polyline.Points.Add(local);
+            _hitArea.Points.Add(local);
         }
 
         protected override void AplicarEstadoVisual(ElementoViewModel vm)

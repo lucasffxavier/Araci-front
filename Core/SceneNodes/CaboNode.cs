@@ -67,6 +67,15 @@ namespace Araci.Core.SceneNodes
                     preview.Y + delta.Y);
             }
 
+            if (_cabo.PreviewDobra.HasValue)
+            {
+                var preview = _cabo.PreviewDobra.Value;
+
+                _cabo.PreviewDobra = new Point(
+                    preview.X + delta.X,
+                    preview.Y + delta.Y);
+            }
+
             AtualizarGeometria();
         }
 
@@ -78,6 +87,9 @@ namespace Araci.Core.SceneNodes
 
             if (_cabo.PreviewPonto.HasValue)
                 pontos.Add(_cabo.PreviewPonto.Value);
+
+            if (_cabo.PreviewDobra.HasValue)
+                pontos.Add(_cabo.PreviewDobra.Value);
 
             if (pontos.Count == 0)
             {
