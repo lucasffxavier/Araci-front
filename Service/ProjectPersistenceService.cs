@@ -143,6 +143,7 @@ namespace Araci.Services
 
             AplicarParametros(elemento, dto.Parameters);
             AplicarVertices(elemento, dto.Vertices);
+            _context.TerminalLayout.AtualizarTerminais(elemento);
             RestaurarTerminais(elemento, dto.Terminals);
 
             return elemento;

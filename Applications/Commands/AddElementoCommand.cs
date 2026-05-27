@@ -8,6 +8,8 @@ namespace Araci.Core.Commands
     {
         private readonly Elemento _elemento;
         private readonly EditorContext _context;
+        private bool _inicializado;
+        private string? _nomeFinal;
 
         public AddElementoCommand(Elemento elemento, EditorContext context)
         {
@@ -17,7 +19,7 @@ namespace Araci.Core.Commands
 
         public void Execute()
         {
-            _context.Names.GarantirNomeUnico(_elemento);
+            PrepararPrimeiraExecucao();
             _context.Document.AdicionarElemento(_elemento);
         }
 
@@ -28,7 +30,27 @@ namespace Araci.Core.Commands
 
         public void Redo()
         {
-            Execute();
+            RestaurarEstadoInicializado();
+            _context.Document.AdicionarElemento(_elemento);
+        }
+
+        private void PrepararPrimeiraExecucao()
+        {
+            if (_inicializado)
+            {
+                RestaurarEstadoInicializado();
+                return;
+            }
+
+            _context.Names.GarantirNomeUnico(_elemento);
+            _nomeFinal = _elemento.Nome;
+            _inicializado = true;
+        }
+
+        private void RestaurarEstadoInicializado()
+        {
+            if (_nomeFinal != null)
+                _elemento.Nome = _nomeFinal;
         }
     }
 }

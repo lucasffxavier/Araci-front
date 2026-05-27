@@ -65,14 +65,28 @@ namespace Araci.ViewModels
 
         public void RegistrarViewModel(ElementoViewModel vm)
         {
+            if (!Document.Elementos.Contains(vm.Modelo) ||
+                !Elementos.Contains(vm))
+            {
+                return;
+            }
+
             _viewModelsPorModelo[vm.Modelo] = vm;
         }
 
         public ElementoViewModel? ObterViewModel(Elemento modelo)
         {
-            return _viewModelsPorModelo.TryGetValue(modelo, out var vm)
-                ? vm
-                : null;
+            if (!_viewModelsPorModelo.TryGetValue(modelo, out var vm))
+                return null;
+
+            if (Document.Elementos.Contains(modelo) &&
+                Elementos.Contains(vm))
+            {
+                return vm;
+            }
+
+            _viewModelsPorModelo.Remove(modelo);
+            return null;
         }
 
         public void AtualizarViewModel(Elemento modelo)
@@ -84,7 +98,7 @@ namespace Araci.ViewModels
         {
             if (e.Action == NotifyCollectionChangedAction.Reset)
             {
-                Elementos.Clear();
+                LimparViewModels();
                 return;
             }
 
@@ -103,7 +117,7 @@ namespace Araci.ViewModels
 
         private void SincronizarComDocumento()
         {
-            Elementos.Clear();
+            LimparViewModels();
 
             foreach (Elemento modelo in Document.Elementos)
                 AdicionarViewModel(modelo);
@@ -125,7 +139,22 @@ namespace Araci.ViewModels
                 return;
 
             _context.Selection.Deselecionar(vm);
+            _context.CableVertexEdit.Clear();
+            _context.Hover.Clear();
             Elementos.Remove(vm);
+            _viewModelsPorModelo.Remove(modelo);
+            _context.SceneQueries.Invalidate();
+        }
+
+        private void LimparViewModels()
+        {
+            _context.Selection.Limpar();
+            _context.CableVertexEdit.Clear();
+            _context.Hover.Clear();
+            _context.TerminalSnap.Limpar();
+            Elementos.Clear();
+            _viewModelsPorModelo.Clear();
+            _context.SceneQueries.Invalidate();
         }
 
         private ElementoViewModel? ObterOuCriarViewModel(Elemento modelo)

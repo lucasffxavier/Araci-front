@@ -8,13 +8,17 @@ namespace Araci.ViewModels
 {
     public class CargaViewModel : ElementoViewModel
     {
+        private readonly TerminalLayoutService _terminalLayout;
+
         public CargaViewModel(
             Carga modelo,
             TypeLibraryService types,
             NameService names,
-            TypePropertiesDialogService typePropertiesDialogs)
+            TypePropertiesDialogService typePropertiesDialogs,
+            TerminalLayoutService terminalLayout)
             : base(modelo, new EquipamentoNode(modelo), types, names, typePropertiesDialogs)
         {
+            _terminalLayout = terminalLayout;
             SelecionarPrimeiroTipoDisponivel();
             AtualizarTerminais();
         }
@@ -233,7 +237,7 @@ namespace Araci.ViewModels
 
         private void AtualizarTerminais()
         {
-            Carga.AtualizarTerminais(Largura);
+            _terminalLayout.AtualizarTerminais(Carga);
         }
     }
 }

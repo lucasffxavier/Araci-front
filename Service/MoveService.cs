@@ -105,6 +105,7 @@ namespace Araci.Services
         private void AtualizarElementoMovido(Elemento elemento)
         {
             _context.Viewport?.AtualizarViewModel(elemento);
+            _context.TerminalLayout.AtualizarTerminais(elemento);
             _context.SceneQueries.Invalidate();
             _context.CableVertexEdit.Refresh();
         }
@@ -136,6 +137,8 @@ namespace Araci.Services
         {
             if (elemento is Cabo)
                 return;
+
+            _context.TerminalLayout.AtualizarTerminais(elemento);
 
             foreach (Cabo cabo in _context.Connectivity.ReancorarCabosConectados(elemento))
                 _context.Viewport?.AtualizarViewModel(cabo);

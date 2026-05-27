@@ -8,13 +8,17 @@ namespace Araci.ViewModels
 {
     public class BarraViewModel : ElementoViewModel
     {
+        private readonly TerminalLayoutService _terminalLayout;
+
         public BarraViewModel(
             Barra modelo,
             TypeLibraryService types,
             NameService names,
-            TypePropertiesDialogService typePropertiesDialogs)
+            TypePropertiesDialogService typePropertiesDialogs,
+            TerminalLayoutService terminalLayout)
             : base(modelo, new BarraNode(modelo), types, names, typePropertiesDialogs)
         {
+            _terminalLayout = terminalLayout;
             SelecionarPrimeiroTipoDisponivel();
             AtualizarTerminais();
         }
@@ -80,7 +84,7 @@ namespace Araci.ViewModels
 
         private void AtualizarTerminais()
         {
-            Barra.AtualizarTerminais();
+            _terminalLayout.AtualizarTerminais(Barra);
         }
     }
 }

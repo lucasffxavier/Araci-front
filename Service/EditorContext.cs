@@ -32,8 +32,9 @@ namespace Araci.Services
             TypePropertiesDialogs = new TypePropertiesDialogService();
             Dialogs = new DialogService();
             Geometry = new ElementGeometryService();
+            TerminalLayout = new TerminalLayoutService(Geometry);
 
-            ElementoFactory = new ElementoFactory(Types, Names, TypePropertiesDialogs);
+            ElementoFactory = new ElementoFactory(Types, Names, TypePropertiesDialogs, TerminalLayout);
             CableVertexEdit = new CableVertexEditService(this);
             Selection = new SelectionService(this);
             Selection.SelectionChanged += CableVertexEdit.Refresh;
@@ -49,7 +50,7 @@ namespace Araci.Services
 
         public IEventBus Events { get; }
 
-        public AraciDocument Document { get; set; } = new AraciDocument();
+        public AraciDocument Document { get; } = new AraciDocument();
 
         public Scene Scene { get; } = new Scene();
 
@@ -115,6 +116,8 @@ namespace Araci.Services
         public DialogService Dialogs { get; }
 
         public ElementGeometryService Geometry { get; }
+
+        public TerminalLayoutService TerminalLayout { get; }
 
         public TypeLibraryService Types { get; } = new TypeLibraryService();
 

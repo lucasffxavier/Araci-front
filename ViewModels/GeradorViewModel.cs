@@ -8,13 +8,17 @@ namespace Araci.ViewModels
 {
     public class GeradorViewModel : ElementoViewModel
     {
+        private readonly TerminalLayoutService _terminalLayout;
+
         public GeradorViewModel(
             Gerador modelo,
             TypeLibraryService types,
             NameService names,
-            TypePropertiesDialogService typePropertiesDialogs)
+            TypePropertiesDialogService typePropertiesDialogs,
+            TerminalLayoutService terminalLayout)
             : base(modelo, new EquipamentoNode(modelo), types, names, typePropertiesDialogs)
         {
+            _terminalLayout = terminalLayout;
             SelecionarPrimeiroTipoDisponivel();
             AtualizarTerminais();
         }
@@ -247,7 +251,7 @@ namespace Araci.ViewModels
 
         private void AtualizarTerminais()
         {
-            Gerador.AtualizarTerminais(Largura, Altura);
+            _terminalLayout.AtualizarTerminais(Gerador);
         }
     }
 }
