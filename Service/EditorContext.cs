@@ -23,6 +23,7 @@ namespace Araci.Services
             Hover = new HoverService(SceneQueries);
             Snap = new SnapService(SceneQueries);
             Connectivity = new ConnectivityService(this);
+            ElectricGraph = new ElectricGraphBuilder(this);
             Topology = new TopologyValidator(this);
             SimulationResults = new SimulationResultApplier(this);
             Simulation = new SimulationPipeline(this);
@@ -101,6 +102,8 @@ namespace Araci.Services
         public NameService Names { get; }
 
         public ConnectivityService Connectivity { get; }
+
+        public ElectricGraphBuilder ElectricGraph { get; }
 
         public TopologyValidator Topology { get; }
 
