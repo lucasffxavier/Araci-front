@@ -41,7 +41,15 @@ namespace Araci.TechnicalChecks
                 ("SIN com gerador vira slack preferencial", SinComGeradorViraSlackPreferencial),
                 ("SIN com multiplos geradores preserva todos em Generators", SinComMultiplosGeradoresPreservaTodosGenerators),
                 ("Multiplos SIN usam primeiro do Document como slack", MultiplosSinUsamPrimeiroDoDocumentComoSlack),
-                ("Reload com SIN mantem slack baseado no SIN", ReloadComSinMantemSlackBaseadoNoSin)
+                ("Reload com SIN mantem slack baseado no SIN", ReloadComSinMantemSlackBaseadoNoSin),
+                ("OperationalGraph energiza SIN cabo e carga", OperationalGraphEnergizaSinCaboECarga),
+                ("OperationalGraph mantem carga isolada desenergizada", OperationalGraphMantemCargaIsoladaDesenergizada),
+                ("OperationalGraph energiza ramificacao com barra", OperationalGraphEnergizaRamificacaoComBarra),
+                ("OperationalGraph nao propaga por cabo invalido", OperationalGraphNaoPropagaPorCaboInvalido),
+                ("OperationalGraph usa gerador como fallback sem SIN", OperationalGraphUsaGeradorComoFallbackSemSin),
+                ("OperationalGraph sem fonte nao energiza nos", OperationalGraphSemFonteNaoEnergizaNos),
+                ("OperationalGraph rebuild repetido nao altera Document", OperationalGraphRebuildRepetidoNaoAlteraDocument),
+                ("OperationalGraph apos reload preserva resultado", OperationalGraphAposReloadPreservaResultado)
             };
 
             var failures = new List<string>();
@@ -540,6 +548,157 @@ namespace Araci.TechnicalChecks
             AssertEqual(circuit.Generator.Id.ToString(), dto.Generators[0].Id, "GeneratorDto.Id apos reload com SIN");
         }
 
+        private static void OperationalGraphEnergizaSinCaboECarga()
+        {
+            var document = new AraciDocument();
+            Sin sin = CreateSin("SIN-OP");
+            Carga load = CreateLoad("CARGA-OP", 300, 100);
+            Cabo cable = CreateCable(sin, 1, load, 0, "L-OP", 1.0);
+
+            document.AdicionarElemento(sin);
+            document.AdicionarElemento(load);
+            document.AdicionarElemento(cable);
+
+            OperationalGraphState state = BuildOperationalState(document);
+
+            AssertEnergized(state, sin, "SIN energizado");
+            AssertEnergized(state, load, "Carga energizada");
+            AssertEdgeEnergized(state, cable, "Cabo energizado");
+            AssertEqual(1, state.SourceNodeIds.Count, "Quantidade de fontes operacionais");
+            AssertEqual(sin.Id.ToString(), state.SourceNodeIds[0], "Fonte operacional SIN");
+        }
+
+        private static void OperationalGraphMantemCargaIsoladaDesenergizada()
+        {
+            var document = new AraciDocument();
+            Sin sin = CreateSin("SIN-ISOLADO");
+            Carga load = CreateLoad("CARGA-ISOLADA", 300, 100);
+
+            document.AdicionarElemento(sin);
+            document.AdicionarElemento(load);
+
+            OperationalGraphState state = BuildOperationalState(document);
+
+            AssertEnergized(state, sin, "SIN isolado energizado");
+            AssertDeenergized(state, load, "Carga isolada desenergizada");
+        }
+
+        private static void OperationalGraphEnergizaRamificacaoComBarra()
+        {
+            var document = new AraciDocument();
+            Sin sin = CreateSin("SIN-RAMO-OP");
+            Barra bar = CreateBar("BARRA-RAMO-OP");
+            Carga load1 = CreateLoad("CARGA-OP-R1", 320, 90);
+            Carga load2 = CreateLoad("CARGA-OP-R2", 280, 85);
+            Cabo cable1 = CreateCable(sin, 1, bar, 0, "L-OP-01", 1.0);
+            Cabo cable2 = CreateCable(bar, 1, load1, 0, "L-OP-02", 1.1);
+            Cabo cable3 = CreateCable(bar, 2, load2, 0, "L-OP-03", 1.2);
+
+            document.AdicionarElemento(sin);
+            document.AdicionarElemento(bar);
+            document.AdicionarElemento(load1);
+            document.AdicionarElemento(load2);
+            document.AdicionarElemento(cable1);
+            document.AdicionarElemento(cable2);
+            document.AdicionarElemento(cable3);
+
+            OperationalGraphState state = BuildOperationalState(document);
+
+            AssertEnergized(state, sin, "SIN ramificado");
+            AssertEnergized(state, bar, "Barra ramificada");
+            AssertEnergized(state, load1, "Carga ramo 1");
+            AssertEnergized(state, load2, "Carga ramo 2");
+            AssertEdgeEnergized(state, cable1, "Cabo ramo 1");
+            AssertEdgeEnergized(state, cable2, "Cabo ramo 2");
+            AssertEdgeEnergized(state, cable3, "Cabo ramo 3");
+        }
+
+        private static void OperationalGraphNaoPropagaPorCaboInvalido()
+        {
+            var document = new AraciDocument();
+            Sin sin = CreateSin("SIN-INVALIDO");
+            Carga load = CreateLoad("CARGA-BLOQUEADA", 300, 100);
+            Cabo cable = CreateCable(sin, 1, load, 0, "L-INVALIDO", 1.0);
+            cable.DestinoTerminalId = "NAO_EXISTE";
+
+            document.AdicionarElemento(sin);
+            document.AdicionarElemento(load);
+            document.AdicionarElemento(cable);
+
+            OperationalGraphState state = BuildOperationalState(document);
+
+            AssertEnergized(state, sin, "SIN com cabo invalido");
+            AssertDeenergized(state, load, "Carga atras de cabo invalido");
+            AssertEdgeDeenergized(state, cable, "Cabo invalido desenergizado");
+        }
+
+        private static void OperationalGraphUsaGeradorComoFallbackSemSin()
+        {
+            SimpleCircuit circuit = CreateSimpleCircuit();
+            OperationalGraphState state = BuildOperationalState(circuit.Document);
+
+            AssertEnergized(state, circuit.Generator, "Gerador fallback");
+            AssertEnergized(state, circuit.Load, "Carga via gerador fallback");
+            AssertEdgeEnergized(state, circuit.Cable, "Cabo via gerador fallback");
+            AssertEqual(circuit.Generator.Id.ToString(), state.SourceNodeIds[0], "Fonte fallback gerador");
+        }
+
+        private static void OperationalGraphSemFonteNaoEnergizaNos()
+        {
+            var document = new AraciDocument();
+            Carga load = CreateLoad("CARGA-SEM-FONTE", 300, 100);
+
+            document.AdicionarElemento(load);
+
+            OperationalGraphState state = BuildOperationalState(document);
+
+            AssertEqual(0, state.SourceNodeIds.Count, "Sem fontes operacionais");
+            AssertEqual(0, state.EnergizedNodeIds.Count, "Nos energizados sem fonte");
+            AssertDeenergized(state, load, "Carga sem fonte");
+        }
+
+        private static void OperationalGraphRebuildRepetidoNaoAlteraDocument()
+        {
+            var document = new AraciDocument();
+            Sin sin = CreateSin("SIN-REBUILD-OP");
+            Carga load = CreateLoad("CARGA-REBUILD-OP", 300, 100);
+
+            document.AdicionarElemento(sin);
+            document.AdicionarElemento(load);
+            document.AdicionarElemento(CreateCable(sin, 1, load, 0, "L-REBUILD-OP", 1.0));
+
+            int countBefore = document.Elementos.Count;
+
+            OperationalGraphState state1 = BuildOperationalState(document);
+            OperationalGraphState state2 = BuildOperationalState(document);
+            OperationalGraphState state3 = BuildOperationalState(document);
+
+            AssertEqual(countBefore, document.Elementos.Count, "Contagem apos rebuild operacional");
+            AssertEqual(state1.EnergizedNodeIds.Count, state2.EnergizedNodeIds.Count, "Operational nodes 1/2");
+            AssertEqual(state2.EnergizedNodeIds.Count, state3.EnergizedNodeIds.Count, "Operational nodes 2/3");
+            AssertEqual(state1.EnergizedEdgeIds.Count, state2.EnergizedEdgeIds.Count, "Operational edges 1/2");
+            AssertEqual(state2.EnergizedEdgeIds.Count, state3.EnergizedEdgeIds.Count, "Operational edges 2/3");
+        }
+
+        private static void OperationalGraphAposReloadPreservaResultado()
+        {
+            var document = new AraciDocument();
+            Sin sin = CreateSin("SIN-RELOAD-OP");
+            Carga load = CreateLoad("CARGA-RELOAD-OP", 300, 100);
+            Cabo cable = CreateCable(sin, 1, load, 0, "L-RELOAD-OP", 1.0);
+
+            document.AdicionarElemento(sin);
+            document.AdicionarElemento(load);
+            document.AdicionarElemento(cable);
+
+            AraciDocument loaded = SaveAndLoad(document);
+            OperationalGraphState state = BuildOperationalState(loaded);
+
+            Assert(state.IsNodeEnergized(sin.Id.ToString()), "SIN deve continuar energizado apos reload.");
+            Assert(state.IsNodeEnergized(load.Id.ToString()), "Carga deve continuar energizada apos reload.");
+            Assert(state.IsEdgeEnergized(cable.Id.ToString()), "Cabo deve continuar energizado apos reload.");
+        }
+
         private static SimpleCircuit CreateSimpleCircuit()
         {
             var document = new AraciDocument();
@@ -756,6 +915,54 @@ namespace Araci.TechnicalChecks
             AssertEqual(expectedLoad.Id.ToString(), loadedCable.DestinoId, $"{name}.DestinoId");
             AssertEqual(expectedSinTerminalId, loadedCable.OrigemTerminalId, $"{name}.OrigemTerminalId");
             AssertEqual(expectedCable.DestinoTerminalId, loadedCable.DestinoTerminalId, $"{name}.DestinoTerminalId");
+        }
+
+        private static OperationalGraphState BuildOperationalState(AraciDocument document)
+        {
+            ElectricGraph graph = new ElectricGraphBuilder(document).Build();
+            return new OperationalGraphStateBuilder().Build(graph);
+        }
+
+        private static void AssertEnergized(
+            OperationalGraphState state,
+            Elemento elemento,
+            string name)
+        {
+            Assert(
+                state.IsNodeEnergized(elemento.Id.ToString()),
+                $"{name}: elemento deveria estar energizado.");
+        }
+
+        private static void AssertDeenergized(
+            OperationalGraphState state,
+            Elemento elemento,
+            string name)
+        {
+            Assert(
+                !state.IsNodeEnergized(elemento.Id.ToString()) &&
+                state.DeenergizedNodeIds.Contains(elemento.Id.ToString()),
+                $"{name}: elemento deveria estar desenergizado.");
+        }
+
+        private static void AssertEdgeEnergized(
+            OperationalGraphState state,
+            Cabo cabo,
+            string name)
+        {
+            Assert(
+                state.IsEdgeEnergized(cabo.Id.ToString()),
+                $"{name}: cabo deveria estar energizado.");
+        }
+
+        private static void AssertEdgeDeenergized(
+            OperationalGraphState state,
+            Cabo cabo,
+            string name)
+        {
+            Assert(
+                !state.IsEdgeEnergized(cabo.Id.ToString()) &&
+                state.DeenergizedEdgeIds.Contains(cabo.Id.ToString()),
+                $"{name}: cabo deveria estar desenergizado.");
         }
 
         private static AraciDocument SaveAndLoad(AraciDocument document)

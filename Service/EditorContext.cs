@@ -24,6 +24,7 @@ namespace Araci.Services
             Snap = new SnapService(SceneQueries);
             Connectivity = new ConnectivityService(this);
             ElectricGraph = new ElectricGraphBuilder(this);
+            OperationalState = new OperationalGraphStateBuilder();
             Topology = new TopologyValidator(this);
             SimulationResults = new SimulationResultApplier(this);
             Simulation = new SimulationPipeline(this);
@@ -104,6 +105,8 @@ namespace Araci.Services
         public ConnectivityService Connectivity { get; }
 
         public ElectricGraphBuilder ElectricGraph { get; }
+
+        public OperationalGraphStateBuilder OperationalState { get; }
 
         public TopologyValidator Topology { get; }
 
