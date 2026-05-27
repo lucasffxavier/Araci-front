@@ -6,6 +6,7 @@ using Araci.Applications.Diagrama.InserirCabo;
 using Araci.Applications.Diagrama.InserirCarga;
 using Araci.Applications.Diagrama.InserirGerador;
 using Araci.Applications.Diagrama.InserirBarra;
+using Araci.Applications.Diagrama.InserirSin;
 
 using Araci.Services;
 
@@ -72,6 +73,22 @@ namespace Araci.Ribbon.Tabs
             if (Context == null) return;
 
             InserirCaboApplication app =
+                new(Context);
+
+            app.Executar();
+        }
+
+        // =========================
+        // SIN
+        // =========================
+
+        private void SinButton_Click(
+            object sender,
+            RoutedEventArgs e)
+        {
+            if (Context == null) return;
+
+            InserirSinApplication app =
                 new(Context);
 
             app.Executar();

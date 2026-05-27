@@ -42,6 +42,11 @@ namespace Araci.Services
                     gerador.AtualizarTerminais(tamanho.Width, tamanho.Height);
                     break;
 
+                case Sin sin:
+                    var tamanhoSin = _geometry.ObterTamanho(sin);
+                    sin.AtualizarTerminais(tamanhoSin.Width, tamanhoSin.Height);
+                    break;
+
                 case Cabo cabo:
                     AtualizarTerminaisCabo(cabo);
                     break;

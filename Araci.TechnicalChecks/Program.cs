@@ -32,7 +32,12 @@ namespace Araci.TechnicalChecks
                 ("Persistencia preserva ramificacao", PersistenciaPreservaRamificacao),
                 ("DTO permanece equivalente apos reload", DtoPermaneceEquivalenteAposReload),
                 ("IDs permanecem estaveis apos reload", IdsPermanecemEstaveisAposReload),
-                ("Builds repetidos apos reload nao alteram Document", BuildsRepetidosAposReloadNaoAlteramDocument)
+                ("Builds repetidos apos reload nao alteram Document", BuildsRepetidosAposReloadNaoAlteramDocument),
+                ("SIN pode ser criado e entra no Document", SinPodeSerCriadoEEntraNoDocument),
+                ("SIN aparece no ElectricGraph", SinApareceNoElectricGraph),
+                ("SIN preserva Id apos reload", SinPreservaIdAposReload),
+                ("Cabo conectado ao SIN preserva conexoes", CaboConectadoAoSinPreservaConexoes),
+                ("DTOs existentes com gerador continuam funcionando", DtosComGeradorContinuamFuncionando)
             };
 
             var failures = new List<string>();
@@ -357,6 +362,85 @@ namespace Araci.TechnicalChecks
             AssertEqual(graph2.Edges.Count, graph3.Edges.Count, "Edges reload build 2/3");
         }
 
+        private static void SinPodeSerCriadoEEntraNoDocument()
+        {
+            var context = new EditorContext();
+            Sin sin = context.ElementoFactory.CriarSin();
+
+            context.Document.AdicionarElemento(sin);
+
+            AssertEqual(1, context.Document.Elementos.Count, "Quantidade no Document");
+            Assert(context.Document.Elementos.Contains(sin), "SIN deve estar no Document.");
+            AssertEqual("Sin", context.Elements.GetKind(sin), "Kind do SIN");
+            Assert(sin.Terminais.Count > 0, "SIN deve possuir terminal conectavel.");
+        }
+
+        private static void SinApareceNoElectricGraph()
+        {
+            var document = new AraciDocument();
+            Sin sin = CreateSin("SIN-GRAFO");
+
+            document.AdicionarElemento(sin);
+
+            ElectricGraph graph = new ElectricGraphBuilder(document).Build();
+            ElectricGraphNode? node = graph.FindNode(sin.Id.ToString());
+
+            Assert(node != null, "SIN deve aparecer como no do ElectricGraph.");
+            AssertEqual(sin.Nome, node!.Name, "Nome do no SIN");
+            AssertEqual(1, node.Terminals.Count, "Terminais do no SIN");
+        }
+
+        private static void SinPreservaIdAposReload()
+        {
+            var document = new AraciDocument();
+            Sin sin = CreateSin("SIN-RELOAD");
+
+            document.AdicionarElemento(sin);
+
+            AraciDocument loaded = SaveAndLoad(document);
+            Sin loadedSin = FindById<Sin>(loaded, sin.Id);
+
+            AssertEqual(sin.Id, loadedSin.Id, "Id do SIN");
+            AssertEqual(sin.Nome, loadedSin.Nome, "Nome do SIN");
+            AssertEqual(sin.Barra, loadedSin.Barra, "Barra do SIN");
+            AssertEqual(sin.Terminais[0].Id, loadedSin.Terminais[0].Id, "Terminal do SIN");
+        }
+
+        private static void CaboConectadoAoSinPreservaConexoes()
+        {
+            var document = new AraciDocument();
+            Sin sin = CreateSin("SIN-CABO");
+            Carga load = CreateLoad("CARGA-SIN", 350, 120);
+            Cabo cable = CreateCable(sin, 0, load, 0, "L-SIN", 1.5);
+
+            document.AdicionarElemento(sin);
+            document.AdicionarElemento(load);
+            document.AdicionarElemento(cable);
+
+            AraciDocument loaded = SaveAndLoad(document);
+            Cabo loadedCable = FindById<Cabo>(loaded, cable.Id);
+            ElectricGraph graph = new ElectricGraphBuilder(loaded).Build();
+
+            AssertEqual(sin.Id.ToString(), loadedCable.OrigemId, "OrigemId SIN apos reload");
+            AssertEqual(load.Id.ToString(), loadedCable.DestinoId, "DestinoId carga apos reload");
+            AssertEqual(cable.OrigemTerminalId, loadedCable.OrigemTerminalId, "OrigemTerminalId SIN apos reload");
+            AssertEqual(cable.DestinoTerminalId, loadedCable.DestinoTerminalId, "DestinoTerminalId carga apos reload");
+            AssertEqual(0, graph.GetInvalidEdges().Count, "Grafo com SIN nao deve ter arestas invalidas");
+        }
+
+        private static void DtosComGeradorContinuamFuncionando()
+        {
+            SimpleCircuit circuit = CreateSimpleCircuit();
+            circuit.Document.AdicionarElemento(CreateSin("SIN-COMPAT"));
+
+            CircuitDto dto = new CircuitBuilder(new ParameterReader(circuit.Document)).Build();
+
+            Assert(dto.Slack != null, "SlackDto deve continuar existindo.");
+            AssertEqual(circuit.Generator.Id.ToString(), dto.Slack!.Id, "Slack deve continuar usando gerador");
+            AssertEqual(1, dto.Loads.Count, "Quantidade de cargas com SIN adicional");
+            AssertEqual(1, dto.Lines.Count, "Quantidade de linhas com SIN adicional");
+        }
+
         private static SimpleCircuit CreateSimpleCircuit()
         {
             var document = new AraciDocument();
@@ -445,6 +529,29 @@ namespace Araci.TechnicalChecks
                 PosicaoX = 200,
                 PosicaoY = 100
             };
+        }
+
+        private static Sin CreateSin(string name)
+        {
+            var sin = new Sin
+            {
+                Nome = name,
+                Barra = name,
+                Tipo = new TipoSin
+                {
+                    TensaoKV = 13.8,
+                    Fases = 3,
+                    PotenciaCurtoMVA = 500,
+                    RelacaoXR = 10
+                },
+                PosicaoX = 80,
+                PosicaoY = 80,
+                TensaoLinha = "13.8"
+            };
+
+            sin.AtualizarTerminais(80, 80);
+
+            return sin;
         }
 
         private static Cabo CreateCable(

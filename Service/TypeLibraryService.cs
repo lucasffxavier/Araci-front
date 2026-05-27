@@ -11,6 +11,7 @@ namespace Araci.Services
             InicializarCabos();
             InicializarCargas();
             InicializarGeradores();
+            InicializarSin();
             InicializarBarras();
         }
 
@@ -20,6 +21,8 @@ namespace Araci.Services
 
         public ObservableCollection<TipoGerador> TiposGeradores { get; } = new();
 
+        public ObservableCollection<TipoSin> TiposSin { get; } = new();
+
         public ObservableCollection<TipoBarra> TiposBarras { get; } = new();
 
         public TipoCabo? TipoCaboPadrao => TiposCabos.FirstOrDefault();
@@ -27,6 +30,8 @@ namespace Araci.Services
         public TipoCarga? TipoCargaPadrao => TiposCargas.FirstOrDefault();
 
         public TipoGerador? TipoGeradorPadrao => TiposGeradores.FirstOrDefault();
+
+        public TipoSin? TipoSinPadrao => TiposSin.FirstOrDefault();
 
         public TipoBarra? TipoBarraPadrao => TiposBarras.FirstOrDefault();
 
@@ -77,6 +82,21 @@ namespace Araci.Services
                     TensaoKV = 12.47,
                     ModeloFonte = 1,
                     FatorPotencia = 0.98
+                });
+        }
+
+        private void InicializarSin()
+        {
+            TiposSin.Add(
+                new TipoSin
+                {
+                    NomeTipo = "Rede Externa",
+                    Familia = "Fontes",
+                    Categoria = "SIN",
+                    Fases = 3,
+                    TensaoKV = 12.47,
+                    PotenciaCurtoMVA = 500,
+                    RelacaoXR = 10
                 });
         }
 

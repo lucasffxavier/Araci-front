@@ -62,6 +62,16 @@ namespace Araci.Services
             return (GeradorViewModel)CriarViewModel(CriarGerador())!;
         }
 
+        public Sin CriarSin()
+        {
+            return _registry.CreateModel<Sin>();
+        }
+
+        public SinViewModel CriarSinVM()
+        {
+            return (SinViewModel)CriarViewModel(CriarSin())!;
+        }
+
         public Barra CriarBarra()
         {
             return _registry.CreateModel<Barra>();

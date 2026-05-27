@@ -191,6 +191,22 @@ namespace Araci.Services
                     ElementGeometryDefaults.EquipamentoAltura)));
 
             Register(new ElementDefinition(
+                "Sin",
+                "SIN",
+                "SIN",
+                typeof(Sin),
+                typeof(SinViewModel),
+                typeof(TipoSin),
+                CriarSin,
+                (m, n, d, l) => new SinViewModel((Sin)m, Types, n, d, l),
+                () => Types.TipoSinPadrao,
+                () => Types.TiposSin,
+                _ => EquipamentoSize(),
+                e => ((Sin)e).AtualizarTerminais(
+                    ElementGeometryDefaults.EquipamentoLargura,
+                    ElementGeometryDefaults.EquipamentoAltura)));
+
+            Register(new ElementDefinition(
                 "Cabo",
                 "Cabo",
                 "CABO",
@@ -236,6 +252,17 @@ namespace Araci.Services
             };
 
             return gerador;
+        }
+
+        private Sin CriarSin()
+        {
+            var sin = new Sin
+            {
+                Tipo = Types.TipoSinPadrao
+                    ?? throw new InvalidOperationException("Nenhum tipo de SIN cadastrado.")
+            };
+
+            return sin;
         }
 
         private Cabo CriarCabo()
