@@ -46,6 +46,12 @@ namespace Araci.Core.Commands
             _undoStack.Push(command);
         }
 
+        public void Clear()
+        {
+            _undoStack.Clear();
+            _redoStack.Clear();
+        }
+
         public bool CanUndo =>
             _undoStack.Count > 0;
 

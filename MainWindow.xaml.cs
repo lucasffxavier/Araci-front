@@ -23,6 +23,7 @@ namespace Araci
         private void InicializarRibbon()
         {
             DataContext = _context;
+            ArquivoMenu.DataContext = _context;
         }
 
         public void ToggleArquivoMenu(
