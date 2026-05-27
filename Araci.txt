@@ -31,6 +31,8 @@ Araci Engine
 │   │   │   └── InserirCarga.cs
 │   │   ├── InserirGerador
 │   │   │   └── InserirGerador.cs
+│   │   ├── InserirSin
+│   │   │   └── InserirSin.cs
 │   │   ├── InsertElementToolBase.cs
 │   │   └── InsertPreviewController.cs
 │   └── Editar
@@ -66,7 +68,8 @@ Araci Engine
 │   ├── BarraControl.cs
 │   ├── CaboControl.cs
 │   ├── CargaControl.cs
-│   └── GeradorControl.cs
+│   ├── GeradorControl.cs
+│   └── SinControl.cs
 ├── Core
 │   ├── Commands
 │   │   └── MoveElementoCommand.cs
@@ -116,7 +119,8 @@ Araci Engine
 │   │   ├── TipoCabo.cs
 │   │   ├── TipoCarga.cs
 │   │   ├── TipoElemento.cs
-│   │   └── TipoGerador.cs
+│   │   ├── TipoGerador.cs
+│   │   └── TipoSin.cs
 │   ├── Barra.cs
 │   ├── Cabo.cs
 │   ├── Carga.cs
@@ -126,6 +130,7 @@ Araci Engine
 │   ├── Gerador.cs
 │   ├── ITerminalOwner.cs
 │   ├── Parameter.cs
+│   ├── Sin.cs
 │   └── Terminal.cs
 ├── Properties
 │   ├── BarraPropertiesView.xaml
@@ -138,6 +143,8 @@ Araci Engine
 │   ├── GeradorPropertiesView.xaml.cs
 │   ├── PropertiesHostView.xaml
 │   ├── PropertiesHostView.xaml.cs
+│   ├── SinPropertiesView.xaml
+│   ├── SinPropertiesView.xaml.cs
 │   ├── TypePropertiesWindow.xaml
 │   └── TypePropertiesWindow.xaml.cs
 ├── Resources
@@ -247,6 +254,7 @@ Araci Engine
 │   ├── ParameterViewModel.cs
 │   ├── PropertiesViewModel.cs
 │   ├── SelectionBoxViewModel.cs
+│   ├── SinViewModel.cs
 │   ├── TerminalSnapState.cs
 │   ├── TipoBarraViewModel.cs
 │   ├── TipoCaboViewModel.cs
@@ -254,6 +262,7 @@ Araci Engine
 │   ├── TipoElementoViewModel.cs
 │   ├── TipoElementoViewModelFactory.cs
 │   ├── TipoGeradorViewModel.cs
+│   ├── TipoSinViewModel.cs
 │   └── ViewportViewModel.cs
 ├── Views
 │   ├── ViewportView.xaml
@@ -274,55 +283,36 @@ Araci Engine
 
 
 ====================================================================================================
-ARQUIVO: C:\Araci-Engine-Front\Araci Engine\Applications\Commands\AddElementoCommand.cs
+ARQUIVO: C:\Araci-Engine-Front\Araci Engine\Applications\Diagrama\InserirSin\InserirSin.cs
 ====================================================================================================
 
 using System;
+using Araci.Applications.Diagrama;
 using Araci.Models;
 using Araci.Services;
-namespace Araci.Core.Commands
+using Araci.ViewModels;
+namespace Araci.Applications.Diagrama.InserirSin
 {
-public class AddElementoCommand : IUndoableCommand
+public class InserirSinApplication
 {
-private readonly Elemento _elemento;
 private readonly EditorContext _context;
-private bool _inicializado;
-private string? _nomeFinal;
-public AddElementoCommand(Elemento elemento, EditorContext context)
+public InserirSinApplication(EditorContext context)
 {
-_elemento = elemento ?? throw new ArgumentNullException(nameof(elemento));
 _context = context ?? throw new ArgumentNullException(nameof(context));
 }
-public void Execute()
+public void Executar()
 {
-PrepararPrimeiraExecucao();
-_context.Document.AdicionarElemento(_elemento);
+_context.Input.ToolAtual = new InserirSinTool(_context);
 }
-public void Undo()
+}
+public class InserirSinTool : InsertElementToolBase<SinViewModel, Sin>
 {
-_context.Document.RemoverElemento(_elemento);
-}
-public void Redo()
+public InserirSinTool(EditorContext context)
+: base(context, context.ElementoFactory.CriarSinVM, vm => vm.Sin)
 {
-RestaurarEstadoInicializado();
-_context.Document.AdicionarElemento(_elemento);
 }
-private void PrepararPrimeiraExecucao()
-{
-if (_inicializado)
-{
-RestaurarEstadoInicializado();
-return;
-}
-_context.Names.GarantirNomeUnico(_elemento);
-_nomeFinal = _elemento.Nome;
-_inicializado = true;
-}
-private void RestaurarEstadoInicializado()
-{
-if (_nomeFinal != null)
-_elemento.Nome = _nomeFinal;
-}
+protected override string ToolName => "Inserir SIN";
+protected override Sin CriarModeloReal() => Context.ElementoFactory.CriarSin();
 }
 }
 
@@ -364,7 +354,12 @@ var tests = new (string Name, Action Run)[]
 ("Persistencia preserva ramificacao", PersistenciaPreservaRamificacao),
 ("DTO permanece equivalente apos reload", DtoPermaneceEquivalenteAposReload),
 ("IDs permanecem estaveis apos reload", IdsPermanecemEstaveisAposReload),
-("Builds repetidos apos reload nao alteram Document", BuildsRepetidosAposReloadNaoAlteramDocument)
+("Builds repetidos apos reload nao alteram Document", BuildsRepetidosAposReloadNaoAlteramDocument),
+("SIN pode ser criado e entra no Document", SinPodeSerCriadoEEntraNoDocument),
+("SIN aparece no ElectricGraph", SinApareceNoElectricGraph),
+("SIN preserva Id apos reload", SinPreservaIdAposReload),
+("Cabo conectado ao SIN preserva conexoes", CaboConectadoAoSinPreservaConexoes),
+("DTOs existentes com gerador continuam funcionando", DtosComGeradorContinuamFuncionando)
 };
 var failures = new List<string>();
 foreach ((string name, Action run) in tests)
@@ -632,6 +627,67 @@ AssertEqual(graph2.Nodes.Count, graph3.Nodes.Count, "Nodes reload build 2/3");
 AssertEqual(graph1.Edges.Count, graph2.Edges.Count, "Edges reload build 1/2");
 AssertEqual(graph2.Edges.Count, graph3.Edges.Count, "Edges reload build 2/3");
 }
+private static void SinPodeSerCriadoEEntraNoDocument()
+{
+var context = new EditorContext();
+Sin sin = context.ElementoFactory.CriarSin();
+context.Document.AdicionarElemento(sin);
+AssertEqual(1, context.Document.Elementos.Count, "Quantidade no Document");
+Assert(context.Document.Elementos.Contains(sin), "SIN deve estar no Document.");
+AssertEqual("Sin", context.Elements.GetKind(sin), "Kind do SIN");
+Assert(sin.Terminais.Count > 0, "SIN deve possuir terminal conectavel.");
+}
+private static void SinApareceNoElectricGraph()
+{
+var document = new AraciDocument();
+Sin sin = CreateSin("SIN-GRAFO");
+document.AdicionarElemento(sin);
+ElectricGraph graph = new ElectricGraphBuilder(document).Build();
+ElectricGraphNode? node = graph.FindNode(sin.Id.ToString());
+Assert(node != null, "SIN deve aparecer como no do ElectricGraph.");
+AssertEqual(sin.Nome, node!.Name, "Nome do no SIN");
+AssertEqual(1, node.Terminals.Count, "Terminais do no SIN");
+}
+private static void SinPreservaIdAposReload()
+{
+var document = new AraciDocument();
+Sin sin = CreateSin("SIN-RELOAD");
+document.AdicionarElemento(sin);
+AraciDocument loaded = SaveAndLoad(document);
+Sin loadedSin = FindById<Sin>(loaded, sin.Id);
+AssertEqual(sin.Id, loadedSin.Id, "Id do SIN");
+AssertEqual(sin.Nome, loadedSin.Nome, "Nome do SIN");
+AssertEqual(sin.Barra, loadedSin.Barra, "Barra do SIN");
+AssertEqual(sin.Terminais[0].Id, loadedSin.Terminais[0].Id, "Terminal do SIN");
+}
+private static void CaboConectadoAoSinPreservaConexoes()
+{
+var document = new AraciDocument();
+Sin sin = CreateSin("SIN-CABO");
+Carga load = CreateLoad("CARGA-SIN", 350, 120);
+Cabo cable = CreateCable(sin, 0, load, 0, "L-SIN", 1.5);
+document.AdicionarElemento(sin);
+document.AdicionarElemento(load);
+document.AdicionarElemento(cable);
+AraciDocument loaded = SaveAndLoad(document);
+Cabo loadedCable = FindById<Cabo>(loaded, cable.Id);
+ElectricGraph graph = new ElectricGraphBuilder(loaded).Build();
+AssertEqual(sin.Id.ToString(), loadedCable.OrigemId, "OrigemId SIN apos reload");
+AssertEqual(load.Id.ToString(), loadedCable.DestinoId, "DestinoId carga apos reload");
+AssertEqual(cable.OrigemTerminalId, loadedCable.OrigemTerminalId, "OrigemTerminalId SIN apos reload");
+AssertEqual(cable.DestinoTerminalId, loadedCable.DestinoTerminalId, "DestinoTerminalId carga apos reload");
+AssertEqual(0, graph.GetInvalidEdges().Count, "Grafo com SIN nao deve ter arestas invalidas");
+}
+private static void DtosComGeradorContinuamFuncionando()
+{
+SimpleCircuit circuit = CreateSimpleCircuit();
+circuit.Document.AdicionarElemento(CreateSin("SIN-COMPAT"));
+CircuitDto dto = new CircuitBuilder(new ParameterReader(circuit.Document)).Build();
+Assert(dto.Slack != null, "SlackDto deve continuar existindo.");
+AssertEqual(circuit.Generator.Id.ToString(), dto.Slack!.Id, "Slack deve continuar usando gerador");
+AssertEqual(1, dto.Loads.Count, "Quantidade de cargas com SIN adicional");
+AssertEqual(1, dto.Lines.Count, "Quantidade de linhas com SIN adicional");
+}
 private static SimpleCircuit CreateSimpleCircuit()
 {
 var document = new AraciDocument();
@@ -707,6 +763,26 @@ Nome = name,
 PosicaoX = 200,
 PosicaoY = 100
 };
+}
+private static Sin CreateSin(string name)
+{
+var sin = new Sin
+{
+Nome = name,
+Barra = name,
+Tipo = new TipoSin
+{
+TensaoKV = 13.8,
+Fases = 3,
+PotenciaCurtoMVA = 500,
+RelacaoXR = 10
+},
+PosicaoX = 80,
+PosicaoY = 80,
+TensaoLinha = "13.8"
+};
+sin.AtualizarTerminais(80, 80);
+return sin;
 }
 private static Cabo CreateCable(
 Gerador generator,
@@ -853,10 +929,10 @@ Cabo Cable);
 
 
 ====================================================================================================
-ARQUIVO: C:\Araci-Engine-Front\Araci Engine\Controls\GeradorControl.cs
+ARQUIVO: C:\Araci-Engine-Front\Araci Engine\Controls\SinControl.cs
 ====================================================================================================
 
-﻿using Araci.Controls.Base;
+using Araci.Controls.Base;
 using Araci.Controls.Converters;
 using SharpVectors.Converters;
 using System;
@@ -866,13 +942,13 @@ using System.Windows.Data;
 using System.Windows.Media;
 namespace Araci.Controls
 {
-public class GeradorControl : ElementoControlBase
+public class SinControl : ElementoControlBase
 {
 private readonly Grid _root;
 private readonly SvgViewbox _svg;
 private readonly Border _overlay;
 private readonly Border _previewOverlay;
-public GeradorControl()
+public SinControl()
 {
 Cursor = System.Windows.Input.Cursors.Hand;
 _svg = new SvgViewbox
@@ -936,1243 +1012,45 @@ _overlay.SetBinding(VisibilityProperty, multi);
 
 
 ====================================================================================================
-ARQUIVO: C:\Araci-Engine-Front\Araci Engine\Core\Documents\AraciDocument.cs
-====================================================================================================
-
-using System.Collections.ObjectModel;
-using Araci.Models;
-namespace Araci.Core.Documents
-{
-public class AraciDocument
-{
-public AraciDocument()
-{
-Elementos = new ObservableCollection<Elemento>();
-}
-public ObservableCollection<Elemento> Elementos { get; }
-public void AdicionarElemento(Elemento elemento)
-{
-if (Elementos.Contains(elemento))
-return;
-Elementos.Add(elemento);
-}
-public void RemoverElemento(Elemento elemento)
-{
-if (!Elementos.Contains(elemento))
-return;
-Elementos.Remove(elemento);
-}
-public void Limpar()
-{
-Elementos.Clear();
-}
-}
-}
-
-
-====================================================================================================
-ARQUIVO: C:\Araci-Engine-Front\Araci Engine\Core\SceneNodes\ElementoNode.cs
-====================================================================================================
-
-﻿using System.Windows;
-using Araci.Models;
-namespace Araci.Core.SceneNodes
-{
-public abstract class ElementoNode
-{
-protected ElementoNode(Elemento modelo)
-{
-Modelo = modelo;
-}
-public Elemento Modelo { get; }
-public Rect Bounds { get; protected set; }
-public Point Centro => new(
-Bounds.X + Bounds.Width / 2,
-Bounds.Y + Bounds.Height / 2);
-public virtual double Largura => Bounds.Width;
-public virtual double Altura => Bounds.Height;
-public virtual double X
-{
-get => Modelo.PosicaoX;
-set => Modelo.PosicaoX = value;
-}
-public virtual double Y
-{
-get => Modelo.PosicaoY;
-set => Modelo.PosicaoY = value;
-}
-public virtual void Mover(Vector delta)
-{
-Modelo.PosicaoX += delta.X;
-Modelo.PosicaoY += delta.Y;
-AtualizarGeometria();
-}
-public abstract void AtualizarGeometria();
-}
-}
-
-
-====================================================================================================
-ARQUIVO: C:\Araci-Engine-Front\Araci Engine\Core\SceneNodes\EquipamentoNode.cs
-====================================================================================================
-
-﻿using System.Windows;
-using Araci.Core.Rendering;
-using Araci.Models;
-namespace Araci.Core.SceneNodes
-{
-public class EquipamentoNode : ElementoNode
-{
-private readonly double _largura;
-private readonly double _altura;
-public EquipamentoNode(
-ElementoEquipamento modelo,
-double largura = ElementGeometryDefaults.EquipamentoLargura,
-double altura = ElementGeometryDefaults.EquipamentoAltura)
-: base(modelo)
-{
-_largura = largura;
-_altura = altura;
-AtualizarGeometria();
-}
-public override void AtualizarGeometria()
-{
-Bounds = new Rect(Modelo.PosicaoX, Modelo.PosicaoY, _largura, _altura);
-}
-}
-}
-
-
-====================================================================================================
-ARQUIVO: C:\Araci-Engine-Front\Araci Engine\DTOs\CircuitBuilder.cs
-====================================================================================================
-
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using Araci.Services;
-namespace Araci.DTOs
-{
-public class CircuitBuilder
-{
-private const double DefaultBaseKv = 12.47;
-private readonly ParameterReader _reader;
-public CircuitBuilder(ParameterReader reader)
-{
-_reader = reader ?? throw new ArgumentNullException(nameof(reader));
-}
-public CircuitDto Build()
-{
-ValidarTopologia();
-IList<ParameterReader.GeneratorData> generators = _reader.GetGenerators();
-ParameterReader.GeneratorData slackGenerator = generators.FirstOrDefault()
-?? throw new InvalidOperationException("Nenhum gerador encontrado para definir a fonte slack.");
-var dto = new CircuitDto
-{
-Loads = BuildLoads(),
-Lines = BuildLines(),
-Transformers = BuildTransformers(),
-Generators = BuildGenerators(generators.Skip(1)),
-Slack = BuildSlack(slackGenerator)
-};
-Validar(dto);
-return dto;
-}
-private IList<LoadDto> BuildLoads()
-{
-return _reader.GetLoads()
-.Select(load => new LoadDto
-{
-Id = load.Id,
-Nome = SafeName(load.Nome, "Carga"),
-Barra = SafeBus(load.Barra, load.Nome),
-Fases = SafePhases(load.Fases),
-R = load.R,
-X = load.X,
-PotenciaAtiva = load.PotenciaAtiva > 0 ? load.PotenciaAtiva : 800,
-PotenciaReativa = load.PotenciaReativa >= 0 ? load.PotenciaReativa : 300,
-Tensao = SafeKv(load.Tensao),
-Conexao = string.IsNullOrWhiteSpace(load.Conexao) ? "Wye" : load.Conexao,
-Modelo = load.Modelo > 0 ? load.Modelo : 1
-})
-.ToList();
-}
-private IList<LineDto> BuildLines()
-{
-return _reader.GetLines()
-.Select(line =>
-{
-double r1 = line.R1 > 0 ? line.R1 : 0.1;
-double x1 = line.X1 > 0 ? line.X1 : 0.2;
-return new LineDto
-{
-Id = line.Id,
-Nome = SafeName(line.Nome, "L1"),
-Barra1 = line.Barra1?.Trim() ?? string.Empty,
-Barra2 = line.Barra2?.Trim() ?? string.Empty,
-Fases = SafePhases(line.Fases),
-Comprimento = line.Comprimento > 0 ? line.Comprimento : 1,
-R1 = r1,
-X1 = x1,
-R0 = line.R0 > 0 ? line.R0 : 3 * r1,
-X0 = line.X0 > 0 ? line.X0 : 3 * x1,
-C1 = line.C1 > 0 ? line.C1 : 3.4,
-C0 = line.C0 > 0 ? line.C0 : 1.6
-};
-})
-.ToList();
-}
-private IList<TransformerDto> BuildTransformers()
-{
-return _reader.GetTransformers()
-.Select(transformer => new TransformerDto
-{
-Id = transformer.Id,
-Nome = transformer.Nome,
-Fases = SafePhases(transformer.Fases),
-Enrolamentos = transformer.Enrolamentos
-})
-.ToList();
-}
-private static IList<GeneratorDto> BuildGenerators(IEnumerable<ParameterReader.GeneratorData> generators)
-{
-return generators
-.Select(generator => new GeneratorDto
-{
-Id = generator.Id,
-Nome = SafeName(generator.Nome, "Gerador"),
-Barra = SafeBus(generator.Barra, generator.Nome),
-Fases = SafePhases(generator.Fases),
-Tensao = SafeKv(generator.Tensao),
-Potencia = generator.Potencia > 0 ? generator.Potencia : 1000,
-FP = generator.FP > 0 ? generator.FP : 0.98
-})
-.ToList();
-}
-private static SlackDto BuildSlack(ParameterReader.GeneratorData generator)
-{
-string nome = SafeName(generator.Nome, "GERADOR-001");
-return new SlackDto
-{
-Id = generator.Id,
-Nome = nome,
-Tensao = SafeKv(generator.Tensao),
-Fases = SafePhases(generator.Fases),
-Barra = SafeBus(generator.Barra, nome)
-};
-}
-private static void Validar(CircuitDto dto)
-{
-if (dto.Slack == null || string.IsNullOrWhiteSpace(dto.Slack.Barra))
-throw new InvalidOperationException("Nenhum gerador encontrado para definir a fonte slack.");
-foreach (LineDto line in dto.Lines)
-{
-if (string.IsNullOrWhiteSpace(line.Barra1) || string.IsNullOrWhiteSpace(line.Barra2))
-throw new InvalidOperationException($"Cabo '{line.Nome}' sem barra origem/destino definida.");
-}
-if (!dto.Loads.Any())
-throw new InvalidOperationException("Nenhuma carga encontrada para simular o fluxo.");
-}
-private void ValidarTopologia()
-{
-TopologyValidationResult? result = _reader.ValidateTopology();
-if (result == null || result.IsValid)
-return;
-throw new InvalidOperationException(
-"Topologia invalida para simulacao:" +
-Environment.NewLine +
-result.FormatErrors());
-}
-private static string SafeName(string value, string fallback)
-{
-return string.IsNullOrWhiteSpace(value) ? fallback : value.Trim();
-}
-private static string SafeBus(string value, string fallback)
-{
-return string.IsNullOrWhiteSpace(value)
-? SafeName(fallback, "BARRA-001")
-: value.Trim();
-}
-private static int SafePhases(int value)
-{
-return value > 0 ? value : 3;
-}
-private static double SafeKv(double value)
-{
-return value > 0 ? value : DefaultBaseKv;
-}
-}
-}
-
-
-====================================================================================================
-ARQUIVO: C:\Araci-Engine-Front\Araci Engine\DTOs\ParameterReader.cs
-====================================================================================================
-
-using System;
-using System.Collections.Generic;
-using System.Globalization;
-using System.Linq;
-using Araci.API;
-using Araci.Core.Documents;
-using Araci.Models;
-using Araci.Services;
-namespace Araci.DTOs
-{
-public class ParameterReader
-{
-private readonly CoreApi _api;
-private readonly ConnectivityService? _connectivity;
-private readonly TopologyValidator? _topology;
-private readonly ElectricGraphBuilder? _graphBuilder;
-public ParameterReader(CoreApi api)
-{
-_api = api ?? throw new ArgumentNullException(nameof(api));
-_connectivity = new ConnectivityService(api.Document);
-}
-public ParameterReader(EditorContext context)
-: this(
-new CoreApi(context),
-new ConnectivityService(context),
-new TopologyValidator(context),
-context.ElectricGraph)
-{
-}
-public ParameterReader(AraciDocument document)
-: this(
-new CoreApi(document),
-new ConnectivityService(document),
-new TopologyValidator(document),
-new ElectricGraphBuilder(document))
-{
-}
-private ParameterReader(
-CoreApi api,
-ConnectivityService connectivity,
-TopologyValidator topology,
-ElectricGraphBuilder? graphBuilder)
-{
-_api = api ?? throw new ArgumentNullException(nameof(api));
-_connectivity = connectivity ?? throw new ArgumentNullException(nameof(connectivity));
-_topology = topology ?? throw new ArgumentNullException(nameof(topology));
-_graphBuilder = graphBuilder;
-}
-public TopologyValidationResult? ValidateTopology()
-{
-return _topology?.Validate();
-}
-public IList<LoadData> GetLoads()
-{
-ElectricGraph? graph = _graphBuilder?.Build();
-return _api.ObterElementos<Carga>()
-.Select(carga => new LoadData
-{
-Id = carga.Id.ToString(),
-Nome = ReadString(carga, "Nome"),
-Barra = ResolverBarraEquipamento(carga, graph),
-Fases = ReadInt(carga, "Fases"),
-R = ReadDouble(carga, "Carga resistencia", "Carga resistência"),
-X = ReadDouble(carga, "Carga reatancia", "Carga reatância"),
-PotenciaAtiva = ReadDouble(carga, "PotenciaAtiva"),
-PotenciaReativa = ReadDouble(carga, "PotenciaReativa"),
-Tensao = ReadVoltage(carga, "TensaoKV", "Tensao", "TensaoLinha"),
-Conexao = ReadString(carga, "Carga conexao", "Conexao"),
-Modelo = ReadInt(carga, "Carga modelo", "ModeloCarga")
-})
-.ToList();
-}
-public IList<LineData> GetLines()
-{
-ElectricGraph? graph = _graphBuilder?.Build();
-return _api.ObterElementos<Cabo>()
-.Select(cabo => new LineData
-{
-Id = cabo.Id.ToString(),
-Nome = ReadString(cabo, "Nome"),
-Barra1 = ResolverBus1(cabo, graph),
-Barra2 = ResolverBus2(cabo, graph),
-Fases = ReadInt(cabo, "Fases"),
-Comprimento = ReadDouble(cabo, "Comprimento"),
-R1 = ReadDouble(cabo, "R1", "Resistencia"),
-X1 = ReadDouble(cabo, "X1", "Reatancia"),
-R0 = ReadDouble(cabo, "R0"),
-X0 = ReadDouble(cabo, "X0"),
-C1 = ReadDouble(cabo, "C1"),
-C0 = ReadDouble(cabo, "C0")
-})
-.ToList();
-}
-public IList<TransformerData> GetTransformers()
-{
-return GetElementsByTypeName("Transformador", "Transformer")
-.Select(transformador => new TransformerData
-{
-Id = transformador.Id.ToString(),
-Nome = ReadString(transformador, "Nome"),
-Fases = ReadInt(transformador, "Fases"),
-Enrolamentos = ReadInt(transformador, "Enrolamentos")
-})
-.ToList();
-}
-public IList<GeneratorData> GetGenerators()
-{
-ElectricGraph? graph = _graphBuilder?.Build();
-return _api.ObterElementos<Gerador>()
-.Select(gerador => new GeneratorData
-{
-Id = gerador.Id.ToString(),
-Nome = ReadString(gerador, "Nome"),
-Barra = ResolverBarraEquipamento(gerador, graph),
-Fases = ReadInt(gerador, "Fases"),
-Tensao = ReadVoltage(gerador, "TensaoKV", "Tensao", "TensaoLinha"),
-Potencia = ReadDouble(gerador, "PotenciaAtiva", "Potencia", "PotenciaAparente"),
-FP = ReadDouble(gerador, "FP", "FatorPotencia")
-})
-.ToList();
-}
-private IList<Elemento> GetElementsByTypeName(params string[] typeNames)
-{
-return _api.ObterElementos()
-.Where(elemento => typeNames.Any(typeName =>
-string.Equals(elemento.GetType().Name, typeName, StringComparison.OrdinalIgnoreCase) ||
-string.Equals(elemento.Tipo?.NomeTipo, typeName, StringComparison.OrdinalIgnoreCase)))
-.ToList();
-}
-private string ResolverBus1(Cabo cabo)
-{
-return _connectivity?.ResolverBus1Estrito(cabo) ?? string.Empty;
-}
-private string ResolverBus1(Cabo cabo, ElectricGraph? graph)
-{
-return ResolverBusPorGrafo(cabo, graph, origem: true) ?? ResolverBus1(cabo);
-}
-private string ResolverBus2(Cabo cabo)
-{
-return _connectivity?.ResolverBus2Estrito(cabo) ?? string.Empty;
-}
-private string ResolverBus2(Cabo cabo, ElectricGraph? graph)
-{
-return ResolverBusPorGrafo(cabo, graph, origem: false) ?? ResolverBus2(cabo);
-}
-private static string? ResolverBusPorGrafo(
-Cabo cabo,
-ElectricGraph? graph,
-bool origem)
-{
-ElectricGraphEdge? edge = graph?.FindEdgeByCable(cabo);
-if (edge == null)
-return null;
-if (!edge.IsValid)
-return string.Empty;
-string elementId = origem ? edge.FromElementId : edge.ToElementId;
-return graph?.FindNode(elementId)?.Name ?? string.Empty;
-}
-private string ResolverBarraEquipamento(ElementoEquipamento equipamento)
-{
-return _connectivity?.ResolverBusNameParaEquipamentoEstrito(equipamento) ?? string.Empty;
-}
-private string ResolverBarraEquipamento(
-ElementoEquipamento equipamento,
-ElectricGraph? graph)
-{
-return ResolverBarraPorGrafo(equipamento, graph) ??
-ResolverBarraEquipamento(equipamento);
-}
-private static string? ResolverBarraPorGrafo(
-ElementoEquipamento equipamento,
-ElectricGraph? graph)
-{
-return graph?.FindNodeByElement(equipamento)?.Name;
-}
-private static string ReadBarra(Elemento elemento, params string[] names)
-{
-string valor = ReadString(elemento, names);
-if (!string.IsNullOrWhiteSpace(valor))
-return valor;
-if (elemento is ITerminalOwner owner)
-return owner.Terminais.FirstOrDefault()?.Barra ?? string.Empty;
-return string.Empty;
-}
-private static string ReadString(Elemento elemento, params string[] names)
-{
-return ReadValueAsString(elemento, names) ?? string.Empty;
-}
-private static int ReadInt(Elemento elemento, params string[] names)
-{
-return (int)ReadDouble(elemento, names);
-}
-private static double ReadDouble(Elemento elemento, params string[] names)
-{
-object? value = ReadValueObject(elemento, names);
-if (value is double doubleValue)
-return ElectricalValueParser.ToNumber(doubleValue);
-if (value is int intValue)
-return intValue;
-if (value is string text)
-return ElectricalValueParser.ToNumber(text);
-return 0;
-}
-private static double ReadVoltage(Elemento elemento, params string[] names)
-{
-object? value = ReadValueObject(elemento, names);
-if (value is double doubleValue)
-return ElectricalValueParser.ToVoltageKv(doubleValue);
-if (value is int intValue)
-return ElectricalValueParser.ToVoltageKv(intValue);
-if (value is string text)
-return ElectricalValueParser.ToVoltageKv(text);
-return 0;
-}
-private static string? ReadValueAsString(Elemento elemento, params string[] names)
-{
-object? value = ReadValueObject(elemento, names);
-return value switch
-{
-IFormattable formattable => formattable.ToString(null, CultureInfo.InvariantCulture),
-_ => value?.ToString()
-};
-}
-private static object? ReadValueObject(Elemento elemento, params string[] names)
-{
-foreach (string name in names)
-{
-if (elemento.Parametros.TryGetValue(name, out Parameter? parametro))
-return parametro.ValorObjeto;
-if (elemento.Tipo?.Parametros.TryGetValue(name, out parametro) == true)
-return parametro.ValorObjeto;
-}
-return null;
-}
-public class LoadData
-{
-public string Id { get; set; } = string.Empty;
-public string Nome { get; set; } = string.Empty;
-public string Barra { get; set; } = string.Empty;
-public int Fases { get; set; }
-public double R { get; set; }
-public double X { get; set; }
-public double PotenciaAtiva { get; set; }
-public double PotenciaReativa { get; set; }
-public double Tensao { get; set; }
-public string Conexao { get; set; } = string.Empty;
-public int Modelo { get; set; }
-}
-public class LineData
-{
-public string Id { get; set; } = string.Empty;
-public string Nome { get; set; } = string.Empty;
-public string Barra1 { get; set; } = string.Empty;
-public string Barra2 { get; set; } = string.Empty;
-public int Fases { get; set; }
-public double Comprimento { get; set; }
-public double R1 { get; set; }
-public double X1 { get; set; }
-public double R0 { get; set; }
-public double X0 { get; set; }
-public double C1 { get; set; }
-public double C0 { get; set; }
-}
-public class TransformerData
-{
-public string Id { get; set; } = string.Empty;
-public string Nome { get; set; } = string.Empty;
-public int Fases { get; set; }
-public int Enrolamentos { get; set; }
-}
-public class GeneratorData
-{
-public string Id { get; set; } = string.Empty;
-public string Nome { get; set; } = string.Empty;
-public string Barra { get; set; } = string.Empty;
-public int Fases { get; set; }
-public double Tensao { get; set; }
-public double Potencia { get; set; }
-public double FP { get; set; }
-}
-}
-}
-
-
-====================================================================================================
-ARQUIVO: C:\Araci-Engine-Front\Araci Engine\DTOs\SlackDto.cs
-====================================================================================================
-
-namespace Araci.DTOs
-{
-public class SlackDto
-{
-public string Id { get; set; } = string.Empty;
-public string Nome { get; set; } = string.Empty;
-public double Tensao { get; set; }
-public int Fases { get; set; }
-public string Barra { get; set; } = string.Empty;
-}
-}
-
-
-====================================================================================================
-ARQUIVO: C:\Araci-Engine-Front\Araci Engine\Models\Gerador.cs
+ARQUIVO: C:\Araci-Engine-Front\Araci Engine\Models\Sin.cs
 ====================================================================================================
 
 using System.Windows;
 using Araci.Models.Tipos;
 namespace Araci.Models
 {
-public class Gerador : ElementoEquipamento
+public class Sin : ElementoEquipamento
 {
-public const string PARAM_POTENCIA_APARENTE = "PotenciaAparente";
-public TipoGerador TipoGerador => (TipoGerador)Tipo!;
-public double PotenciaAparente
+public TipoSin TipoSin => (TipoSin)Tipo!;
+public Sin()
 {
-get => Obter<double>(PARAM_POTENCIA_APARENTE);
-set => Definir(PARAM_POTENCIA_APARENTE, value);
-}
-public Gerador()
-{
-DefinirParametro(new Parameter<double>(PARAM_POTENCIA_APARENTE, 0));
-Nome = "GERADOR-001";
-Barra = "GERADOR-001";
+Nome = "SIN-001";
+Barra = "SIN-001";
 Alimentador = 1;
-PotenciaAparente = 1020;
-PotenciaAtiva = 1000;
-PotenciaReativa = 203;
-TensaoLinha = "12.47∠0°";
-TensaoFaseA = "7.2∠0°";
-TensaoFaseB = "7.2∠-120°";
-TensaoFaseC = "7.2∠120°";
-CorrenteLinha = "0∠0°";
-CorrenteFaseA = "0∠0°";
-CorrenteFaseB = "0∠-120°";
-CorrenteFaseC = "0∠120°";
-PosicaoX = 300;
-PosicaoY = 200;
+TensaoLinha = "12.47";
+TensaoFaseA = "7.2";
+TensaoFaseB = "7.2";
+TensaoFaseC = "7.2";
+CorrenteLinha = "0";
+CorrenteFaseA = "0";
+CorrenteFaseB = "0";
+CorrenteFaseC = "0";
+PosicaoX = 200;
+PosicaoY = 160;
 }
 public void AtualizarTerminais(double largura, double altura)
 {
 var terminais = ObterTerminaisInternos();
-if (terminais.Count < 4)
-{
-terminais.Clear();
-for (int i = 0; i < 4; i++)
-terminais.Add(new Terminal(this, new Point(), IdTerminal(i)) { Barra = Barra });
-}
+if (terminais.Count == 0)
+return;
 terminais[0].Barra = Barra;
-terminais[0].Posicao = new Point(PosicaoX + largura / 2, PosicaoY);
-terminais[1].Posicao = new Point(PosicaoX + largura / 2, PosicaoY + altura);
-terminais[2].Posicao = new Point(PosicaoX, PosicaoY + altura / 2);
-terminais[3].Posicao = new Point(PosicaoX + largura, PosicaoY + altura / 2);
+terminais[0].Posicao = new Point(PosicaoX + largura / 2, PosicaoY + altura);
 }
 public override Elemento Clonar()
 {
-var clone = new Gerador();
+var clone = new Sin();
 CopiarEquipamentoPara(clone);
 return clone;
-}
-private static string IdTerminal(int index)
-{
-return index switch
-{
-0 => "TOPO",
-1 => "BASE",
-2 => "ESQUERDA",
-3 => "DIREITA",
-_ => $"T{index + 1}"
-};
-}
-}
-}
-
-
-====================================================================================================
-ARQUIVO: C:\Araci-Engine-Front\Araci Engine\Models\Tipos\TipoElemento.cs
-====================================================================================================
-
-﻿using System;
-using System.Collections.Generic;
-namespace Araci.Models.Tipos
-{
-public abstract class TipoElemento
-{
-public const string PARAM_NOME_TIPO =
-"NomeTipo";
-public const string PARAM_FAMILIA =
-"Familia";
-public const string PARAM_CATEGORIA =
-"Categoria";
-private readonly Dictionary<string, Parameter>
-_parametros = new();
-protected TipoElemento()
-{
-DefinirParametro(
-new Parameter<string>(
-PARAM_NOME_TIPO,
-string.Empty));
-DefinirParametro(
-new Parameter<string>(
-PARAM_FAMILIA,
-string.Empty));
-DefinirParametro(
-new Parameter<string>(
-PARAM_CATEGORIA,
-string.Empty));
-}
-public string NomeTipo
-{
-get => Obter<string>(
-PARAM_NOME_TIPO);
-set => Definir(
-PARAM_NOME_TIPO,
-value);
-}
-public string Familia
-{
-get => Obter<string>(
-PARAM_FAMILIA);
-set => Definir(
-PARAM_FAMILIA,
-value);
-}
-public string Categoria
-{
-get => Obter<string>(
-PARAM_CATEGORIA);
-set => Definir(
-PARAM_CATEGORIA,
-value);
-}
-public IReadOnlyDictionary<string, Parameter>
-Parametros =>
-_parametros;
-protected void DefinirParametro(
-Parameter parameter)
-{
-_parametros[parameter.Nome] =
-parameter;
-}
-public bool PossuiParametro(
-string nome)
-{
-return _parametros.ContainsKey(nome);
-}
-public T Obter<T>(
-string nome)
-{
-if (!_parametros.TryGetValue(
-nome,
-out var parameter))
-{
-throw new InvalidOperationException(
-$"Parâmetro de tipo '{nome}' não encontrado.");
-}
-return ((Parameter<T>)parameter)
-.Valor;
-}
-public void Definir<T>(
-string nome,
-T valor)
-{
-if (!_parametros.TryGetValue(
-nome,
-out var parameter))
-{
-throw new InvalidOperationException(
-$"Parâmetro de tipo '{nome}' não encontrado.");
-}
-((Parameter<T>)parameter).Valor =
-valor!;
-}
-}
-}
-
-
-====================================================================================================
-ARQUIVO: C:\Araci-Engine-Front\Araci Engine\Models\Tipos\TipoGerador.cs
-====================================================================================================
-
-namespace Araci.Models.Tipos
-{
-public class TipoGerador : TipoElemento
-{
-public const string PARAM_FASES = "Fases";
-public const string PARAM_TENSAO_KV = "TensaoKV";
-public const string PARAM_MODELO_FONTE = "ModeloFonte";
-public const string PARAM_FATOR_POTENCIA = "FatorPotencia";
-public TipoGerador()
-{
-NomeTipo = "Gerador Eolico";
-Familia = "Geradores";
-Categoria = "Geradores";
-DefinirParametro(new Parameter<int>(PARAM_FASES, 3));
-DefinirParametro(new Parameter<double>(PARAM_TENSAO_KV, 12.47));
-DefinirParametro(new Parameter<int>(PARAM_MODELO_FONTE, 1));
-DefinirParametro(new Parameter<double>(PARAM_FATOR_POTENCIA, 0.98));
-}
-public int Fases
-{
-get => Obter<int>(PARAM_FASES);
-set => Definir(PARAM_FASES, value <= 0 ? 1 : value);
-}
-public double TensaoKV
-{
-get => Obter<double>(PARAM_TENSAO_KV);
-set => Definir(PARAM_TENSAO_KV, value > 0 ? value : 12.47);
-}
-public int ModeloFonte
-{
-get => Obter<int>(PARAM_MODELO_FONTE);
-set => Definir(PARAM_MODELO_FONTE, value < 0 ? 0 : value);
-}
-public double FatorPotencia
-{
-get => Obter<double>(PARAM_FATOR_POTENCIA);
-set => Definir(PARAM_FATOR_POTENCIA, value);
-}
-}
-}
-
-
-====================================================================================================
-ARQUIVO: C:\Araci-Engine-Front\Araci Engine\Properties\GeradorPropertiesView.xaml
-====================================================================================================
-
-<UserControl x:Class="Araci.Properties.GeradorPropertiesView"
-xmlns="http:
-xmlns:x="http:
-<Grid Background="#252526">
-<ScrollViewer VerticalScrollBarVisibility="Auto">
-<StackPanel Margin="12">
-<TextBlock Text="PROPRIEDADES DO GERADOR"
-Style="{StaticResource PropertyHeaderTextBlockStyle}"/>
-<Grid>
-<Grid.ColumnDefinitions>
-<ColumnDefinition Width="130"/>
-<ColumnDefinition Width="*"/>
-</Grid.ColumnDefinitions>
-<Grid.RowDefinitions>
-<RowDefinition Height="Auto"/>
-<RowDefinition Height="Auto"/>
-<RowDefinition Height="Auto"/>
-<RowDefinition Height="Auto"/>
-<RowDefinition Height="Auto"/>
-<RowDefinition Height="Auto"/>
-<RowDefinition Height="Auto"/>
-<RowDefinition Height="Auto"/>
-<RowDefinition Height="Auto"/>
-<RowDefinition Height="Auto"/>
-<RowDefinition Height="Auto"/>
-<RowDefinition Height="Auto"/>
-<RowDefinition Height="Auto"/>
-<RowDefinition Height="Auto"/>
-</Grid.RowDefinitions>
-<ComboBox Grid.ColumnSpan="2"
-Style="{StaticResource PropertyFullComboBoxStyle}"
-ItemsSource="{Binding TiposDisponiveis}"
-SelectedItem="{Binding Tipo}"
-DisplayMemberPath="NomeTipo"/>
-<Button Grid.Row="1"
-Grid.ColumnSpan="2"
-Style="{StaticResource PropertyFullButtonStyle}"
-Content="Visualizar propriedades de tipo"
-Command="{Binding AbrirPropriedadesTipoCommand}"/>
-<TextBlock Grid.Row="2" Text="Nome" Style="{StaticResource PropertyLabelTextBlockStyle}"/>
-<TextBox Grid.Row="2" Grid.Column="1" Text="{Binding Nome}" Style="{StaticResource PropertyValueTextBoxStyle}"/>
-<TextBlock Grid.Row="3" Text="Potencia aparente" Style="{StaticResource PropertyLabelTextBlockStyle}"/>
-<TextBox Grid.Row="3" Grid.Column="1" Text="{Binding PotenciaAparente, ValidatesOnDataErrors=True, ValidatesOnExceptions=True, NotifyOnValidationError=True}" Style="{StaticResource PropertyNumericTextBoxStyle}"/>
-<TextBlock Grid.Row="4" Text="Potencia ativa" Style="{StaticResource PropertyLabelTextBlockStyle}"/>
-<TextBox Grid.Row="4" Grid.Column="1" Text="{Binding PotenciaAtiva, ValidatesOnDataErrors=True, ValidatesOnExceptions=True, NotifyOnValidationError=True}" Style="{StaticResource PropertyNumericTextBoxStyle}"/>
-<TextBlock Grid.Row="5" Text="Potencia reativa" Style="{StaticResource PropertyLabelTextBlockStyle}"/>
-<TextBox Grid.Row="5" Grid.Column="1" Text="{Binding PotenciaReativa, ValidatesOnDataErrors=True, ValidatesOnExceptions=True, NotifyOnValidationError=True}" Style="{StaticResource PropertyNumericTextBoxStyle}"/>
-<TextBlock Grid.Row="6" Text="Tensao linha" Style="{StaticResource PropertyLabelTextBlockStyle}"/>
-<TextBox Grid.Row="6" Grid.Column="1" Text="{Binding TensaoLinha}" Style="{StaticResource PropertyValueTextBoxStyle}"/>
-<TextBlock Grid.Row="7" Text="Tensao fase A" Style="{StaticResource PropertyLabelTextBlockStyle}"/>
-<TextBox Grid.Row="7" Grid.Column="1" Text="{Binding TensaoFaseA}" Style="{StaticResource PropertyValueTextBoxStyle}"/>
-<TextBlock Grid.Row="8" Text="Tensao fase B" Style="{StaticResource PropertyLabelTextBlockStyle}"/>
-<TextBox Grid.Row="8" Grid.Column="1" Text="{Binding TensaoFaseB}" Style="{StaticResource PropertyValueTextBoxStyle}"/>
-<TextBlock Grid.Row="9" Text="Tensao fase C" Style="{StaticResource PropertyLabelTextBlockStyle}"/>
-<TextBox Grid.Row="9" Grid.Column="1" Text="{Binding TensaoFaseC}" Style="{StaticResource PropertyValueTextBoxStyle}"/>
-<TextBlock Grid.Row="10" Text="Corrente linha" Style="{StaticResource PropertyLabelTextBlockStyle}"/>
-<TextBox Grid.Row="10" Grid.Column="1" Text="{Binding CorrenteLinha}" Style="{StaticResource PropertyValueTextBoxStyle}"/>
-<TextBlock Grid.Row="11" Text="Corrente fase A" Style="{StaticResource PropertyLabelTextBlockStyle}"/>
-<TextBox Grid.Row="11" Grid.Column="1" Text="{Binding CorrenteFaseA}" Style="{StaticResource PropertyValueTextBoxStyle}"/>
-<TextBlock Grid.Row="12" Text="Corrente fase B" Style="{StaticResource PropertyLabelTextBlockStyle}"/>
-<TextBox Grid.Row="12" Grid.Column="1" Text="{Binding CorrenteFaseB}" Style="{StaticResource PropertyValueTextBoxStyle}"/>
-<TextBlock Grid.Row="13" Text="Corrente fase C" Style="{StaticResource PropertyLabelTextBlockStyle}"/>
-<TextBox Grid.Row="13" Grid.Column="1" Text="{Binding CorrenteFaseC}" Style="{StaticResource PropertyValueTextBoxStyle}"/>
-</Grid>
-</StackPanel>
-</ScrollViewer>
-</Grid>
-</UserControl>
-
-
-====================================================================================================
-ARQUIVO: C:\Araci-Engine-Front\Araci Engine\Properties\GeradorPropertiesView.xaml.cs
-====================================================================================================
-
-﻿using System.Windows;
-using System.Windows.Controls;
-using Araci.Models;
-namespace Araci.Properties
-{
-public partial class GeradorPropertiesView : UserControl
-{
-public GeradorPropertiesView()
-{
-InitializeComponent();
-}
-}
-}
-
-
-====================================================================================================
-ARQUIVO: C:\Araci-Engine-Front\Araci Engine\Resources\Templates\DataTemplates.xaml
-====================================================================================================
-
-<ResourceDictionary
-xmlns="http:
-xmlns:x="http:
-xmlns:viewModels="clr-namespace:Araci.ViewModels"
-xmlns:properties="clr-namespace:Araci.Properties">
-<DataTemplate DataType="{x:Type viewModels:CaboViewModel}">
-<properties:CaboPropertiesView/>
-</DataTemplate>
-<DataTemplate DataType="{x:Type viewModels:CargaViewModel}">
-<properties:CargaPropertiesView/>
-</DataTemplate>
-<DataTemplate DataType="{x:Type viewModels:GeradorViewModel}">
-<properties:GeradorPropertiesView/>
-</DataTemplate>
-<DataTemplate DataType="{x:Type viewModels:BarraViewModel}">
-<properties:BarraPropertiesView/>
-</DataTemplate>
-</ResourceDictionary>
-
-
-====================================================================================================
-ARQUIVO: C:\Araci-Engine-Front\Araci Engine\Resources\Templates\TypePropertiesTemplates.xaml
-====================================================================================================
-
-<ResourceDictionary
-xmlns="http:
-xmlns:x="http:
-xmlns:viewModels="clr-namespace:Araci.ViewModels">
-<DataTemplate DataType="{x:Type viewModels:TipoBarraViewModel}">
-<StackPanel>
-<TextBlock Text="PROPRIEDADES DE TIPO"
-Style="{StaticResource PropertyHeaderTextBlockStyle}"/>
-<Grid>
-<Grid.ColumnDefinitions>
-<ColumnDefinition Width="150"/>
-<ColumnDefinition Width="*"/>
-</Grid.ColumnDefinitions>
-<Grid.RowDefinitions>
-<RowDefinition Height="Auto"/>
-<RowDefinition Height="Auto"/>
-<RowDefinition Height="Auto"/>
-<RowDefinition Height="Auto"/>
-<RowDefinition Height="Auto"/>
-<RowDefinition Height="Auto"/>
-<RowDefinition Height="Auto"/>
-</Grid.RowDefinitions>
-<TextBlock Grid.Row="0" Text="Nome do tipo" Style="{StaticResource PropertyLabelTextBlockStyle}"/>
-<TextBox Grid.Row="0" Grid.Column="1" Text="{Binding NomeTipo}" Style="{StaticResource PropertyReadOnlyTextBoxStyle}"/>
-<TextBlock Grid.Row="1" Text="Familia" Style="{StaticResource PropertyLabelTextBlockStyle}"/>
-<TextBox Grid.Row="1" Grid.Column="1" Text="{Binding Familia}" Style="{StaticResource PropertyReadOnlyTextBoxStyle}"/>
-<TextBlock Grid.Row="2" Text="Categoria" Style="{StaticResource PropertyLabelTextBlockStyle}"/>
-<TextBox Grid.Row="2" Grid.Column="1" Text="{Binding Categoria}" Style="{StaticResource PropertyReadOnlyTextBoxStyle}"/>
-<TextBlock Grid.Row="3" Text="Classe tensao" Style="{StaticResource PropertyLabelTextBlockStyle}"/>
-<TextBox Grid.Row="3" Grid.Column="1" Text="{Binding ClasseTensao}" Style="{StaticResource PropertyReadOnlyTextBoxStyle}"/>
-<TextBlock Grid.Row="4" Text="Fases" Style="{StaticResource PropertyLabelTextBlockStyle}"/>
-<TextBox Grid.Row="4" Grid.Column="1" Text="{Binding Fases}" Style="{StaticResource PropertyReadOnlyTextBoxStyle}"/>
-<TextBlock Grid.Row="5" Text="Altura padrao" Style="{StaticResource PropertyLabelTextBlockStyle}"/>
-<TextBox Grid.Row="5" Grid.Column="1" Text="{Binding AlturaPadrao}" Style="{StaticResource PropertyReadOnlyTextBoxStyle}"/>
-<TextBlock Grid.Row="6" Text="Conexoes" Style="{StaticResource PropertyLabelTextBlockStyle}"/>
-<TextBox Grid.Row="6" Grid.Column="1" Text="{Binding NumeroConexoes}" Style="{StaticResource PropertyReadOnlyTextBoxStyle}"/>
-</Grid>
-</StackPanel>
-</DataTemplate>
-<DataTemplate DataType="{x:Type viewModels:TipoCargaViewModel}">
-<StackPanel>
-<TextBlock Text="PROPRIEDADES DE TIPO"
-Style="{StaticResource PropertyHeaderTextBlockStyle}"/>
-<Grid>
-<Grid.ColumnDefinitions>
-<ColumnDefinition Width="150"/>
-<ColumnDefinition Width="*"/>
-</Grid.ColumnDefinitions>
-<Grid.RowDefinitions>
-<RowDefinition Height="Auto"/>
-<RowDefinition Height="Auto"/>
-<RowDefinition Height="Auto"/>
-<RowDefinition Height="Auto"/>
-<RowDefinition Height="Auto"/>
-<RowDefinition Height="Auto"/>
-<RowDefinition Height="Auto"/>
-<RowDefinition Height="Auto"/>
-</Grid.RowDefinitions>
-<TextBlock Grid.Row="0" Text="Nome do tipo" Style="{StaticResource PropertyLabelTextBlockStyle}"/>
-<TextBox Grid.Row="0" Grid.Column="1" Text="{Binding NomeTipo}" Style="{StaticResource PropertyReadOnlyTextBoxStyle}"/>
-<TextBlock Grid.Row="1" Text="Familia" Style="{StaticResource PropertyLabelTextBlockStyle}"/>
-<TextBox Grid.Row="1" Grid.Column="1" Text="{Binding Familia}" Style="{StaticResource PropertyReadOnlyTextBoxStyle}"/>
-<TextBlock Grid.Row="2" Text="Categoria" Style="{StaticResource PropertyLabelTextBlockStyle}"/>
-<TextBox Grid.Row="2" Grid.Column="1" Text="{Binding Categoria}" Style="{StaticResource PropertyReadOnlyTextBoxStyle}"/>
-<TextBlock Grid.Row="3" Text="Modelo carga" Style="{StaticResource PropertyLabelTextBlockStyle}"/>
-<TextBox Grid.Row="3" Grid.Column="1" Text="{Binding ModeloCarga}" Style="{StaticResource PropertyReadOnlyTextBoxStyle}"/>
-<TextBlock Grid.Row="4" Text="Conexao" Style="{StaticResource PropertyLabelTextBlockStyle}"/>
-<TextBox Grid.Row="4" Grid.Column="1" Text="{Binding Conexao}" Style="{StaticResource PropertyReadOnlyTextBoxStyle}"/>
-<TextBlock Grid.Row="5" Text="Tensao" Style="{StaticResource PropertyLabelTextBlockStyle}"/>
-<TextBox Grid.Row="5" Grid.Column="1" Text="{Binding Tensao}" Style="{StaticResource PropertyReadOnlyTextBoxStyle}"/>
-<TextBlock Grid.Row="6" Text="Fases" Style="{StaticResource PropertyLabelTextBlockStyle}"/>
-<TextBox Grid.Row="6" Grid.Column="1" Text="{Binding Fases}" Style="{StaticResource PropertyReadOnlyTextBoxStyle}"/>
-<TextBlock Grid.Row="7" Text="Fator potencia" Style="{StaticResource PropertyLabelTextBlockStyle}"/>
-<TextBox Grid.Row="7" Grid.Column="1" Text="{Binding FatorPotencia}" Style="{StaticResource PropertyReadOnlyTextBoxStyle}"/>
-</Grid>
-</StackPanel>
-</DataTemplate>
-<DataTemplate DataType="{x:Type viewModels:TipoGeradorViewModel}">
-<StackPanel>
-<TextBlock Text="PROPRIEDADES DE TIPO"
-Style="{StaticResource PropertyHeaderTextBlockStyle}"/>
-<Grid>
-<Grid.ColumnDefinitions>
-<ColumnDefinition Width="150"/>
-<ColumnDefinition Width="*"/>
-</Grid.ColumnDefinitions>
-<Grid.RowDefinitions>
-<RowDefinition Height="Auto"/>
-<RowDefinition Height="Auto"/>
-<RowDefinition Height="Auto"/>
-<RowDefinition Height="Auto"/>
-<RowDefinition Height="Auto"/>
-<RowDefinition Height="Auto"/>
-</Grid.RowDefinitions>
-<TextBlock Grid.Row="0" Text="Nome do tipo" Style="{StaticResource PropertyLabelTextBlockStyle}"/>
-<TextBox Grid.Row="0" Grid.Column="1" Text="{Binding NomeTipo}" Style="{StaticResource PropertyReadOnlyTextBoxStyle}"/>
-<TextBlock Grid.Row="1" Text="Familia" Style="{StaticResource PropertyLabelTextBlockStyle}"/>
-<TextBox Grid.Row="1" Grid.Column="1" Text="{Binding Familia}" Style="{StaticResource PropertyReadOnlyTextBoxStyle}"/>
-<TextBlock Grid.Row="2" Text="Categoria" Style="{StaticResource PropertyLabelTextBlockStyle}"/>
-<TextBox Grid.Row="2" Grid.Column="1" Text="{Binding Categoria}" Style="{StaticResource PropertyReadOnlyTextBoxStyle}"/>
-<TextBlock Grid.Row="3" Text="Fases" Style="{StaticResource PropertyLabelTextBlockStyle}"/>
-<TextBox Grid.Row="3" Grid.Column="1" Text="{Binding Fases}" Style="{StaticResource PropertyReadOnlyTextBoxStyle}"/>
-<TextBlock Grid.Row="4" Text="Modelo fonte" Style="{StaticResource PropertyLabelTextBlockStyle}"/>
-<TextBox Grid.Row="4" Grid.Column="1" Text="{Binding ModeloFonte}" Style="{StaticResource PropertyReadOnlyTextBoxStyle}"/>
-<TextBlock Grid.Row="5" Text="Fator potencia" Style="{StaticResource PropertyLabelTextBlockStyle}"/>
-<TextBox Grid.Row="5" Grid.Column="1" Text="{Binding FatorPotencia}" Style="{StaticResource PropertyReadOnlyTextBoxStyle}"/>
-</Grid>
-</StackPanel>
-</DataTemplate>
-<DataTemplate DataType="{x:Type viewModels:TipoCaboViewModel}">
-<StackPanel>
-<TextBlock Text="PROPRIEDADES DE TIPO"
-Style="{StaticResource PropertyHeaderTextBlockStyle}"/>
-<Grid>
-<Grid.ColumnDefinitions>
-<ColumnDefinition Width="150"/>
-<ColumnDefinition Width="*"/>
-</Grid.ColumnDefinitions>
-<Grid.RowDefinitions>
-<RowDefinition Height="Auto"/>
-<RowDefinition Height="Auto"/>
-<RowDefinition Height="Auto"/>
-<RowDefinition Height="Auto"/>
-<RowDefinition Height="Auto"/>
-<RowDefinition Height="Auto"/>
-<RowDefinition Height="Auto"/>
-<RowDefinition Height="Auto"/>
-<RowDefinition Height="Auto"/>
-<RowDefinition Height="Auto"/>
-<RowDefinition Height="Auto"/>
-</Grid.RowDefinitions>
-<TextBlock Grid.Row="0" Text="Nome do tipo" Style="{StaticResource PropertyLabelTextBlockStyle}"/>
-<TextBox Grid.Row="0" Grid.Column="1" Text="{Binding NomeTipo}" Style="{StaticResource PropertyReadOnlyTextBoxStyle}"/>
-<TextBlock Grid.Row="1" Text="Familia" Style="{StaticResource PropertyLabelTextBlockStyle}"/>
-<TextBox Grid.Row="1" Grid.Column="1" Text="{Binding Familia}" Style="{StaticResource PropertyReadOnlyTextBoxStyle}"/>
-<TextBlock Grid.Row="2" Text="Categoria" Style="{StaticResource PropertyLabelTextBlockStyle}"/>
-<TextBox Grid.Row="2" Grid.Column="1" Text="{Binding Categoria}" Style="{StaticResource PropertyReadOnlyTextBoxStyle}"/>
-<TextBlock Grid.Row="3" Text="Fases" Style="{StaticResource PropertyLabelTextBlockStyle}"/>
-<TextBox Grid.Row="3" Grid.Column="1" Text="{Binding Fases}" Style="{StaticResource PropertyReadOnlyTextBoxStyle}"/>
-<TextBlock Grid.Row="4" Text="R1" Style="{StaticResource PropertyLabelTextBlockStyle}"/>
-<TextBox Grid.Row="4" Grid.Column="1" Text="{Binding R1}" Style="{StaticResource PropertyReadOnlyTextBoxStyle}"/>
-<TextBlock Grid.Row="5" Text="X1" Style="{StaticResource PropertyLabelTextBlockStyle}"/>
-<TextBox Grid.Row="5" Grid.Column="1" Text="{Binding X1}" Style="{StaticResource PropertyReadOnlyTextBoxStyle}"/>
-<TextBlock Grid.Row="6" Text="R0" Style="{StaticResource PropertyLabelTextBlockStyle}"/>
-<TextBox Grid.Row="6" Grid.Column="1" Text="{Binding R0}" Style="{StaticResource PropertyReadOnlyTextBoxStyle}"/>
-<TextBlock Grid.Row="7" Text="X0" Style="{StaticResource PropertyLabelTextBlockStyle}"/>
-<TextBox Grid.Row="7" Grid.Column="1" Text="{Binding X0}" Style="{StaticResource PropertyReadOnlyTextBoxStyle}"/>
-<TextBlock Grid.Row="8" Text="C1" Style="{StaticResource PropertyLabelTextBlockStyle}"/>
-<TextBox Grid.Row="8" Grid.Column="1" Text="{Binding C1}" Style="{StaticResource PropertyReadOnlyTextBoxStyle}"/>
-<TextBlock Grid.Row="9" Text="C0" Style="{StaticResource PropertyLabelTextBlockStyle}"/>
-<TextBox Grid.Row="9" Grid.Column="1" Text="{Binding C0}" Style="{StaticResource PropertyReadOnlyTextBoxStyle}"/>
-<TextBlock Grid.Row="10" Text="Secao" Style="{StaticResource PropertyLabelTextBlockStyle}"/>
-<TextBox Grid.Row="10" Grid.Column="1" Text="{Binding Secao}" Style="{StaticResource PropertyReadOnlyTextBoxStyle}"/>
-</Grid>
-</StackPanel>
-</DataTemplate>
-</ResourceDictionary>
-
-
-====================================================================================================
-ARQUIVO: C:\Araci-Engine-Front\Araci Engine\Ribbon\Tabs\DiagramaTab.xaml
-====================================================================================================
-
-﻿<UserControl x:Class="Araci.Ribbon.Tabs.DiagramaTab"
-xmlns="http:
-xmlns:x="http:
-Background="#F4F4F4"
-Height="130" Loaded="UserControl_Loaded">
-<Grid Margin="8">
-<StackPanel Orientation="Horizontal">
-<Border Background="#F4F4F4"
-BorderBrush="#D0D0D0"
-BorderThickness="1"
-Padding="6"
-Margin="0,0,0,0">
-<DockPanel>
-<TextBlock Text="Inserir"
-DockPanel.Dock="Bottom"
-HorizontalAlignment="Center"
-FontSize="12"
-FontWeight="SemiBold"
-Margin="0,8,0,0"/>
-<WrapPanel>
-<!-- CABO -->
-<Button Width="80"
-Height="70"
-Background="Transparent"
-BorderThickness="0"
-Click="CaboButton_Click">
-<StackPanel HorizontalAlignment="Center">
-<Image Source="pack:
-Width="50"
-Height="50"/>
-<TextBlock Text="Cabo"
-Width="80"
-TextAlignment="Center"
-FontSize="11"
-Foreground="Black"/>
-</StackPanel>
-</Button>
-<!-- CARGA -->
-<Button Width="80"
-Height="70"
-Background="Transparent"
-BorderThickness="0"
-Click="CargaButton_Click">
-<StackPanel HorizontalAlignment="Center">
-<Image Source="pack:
-Width="50"
-Height="50"/>
-<TextBlock Text="Carga"
-Width="80"
-TextAlignment="Center"
-FontSize="11"
-Foreground="Black"/>
-</StackPanel>
-</Button>
-<!-- GERADOR -->
-<Button Width="80"
-Height="70"
-Background="Transparent"
-BorderThickness="0"
-Click="GeradorButton_Click">
-<StackPanel HorizontalAlignment="Center">
-<Image Source="pack:
-Width="50"
-Height="50"/>
-<TextBlock Text="Fonte"
-Width="80"
-TextAlignment="Center"
-FontSize="11"
-Foreground="Black"/>
-</StackPanel>
-</Button>
-<!-- NOVO: BARRA -->
-<Button Width="80"
-Height="70"
-Background="Transparent"
-BorderThickness="0"
-Click="BarraButton_Click">
-<StackPanel HorizontalAlignment="Center">
-<Image Source="pack:
-Width="50"
-Height="50"/>
-<TextBlock Text="Barra"
-Width="80"
-TextAlignment="Center"
-FontSize="11"
-Foreground="Black"/>
-</StackPanel>
-</Button>
-</WrapPanel>
-</DockPanel>
-</Border>
-</StackPanel>
-</Grid>
-</UserControl>
-
-
-====================================================================================================
-ARQUIVO: C:\Araci-Engine-Front\Araci Engine\Ribbon\Tabs\DiagramaTab.xaml.cs
-====================================================================================================
-
-﻿using System;
-using System.Windows;
-using System.Windows.Controls;
-using Araci.Applications.Diagrama.InserirCabo;
-using Araci.Applications.Diagrama.InserirCarga;
-using Araci.Applications.Diagrama.InserirGerador;
-using Araci.Applications.Diagrama.InserirBarra;
-using Araci.Services;
-namespace Araci.Ribbon.Tabs
-{
-public partial class DiagramaTab : UserControl
-{
-public DiagramaTab()
-{
-InitializeComponent();
-}
-private EditorContext? Context =>
-DataContext as EditorContext;
-private void GeradorButton_Click(
-object sender,
-RoutedEventArgs e)
-{
-if (Context == null) return;
-InserirGeradorApplication app =
-new(Context);
-app.Executar();
-}
-private void CargaButton_Click(
-object sender,
-RoutedEventArgs e)
-{
-if (Context == null) return;
-InserirCargaApplication app =
-new(Context);
-app.Executar();
-}
-private void CaboButton_Click(
-object sender,
-RoutedEventArgs e)
-{
-if (Context == null) return;
-InserirCaboApplication app =
-new(Context);
-app.Executar();
-}
-private void BarraButton_Click(
-object sender,
-RoutedEventArgs e)
-{
-if (Context == null) return;
-InserirBarraApplication app =
-new(Context);
-app.Executar();
-}
-private void UserControl_Loaded(
-object sender,
-RoutedEventArgs e)
-{
 }
 }
 }
@@ -2501,70 +1379,6 @@ return id.Length >= 8 ? $"BUS-{id[..8]}" : $"BUS-{id}";
 
 
 ====================================================================================================
-ARQUIVO: C:\Araci-Engine-Front\Araci Engine\Service\ElectricGraphNode.cs
-====================================================================================================
-
-using System;
-using System.Collections.Generic;
-using Araci.Models;
-namespace Araci.Services
-{
-public class ElectricGraphNode
-{
-public ElectricGraphNode(
-string elementId,
-Guid elementGuid,
-string name,
-string kind,
-Elemento sourceElement,
-IReadOnlyList<ElectricGraphTerminal> terminals)
-{
-ElementId = elementId;
-ElementGuid = elementGuid;
-Name = name;
-Kind = kind;
-SourceElement = sourceElement;
-Terminals = terminals;
-}
-public string ElementId { get; }
-public Guid ElementGuid { get; }
-public string Name { get; }
-public string Kind { get; }
-public Elemento SourceElement { get; }
-public IReadOnlyList<ElectricGraphTerminal> Terminals { get; }
-}
-}
-
-
-====================================================================================================
-ARQUIVO: C:\Araci-Engine-Front\Araci Engine\Service\ElectricGraphTerminal.cs
-====================================================================================================
-
-using Araci.Models;
-namespace Araci.Services
-{
-public class ElectricGraphTerminal
-{
-public ElectricGraphTerminal(
-string elementId,
-string terminalId,
-string? busName,
-Terminal sourceTerminal)
-{
-ElementId = elementId;
-TerminalId = terminalId;
-BusName = busName;
-SourceTerminal = sourceTerminal;
-}
-public string ElementId { get; }
-public string TerminalId { get; }
-public string? BusName { get; }
-public Terminal SourceTerminal { get; }
-}
-}
-
-
-====================================================================================================
 ARQUIVO: C:\Araci-Engine-Front\Araci Engine\Service\ElementRegistryService.cs
 ====================================================================================================
 
@@ -2730,6 +1544,21 @@ e => ((Gerador)e).AtualizarTerminais(
 ElementGeometryDefaults.EquipamentoLargura,
 ElementGeometryDefaults.EquipamentoAltura)));
 Register(new ElementDefinition(
+"Sin",
+"SIN",
+"SIN",
+typeof(Sin),
+typeof(SinViewModel),
+typeof(TipoSin),
+CriarSin,
+(m, n, d, l) => new SinViewModel((Sin)m, Types, n, d, l),
+() => Types.TipoSinPadrao,
+() => Types.TiposSin,
+_ => EquipamentoSize(),
+e => ((Sin)e).AtualizarTerminais(
+ElementGeometryDefaults.EquipamentoLargura,
+ElementGeometryDefaults.EquipamentoAltura)));
+Register(new ElementDefinition(
 "Cabo",
 "Cabo",
 "CABO",
@@ -2769,6 +1598,15 @@ Tipo = Types.TipoGeradorPadrao
 ?? throw new InvalidOperationException("Nenhum tipo de gerador cadastrado.")
 };
 return gerador;
+}
+private Sin CriarSin()
+{
+var sin = new Sin
+{
+Tipo = Types.TipoSinPadrao
+?? throw new InvalidOperationException("Nenhum tipo de SIN cadastrado.")
+};
+return sin;
 }
 private Cabo CriarCabo()
 {
@@ -2862,6 +1700,14 @@ return _registry.CreateModel<Gerador>();
 public GeradorViewModel CriarGeradorVM()
 {
 return (GeradorViewModel)CriarViewModel(CriarGerador())!;
+}
+public Sin CriarSin()
+{
+return _registry.CreateModel<Sin>();
+}
+public SinViewModel CriarSinVM()
+{
+return (SinViewModel)CriarViewModel(CriarSin())!;
 }
 public Barra CriarBarra()
 {
@@ -3280,77 +2126,6 @@ public double Y { get; set; }
 
 
 ====================================================================================================
-ARQUIVO: C:\Araci-Engine-Front\Araci Engine\Service\SimulationExportService.cs
-====================================================================================================
-
-using System;
-using System.IO;
-using System.Text;
-using System.Text.Json;
-using Araci.Applications.Analisar.FluxoDeCorrente;
-using Araci.DTOs;
-namespace Araci.Services
-{
-public class SimulationExportService
-{
-public SimulationExportPaths GetPaths(FluxoDeCorrenteOptions options)
-{
-if (options == null)
-throw new ArgumentNullException(nameof(options));
-string baseName = SanitizarNomeArquivo(options.NomeArquivo);
-string dssFileName = baseName.EndsWith(".dss", StringComparison.OrdinalIgnoreCase)
-? baseName
-: $"{baseName}.dss";
-string jsonBaseName = Path.GetFileNameWithoutExtension(dssFileName);
-string dssPath = Path.Combine(options.PastaSaida, dssFileName);
-string jsonPath = Path.Combine(options.PastaSaida, $"{jsonBaseName}_resultado.json");
-return new SimulationExportPaths(dssPath, jsonPath);
-}
-public bool Exists(SimulationExportPaths paths)
-{
-if (paths == null)
-throw new ArgumentNullException(nameof(paths));
-return File.Exists(paths.DssPath) || File.Exists(paths.JsonPath);
-}
-public string Save(FluxoDeCorrenteOptions options, SimulationResultDto resultado)
-{
-if (resultado == null)
-throw new ArgumentNullException(nameof(resultado));
-SimulationExportPaths paths = GetPaths(options);
-Directory.CreateDirectory(options.PastaSaida);
-File.WriteAllText(paths.DssPath, resultado.Script, Encoding.UTF8);
-var jsonOptions = new JsonSerializerOptions
-{
-WriteIndented = true
-};
-string json = JsonSerializer.Serialize(resultado, jsonOptions);
-File.WriteAllText(paths.JsonPath, json, Encoding.UTF8);
-return paths.DssPath;
-}
-private static string SanitizarNomeArquivo(string nomeArquivo)
-{
-string nome = string.IsNullOrWhiteSpace(nomeArquivo)
-? "circuito"
-: nomeArquivo.Trim();
-foreach (char invalid in Path.GetInvalidFileNameChars())
-nome = nome.Replace(invalid.ToString(), string.Empty);
-return string.IsNullOrWhiteSpace(nome) ? "circuito" : nome;
-}
-}
-public class SimulationExportPaths
-{
-public SimulationExportPaths(string dssPath, string jsonPath)
-{
-DssPath = dssPath;
-JsonPath = jsonPath;
-}
-public string DssPath { get; }
-public string JsonPath { get; }
-}
-}
-
-
-====================================================================================================
 ARQUIVO: C:\Araci-Engine-Front\Araci Engine\Service\TerminalLayoutService.cs
 ====================================================================================================
 
@@ -3390,6 +2165,10 @@ case Gerador gerador:
 var tamanho = _geometry.ObterTamanho(gerador);
 gerador.AtualizarTerminais(tamanho.Width, tamanho.Height);
 break;
+case Sin sin:
+var tamanhoSin = _geometry.ObterTamanho(sin);
+sin.AtualizarTerminais(tamanhoSin.Width, tamanhoSin.Height);
+break;
 case Cabo cabo:
 AtualizarTerminaisCabo(cabo);
 break;
@@ -3407,390 +2186,7 @@ cabo.DefinirDestino(cabo.Vertices[^1]);
 
 
 ====================================================================================================
-ARQUIVO: C:\Araci-Engine-Front\Araci Engine\Service\TypeLibraryService.cs
-====================================================================================================
-
-using System.Collections.ObjectModel;
-using System.Linq;
-using Araci.Models.Tipos;
-namespace Araci.Services
-{
-public class TypeLibraryService
-{
-public TypeLibraryService()
-{
-InicializarCabos();
-InicializarCargas();
-InicializarGeradores();
-InicializarBarras();
-}
-public ObservableCollection<TipoCabo> TiposCabos { get; } = new();
-public ObservableCollection<TipoCarga> TiposCargas { get; } = new();
-public ObservableCollection<TipoGerador> TiposGeradores { get; } = new();
-public ObservableCollection<TipoBarra> TiposBarras { get; } = new();
-public TipoCabo? TipoCaboPadrao => TiposCabos.FirstOrDefault();
-public TipoCarga? TipoCargaPadrao => TiposCargas.FirstOrDefault();
-public TipoGerador? TipoGeradorPadrao => TiposGeradores.FirstOrDefault();
-public TipoBarra? TipoBarraPadrao => TiposBarras.FirstOrDefault();
-private void InicializarCabos()
-{
-TiposCabos.Add(
-new TipoCabo
-{
-NomeTipo = "LC-500MCM",
-Familia = "Cabos",
-Categoria = "Cabos",
-Fases = 3,
-R1 = 0.1,
-X1 = 0.2,
-R0 = 0.3,
-X0 = 0.6,
-C1 = 3.4,
-C0 = 1.6,
-Secao = 253
-});
-}
-private void InicializarCargas()
-{
-TiposCargas.Add(
-new TipoCarga
-{
-NomeTipo = "Carga MT",
-Familia = "Cargas",
-Categoria = "Cargas",
-ModeloCarga = 1,
-Conexao = "Wye",
-Tensao = "12.47",
-Fases = 3,
-FatorPotencia = 0.96
-});
-}
-private void InicializarGeradores()
-{
-TiposGeradores.Add(
-new TipoGerador
-{
-NomeTipo = "Gerador Eolico",
-Familia = "Geradores",
-Categoria = "Geradores",
-Fases = 3,
-TensaoKV = 12.47,
-ModeloFonte = 1,
-FatorPotencia = 0.98
-});
-}
-private void InicializarBarras()
-{
-TiposBarras.Add(
-new TipoBarra
-{
-NomeTipo = "Barra Vertical",
-Familia = "Barras",
-Categoria = "Barras",
-ClasseTensao = "12.47",
-Fases = 3,
-AlturaPadrao = 120,
-NumeroConexoes = 6
-});
-}
-}
-}
-
-
-====================================================================================================
-ARQUIVO: C:\Araci-Engine-Front\Araci Engine\ViewModels\ElementoViewModel.cs
-====================================================================================================
-
-using System;
-using System.Collections;
-using System.Collections.ObjectModel;
-using System.Linq;
-using System.Windows;
-using System.Windows.Input;
-using System.Windows.Media;
-using Araci.Core.Rendering;
-using Araci.Core.SceneNodes;
-using Araci.Models;
-using Araci.Models.Tipos;
-using Araci.Services;
-using Araci.ViewModels.Base;
-using Araci.ViewModels.VisualStates;
-namespace Araci.ViewModels
-{
-public abstract class ElementoViewModel : ViewModelBase
-{
-private readonly ElementoNode _node;
-private readonly NameService _names;
-private readonly TypePropertiesDialogService _typePropertiesDialogs;
-private ICommand? _abrirPropriedadesTipoCommand;
-private ObservableCollection<ParameterViewModel>? _parametros;
-private bool _isPreview;
-protected ElementoViewModel(
-Elemento modelo,
-ElementoNode node,
-TypeLibraryService types,
-NameService names,
-TypePropertiesDialogService typePropertiesDialogs)
-{
-Modelo = modelo ?? throw new ArgumentNullException(nameof(modelo));
-_node = node ?? throw new ArgumentNullException(nameof(node));
-Types = types ?? throw new ArgumentNullException(nameof(types));
-_names = names ?? throw new ArgumentNullException(nameof(names));
-_typePropertiesDialogs = typePropertiesDialogs ?? throw new ArgumentNullException(nameof(typePropertiesDialogs));
-VisualState = new ElementoVisualState();
-_node.AtualizarGeometria();
-}
-public Elemento Modelo { get; }
-public ElementoNode Node => _node;
-protected TypeLibraryService Types { get; }
-protected void RenomearModelo(string novoNome)
-{
-_names.Renomear(Modelo, novoNome);
-}
-public TipoElemento Tipo
-{
-get => Modelo.Tipo!;
-set
-{
-if (ReferenceEquals(Modelo.Tipo, value))
-return;
-Modelo.Tipo = value;
-OnPropertyChanged();
-OnPropertyChanged(nameof(TipoViewModel));
-}
-}
-public abstract IEnumerable TiposDisponiveis { get; }
-public virtual TipoElementoViewModel? TipoViewModel =>
-TipoElementoViewModelFactory.Criar(Tipo);
-public ICommand AbrirPropriedadesTipoCommand =>
-_abrirPropriedadesTipoCommand ??= new RelayCommand(AbrirPropriedadesTipo);
-public ElementoVisualState VisualState { get; }
-public bool IsSelecionado
-{
-get => VisualState.IsSelecionado;
-set
-{
-if (VisualState.IsSelecionado == value)
-return;
-VisualState.AtualizarSelecao(value);
-OnPropertyChanged();
-OnPropertyChanged(nameof(Stroke));
-OnPropertyChanged(nameof(StrokeThickness));
-OnPropertyChanged(nameof(RenderData));
-}
-}
-public bool IsHover
-{
-get => VisualState.IsHover;
-set
-{
-if (VisualState.IsHover == value)
-return;
-VisualState.AtualizarHover(value);
-OnPropertyChanged();
-OnPropertyChanged(nameof(Stroke));
-OnPropertyChanged(nameof(StrokeThickness));
-OnPropertyChanged(nameof(RenderData));
-}
-}
-public bool IsPreview
-{
-get => _isPreview;
-set
-{
-if (_isPreview == value)
-return;
-_isPreview = value;
-OnPropertyChanged();
-OnPropertyChanged(nameof(RenderData));
-}
-}
-public Brush Stroke => VisualState.Stroke;
-public double StrokeThickness => VisualState.StrokeThickness;
-public virtual ElementoRenderData RenderData => new(
-Largura,
-Altura,
-PontoLocalInicial,
-PontoLocalFinal,
-Stroke,
-StrokeThickness);
-public virtual double X
-{
-get => Node.X;
-set
-{
-if (Math.Abs(Node.X - value) < 0.0001)
-return;
-Node.X = value;
-AtualizarNode();
-}
-}
-public virtual double Y
-{
-get => Node.Y;
-set
-{
-if (Math.Abs(Node.Y - value) < 0.0001)
-return;
-Node.Y = value;
-AtualizarNode();
-}
-}
-public virtual double WorldX => Node.X;
-public virtual double WorldY => Node.Y;
-public virtual double Largura => Node.Largura;
-public virtual double Altura
-{
-get => Node.Altura;
-set { }
-}
-public virtual Rect Bounds => Node.Bounds;
-public virtual Point Centro => Node.Centro;
-public ObservableCollection<ParameterViewModel> Parametros =>
-_parametros ??=
-new ObservableCollection<ParameterViewModel>(
-Modelo.Parametros.Values.Select(p => new ParameterViewModel(p)));
-protected virtual Point PontoLocalInicial => new(0, 0);
-protected virtual Point PontoLocalFinal => new(Largura, Altura);
-protected void SelecionarPrimeiroTipoDisponivel()
-{
-TipoElemento? primeiroTipo = null;
-bool tipoAtualExiste = false;
-foreach (object? item in TiposDisponiveis)
-{
-if (item is not TipoElemento tipo)
-continue;
-primeiroTipo ??= tipo;
-if (ReferenceEquals(tipo, Modelo.Tipo))
-{
-tipoAtualExiste = true;
-break;
-}
-}
-if (tipoAtualExiste || primeiroTipo == null)
-return;
-Tipo = primeiroTipo;
-}
-public virtual void Mover(Vector delta)
-{
-Node.Mover(delta);
-NotificarGeometria();
-}
-public virtual ElementoEstado CapturarEstado()
-{
-return new ElementoEstado(X, Y);
-}
-public virtual void AplicarEstado(ElementoEstado estado)
-{
-Node.X = estado.X;
-Node.Y = estado.Y;
-AtualizarNode();
-}
-public virtual void AtualizarAposModeloAlterado()
-{
-AtualizarNode();
-}
-public virtual void NotificarParametros()
-{
-foreach (var parametro in Parametros)
-parametro.Atualizar();
-OnPropertyChanged(nameof(Parametros));
-}
-public void NotificarPropriedades(params string[] nomes)
-{
-foreach (string nome in nomes)
-OnPropertyChanged(nome);
-NotificarParametros();
-}
-protected virtual void AtualizarNode()
-{
-Node.AtualizarGeometria();
-NotificarGeometria();
-}
-protected virtual void NotificarGeometria()
-{
-OnPropertyChanged(nameof(X));
-OnPropertyChanged(nameof(Y));
-OnPropertyChanged(nameof(WorldX));
-OnPropertyChanged(nameof(WorldY));
-OnPropertyChanged(nameof(Largura));
-OnPropertyChanged(nameof(Altura));
-OnPropertyChanged(nameof(Bounds));
-OnPropertyChanged(nameof(Centro));
-OnPropertyChanged(nameof(RenderData));
-}
-private void AbrirPropriedadesTipo()
-{
-_typePropertiesDialogs.Show(TipoViewModel);
-}
-}
-}
-
-
-====================================================================================================
-ARQUIVO: C:\Araci-Engine-Front\Araci Engine\ViewModels\EquipamentoViewModelBase.cs
-====================================================================================================
-
-using Araci.Core.SceneNodes;
-using Araci.Models;
-using Araci.Services;
-namespace Araci.ViewModels
-{
-public abstract class EquipamentoViewModelBase<T> : ElementoViewModel
-where T : ElementoEquipamento
-{
-protected readonly T _equipamento;
-protected EquipamentoViewModelBase(
-T equipamento,
-TypeLibraryService types,
-NameService names,
-TypePropertiesDialogService typePropertiesDialogs)
-: base(equipamento, new EquipamentoNode(equipamento), types, names, typePropertiesDialogs)
-{
-_equipamento = equipamento;
-}
-public string Nome
-{
-get => _equipamento.Nome;
-set
-{
-if (_equipamento.Nome == value)
-return;
-RenomearModelo(value);
-OnPropertyChanged();
-NotificarParametros();
-}
-}
-public int Alimentador
-{
-get => _equipamento.Alimentador;
-set
-{
-if (_equipamento.Alimentador == value)
-return;
-_equipamento.Alimentador = value;
-OnPropertyChanged();
-NotificarParametros();
-}
-}
-public double PotenciaAtiva
-{
-get => _equipamento.PotenciaAtiva;
-set
-{
-if (_equipamento.PotenciaAtiva == value)
-return;
-_equipamento.PotenciaAtiva = value;
-OnPropertyChanged();
-NotificarParametros();
-}
-}
-}
-}
-
-
-====================================================================================================
-ARQUIVO: C:\Araci-Engine-Front\Araci Engine\ViewModels\GeradorViewModel.cs
+ARQUIVO: C:\Araci-Engine-Front\Araci Engine\ViewModels\SinViewModel.cs
 ====================================================================================================
 
 using System.Collections;
@@ -3800,11 +2196,11 @@ using Araci.Models;
 using Araci.Services;
 namespace Araci.ViewModels
 {
-public class GeradorViewModel : ElementoViewModel
+public class SinViewModel : ElementoViewModel
 {
 private readonly TerminalLayoutService _terminalLayout;
-public GeradorViewModel(
-Gerador modelo,
+public SinViewModel(
+Sin modelo,
 TypeLibraryService types,
 NameService names,
 TypePropertiesDialogService typePropertiesDialogs,
@@ -3815,184 +2211,52 @@ _terminalLayout = terminalLayout;
 SelecionarPrimeiroTipoDisponivel();
 AtualizarTerminais();
 }
-public Gerador Gerador => (Gerador)Modelo;
-public override IEnumerable TiposDisponiveis => Types.TiposGeradores;
-public string Barra
-{
-get => Gerador.Barra;
-set
-{
-if (Gerador.Barra == value)
-return;
-Gerador.Barra = value;
-OnPropertyChanged();
-NotificarParametros();
-}
-}
-public string BarraId
-{
-get => Gerador.BarraId;
-set
-{
-if (Gerador.BarraId == value)
-return;
-Gerador.BarraId = value;
-OnPropertyChanged();
-NotificarParametros();
-}
-}
+public Sin Sin => (Sin)Modelo;
+public override IEnumerable TiposDisponiveis => Types.TiposSin;
 public string Nome
 {
-get => Gerador.Nome;
+get => Sin.Nome;
 set
 {
-if (Gerador.Nome == value)
+if (Sin.Nome == value)
 return;
 RenomearModelo(value);
 OnPropertyChanged();
 NotificarParametros();
 }
 }
-public double PotenciaAparente
+public string Barra
 {
-get => Gerador.PotenciaAparente;
+get => Sin.Barra;
 set
 {
-if (Gerador.PotenciaAparente == value)
+if (Sin.Barra == value)
 return;
-Gerador.PotenciaAparente = value;
-OnPropertyChanged();
-NotificarParametros();
-}
-}
-public double PotenciaAtiva
-{
-get => Gerador.PotenciaAtiva;
-set
-{
-if (Gerador.PotenciaAtiva == value)
-return;
-Gerador.PotenciaAtiva = value;
-OnPropertyChanged();
-NotificarParametros();
-}
-}
-public double PotenciaReativa
-{
-get => Gerador.PotenciaReativa;
-set
-{
-if (Gerador.PotenciaReativa == value)
-return;
-Gerador.PotenciaReativa = value;
+Sin.Barra = value;
 OnPropertyChanged();
 NotificarParametros();
 }
 }
 public string TensaoLinha
 {
-get => Gerador.TensaoLinha;
+get => Sin.TensaoLinha;
 set
 {
-if (Gerador.TensaoLinha == value)
+if (Sin.TensaoLinha == value)
 return;
-Gerador.TensaoLinha = value;
-OnPropertyChanged();
-NotificarParametros();
-}
-}
-public string TensaoFaseA
-{
-get => Gerador.TensaoFaseA;
-set
-{
-if (Gerador.TensaoFaseA == value)
-return;
-Gerador.TensaoFaseA = value;
-OnPropertyChanged();
-NotificarParametros();
-}
-}
-public string TensaoFaseB
-{
-get => Gerador.TensaoFaseB;
-set
-{
-if (Gerador.TensaoFaseB == value)
-return;
-Gerador.TensaoFaseB = value;
-OnPropertyChanged();
-NotificarParametros();
-}
-}
-public string TensaoFaseC
-{
-get => Gerador.TensaoFaseC;
-set
-{
-if (Gerador.TensaoFaseC == value)
-return;
-Gerador.TensaoFaseC = value;
-OnPropertyChanged();
-NotificarParametros();
-}
-}
-public string CorrenteLinha
-{
-get => Gerador.CorrenteLinha;
-set
-{
-if (Gerador.CorrenteLinha == value)
-return;
-Gerador.CorrenteLinha = value;
-OnPropertyChanged();
-NotificarParametros();
-}
-}
-public string CorrenteFaseA
-{
-get => Gerador.CorrenteFaseA;
-set
-{
-if (Gerador.CorrenteFaseA == value)
-return;
-Gerador.CorrenteFaseA = value;
-OnPropertyChanged();
-NotificarParametros();
-}
-}
-public string CorrenteFaseB
-{
-get => Gerador.CorrenteFaseB;
-set
-{
-if (Gerador.CorrenteFaseB == value)
-return;
-Gerador.CorrenteFaseB = value;
-OnPropertyChanged();
-NotificarParametros();
-}
-}
-public string CorrenteFaseC
-{
-get => Gerador.CorrenteFaseC;
-set
-{
-if (Gerador.CorrenteFaseC == value)
-return;
-Gerador.CorrenteFaseC = value;
+Sin.TensaoLinha = value;
 OnPropertyChanged();
 NotificarParametros();
 }
 }
 public int Alimentador
 {
-get => Gerador.Alimentador;
+get => Sin.Alimentador;
 set
 {
-if (Gerador.Alimentador == value)
+if (Sin.Alimentador == value)
 return;
-Gerador.Alimentador = value;
+Sin.Alimentador = value;
 OnPropertyChanged();
 NotificarParametros();
 }
@@ -4009,253 +2273,7 @@ AtualizarTerminais();
 }
 private void AtualizarTerminais()
 {
-_terminalLayout.AtualizarTerminais(Gerador);
-}
-}
-}
-
-
-====================================================================================================
-ARQUIVO: C:\Araci-Engine-Front\Araci Engine\ViewModels\TipoElementoViewModelFactory.cs
-====================================================================================================
-
-using System.Collections.Generic;
-using Araci.Models.Tipos;
-namespace Araci.ViewModels
-{
-public static class TipoElementoViewModelFactory
-{
-private static readonly Dictionary<TipoElemento, TipoElementoViewModel> _cache = new();
-public static TipoElementoViewModel? Criar(TipoElemento? tipo)
-{
-if (tipo == null)
-return null;
-if (_cache.TryGetValue(tipo, out TipoElementoViewModel? existente))
-return existente;
-TipoElementoViewModel? criado = CriarNovo(tipo);
-if (criado != null)
-_cache[tipo] = criado;
-return criado;
-}
-public static void Remover(TipoElemento tipo)
-{
-_cache.Remove(tipo);
-}
-public static void Limpar()
-{
-_cache.Clear();
-}
-private static TipoElementoViewModel? CriarNovo(TipoElemento tipo)
-{
-return tipo switch
-{
-TipoBarra barra => new TipoBarraViewModel(barra),
-TipoCabo cabo => new TipoCaboViewModel(cabo),
-TipoCarga carga => new TipoCargaViewModel(carga),
-TipoGerador gerador => new TipoGeradorViewModel(gerador),
-_ => null
-};
-}
-}
-}
-
-
-====================================================================================================
-ARQUIVO: C:\Araci-Engine-Front\Araci Engine\ViewModels\TipoGeradorViewModel.cs
-====================================================================================================
-
-using Araci.Models.Tipos;
-namespace Araci.ViewModels
-{
-public class TipoGeradorViewModel : TipoElementoViewModel
-{
-public TipoGeradorViewModel(TipoGerador tipo)
-: base(tipo)
-{
-}
-protected TipoGerador TipoGerador => (TipoGerador)_tipo;
-public int Fases
-{
-get => TipoGerador.Fases;
-set
-{
-if (TipoGerador.Fases == value)
-return;
-TipoGerador.Fases = value;
-OnPropertyChanged();
-}
-}
-public int ModeloFonte
-{
-get => TipoGerador.ModeloFonte;
-set
-{
-if (TipoGerador.ModeloFonte == value)
-return;
-TipoGerador.ModeloFonte = value;
-OnPropertyChanged();
-}
-}
-public double FatorPotencia
-{
-get => TipoGerador.FatorPotencia;
-set
-{
-if (TipoGerador.FatorPotencia == value)
-return;
-TipoGerador.FatorPotencia = value;
-OnPropertyChanged();
-}
-}
-}
-}
-
-
-====================================================================================================
-ARQUIVO: C:\Araci-Engine-Front\Araci Engine\ViewModels\ViewportViewModel.cs
-====================================================================================================
-
-using System;
-using System.Collections.Generic;
-using System.Collections.ObjectModel;
-using System.Collections.Specialized;
-using System.ComponentModel;
-using System.Runtime.CompilerServices;
-using Araci.Core.Documents;
-using Araci.Core.Scenes;
-using Araci.Models;
-using Araci.Services;
-namespace Araci.ViewModels
-{
-public class ViewportViewModel : INotifyPropertyChanged
-{
-private readonly EditorContext _context;
-private readonly Dictionary<Elemento, ElementoViewModel> _viewModelsPorModelo = new();
-private double _inverseZoom = 1;
-public ViewportViewModel(EditorContext context)
-{
-_context = context ?? throw new ArgumentNullException(nameof(context));
-Document = context.Document;
-Scene = context.Scene;
-SelectionBox = context.SelectionBox;
-TerminalSnap = context.TerminalSnap;
-CableVertexEdit = context.CableVertexEdit;
-MoveHud = context.MoveHud;
-Document.Elementos.CollectionChanged += OnDocumentElementosChanged;
-SincronizarComDocumento();
-}
-public AraciDocument Document { get; }
-public Scene Scene { get; }
-public SelectionBoxViewModel SelectionBox { get; }
-public TerminalSnapState TerminalSnap { get; }
-public CableVertexEditService CableVertexEdit { get; }
-public MoveHudService MoveHud { get; }
-public ObservableCollection<ElementoViewModel> Elementos => Scene.Elementos;
-public double InverseZoom => _inverseZoom;
-public double CableHandleVisualOffset => -5 * _inverseZoom;
-public double TerminalMarkerVisualOffset => -7 * _inverseZoom;
-public void AtualizarZoomVisual(double zoom)
-{
-double inverseZoom = zoom > 0
-? 1 / zoom
-: 1;
-if (Math.Abs(_inverseZoom - inverseZoom) < 0.000001)
-return;
-_inverseZoom = inverseZoom;
-OnPropertyChanged(nameof(InverseZoom));
-OnPropertyChanged(nameof(CableHandleVisualOffset));
-OnPropertyChanged(nameof(TerminalMarkerVisualOffset));
-}
-public void RegistrarViewModel(ElementoViewModel vm)
-{
-if (!Document.Elementos.Contains(vm.Modelo) ||
-!Elementos.Contains(vm))
-{
-return;
-}
-_viewModelsPorModelo[vm.Modelo] = vm;
-}
-public ElementoViewModel? ObterViewModel(Elemento modelo)
-{
-if (!_viewModelsPorModelo.TryGetValue(modelo, out var vm))
-return null;
-if (Document.Elementos.Contains(modelo) &&
-Elementos.Contains(vm))
-{
-return vm;
-}
-_viewModelsPorModelo.Remove(modelo);
-return null;
-}
-public void AtualizarViewModel(Elemento modelo)
-{
-ObterViewModel(modelo)?.AtualizarAposModeloAlterado();
-}
-private void OnDocumentElementosChanged(object? sender, NotifyCollectionChangedEventArgs e)
-{
-if (e.Action == NotifyCollectionChangedAction.Reset)
-{
-LimparViewModels();
-return;
-}
-if (e.OldItems != null)
-{
-foreach (Elemento modelo in e.OldItems)
-RemoverViewModel(modelo);
-}
-if (e.NewItems != null)
-{
-foreach (Elemento modelo in e.NewItems)
-AdicionarViewModel(modelo);
-}
-}
-private void SincronizarComDocumento()
-{
-LimparViewModels();
-foreach (Elemento modelo in Document.Elementos)
-AdicionarViewModel(modelo);
-}
-private void AdicionarViewModel(Elemento modelo)
-{
-var vm = ObterOuCriarViewModel(modelo);
-if (vm == null || Elementos.Contains(vm))
-return;
-Elementos.Add(vm);
-}
-private void RemoverViewModel(Elemento modelo)
-{
-if (!_viewModelsPorModelo.TryGetValue(modelo, out var vm))
-return;
-_context.Selection.Deselecionar(vm);
-_context.CableVertexEdit.Clear();
-_context.Hover.Clear();
-Elementos.Remove(vm);
-_viewModelsPorModelo.Remove(modelo);
-_context.SceneQueries.Invalidate();
-}
-private void LimparViewModels()
-{
-_context.Selection.Limpar();
-_context.CableVertexEdit.Clear();
-_context.Hover.Clear();
-_context.TerminalSnap.Limpar();
-Elementos.Clear();
-_viewModelsPorModelo.Clear();
-_context.SceneQueries.Invalidate();
-}
-private ElementoViewModel? ObterOuCriarViewModel(Elemento modelo)
-{
-if (_viewModelsPorModelo.TryGetValue(modelo, out var existente))
-return existente;
-var vm = _context.ElementoFactory.CriarViewModel(modelo);
-if (vm != null)
-_viewModelsPorModelo[modelo] = vm;
-return vm;
-}
-public event PropertyChangedEventHandler? PropertyChanged;
-protected virtual void OnPropertyChanged([CallerMemberName] string? nome = null)
-{
-PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nome));
+_terminalLayout.AtualizarTerminais(Sin);
 }
 }
 }
@@ -4328,6 +2346,9 @@ Value="{Binding WorldY}"/>
 </DataTemplate>
 <DataTemplate DataType="{x:Type viewModels:GeradorViewModel}">
 <controls:GeradorControl/>
+</DataTemplate>
+<DataTemplate DataType="{x:Type viewModels:SinViewModel}">
+<controls:SinControl/>
 </DataTemplate>
 <DataTemplate DataType="{x:Type viewModels:BarraViewModel}">
 <controls:BarraControl/>

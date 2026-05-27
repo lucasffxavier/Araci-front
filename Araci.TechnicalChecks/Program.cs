@@ -36,7 +36,7 @@ namespace Araci.TechnicalChecks
                 ("SIN pode ser criado e entra no Document", SinPodeSerCriadoEEntraNoDocument),
                 ("SIN aparece no ElectricGraph", SinApareceNoElectricGraph),
                 ("SIN preserva Id apos reload", SinPreservaIdAposReload),
-                ("Cabo conectado ao SIN preserva conexoes", CaboConectadoAoSinPreservaConexoes),
+                ("Cabos conectados aos terminais do SIN preservam conexoes", CabosConectadosAosTerminaisDoSinPreservamConexoes),
                 ("DTOs existentes com gerador continuam funcionando", DtosComGeradorContinuamFuncionando)
             };
 
@@ -372,7 +372,7 @@ namespace Araci.TechnicalChecks
             AssertEqual(1, context.Document.Elementos.Count, "Quantidade no Document");
             Assert(context.Document.Elementos.Contains(sin), "SIN deve estar no Document.");
             AssertEqual("Sin", context.Elements.GetKind(sin), "Kind do SIN");
-            Assert(sin.Terminais.Count > 0, "SIN deve possuir terminal conectavel.");
+            AssertSinTerminals(sin, "SIN criado");
         }
 
         private static void SinApareceNoElectricGraph()
@@ -387,7 +387,11 @@ namespace Araci.TechnicalChecks
 
             Assert(node != null, "SIN deve aparecer como no do ElectricGraph.");
             AssertEqual(sin.Nome, node!.Name, "Nome do no SIN");
-            AssertEqual(1, node.Terminals.Count, "Terminais do no SIN");
+            AssertEqual(4, node.Terminals.Count, "Terminais do no SIN");
+            AssertGraphTerminal(node, Sin.TERMINAL_NORTE, "Terminal NORTE no grafo");
+            AssertGraphTerminal(node, Sin.TERMINAL_SUL, "Terminal SUL no grafo");
+            AssertGraphTerminal(node, Sin.TERMINAL_LESTE, "Terminal LESTE no grafo");
+            AssertGraphTerminal(node, Sin.TERMINAL_OESTE, "Terminal OESTE no grafo");
         }
 
         private static void SinPreservaIdAposReload()
@@ -403,28 +407,41 @@ namespace Araci.TechnicalChecks
             AssertEqual(sin.Id, loadedSin.Id, "Id do SIN");
             AssertEqual(sin.Nome, loadedSin.Nome, "Nome do SIN");
             AssertEqual(sin.Barra, loadedSin.Barra, "Barra do SIN");
-            AssertEqual(sin.Terminais[0].Id, loadedSin.Terminais[0].Id, "Terminal do SIN");
+            AssertSinTerminals(loadedSin, "SIN apos reload");
         }
 
-        private static void CaboConectadoAoSinPreservaConexoes()
+        private static void CabosConectadosAosTerminaisDoSinPreservamConexoes()
         {
             var document = new AraciDocument();
             Sin sin = CreateSin("SIN-CABO");
-            Carga load = CreateLoad("CARGA-SIN", 350, 120);
-            Cabo cable = CreateCable(sin, 0, load, 0, "L-SIN", 1.5);
+            Carga loadNorte = CreateLoad("CARGA-SIN-N", 350, 120);
+            Carga loadSul = CreateLoad("CARGA-SIN-S", 351, 121);
+            Carga loadLeste = CreateLoad("CARGA-SIN-L", 352, 122);
+            Carga loadOeste = CreateLoad("CARGA-SIN-O", 353, 123);
+            Cabo cableNorte = CreateCable(sin, 0, loadNorte, 0, "L-SIN-N", 1.5);
+            Cabo cableSul = CreateCable(sin, 1, loadSul, 0, "L-SIN-S", 1.6);
+            Cabo cableLeste = CreateCable(sin, 2, loadLeste, 0, "L-SIN-L", 1.7);
+            Cabo cableOeste = CreateCable(sin, 3, loadOeste, 0, "L-SIN-O", 1.8);
 
             document.AdicionarElemento(sin);
-            document.AdicionarElemento(load);
-            document.AdicionarElemento(cable);
+            document.AdicionarElemento(loadNorte);
+            document.AdicionarElemento(loadSul);
+            document.AdicionarElemento(loadLeste);
+            document.AdicionarElemento(loadOeste);
+            document.AdicionarElemento(cableNorte);
+            document.AdicionarElemento(cableSul);
+            document.AdicionarElemento(cableLeste);
+            document.AdicionarElemento(cableOeste);
 
             AraciDocument loaded = SaveAndLoad(document);
-            Cabo loadedCable = FindById<Cabo>(loaded, cable.Id);
             ElectricGraph graph = new ElectricGraphBuilder(loaded).Build();
+            Sin loadedSin = FindById<Sin>(loaded, sin.Id);
 
-            AssertEqual(sin.Id.ToString(), loadedCable.OrigemId, "OrigemId SIN apos reload");
-            AssertEqual(load.Id.ToString(), loadedCable.DestinoId, "DestinoId carga apos reload");
-            AssertEqual(cable.OrigemTerminalId, loadedCable.OrigemTerminalId, "OrigemTerminalId SIN apos reload");
-            AssertEqual(cable.DestinoTerminalId, loadedCable.DestinoTerminalId, "DestinoTerminalId carga apos reload");
+            AssertSinTerminals(loadedSin, "SIN conectado apos reload");
+            AssertCableEndpoint(loaded, cableNorte, sin, Sin.TERMINAL_NORTE, loadNorte, "Cabo NORTE");
+            AssertCableEndpoint(loaded, cableSul, sin, Sin.TERMINAL_SUL, loadSul, "Cabo SUL");
+            AssertCableEndpoint(loaded, cableLeste, sin, Sin.TERMINAL_LESTE, loadLeste, "Cabo LESTE");
+            AssertCableEndpoint(loaded, cableOeste, sin, Sin.TERMINAL_OESTE, loadOeste, "Cabo OESTE");
             AssertEqual(0, graph.GetInvalidEdges().Count, "Grafo com SIN nao deve ter arestas invalidas");
         }
 
@@ -621,6 +638,42 @@ namespace Araci.TechnicalChecks
                 string.Equals(n.ElementId, expected.Id.ToString(), StringComparison.OrdinalIgnoreCase));
 
             Assert(contains, $"{name}: no '{expected.Nome}' nao encontrado.");
+        }
+
+        private static void AssertSinTerminals(Sin sin, string name)
+        {
+            AssertEqual(4, sin.Terminais.Count, $"{name}.Terminais.Count");
+            AssertEqual(Sin.TERMINAL_NORTE, sin.Terminais[0].Id, $"{name}.Terminal[0]");
+            AssertEqual(Sin.TERMINAL_SUL, sin.Terminais[1].Id, $"{name}.Terminal[1]");
+            AssertEqual(Sin.TERMINAL_LESTE, sin.Terminais[2].Id, $"{name}.Terminal[2]");
+            AssertEqual(Sin.TERMINAL_OESTE, sin.Terminais[3].Id, $"{name}.Terminal[3]");
+
+            foreach (Terminal terminal in sin.Terminais)
+                AssertEqual(sin.Barra, terminal.Barra ?? string.Empty, $"{name}.{terminal.Id}.Barra");
+        }
+
+        private static void AssertGraphTerminal(ElectricGraphNode node, string terminalId, string name)
+        {
+            bool exists = node.Terminals.Any(t =>
+                string.Equals(t.TerminalId, terminalId, StringComparison.OrdinalIgnoreCase));
+
+            Assert(exists, $"{name}: terminal '{terminalId}' nao encontrado.");
+        }
+
+        private static void AssertCableEndpoint(
+            AraciDocument loaded,
+            Cabo expectedCable,
+            Sin expectedSin,
+            string expectedSinTerminalId,
+            Carga expectedLoad,
+            string name)
+        {
+            Cabo loadedCable = FindById<Cabo>(loaded, expectedCable.Id);
+
+            AssertEqual(expectedSin.Id.ToString(), loadedCable.OrigemId, $"{name}.OrigemId");
+            AssertEqual(expectedLoad.Id.ToString(), loadedCable.DestinoId, $"{name}.DestinoId");
+            AssertEqual(expectedSinTerminalId, loadedCable.OrigemTerminalId, $"{name}.OrigemTerminalId");
+            AssertEqual(expectedCable.DestinoTerminalId, loadedCable.DestinoTerminalId, $"{name}.DestinoTerminalId");
         }
 
         private static AraciDocument SaveAndLoad(AraciDocument document)
