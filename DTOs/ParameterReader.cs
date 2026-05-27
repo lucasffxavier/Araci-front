@@ -14,6 +14,7 @@ namespace Araci.DTOs
         private readonly CoreApi _api;
         private readonly ConnectivityService? _connectivity;
         private readonly TopologyValidator? _topology;
+        private readonly ElectricGraphBuilder? _graphBuilder;
 
         public ParameterReader(CoreApi api)
         {
@@ -21,20 +22,33 @@ namespace Araci.DTOs
         }
 
         public ParameterReader(EditorContext context)
-            : this(new CoreApi(context), new ConnectivityService(context), new TopologyValidator(context))
+            : this(
+                new CoreApi(context),
+                new ConnectivityService(context),
+                new TopologyValidator(context),
+                context.ElectricGraph)
         {
         }
 
         public ParameterReader(AraciDocument document)
-            : this(new CoreApi(document), new ConnectivityService(document), new TopologyValidator(document))
+            : this(
+                new CoreApi(document),
+                new ConnectivityService(document),
+                new TopologyValidator(document),
+                new ElectricGraphBuilder(document))
         {
         }
 
-        private ParameterReader(CoreApi api, ConnectivityService connectivity, TopologyValidator topology)
+        private ParameterReader(
+            CoreApi api,
+            ConnectivityService connectivity,
+            TopologyValidator topology,
+            ElectricGraphBuilder? graphBuilder)
         {
             _api = api ?? throw new ArgumentNullException(nameof(api));
             _connectivity = connectivity ?? throw new ArgumentNullException(nameof(connectivity));
             _topology = topology ?? throw new ArgumentNullException(nameof(topology));
+            _graphBuilder = graphBuilder;
         }
 
         public TopologyValidationResult? ValidateTopology()
@@ -64,13 +78,15 @@ namespace Araci.DTOs
 
         public IList<LineData> GetLines()
         {
+            ElectricGraph? graph = _graphBuilder?.Build();
+
             return _api.ObterElementos<Cabo>()
                 .Select(cabo => new LineData
                 {
                     Id = cabo.Id.ToString(),
                     Nome = ReadString(cabo, "Nome"),
-                    Barra1 = ResolverBus1(cabo),
-                    Barra2 = ResolverBus2(cabo),
+                    Barra1 = ResolverBus1(cabo, graph),
+                    Barra2 = ResolverBus2(cabo, graph),
                     Fases = ReadInt(cabo, "Fases"),
                     Comprimento = ReadDouble(cabo, "Comprimento"),
                     R1 = ReadDouble(cabo, "R1", "Resistencia"),
@@ -126,9 +142,37 @@ namespace Araci.DTOs
             return _connectivity?.ResolverBus1Estrito(cabo) ?? string.Empty;
         }
 
+        private string ResolverBus1(Cabo cabo, ElectricGraph? graph)
+        {
+            return ResolverBusPorGrafo(cabo, graph, origem: true) ?? ResolverBus1(cabo);
+        }
+
         private string ResolverBus2(Cabo cabo)
         {
             return _connectivity?.ResolverBus2Estrito(cabo) ?? string.Empty;
+        }
+
+        private string ResolverBus2(Cabo cabo, ElectricGraph? graph)
+        {
+            return ResolverBusPorGrafo(cabo, graph, origem: false) ?? ResolverBus2(cabo);
+        }
+
+        private static string? ResolverBusPorGrafo(
+            Cabo cabo,
+            ElectricGraph? graph,
+            bool origem)
+        {
+            ElectricGraphEdge? edge = graph?.FindEdgeByCable(cabo);
+
+            if (edge == null)
+                return null;
+
+            if (!edge.IsValid)
+                return string.Empty;
+
+            string elementId = origem ? edge.FromElementId : edge.ToElementId;
+
+            return graph?.FindNode(elementId)?.Name ?? string.Empty;
         }
 
         private string ResolverBarraEquipamento(ElementoEquipamento equipamento)

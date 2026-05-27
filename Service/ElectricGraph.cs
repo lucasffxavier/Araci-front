@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using Araci.Models;
 
 namespace Araci.Services
 {
@@ -94,6 +95,27 @@ namespace Araci.Services
         public IReadOnlyList<ElectricGraphEdge> GetInvalidEdges()
         {
             return Edges.Where(e => !e.IsValid).ToList();
+        }
+
+        public IReadOnlyList<ElectricGraphEdge> GetValidEdges()
+        {
+            return Edges.Where(e => e.IsValid).ToList();
+        }
+
+        public ElectricGraphEdge? FindEdgeByCableId(string cableId)
+        {
+            if (string.IsNullOrWhiteSpace(cableId))
+                return null;
+
+            string id = cableId.Trim();
+
+            return Edges.FirstOrDefault(e =>
+                string.Equals(e.EdgeId, id, StringComparison.OrdinalIgnoreCase));
+        }
+
+        public ElectricGraphEdge? FindEdgeByCable(Cabo cabo)
+        {
+            return cabo == null ? null : FindEdgeByCableId(cabo.Id.ToString());
         }
 
         private static bool SameTerminal(

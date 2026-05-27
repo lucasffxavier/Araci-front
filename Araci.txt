@@ -192,6 +192,11 @@ Araci Engine
 │   ├── EditorContext.cs
 │   ├── EditorSettings.cs
 │   ├── EditorState.cs
+│   ├── ElectricGraph.cs
+│   ├── ElectricGraphBuilder.cs
+│   ├── ElectricGraphEdge.cs
+│   ├── ElectricGraphNode.cs
+│   ├── ElectricGraphTerminal.cs
 │   ├── ElementDefinition.cs
 │   ├── ElementGeometryService.cs
 │   ├── ElementoFactory.cs
@@ -1017,45 +1022,6 @@ _ => $"T{index + 1}"
 
 
 ====================================================================================================
-ARQUIVO: C:\Araci-Engine-Front\Araci Engine\Models\ITerminalOwner.cs
-====================================================================================================
-
-﻿using System.Collections.Generic;
-namespace Araci.Models
-{
-public interface ITerminalOwner
-{
-IReadOnlyList<Terminal> Terminais { get; }
-}
-}
-
-
-====================================================================================================
-ARQUIVO: C:\Araci-Engine-Front\Araci Engine\Models\Terminal.cs
-====================================================================================================
-
-﻿using System.Windows;
-namespace Araci.Models
-{
-public class Terminal
-{
-public Elemento Dono { get; }
-public string Id { get; }
-public Point Posicao { get; set; }
-public string? Barra { get; set; }
-public Terminal(Elemento dono, Point posicao, string? id = null)
-{
-Dono = dono;
-Id = string.IsNullOrWhiteSpace(id)
-? System.Guid.NewGuid().ToString("N")
-: id;
-Posicao = posicao;
-}
-}
-}
-
-
-====================================================================================================
 ARQUIVO: C:\Araci-Engine-Front\Araci Engine\Service\ConnectivityService.cs
 ====================================================================================================
 
@@ -1380,6 +1346,7 @@ SceneQueries = new SceneQueryService(Scene);
 Hover = new HoverService(SceneQueries);
 Snap = new SnapService(SceneQueries);
 Connectivity = new ConnectivityService(this);
+ElectricGraph = new ElectricGraphBuilder(this);
 Topology = new TopologyValidator(this);
 SimulationResults = new SimulationResultApplier(this);
 Simulation = new SimulationPipeline(this);
@@ -1432,6 +1399,7 @@ public MoveService Move { get; }
 public SnapService Snap { get; }
 public NameService Names { get; }
 public ConnectivityService Connectivity { get; }
+public ElectricGraphBuilder ElectricGraph { get; }
 public TopologyValidator Topology { get; }
 public SimulationResultApplier SimulationResults { get; }
 public SimulationPipeline Simulation { get; }
@@ -1453,72 +1421,402 @@ return new TransactionScope(Commands);
 
 
 ====================================================================================================
-ARQUIVO: C:\Araci-Engine-Front\Araci Engine\Service\SimulationExportService.cs
+ARQUIVO: C:\Araci-Engine-Front\Araci Engine\Service\ElectricGraph.cs
 ====================================================================================================
 
 using System;
-using System.IO;
-using System.Text;
-using System.Text.Json;
-using Araci.Applications.Analisar.FluxoDeCorrente;
-using Araci.DTOs;
+using System.Collections.Generic;
+using System.Linq;
 namespace Araci.Services
 {
-public class SimulationExportService
+public class ElectricGraph
 {
-public SimulationExportPaths GetPaths(FluxoDeCorrenteOptions options)
+private readonly Dictionary<string, ElectricGraphNode> _nodesById;
+public ElectricGraph(
+IReadOnlyList<ElectricGraphNode> nodes,
+IReadOnlyList<ElectricGraphEdge> edges)
 {
-if (options == null)
-throw new ArgumentNullException(nameof(options));
-string baseName = SanitizarNomeArquivo(options.NomeArquivo);
-string dssFileName = baseName.EndsWith(".dss", StringComparison.OrdinalIgnoreCase)
-? baseName
-: $"{baseName}.dss";
-string jsonBaseName = Path.GetFileNameWithoutExtension(dssFileName);
-string dssPath = Path.Combine(options.PastaSaida, dssFileName);
-string jsonPath = Path.Combine(options.PastaSaida, $"{jsonBaseName}_resultado.json");
-return new SimulationExportPaths(dssPath, jsonPath);
+Nodes = nodes;
+Edges = edges;
+_nodesById = nodes.ToDictionary(
+n => n.ElementId,
+StringComparer.OrdinalIgnoreCase);
 }
-public bool Exists(SimulationExportPaths paths)
+public IReadOnlyList<ElectricGraphNode> Nodes { get; }
+public IReadOnlyList<ElectricGraphEdge> Edges { get; }
+public ElectricGraphNode? FindNode(string elementId)
 {
-if (paths == null)
-throw new ArgumentNullException(nameof(paths));
-return File.Exists(paths.DssPath) || File.Exists(paths.JsonPath);
+return string.IsNullOrWhiteSpace(elementId)
+? null
+: _nodesById.TryGetValue(elementId.Trim(), out ElectricGraphNode? node)
+? node
+: null;
 }
-public string Save(FluxoDeCorrenteOptions options, SimulationResultDto resultado)
+public ElectricGraphTerminal? FindTerminal(string elementId, string terminalId)
 {
-if (resultado == null)
-throw new ArgumentNullException(nameof(resultado));
-SimulationExportPaths paths = GetPaths(options);
-Directory.CreateDirectory(options.PastaSaida);
-File.WriteAllText(paths.DssPath, resultado.Script, Encoding.UTF8);
-var jsonOptions = new JsonSerializerOptions
-{
-WriteIndented = true
-};
-string json = JsonSerializer.Serialize(resultado, jsonOptions);
-File.WriteAllText(paths.JsonPath, json, Encoding.UTF8);
-return paths.DssPath;
+if (string.IsNullOrWhiteSpace(terminalId))
+return null;
+return FindNode(elementId)?.Terminals.FirstOrDefault(t =>
+string.Equals(t.TerminalId, terminalId.Trim(), StringComparison.OrdinalIgnoreCase));
 }
-private static string SanitizarNomeArquivo(string nomeArquivo)
+public IReadOnlyList<ElectricGraphEdge> GetEdgesForElement(string elementId)
 {
-string nome = string.IsNullOrWhiteSpace(nomeArquivo)
-? "circuito"
-: nomeArquivo.Trim();
-foreach (char invalid in Path.GetInvalidFileNameChars())
-nome = nome.Replace(invalid.ToString(), string.Empty);
-return string.IsNullOrWhiteSpace(nome) ? "circuito" : nome;
+if (string.IsNullOrWhiteSpace(elementId))
+return Array.Empty<ElectricGraphEdge>();
+string id = elementId.Trim();
+return Edges.Where(e =>
+string.Equals(e.FromElementId, id, StringComparison.OrdinalIgnoreCase) ||
+string.Equals(e.ToElementId, id, StringComparison.OrdinalIgnoreCase))
+.ToList();
+}
+public IReadOnlyList<ElectricGraphEdge> GetEdgesForTerminal(
+string elementId,
+string terminalId)
+{
+if (string.IsNullOrWhiteSpace(elementId) ||
+string.IsNullOrWhiteSpace(terminalId))
+{
+return Array.Empty<ElectricGraphEdge>();
+}
+string element = elementId.Trim();
+string terminal = terminalId.Trim();
+return Edges.Where(e =>
+SameTerminal(e.FromElementId, e.FromTerminalId, element, terminal) ||
+SameTerminal(e.ToElementId, e.ToTerminalId, element, terminal))
+.ToList();
+}
+public IReadOnlyList<ElectricGraphNode> GetNeighbors(string elementId)
+{
+var neighbors = new List<ElectricGraphNode>();
+foreach (ElectricGraphEdge edge in GetEdgesForElement(elementId).Where(e => e.IsValid))
+{
+string otherId = string.Equals(edge.FromElementId, elementId, StringComparison.OrdinalIgnoreCase)
+? edge.ToElementId
+: edge.FromElementId;
+ElectricGraphNode? node = FindNode(otherId);
+if (node != null && !neighbors.Contains(node))
+neighbors.Add(node);
+}
+return neighbors;
+}
+public IReadOnlyList<ElectricGraphEdge> GetInvalidEdges()
+{
+return Edges.Where(e => !e.IsValid).ToList();
+}
+private static bool SameTerminal(
+string elementA,
+string terminalA,
+string elementB,
+string terminalB)
+{
+return string.Equals(elementA, elementB, StringComparison.OrdinalIgnoreCase) &&
+string.Equals(terminalA, terminalB, StringComparison.OrdinalIgnoreCase);
 }
 }
-public class SimulationExportPaths
-{
-public SimulationExportPaths(string dssPath, string jsonPath)
-{
-DssPath = dssPath;
-JsonPath = jsonPath;
 }
-public string DssPath { get; }
-public string JsonPath { get; }
+
+
+====================================================================================================
+ARQUIVO: C:\Araci-Engine-Front\Araci Engine\Service\ElectricGraphBuilder.cs
+====================================================================================================
+
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using Araci.Core.Documents;
+using Araci.Models;
+namespace Araci.Services
+{
+public class ElectricGraphBuilder
+{
+private readonly AraciDocument _document;
+private readonly ElementRegistryService? _registry;
+public ElectricGraphBuilder(AraciDocument document)
+: this(document, null)
+{
+}
+public ElectricGraphBuilder(EditorContext context)
+: this(
+context?.Document ?? throw new ArgumentNullException(nameof(context)),
+context.Elements)
+{
+}
+private ElectricGraphBuilder(
+AraciDocument document,
+ElementRegistryService? registry)
+{
+_document = document ?? throw new ArgumentNullException(nameof(document));
+_registry = registry;
+}
+public ElectricGraph Build()
+{
+var nodes = _document.Elementos
+.Where(IsNodeElement)
+.Select(CreateNode)
+.ToList();
+var nodeById = nodes.ToDictionary(
+n => n.ElementId,
+StringComparer.OrdinalIgnoreCase);
+var edges = BuildEdges(nodeById);
+return new ElectricGraph(nodes, edges);
+}
+private static bool IsNodeElement(Elemento elemento)
+{
+return elemento is ITerminalOwner and not Cabo;
+}
+private ElectricGraphNode CreateNode(Elemento elemento)
+{
+string elementId = elemento.Id.ToString();
+var terminals = ((ITerminalOwner)elemento).Terminais
+.Select(t => new ElectricGraphTerminal(
+elementId,
+t.Id,
+string.IsNullOrWhiteSpace(t.Barra) ? ResolveBusName(elemento) : t.Barra,
+t))
+.ToList();
+return new ElectricGraphNode(
+elementId,
+elemento.Id,
+ResolveBusName(elemento),
+_registry?.GetKind(elemento) ?? elemento.GetType().Name,
+elemento,
+terminals);
+}
+private IReadOnlyList<ElectricGraphEdge> BuildEdges(
+IReadOnlyDictionary<string, ElectricGraphNode> nodeById)
+{
+var edges = new List<ElectricGraphEdge>();
+var usedPairs = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+foreach (Cabo cabo in _document.Elementos.OfType<Cabo>())
+edges.Add(CreateEdge(cabo, nodeById, usedPairs));
+return edges;
+}
+private ElectricGraphEdge CreateEdge(
+Cabo cabo,
+IReadOnlyDictionary<string, ElectricGraphNode> nodeById,
+ISet<string> usedPairs)
+{
+string fromElementId = Normalize(cabo.OrigemId);
+string fromTerminalId = Normalize(cabo.OrigemTerminalId);
+string toElementId = Normalize(cabo.DestinoId);
+string toTerminalId = Normalize(cabo.DestinoTerminalId);
+var errors = new List<string>();
+ValidateEndpoint(
+"Origem",
+fromElementId,
+fromTerminalId,
+nodeById,
+errors);
+ValidateEndpoint(
+"Destino",
+toElementId,
+toTerminalId,
+nodeById,
+errors);
+if (!string.IsNullOrWhiteSpace(fromElementId) &&
+!string.IsNullOrWhiteSpace(toElementId) &&
+string.Equals(fromElementId, toElementId, StringComparison.OrdinalIgnoreCase))
+{
+errors.Add("Origem e destino pertencem ao mesmo elemento.");
+}
+if (!string.IsNullOrWhiteSpace(fromElementId) &&
+!string.IsNullOrWhiteSpace(toElementId) &&
+!string.IsNullOrWhiteSpace(fromTerminalId) &&
+!string.IsNullOrWhiteSpace(toTerminalId) &&
+SameTerminal(fromElementId, fromTerminalId, toElementId, toTerminalId))
+{
+errors.Add("Origem e destino usam o mesmo terminal.");
+}
+if (EndpointComplete(fromElementId, fromTerminalId, toElementId, toTerminalId))
+{
+string key = PairKey(fromElementId, fromTerminalId, toElementId, toTerminalId);
+if (!usedPairs.Add(key))
+errors.Add("Cabo duplicado entre os mesmos terminais.");
+}
+return new ElectricGraphEdge(
+cabo.Id.ToString(),
+cabo,
+fromElementId,
+fromTerminalId,
+toElementId,
+toTerminalId,
+errors.Count == 0,
+errors.Count == 0 ? null : string.Join(" ", errors));
+}
+private static void ValidateEndpoint(
+string label,
+string elementId,
+string terminalId,
+IReadOnlyDictionary<string, ElectricGraphNode> nodeById,
+ICollection<string> errors)
+{
+if (string.IsNullOrWhiteSpace(elementId))
+{
+errors.Add($"Cabo sem {label}Id.");
+return;
+}
+if (!nodeById.TryGetValue(elementId, out ElectricGraphNode? node))
+{
+errors.Add($"Cabo com {label}Id inexistente: {elementId}.");
+return;
+}
+if (string.IsNullOrWhiteSpace(terminalId))
+{
+errors.Add($"Cabo sem {label}TerminalId.");
+return;
+}
+bool terminalExiste = node.Terminals.Any(t =>
+string.Equals(t.TerminalId, terminalId, StringComparison.OrdinalIgnoreCase));
+if (!terminalExiste)
+errors.Add($"Cabo com {label}TerminalId inexistente: {terminalId}.");
+}
+private static bool EndpointComplete(
+string fromElementId,
+string fromTerminalId,
+string toElementId,
+string toTerminalId)
+{
+return !string.IsNullOrWhiteSpace(fromElementId) &&
+!string.IsNullOrWhiteSpace(fromTerminalId) &&
+!string.IsNullOrWhiteSpace(toElementId) &&
+!string.IsNullOrWhiteSpace(toTerminalId);
+}
+private static string PairKey(
+string fromElementId,
+string fromTerminalId,
+string toElementId,
+string toTerminalId)
+{
+string a = $"{fromElementId.Trim()}:{fromTerminalId.Trim()}";
+string b = $"{toElementId.Trim()}:{toTerminalId.Trim()}";
+return string.Compare(a, b, StringComparison.OrdinalIgnoreCase) <= 0
+? $"{a}|{b}"
+: $"{b}|{a}";
+}
+private static bool SameTerminal(
+string elementA,
+string terminalA,
+string elementB,
+string terminalB)
+{
+return string.Equals(elementA, elementB, StringComparison.OrdinalIgnoreCase) &&
+string.Equals(terminalA, terminalB, StringComparison.OrdinalIgnoreCase);
+}
+private static string Normalize(string value)
+{
+return value?.Trim() ?? string.Empty;
+}
+private static string ResolveBusName(Elemento elemento)
+{
+if (!string.IsNullOrWhiteSpace(elemento.Nome))
+return elemento.Nome.Trim();
+string id = elemento.Id.ToString("N");
+return id.Length >= 8 ? $"BUS-{id[..8]}" : $"BUS-{id}";
+}
+}
+}
+
+
+====================================================================================================
+ARQUIVO: C:\Araci-Engine-Front\Araci Engine\Service\ElectricGraphEdge.cs
+====================================================================================================
+
+using Araci.Models;
+namespace Araci.Services
+{
+public class ElectricGraphEdge
+{
+public ElectricGraphEdge(
+string edgeId,
+Cabo sourceCable,
+string fromElementId,
+string fromTerminalId,
+string toElementId,
+string toTerminalId,
+bool isValid,
+string? error)
+{
+EdgeId = edgeId;
+SourceCable = sourceCable;
+FromElementId = fromElementId;
+FromTerminalId = fromTerminalId;
+ToElementId = toElementId;
+ToTerminalId = toTerminalId;
+IsValid = isValid;
+Error = error;
+}
+public string EdgeId { get; }
+public Cabo SourceCable { get; }
+public string FromElementId { get; }
+public string FromTerminalId { get; }
+public string ToElementId { get; }
+public string ToTerminalId { get; }
+public bool IsValid { get; }
+public string? Error { get; }
+}
+}
+
+
+====================================================================================================
+ARQUIVO: C:\Araci-Engine-Front\Araci Engine\Service\ElectricGraphNode.cs
+====================================================================================================
+
+using System;
+using System.Collections.Generic;
+using Araci.Models;
+namespace Araci.Services
+{
+public class ElectricGraphNode
+{
+public ElectricGraphNode(
+string elementId,
+Guid elementGuid,
+string name,
+string kind,
+Elemento sourceElement,
+IReadOnlyList<ElectricGraphTerminal> terminals)
+{
+ElementId = elementId;
+ElementGuid = elementGuid;
+Name = name;
+Kind = kind;
+SourceElement = sourceElement;
+Terminals = terminals;
+}
+public string ElementId { get; }
+public Guid ElementGuid { get; }
+public string Name { get; }
+public string Kind { get; }
+public Elemento SourceElement { get; }
+public IReadOnlyList<ElectricGraphTerminal> Terminals { get; }
+}
+}
+
+
+====================================================================================================
+ARQUIVO: C:\Araci-Engine-Front\Araci Engine\Service\ElectricGraphTerminal.cs
+====================================================================================================
+
+using Araci.Models;
+namespace Araci.Services
+{
+public class ElectricGraphTerminal
+{
+public ElectricGraphTerminal(
+string elementId,
+string terminalId,
+string? busName,
+Terminal sourceTerminal)
+{
+ElementId = elementId;
+TerminalId = terminalId;
+BusName = busName;
+SourceTerminal = sourceTerminal;
+}
+public string ElementId { get; }
+public string TerminalId { get; }
+public string? BusName { get; }
+public Terminal SourceTerminal { get; }
 }
 }
 
@@ -1567,14 +1865,24 @@ public class TopologyValidator
 {
 private readonly AraciDocument _document;
 private readonly ConnectivityService _connectivity;
+private readonly ElectricGraphBuilder _graphBuilder;
 public TopologyValidator(EditorContext context)
-: this(context?.Document ?? throw new ArgumentNullException(nameof(context)))
+: this(
+context?.Document ?? throw new ArgumentNullException(nameof(context)),
+context.ElectricGraph)
 {
 }
 public TopologyValidator(AraciDocument document)
+: this(document, new ElectricGraphBuilder(document))
+{
+}
+private TopologyValidator(
+AraciDocument document,
+ElectricGraphBuilder graphBuilder)
 {
 _document = document ?? throw new ArgumentNullException(nameof(document));
 _connectivity = new ConnectivityService(_document);
+_graphBuilder = graphBuilder ?? throw new ArgumentNullException(nameof(graphBuilder));
 }
 public TopologyValidationResult Validate()
 {
@@ -1601,43 +1909,11 @@ result.AddError($"Nome duplicado no documento: '{grupo.Key}'.");
 }
 private void ValidarCabos(TopologyValidationResult result)
 {
-var cabosAnteriores = new System.Collections.Generic.List<Cabo>();
-foreach (Cabo cabo in _document.Elementos.OfType<Cabo>())
+ElectricGraph graph = _graphBuilder.Build();
+foreach (ElectricGraphEdge edge in graph.GetInvalidEdges())
 {
-bool origemVazia = string.IsNullOrWhiteSpace(cabo.OrigemId);
-bool destinoVazio = string.IsNullOrWhiteSpace(cabo.DestinoId);
-bool origemTerminalVazio = string.IsNullOrWhiteSpace(cabo.OrigemTerminalId);
-bool destinoTerminalVazio = string.IsNullOrWhiteSpace(cabo.DestinoTerminalId);
-if (origemVazia)
-result.AddError($"Cabo '{Nome(cabo)}' sem OrigemId.");
-if (destinoVazio)
-result.AddError($"Cabo '{Nome(cabo)}' sem DestinoId.");
-if (origemTerminalVazio)
-result.AddError($"Cabo '{Nome(cabo)}' sem OrigemTerminalId.");
-if (destinoTerminalVazio)
-result.AddError($"Cabo '{Nome(cabo)}' sem DestinoTerminalId.");
-if (!origemVazia && _connectivity.ObterElementoPorId(cabo.OrigemId) == null)
-result.AddError($"Cabo '{Nome(cabo)}' com OrigemId invalido: {cabo.OrigemId}.");
-if (!destinoVazio && _connectivity.ObterElementoPorId(cabo.DestinoId) == null)
-result.AddError($"Cabo '{Nome(cabo)}' com DestinoId invalido: {cabo.DestinoId}.");
-if (!origemVazia &&
-!destinoVazio &&
-string.Equals(cabo.OrigemId.Trim(), cabo.DestinoId.Trim(), StringComparison.OrdinalIgnoreCase))
-{
-result.AddError($"Cabo '{Nome(cabo)}' conecta origem e destino ao mesmo elemento.");
-}
-if (!origemVazia &&
-!destinoVazio &&
-!origemTerminalVazio &&
-!destinoTerminalVazio &&
-string.Equals(cabo.OrigemId.Trim(), cabo.DestinoId.Trim(), StringComparison.OrdinalIgnoreCase) &&
-string.Equals(cabo.OrigemTerminalId.Trim(), cabo.DestinoTerminalId.Trim(), StringComparison.OrdinalIgnoreCase))
-{
-result.AddError($"Cabo '{Nome(cabo)}' conecta origem e destino ao mesmo terminal.");
-}
-if (_connectivity.EhCaboDuplicado(cabo, cabosAnteriores))
-result.AddError($"Cabo '{Nome(cabo)}' duplica uma conexao existente entre os mesmos terminais.");
-cabosAnteriores.Add(cabo);
+result.AddError(
+$"Cabo '{Nome(edge.SourceCable)}': {edge.Error}");
 }
 }
 private void ValidarEquipamentos(TopologyValidationResult result)
