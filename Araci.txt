@@ -450,23 +450,37 @@ public class ParameterReader
 private readonly CoreApi _api;
 private readonly ConnectivityService? _connectivity;
 private readonly TopologyValidator? _topology;
+private readonly ElectricGraphBuilder? _graphBuilder;
 public ParameterReader(CoreApi api)
 {
 _api = api ?? throw new ArgumentNullException(nameof(api));
 }
 public ParameterReader(EditorContext context)
-: this(new CoreApi(context), new ConnectivityService(context), new TopologyValidator(context))
+: this(
+new CoreApi(context),
+new ConnectivityService(context),
+new TopologyValidator(context),
+context.ElectricGraph)
 {
 }
 public ParameterReader(AraciDocument document)
-: this(new CoreApi(document), new ConnectivityService(document), new TopologyValidator(document))
+: this(
+new CoreApi(document),
+new ConnectivityService(document),
+new TopologyValidator(document),
+new ElectricGraphBuilder(document))
 {
 }
-private ParameterReader(CoreApi api, ConnectivityService connectivity, TopologyValidator topology)
+private ParameterReader(
+CoreApi api,
+ConnectivityService connectivity,
+TopologyValidator topology,
+ElectricGraphBuilder? graphBuilder)
 {
 _api = api ?? throw new ArgumentNullException(nameof(api));
 _connectivity = connectivity ?? throw new ArgumentNullException(nameof(connectivity));
 _topology = topology ?? throw new ArgumentNullException(nameof(topology));
+_graphBuilder = graphBuilder;
 }
 public TopologyValidationResult? ValidateTopology()
 {
@@ -493,13 +507,14 @@ Modelo = ReadInt(carga, "Carga modelo", "ModeloCarga")
 }
 public IList<LineData> GetLines()
 {
+ElectricGraph? graph = _graphBuilder?.Build();
 return _api.ObterElementos<Cabo>()
 .Select(cabo => new LineData
 {
 Id = cabo.Id.ToString(),
 Nome = ReadString(cabo, "Nome"),
-Barra1 = ResolverBus1(cabo),
-Barra2 = ResolverBus2(cabo),
+Barra1 = ResolverBus1(cabo, graph),
+Barra2 = ResolverBus2(cabo, graph),
 Fases = ReadInt(cabo, "Fases"),
 Comprimento = ReadDouble(cabo, "Comprimento"),
 R1 = ReadDouble(cabo, "R1", "Resistencia"),
@@ -550,9 +565,30 @@ private string ResolverBus1(Cabo cabo)
 {
 return _connectivity?.ResolverBus1Estrito(cabo) ?? string.Empty;
 }
+private string ResolverBus1(Cabo cabo, ElectricGraph? graph)
+{
+return ResolverBusPorGrafo(cabo, graph, origem: true) ?? ResolverBus1(cabo);
+}
 private string ResolverBus2(Cabo cabo)
 {
 return _connectivity?.ResolverBus2Estrito(cabo) ?? string.Empty;
+}
+private string ResolverBus2(Cabo cabo, ElectricGraph? graph)
+{
+return ResolverBusPorGrafo(cabo, graph, origem: false) ?? ResolverBus2(cabo);
+}
+private static string? ResolverBusPorGrafo(
+Cabo cabo,
+ElectricGraph? graph,
+bool origem)
+{
+ElectricGraphEdge? edge = graph?.FindEdgeByCable(cabo);
+if (edge == null)
+return null;
+if (!edge.IsValid)
+return string.Empty;
+string elementId = origem ? edge.FromElementId : edge.ToElementId;
+return graph?.FindNode(elementId)?.Name ?? string.Empty;
 }
 private string ResolverBarraEquipamento(ElementoEquipamento equipamento)
 {
@@ -1022,6 +1058,45 @@ _ => $"T{index + 1}"
 
 
 ====================================================================================================
+ARQUIVO: C:\Araci-Engine-Front\Araci Engine\Models\ITerminalOwner.cs
+====================================================================================================
+
+﻿using System.Collections.Generic;
+namespace Araci.Models
+{
+public interface ITerminalOwner
+{
+IReadOnlyList<Terminal> Terminais { get; }
+}
+}
+
+
+====================================================================================================
+ARQUIVO: C:\Araci-Engine-Front\Araci Engine\Models\Terminal.cs
+====================================================================================================
+
+﻿using System.Windows;
+namespace Araci.Models
+{
+public class Terminal
+{
+public Elemento Dono { get; }
+public string Id { get; }
+public Point Posicao { get; set; }
+public string? Barra { get; set; }
+public Terminal(Elemento dono, Point posicao, string? id = null)
+{
+Dono = dono;
+Id = string.IsNullOrWhiteSpace(id)
+? System.Guid.NewGuid().ToString("N")
+: id;
+Posicao = posicao;
+}
+}
+}
+
+
+====================================================================================================
 ARQUIVO: C:\Araci-Engine-Front\Araci Engine\Service\ConnectivityService.cs
 ====================================================================================================
 
@@ -1427,6 +1502,7 @@ ARQUIVO: C:\Araci-Engine-Front\Araci Engine\Service\ElectricGraph.cs
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using Araci.Models;
 namespace Araci.Services
 {
 public class ElectricGraph
@@ -1502,6 +1578,22 @@ return neighbors;
 public IReadOnlyList<ElectricGraphEdge> GetInvalidEdges()
 {
 return Edges.Where(e => !e.IsValid).ToList();
+}
+public IReadOnlyList<ElectricGraphEdge> GetValidEdges()
+{
+return Edges.Where(e => e.IsValid).ToList();
+}
+public ElectricGraphEdge? FindEdgeByCableId(string cableId)
+{
+if (string.IsNullOrWhiteSpace(cableId))
+return null;
+string id = cableId.Trim();
+return Edges.FirstOrDefault(e =>
+string.Equals(e.EdgeId, id, StringComparison.OrdinalIgnoreCase));
+}
+public ElectricGraphEdge? FindEdgeByCable(Cabo cabo)
+{
+return cabo == null ? null : FindEdgeByCableId(cabo.Id.ToString());
 }
 private static bool SameTerminal(
 string elementA,
@@ -1817,36 +1909,6 @@ public string ElementId { get; }
 public string TerminalId { get; }
 public string? BusName { get; }
 public Terminal SourceTerminal { get; }
-}
-}
-
-
-====================================================================================================
-ARQUIVO: C:\Araci-Engine-Front\Araci Engine\Service\SimulationPipeline.cs
-====================================================================================================
-
-using System;
-using System.Threading.Tasks;
-using Araci.DTOs;
-namespace Araci.Services
-{
-public class SimulationPipeline
-{
-private readonly EditorContext _context;
-public SimulationPipeline(EditorContext context)
-{
-_context = context ?? throw new ArgumentNullException(nameof(context));
-}
-public async Task<SimulationResultDto> ExecutarFluxoDeCorrenteAsync()
-{
-ParameterReader reader = new(_context);
-CircuitBuilder builder = new(reader);
-CircuitDto dto = builder.Build();
-SimulationApiClient client = new();
-SimulationResultDto resultado = await client.SimularTipadoAsync(dto);
-_context.SimulationResults.Apply(resultado);
-return resultado;
-}
 }
 }
 

@@ -58,12 +58,14 @@ namespace Araci.DTOs
 
         public IList<LoadData> GetLoads()
         {
+            ElectricGraph? graph = _graphBuilder?.Build();
+
             return _api.ObterElementos<Carga>()
                 .Select(carga => new LoadData
                 {
                     Id = carga.Id.ToString(),
                     Nome = ReadString(carga, "Nome"),
-                    Barra = ResolverBarraEquipamento(carga),
+                    Barra = ResolverBarraEquipamento(carga, graph),
                     Fases = ReadInt(carga, "Fases"),
                     R = ReadDouble(carga, "Carga resistencia", "Carga resistência"),
                     X = ReadDouble(carga, "Carga reatancia", "Carga reatância"),
@@ -114,12 +116,14 @@ namespace Araci.DTOs
 
         public IList<GeneratorData> GetGenerators()
         {
+            ElectricGraph? graph = _graphBuilder?.Build();
+
             return _api.ObterElementos<Gerador>()
                 .Select(gerador => new GeneratorData
                 {
                     Id = gerador.Id.ToString(),
                     Nome = ReadString(gerador, "Nome"),
-                    Barra = ResolverBarraEquipamento(gerador),
+                    Barra = ResolverBarraEquipamento(gerador, graph),
                     Fases = ReadInt(gerador, "Fases"),
                     Tensao = ReadVoltage(gerador, "TensaoKV", "Tensao", "TensaoLinha"),
                     Potencia = ReadDouble(gerador, "PotenciaAtiva", "Potencia", "PotenciaAparente"),
@@ -178,6 +182,21 @@ namespace Araci.DTOs
         private string ResolverBarraEquipamento(ElementoEquipamento equipamento)
         {
             return _connectivity?.ResolverBusNameParaEquipamentoEstrito(equipamento) ?? string.Empty;
+        }
+
+        private string ResolverBarraEquipamento(
+            ElementoEquipamento equipamento,
+            ElectricGraph? graph)
+        {
+            return ResolverBarraPorGrafo(equipamento, graph) ??
+                ResolverBarraEquipamento(equipamento);
+        }
+
+        private static string? ResolverBarraPorGrafo(
+            ElementoEquipamento equipamento,
+            ElectricGraph? graph)
+        {
+            return graph?.FindNodeByElement(equipamento)?.Name;
         }
 
         private static string ReadBarra(Elemento elemento, params string[] names)

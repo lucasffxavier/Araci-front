@@ -32,6 +32,16 @@ namespace Araci.Services
                     : null;
         }
 
+        public ElectricGraphNode? FindNodeByElementId(string elementId)
+        {
+            return FindNode(elementId);
+        }
+
+        public ElectricGraphNode? FindNodeByElement(Elemento elemento)
+        {
+            return elemento == null ? null : FindNodeByElementId(elemento.Id.ToString());
+        }
+
         public ElectricGraphTerminal? FindTerminal(string elementId, string terminalId)
         {
             if (string.IsNullOrWhiteSpace(terminalId))
