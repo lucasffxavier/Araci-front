@@ -8,7 +8,6 @@ namespace Araci.DTOs
     public class CircuitBuilder
     {
         private const double DefaultBaseKv = 12.47;
-
         private readonly ParameterReader _reader;
 
         public CircuitBuilder(ParameterReader reader)
@@ -22,6 +21,7 @@ namespace Araci.DTOs
 
             IList<ParameterReader.ExternalSourceData> sins = _reader.GetSins();
             IList<ParameterReader.GeneratorData> generators = _reader.GetGenerators();
+
             ParameterReader.ExternalSourceData? slackSin = sins.FirstOrDefault();
             ParameterReader.GeneratorData? slackGenerator = generators.FirstOrDefault();
 
@@ -38,7 +38,6 @@ namespace Araci.DTOs
             };
 
             Validar(dto);
-
             return dto;
         }
 
@@ -165,9 +164,6 @@ namespace Araci.DTOs
                 if (string.IsNullOrWhiteSpace(line.Barra1) || string.IsNullOrWhiteSpace(line.Barra2))
                     throw new InvalidOperationException($"Cabo '{line.Nome}' sem barra origem/destino definida.");
             }
-
-            if (!dto.Loads.Any())
-                throw new InvalidOperationException("Nenhuma carga encontrada para simular o fluxo.");
         }
 
         private void ValidarTopologia()

@@ -13,9 +13,7 @@ namespace Araci.Services
         private readonly ElectricGraphBuilder _graphBuilder;
 
         public TopologyValidator(EditorContext context)
-            : this(
-                context?.Document ?? throw new ArgumentNullException(nameof(context)),
-                context.ElectricGraph)
+            : this(context?.Document ?? throw new ArgumentNullException(nameof(context)), context.ElectricGraph)
         {
         }
 
@@ -24,9 +22,7 @@ namespace Araci.Services
         {
         }
 
-        private TopologyValidator(
-            AraciDocument document,
-            ElectricGraphBuilder graphBuilder)
+        private TopologyValidator(AraciDocument document, ElectricGraphBuilder graphBuilder)
         {
             _document = document ?? throw new ArgumentNullException(nameof(document));
             _connectivity = new ConnectivityService(_document);
@@ -36,12 +32,10 @@ namespace Araci.Services
         public TopologyValidationResult Validate()
         {
             var result = new TopologyValidationResult();
-
             ValidarNomes(result);
             ValidarCabos(result);
             ValidarEquipamentos(result);
             ValidarCircuito(result);
-
             return result;
         }
 
@@ -67,10 +61,7 @@ namespace Araci.Services
             ElectricGraph graph = _graphBuilder.Build();
 
             foreach (ElectricGraphEdge edge in graph.GetInvalidEdges())
-            {
-                result.AddError(
-                    $"Cabo '{Nome(edge.SourceCable)}': {edge.Error}");
-            }
+                result.AddError($"Cabo '{Nome(edge.SourceCable)}': {edge.Error}");
         }
 
         private void ValidarEquipamentos(TopologyValidationResult result)
@@ -84,13 +75,13 @@ namespace Araci.Services
                 }
             }
 
-            foreach (Carga carga in _document.Elementos.OfType<Carga>())
+            foreach (Carga carga in _document.Elementos.OfType<Carga>().Where(c => c.ParticipaDoGrafoEletrico))
             {
                 if (!TemConexaoTopologica(carga))
                     result.AddError($"Carga '{Nome(carga)}' sem conexao topologica utilizavel por Id.");
             }
 
-            foreach (Gerador gerador in _document.Elementos.OfType<Gerador>())
+            foreach (Gerador gerador in _document.Elementos.OfType<Gerador>().Where(g => g.ParticipaDoGrafoEletrico))
             {
                 if (!TemConexaoTopologica(gerador))
                     result.AddError($"Gerador '{Nome(gerador)}' sem conexao topologica utilizavel por Id.");
@@ -102,14 +93,8 @@ namespace Araci.Services
             IEnumerable<Elemento> eletricos = ElementosEletricos();
             int equipamentos = eletricos.OfType<ElementoEquipamento>().Count();
 
-            if (!eletricos.OfType<Sin>().Any() &&
-                !eletricos.OfType<Gerador>().Any())
-            {
+            if (!eletricos.OfType<Sin>().Any() && !eletricos.OfType<Gerador>().Any())
                 result.AddError("Circuito sem fonte slack.");
-            }
-
-            if (!eletricos.OfType<Carga>().Any())
-                result.AddError("Circuito sem carga.");
 
             if (equipamentos > 1 && !eletricos.OfType<Cabo>().Any())
                 result.AddError("Circuito com mais de um equipamento e sem cabo.");
@@ -124,7 +109,6 @@ namespace Araci.Services
             }
 
             string id = equipamento.Id.ToString();
-
             return ElementosEletricos().OfType<Cabo>().Any(c =>
                 string.Equals(c.OrigemId, id, StringComparison.OrdinalIgnoreCase) ||
                 string.Equals(c.DestinoId, id, StringComparison.OrdinalIgnoreCase));
@@ -137,9 +121,7 @@ namespace Araci.Services
 
         private static string Nome(Elemento elemento)
         {
-            return string.IsNullOrWhiteSpace(elemento.Nome)
-                ? elemento.Id.ToString()
-                : elemento.Nome.Trim();
+            return string.IsNullOrWhiteSpace(elemento.Nome) ? elemento.Id.ToString() : elemento.Nome.Trim();
         }
     }
 }
