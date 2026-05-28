@@ -1,8 +1,16 @@
 using System;
 using System.Linq;
 using System.Windows;
+using System.Windows.Controls;
 using System.Windows.Input;
+using Araci.Applications.Diagrama.InserirBarra;
+using Araci.Applications.Diagrama.InserirCabo;
+using Araci.Applications.Diagrama.InserirCarga;
+using Araci.Applications.Diagrama.InserirGerador;
+using Araci.Applications.Diagrama.InserirSin;
+using Araci.Applications.Diagrama.InserirTransformador;
 using Araci.Applications.Editar.Base;
+using Araci.Applications.Editar.Mover;
 using Araci.Applications.Editar.Selecionar;
 using Araci.ViewModels;
 
@@ -11,6 +19,9 @@ namespace Araci.Services
     public class InputRouter
     {
         private readonly EditorContext _context;
+        private string _shortcutBuffer = string.Empty;
+        private DateTime _lastShortcutKeyTime = DateTime.MinValue;
+        private static readonly TimeSpan ShortcutTimeout = TimeSpan.FromSeconds(1);
 
         public InputRouter(EditorContext context)
         {
@@ -64,39 +75,49 @@ namespace Araci.Services
 
             if (control && key == Key.Z)
             {
+                LimparAtalho();
                 _context.Commands.Undo();
                 return true;
             }
 
             if (control && key == Key.Y)
             {
+                LimparAtalho();
                 _context.Commands.Redo();
                 return true;
             }
 
             if (control && key == Key.C)
             {
+                LimparAtalho();
                 ClipboardService.CopiarSelecionados(_context);
                 return true;
             }
 
             if (control && key == Key.V)
             {
+                LimparAtalho();
                 ClipboardService.Colar(_context);
                 return true;
             }
 
             if (key == Key.Delete)
             {
+                LimparAtalho();
                 _context.SafeDelete.DeleteActiveHandleOrSelection();
                 return true;
             }
 
             if (key == Key.Escape)
+            {
+                LimparAtalho();
                 return HandleEscape();
+            }
 
             if (key == Key.Space)
             {
+                LimparAtalho();
+
                 if (ToolAtual.IsBusy ||
                     ToolAtual.HandlesKey(key) ||
                     _context.Selection.Selecionados.Any(RotationService.PodeRotacionar))
@@ -108,8 +129,102 @@ namespace Araci.Services
                 return false;
             }
 
+            if (TryHandleTwoKeyShortcut(key))
+                return true;
+
             ToolAtual.OnKeyDown(key);
             return false;
+        }
+
+        private bool TryHandleTwoKeyShortcut(Key key)
+        {
+            if (Keyboard.Modifiers != ModifierKeys.None)
+            {
+                LimparAtalho();
+                return false;
+            }
+
+            if (Keyboard.FocusedElement is TextBox)
+            {
+                LimparAtalho();
+                return false;
+            }
+
+            char? c = KeyToChar(key);
+            if (c == null)
+                return false;
+
+            DateTime now = DateTime.Now;
+            if (now - _lastShortcutKeyTime > ShortcutTimeout)
+                _shortcutBuffer = string.Empty;
+
+            _lastShortcutKeyTime = now;
+            _shortcutBuffer = (_shortcutBuffer + c.Value).ToUpperInvariant();
+
+            if (_shortcutBuffer.Length > 2)
+                _shortcutBuffer = _shortcutBuffer[^2..];
+
+            if (_shortcutBuffer.Length < 2)
+                return true;
+
+            bool handled = ExecutarAtalho(_shortcutBuffer);
+            LimparAtalho();
+            return handled;
+        }
+
+        private bool ExecutarAtalho(string shortcut)
+        {
+            switch (shortcut)
+            {
+                case "CB":
+                    new InserirCaboApplication(_context).Executar();
+                    return true;
+
+                case "CG":
+                    new InserirCargaApplication(_context).Executar();
+                    return true;
+
+                case "GE":
+                    new InserirGeradorApplication(_context).Executar();
+                    return true;
+
+                case "BA":
+                    new InserirBarraApplication(_context).Executar();
+                    return true;
+
+                case "SI":
+                    new InserirSinApplication(_context).Executar();
+                    return true;
+
+                case "TR":
+                    new InserirTransformadorApplication(_context).Executar();
+                    return true;
+
+                case "SE":
+                    _context.Tools.VoltarParaSelecao();
+                    return true;
+
+                case "MV":
+                    _context.Tools.AtivarFerramenta(new MoverTool(_context));
+                    return true;
+
+                default:
+                    return false;
+            }
+        }
+
+        private static char? KeyToChar(Key key)
+        {
+            if (key >= Key.A && key <= Key.Z)
+                return (char)('A' + (key - Key.A));
+
+            return null;
+        }
+
+        private void LimparAtalho()
+        {
+            _shortcutBuffer = string.Empty;
+            _lastShortcutKeyTime = DateTime.MinValue;
         }
 
         private bool HandleEscape()
