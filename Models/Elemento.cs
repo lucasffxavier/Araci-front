@@ -22,6 +22,8 @@ namespace Araci.Models
         public double Rotacao { get; set; }
         public double Escala { get; set; } = 1;
         public TipoElemento? Tipo { get; set; }
+        public virtual ElementoDomainRole DomainRole => ElementoDomainRole.Grafico;
+        public bool ParticipaDoGrafoEletrico => DomainRole == ElementoDomainRole.EletricoTopologico;
 
         public string Nome
         {

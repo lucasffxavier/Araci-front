@@ -21,6 +21,8 @@ namespace Araci.Models
 
         private readonly List<Terminal> _terminais = new();
 
+        public override ElementoDomainRole DomainRole => ElementoDomainRole.EletricoTopologico;
+
         protected ElementoEquipamento()
         {
             DefinirParametro(new Parameter<string>(PARAM_NOME, string.Empty));

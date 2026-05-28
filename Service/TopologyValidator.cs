@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Linq;
 using Araci.Core.Documents;
 using Araci.Models;
@@ -46,13 +47,13 @@ namespace Araci.Services
 
         private void ValidarNomes(TopologyValidationResult result)
         {
-            foreach (Elemento elemento in _document.Elementos)
+            foreach (Elemento elemento in ElementosEletricos())
             {
                 if (string.IsNullOrWhiteSpace(elemento.Nome))
                     result.AddError($"Elemento {elemento.Id} sem Nome.");
             }
 
-            var duplicados = _document.Elementos
+            var duplicados = ElementosEletricos()
                 .Where(e => !string.IsNullOrWhiteSpace(e.Nome))
                 .GroupBy(e => e.Nome.Trim(), StringComparer.OrdinalIgnoreCase)
                 .Where(g => g.Count() > 1);
@@ -74,7 +75,7 @@ namespace Araci.Services
 
         private void ValidarEquipamentos(TopologyValidationResult result)
         {
-            foreach (ElementoEquipamento equipamento in _document.Elementos.OfType<ElementoEquipamento>())
+            foreach (ElementoEquipamento equipamento in ElementosEletricos().OfType<ElementoEquipamento>())
             {
                 if (!string.IsNullOrWhiteSpace(equipamento.BarraId) &&
                     _connectivity.ObterElementoPorId(equipamento.BarraId) == null)
@@ -98,18 +99,19 @@ namespace Araci.Services
 
         private void ValidarCircuito(TopologyValidationResult result)
         {
-            int equipamentos = _document.Elementos.OfType<ElementoEquipamento>().Count();
+            IEnumerable<Elemento> eletricos = ElementosEletricos();
+            int equipamentos = eletricos.OfType<ElementoEquipamento>().Count();
 
-            if (!_document.Elementos.OfType<Sin>().Any() &&
-                !_document.Elementos.OfType<Gerador>().Any())
+            if (!eletricos.OfType<Sin>().Any() &&
+                !eletricos.OfType<Gerador>().Any())
             {
                 result.AddError("Circuito sem fonte slack.");
             }
 
-            if (!_document.Elementos.OfType<Carga>().Any())
+            if (!eletricos.OfType<Carga>().Any())
                 result.AddError("Circuito sem carga.");
 
-            if (equipamentos > 1 && !_document.Elementos.OfType<Cabo>().Any())
+            if (equipamentos > 1 && !eletricos.OfType<Cabo>().Any())
                 result.AddError("Circuito com mais de um equipamento e sem cabo.");
         }
 
@@ -123,9 +125,14 @@ namespace Araci.Services
 
             string id = equipamento.Id.ToString();
 
-            return _document.Elementos.OfType<Cabo>().Any(c =>
+            return ElementosEletricos().OfType<Cabo>().Any(c =>
                 string.Equals(c.OrigemId, id, StringComparison.OrdinalIgnoreCase) ||
                 string.Equals(c.DestinoId, id, StringComparison.OrdinalIgnoreCase));
+        }
+
+        private IEnumerable<Elemento> ElementosEletricos()
+        {
+            return _document.Elementos.Where(e => e.ParticipaDoGrafoEletrico);
         }
 
         private static string Nome(Elemento elemento)

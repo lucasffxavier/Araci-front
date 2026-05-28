@@ -49,7 +49,8 @@ namespace Araci.Services
 
         private static bool IsNodeElement(Elemento elemento)
         {
-            return elemento is ITerminalOwner and not Cabo;
+            return elemento.ParticipaDoGrafoEletrico &&
+                elemento is ITerminalOwner and not Cabo;
         }
 
         private ElectricGraphNode CreateNode(Elemento elemento)
@@ -78,7 +79,7 @@ namespace Araci.Services
             var edges = new List<ElectricGraphEdge>();
             var usedPairs = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 
-            foreach (Cabo cabo in _document.Elementos.OfType<Cabo>())
+            foreach (Cabo cabo in _document.Elementos.OfType<Cabo>().Where(c => c.ParticipaDoGrafoEletrico))
                 edges.Add(CreateEdge(cabo, nodeById, usedPairs));
 
             return edges;

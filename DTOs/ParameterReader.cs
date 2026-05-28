@@ -62,6 +62,7 @@ namespace Araci.DTOs
             ElectricGraph? graph = _graphBuilder?.Build();
 
             return _api.ObterElementos<Carga>()
+                .Where(carga => carga.ParticipaDoGrafoEletrico)
                 .Select(carga => new LoadData
                 {
                     Id = carga.Id.ToString(),
@@ -84,6 +85,7 @@ namespace Araci.DTOs
             ElectricGraph? graph = _graphBuilder?.Build();
 
             return _api.ObterElementos<Cabo>()
+                .Where(cabo => cabo.ParticipaDoGrafoEletrico)
                 .Select(cabo => new LineData
                 {
                     Id = cabo.Id.ToString(),
@@ -105,6 +107,7 @@ namespace Araci.DTOs
         public IList<TransformerData> GetTransformers()
         {
             return _api.ObterElementos<Transformador>()
+                .Where(transformador => transformador.ParticipaDoGrafoEletrico)
                 .Select(transformador => new TransformerData
                 {
                     Id = transformador.Id.ToString(),
@@ -153,6 +156,7 @@ namespace Araci.DTOs
             ElectricGraph? graph = _graphBuilder?.Build();
 
             return _api.ObterElementos<Gerador>()
+                .Where(gerador => gerador.ParticipaDoGrafoEletrico)
                 .Select(gerador => new GeneratorData
                 {
                     Id = gerador.Id.ToString(),
@@ -171,6 +175,7 @@ namespace Araci.DTOs
             ElectricGraph? graph = _graphBuilder?.Build();
 
             return _api.ObterElementos<Sin>()
+                .Where(sin => sin.ParticipaDoGrafoEletrico)
                 .Select(sin => new ExternalSourceData
                 {
                     Id = sin.Id.ToString(),

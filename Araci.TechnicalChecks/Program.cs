@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Text.Json;
 using System.Threading;
 using System.Windows;
 using System.Windows.Input;
@@ -28,7 +29,13 @@ namespace Araci.TechnicalChecks
                 ("ParameterReader CoreApi usa fallback sem ElectricGraph", CoreApiUsaFallbackSemElectricGraph),
                 ("Cabo invalido bloqueia DTO final", CaboInvalidoBloqueiaDto),
                 ("Cabo duplicado gera erro topologico", CaboDuplicadoGeraErro),
+                ("Elementos existentes permanecem eletricos", ElementosExistentesPermanecemEletricos),
                 ("ElectricGraph Build nao altera Document", ElectricGraphBuildNaoAlteraDocument),
+                ("ElectricGraph inclui eletricos e ignora anotativo", ElectricGraphIncluiEletricosEIgnoraAnotativo),
+                ("DTO permanece identico com anotativo no Document", DtoPermaneceIdenticoComAnotativoNoDocument),
+                ("OperationalGraph ignora anotativo", OperationalGraphIgnoraAnotativo),
+                ("TopologyValidator ignora anotativo", TopologyValidatorIgnoraAnotativo),
+                ("Classificacao eletrica nao depende de nome tipo ou SVG", ClassificacaoEletricaNaoDependeDeNomeTipoOuSvg),
                 ("Multiplos geradores preservam slack e restantes", MultiplosGeradoresPreservamSlack),
                 ("Cabos em serie preservam orientacao", CabosEmSeriePreservamOrientacao),
                 ("Ramificacao simples valida grafo e DTO", RamificacaoSimplesValidaGrafoEDto),
@@ -234,6 +241,28 @@ namespace Araci.TechnicalChecks
             AssertEqual(4, circuit.Document.Elementos.Count, "Cabos duplicados nao devem ser removidos.");
         }
 
+        private static void ElementosExistentesPermanecemEletricos()
+        {
+            Elemento[] elementos =
+            {
+                new Cabo(),
+                new Barra(),
+                new Carga(),
+                new Gerador(),
+                new Sin(),
+                new Transformador()
+            };
+
+            foreach (Elemento elemento in elementos)
+            {
+                AssertEqual(
+                    ElementoDomainRole.EletricoTopologico,
+                    elemento.DomainRole,
+                    $"{elemento.GetType().Name}.DomainRole");
+                Assert(elemento.ParticipaDoGrafoEletrico, $"{elemento.GetType().Name} deve participar do grafo eletrico.");
+            }
+        }
+
         private static void ElectricGraphBuildNaoAlteraDocument()
         {
             SimpleCircuit circuit = CreateSimpleCircuit();
@@ -244,6 +273,107 @@ namespace Araci.TechnicalChecks
             AssertEqual(countBefore, circuit.Document.Elementos.Count, "Contagem do Document");
             AssertEqual(2, graph.Nodes.Count, "Quantidade de nos do grafo");
             AssertEqual(1, graph.Edges.Count, "Quantidade de arestas do grafo");
+        }
+
+        private static void ElectricGraphIncluiEletricosEIgnoraAnotativo()
+        {
+            var document = new AraciDocument();
+            Sin sin = CreateSin("SIN-GRAFO");
+            Transformador transformer = CreateTransformador("TR-GRAFO");
+            Barra bar = CreateBar("BARRA-GRAFO");
+            Gerador generator = CreateGenerator("GER-GRAFO", 900, 0.95);
+            Carga load = CreateLoad("CARGA-GRAFO", 300, 100);
+            Cabo cable = CreateCable(generator, load, "L-GRAFO", 1);
+            Elemento annotation = CreateAnnotation("CARGA-GRAFO");
+
+            document.AdicionarElemento(sin);
+            document.AdicionarElemento(transformer);
+            document.AdicionarElemento(bar);
+            document.AdicionarElemento(generator);
+            document.AdicionarElemento(load);
+            document.AdicionarElemento(cable);
+            document.AdicionarElemento(annotation);
+
+            ElectricGraph graph = new ElectricGraphBuilder(document).Build();
+
+            AssertEqual(5, graph.Nodes.Count, "Quantidade de nos eletricos");
+            AssertEqual(1, graph.Edges.Count, "Quantidade de cabos eletricos");
+            AssertContainsNode(graph.Nodes, sin, "SIN no grafo");
+            AssertContainsNode(graph.Nodes, transformer, "Transformador no grafo");
+            AssertContainsNode(graph.Nodes, bar, "Barra no grafo");
+            AssertContainsNode(graph.Nodes, generator, "Gerador no grafo");
+            AssertContainsNode(graph.Nodes, load, "Carga no grafo");
+            Assert(graph.FindNode(annotation.Id.ToString()) == null, "Anotativo nao deve virar no do grafo.");
+        }
+
+        private static void DtoPermaneceIdenticoComAnotativoNoDocument()
+        {
+            SimpleCircuit circuit = CreateSimpleCircuit();
+            string dtoBefore = SerializeCircuitDto(new CircuitBuilder(new ParameterReader(circuit.Document)).Build());
+
+            circuit.Document.AdicionarElemento(CreateAnnotation(circuit.Generator.Nome));
+
+            string dtoAfter = SerializeCircuitDto(new CircuitBuilder(new ParameterReader(circuit.Document)).Build());
+            ParameterReader reader = new(circuit.Document);
+
+            AssertEqual(dtoBefore, dtoAfter, "CircuitDto serializado");
+            AssertEqual(1, reader.GetGenerators().Count, "ParameterReader.Generators");
+            AssertEqual(1, reader.GetLoads().Count, "ParameterReader.Loads");
+            AssertEqual(1, reader.GetLines().Count, "ParameterReader.Lines");
+            AssertEqual(0, reader.GetSins().Count, "ParameterReader.Sins");
+            AssertEqual(0, reader.GetTransformers().Count, "ParameterReader.Transformers");
+        }
+
+        private static void OperationalGraphIgnoraAnotativo()
+        {
+            var document = new AraciDocument();
+            Sin sin = CreateSin("SIN-ANOT");
+            Carga load = CreateLoad("CARGA-ANOT", 300, 100);
+            Cabo cable = CreateCable(sin, 1, load, 0, "L-ANOT", 1.0);
+            Elemento annotation = CreateAnnotation("SIN-ANOT");
+
+            document.AdicionarElemento(sin);
+            document.AdicionarElemento(load);
+            document.AdicionarElemento(cable);
+            document.AdicionarElemento(annotation);
+
+            OperationalGraphState state = BuildOperationalState(document);
+
+            AssertEnergized(state, sin, "SIN energizado com anotativo");
+            AssertEnergized(state, load, "Carga energizada com anotativo");
+            AssertEdgeEnergized(state, cable, "Cabo energizado com anotativo");
+            Assert(!state.EnergizedNodeIds.Contains(annotation.Id.ToString()), "Anotativo nao deve energizar.");
+            Assert(!state.DeenergizedNodeIds.Contains(annotation.Id.ToString()), "Anotativo nao deve aparecer desenergizado.");
+        }
+
+        private static void TopologyValidatorIgnoraAnotativo()
+        {
+            SimpleCircuit circuit = CreateSimpleCircuit();
+            circuit.Document.AdicionarElemento(CreateAnnotation(circuit.Generator.Nome));
+
+            TopologyValidationResult result = new TopologyValidator(circuit.Document).Validate();
+
+            Assert(result.IsValid, "Anotativo com nome duplicado deve ser ignorado pelo validador topologico.");
+            AssertEqual(4, circuit.Document.Elementos.Count, "Anotativo deve permanecer no Document.");
+        }
+
+        private static void ClassificacaoEletricaNaoDependeDeNomeTipoOuSvg()
+        {
+            var carga = new Carga
+            {
+                Nome = "texto livre",
+                Tipo = new TipoCarga()
+            };
+
+            var annotation = new FakeAnnotationElement
+            {
+                Nome = "Carga",
+                Tipo = new TipoCarga()
+            };
+
+            Assert(carga.ParticipaDoGrafoEletrico, "Carga deve ser eletrica apesar do nome livre.");
+            AssertEqual(ElementoDomainRole.Grafico, annotation.DomainRole, "Anotativo.DomainRole");
+            Assert(!annotation.ParticipaDoGrafoEletrico, "Anotativo nao deve virar eletrico por nome ou Tipo.");
         }
 
         private static void MultiplosGeradoresPreservamSlack()
@@ -2023,6 +2153,21 @@ namespace Araci.TechnicalChecks
             return new SimpleCircuit(document, generator, load, cable);
         }
 
+        private static Elemento CreateAnnotation(string name)
+        {
+            return new FakeAnnotationElement
+            {
+                Nome = name,
+                PosicaoX = 40,
+                PosicaoY = 40
+            };
+        }
+
+        private static string SerializeCircuitDto(CircuitDto dto)
+        {
+            return JsonSerializer.Serialize(dto);
+        }
+
         private static RotatedCircuit CreateRotatedCircuit()
         {
             EditorContext context = CreateContextWithViewport();
@@ -2675,5 +2820,15 @@ namespace Araci.TechnicalChecks
             Carga Load,
             Cabo Incoming,
             Cabo Outgoing);
+
+        private sealed class FakeAnnotationElement : Elemento
+        {
+            public override Elemento Clonar()
+            {
+                var clone = new FakeAnnotationElement();
+                CopiarBasePara(clone);
+                return clone;
+            }
+        }
     }
 }

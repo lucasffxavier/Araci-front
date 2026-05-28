@@ -212,6 +212,7 @@ namespace Araci.Services
             return new ElementDto
             {
                 Kind = ObterKind(elemento),
+                DomainRole = elemento.DomainRole.ToString(),
                 Id = elemento.Id,
                 X = elemento.PosicaoX,
                 Y = elemento.PosicaoY,
@@ -430,6 +431,7 @@ namespace Araci.Services
         public sealed class ElementDto
         {
             public string Kind { get; set; } = string.Empty;
+            public string? DomainRole { get; set; }
             public Guid Id { get; set; }
             public double X { get; set; }
             public double Y { get; set; }

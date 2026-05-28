@@ -25,6 +25,8 @@ namespace Araci.Models
 
         public IReadOnlyList<Terminal> Terminais => _terminais;
 
+        public override ElementoDomainRole DomainRole => ElementoDomainRole.EletricoTopologico;
+
         public TipoBarra TipoBarra => (TipoBarra)Tipo!;
 
         public double Altura
