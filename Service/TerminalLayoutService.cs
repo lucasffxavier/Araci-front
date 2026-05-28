@@ -30,11 +30,12 @@ namespace Araci.Services
             switch (elemento)
             {
                 case Barra barra:
-                    barra.AtualizarTerminais();
+                    barra.AtualizarTerminais(_geometry.ObterTamanho(barra).Width);
                     break;
 
                 case Carga carga:
-                    carga.AtualizarTerminais(_geometry.ObterTamanho(carga).Width);
+                    var tamanhoCarga = _geometry.ObterTamanho(carga);
+                    carga.AtualizarTerminais(tamanhoCarga.Width, tamanhoCarga.Height);
                     break;
 
                 case Gerador gerador:

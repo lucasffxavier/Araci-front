@@ -306,10 +306,12 @@ namespace Araci.Services
                 cabo.DefinirDestino(cabo.Vertices[^1]);
         }
 
-        private static void RestaurarTerminais(Elemento elemento, IEnumerable<TerminalDto> terminais)
+        private void RestaurarTerminais(Elemento elemento, IEnumerable<TerminalDto> terminais)
         {
             if (elemento is not ITerminalOwner owner)
                 return;
+
+            Size tamanho = _context.Geometry.ObterTamanho(elemento);
 
             foreach (TerminalDto dto in terminais)
             {
@@ -319,7 +321,11 @@ namespace Araci.Services
                 if (terminal == null)
                     continue;
 
-                terminal.DefinirPosicaoVisual(new Point(dto.X, dto.Y));
+                if (elemento is Cabo || tamanho.IsEmpty)
+                    terminal.DefinirPosicaoVisual(new Point(dto.X, dto.Y));
+                else
+                    terminal.DefinirPosicaoVisual(new Point(dto.X, dto.Y), tamanho.Width, tamanho.Height);
+
                 terminal.Barra = dto.Barra;
             }
         }

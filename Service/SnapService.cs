@@ -168,8 +168,11 @@ namespace Araci.Services
                     continue;
                 }
 
-                if (dist >= menorDist)
+                if (melhor != null &&
+                    !EhMelhorTerminal(terminal, dist, melhor, menorDist))
+                {
                     continue;
+                }
 
                 menorDist = dist;
 
@@ -177,6 +180,26 @@ namespace Araci.Services
             }
 
             return melhor;
+        }
+
+        private static bool EhMelhorTerminal(
+            Terminal candidato,
+            double distancia,
+            Terminal atual,
+            double distanciaAtual)
+        {
+            if (distancia < distanciaAtual - 0.000001)
+                return true;
+
+            if (Math.Abs(distancia - distanciaAtual) > 0.000001)
+                return false;
+
+            return PrioridadeTerminal(candidato) < PrioridadeTerminal(atual);
+        }
+
+        private static int PrioridadeTerminal(Terminal terminal)
+        {
+            return terminal.Kind == TerminalKind.Electrical ? 0 : 1;
         }
 
         private static IEnumerable<Terminal>

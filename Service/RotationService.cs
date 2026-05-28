@@ -33,7 +33,7 @@ namespace Araci.Services
                 RotacionarModelo(vm.Modelo);
 
             foreach (ElementoViewModel vm in targets)
-                AtualizarElementoRotacionado(vm.Modelo);
+                AtualizarElementoRotacionadoComCabos(vm.Modelo);
 
             var after = Capturar(affected);
             var items = affected
@@ -45,7 +45,6 @@ namespace Araci.Services
                 return false;
 
             _context.Commands.Execute(new RotateElementoCommand(items, AtualizarAposComando));
-            AtualizarEstadoVisual();
             return true;
         }
 
@@ -108,27 +107,43 @@ namespace Araci.Services
             return items.ToDictionary(vm => vm, vm => vm.CapturarEstado());
         }
 
-        private void AtualizarElementoRotacionado(Elemento elemento)
+        private void AtualizarElementoRotacionadoComCabos(Elemento elemento)
         {
+            if (elemento is Cabo cabo)
+            {
+                AtualizarCabo(cabo);
+                AtualizarEstadoVisual();
+                return;
+            }
+
             _context.TerminalLayout.AtualizarTerminais(elemento);
 
-            foreach (Cabo cabo in _context.Connectivity.ReancorarCabosConectados(elemento))
-                _context.Viewport?.AtualizarViewModel(cabo);
+            IReadOnlyList<Cabo> cabosReancorados =
+                _context.Connectivity.ReancorarCabosConectados(elemento);
 
             _context.Viewport?.AtualizarViewModel(elemento);
+
+            foreach (Cabo caboReancorado in cabosReancorados)
+                AtualizarCabo(caboReancorado);
+
+            AtualizarEstadoVisual();
         }
 
         private void AtualizarAposComando(Elemento elemento)
         {
-            _context.TerminalLayout.AtualizarTerminais(elemento);
-            _context.Viewport?.AtualizarViewModel(elemento);
-            _context.SceneQueries.Invalidate();
-            _context.CableVertexEdit.Refresh();
+            AtualizarElementoRotacionadoComCabos(elemento);
+        }
+
+        private void AtualizarCabo(Cabo cabo)
+        {
+            _context.TerminalLayout.AtualizarTerminais(cabo);
+            _context.Viewport?.AtualizarViewModel(cabo);
         }
 
         private void AtualizarEstadoVisual()
         {
             _context.SceneQueries.Invalidate();
+            _context.TerminalSnap.Limpar();
             _context.CableVertexEdit.Refresh();
         }
 

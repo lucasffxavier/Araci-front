@@ -38,10 +38,22 @@ namespace Araci.Models
             Posicao = TerminalPlacement.ToWorld(Dono, local);
         }
 
+        public void DefinirPosicaoLocal(Point local, double width, double height)
+        {
+            PosicaoLocal = local;
+            Posicao = TerminalPlacement.ToWorld(Dono, local, width, height);
+        }
+
         public void DefinirPosicaoVisual(Point world)
         {
             Posicao = world;
             PosicaoLocal = TerminalPlacement.ToLocal(Dono, world);
+        }
+
+        public void DefinirPosicaoVisual(Point world, double width, double height)
+        {
+            Posicao = world;
+            PosicaoLocal = TerminalPlacement.ToLocal(Dono, world, width, height);
         }
     }
 }

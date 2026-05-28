@@ -70,10 +70,10 @@ namespace Araci.Models
             }
 
             terminais[0].Barra = Barra;
-            terminais[0].DefinirPosicaoLocal(new Point(largura / 2, 0));
-            terminais[1].DefinirPosicaoLocal(new Point(largura / 2, altura));
-            terminais[2].DefinirPosicaoLocal(new Point(0, altura / 2));
-            terminais[3].DefinirPosicaoLocal(new Point(largura, altura / 2));
+            terminais[0].DefinirPosicaoLocal(new Point(largura / 2, 0), largura, altura);
+            terminais[1].DefinirPosicaoLocal(new Point(largura / 2, altura), largura, altura);
+            terminais[2].DefinirPosicaoLocal(new Point(0, altura / 2), largura, altura);
+            terminais[3].DefinirPosicaoLocal(new Point(largura, altura / 2), largura, altura);
         }
 
         public override Elemento Clonar()

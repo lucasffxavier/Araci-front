@@ -158,7 +158,7 @@ namespace Araci.Services
                 () => Types.TipoBarraPadrao,
                 () => Types.TiposBarras,
                 e => new Size(ElementGeometryDefaults.BarraLargura, ((Barra)e).Altura),
-                e => ((Barra)e).AtualizarTerminais()));
+                e => ((Barra)e).AtualizarTerminais(ElementGeometryDefaults.BarraLargura)));
 
             Register(new ElementDefinition(
                 "Carga",
@@ -172,7 +172,9 @@ namespace Araci.Services
                 () => Types.TipoCargaPadrao,
                 () => Types.TiposCargas,
                 _ => EquipamentoSize(),
-                e => ((Carga)e).AtualizarTerminais(ElementGeometryDefaults.EquipamentoLargura)));
+                e => ((Carga)e).AtualizarTerminais(
+                    ElementGeometryDefaults.EquipamentoLargura,
+                    ElementGeometryDefaults.EquipamentoAltura)));
 
             Register(new ElementDefinition(
                 "Gerador",

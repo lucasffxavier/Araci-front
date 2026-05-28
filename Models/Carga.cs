@@ -29,6 +29,11 @@ namespace Araci.Models
 
         public void AtualizarTerminais(double largura)
         {
+            AtualizarTerminais(largura, largura);
+        }
+
+        public void AtualizarTerminais(double largura, double altura)
+        {
             var terminais = ObterTerminaisInternos();
 
             if (terminais.Count == 0)
@@ -36,7 +41,10 @@ namespace Araci.Models
 
             terminais[0].Barra = Barra;
             terminais[0].Direction = TerminalDirection.North;
-            terminais[0].DefinirPosicaoLocal(new Point(largura / 2, 0));
+            terminais[0].DefinirPosicaoLocal(
+                new Point(largura / 2, 0),
+                largura,
+                altura);
         }
 
         public override Elemento Clonar()

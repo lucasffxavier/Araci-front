@@ -71,7 +71,14 @@ namespace Araci.TechnicalChecks
                 ("TopologyValidator aceita gerador legado sem SIN", TopologyValidatorAceitaGeradorLegadoSemSin),
                 ("TopologyValidator sem fonte slack falha com mensagem clara", TopologyValidatorSemFonteSlackFalhaComMensagemClara),
                 ("TerminalEndpoint identifica conexao por valor", TerminalEndpointIdentificaConexaoPorValor),
+                ("TerminalPlacement usa pivo central", TerminalPlacementUsaPivoCentral),
+                ("TerminalPlacement ToLocal inverte ToWorld", TerminalPlacementToLocalInverteToWorld),
                 ("Rotacao recalcula terminal por posicao local", RotacaoRecalculaTerminalPorPosicaoLocal),
+                ("Carga rotacionada alinha terminal com pivo central", CargaRotacionadaAlinhaTerminalComPivoCentral),
+                ("Gerador rotacionado alinha terminais com pivo central", GeradorRotacionadoAlinhaTerminaisComPivoCentral),
+                ("SIN rotacionado alinha terminais com pivo central", SinRotacionadoAlinhaTerminaisComPivoCentral),
+                ("Transformador rotacionado alinha terminais com pivo central", TransformadorRotacionadoAlinhaTerminaisComPivoCentral),
+                ("Barra rotacionada alinha terminais com pivo central", BarraRotacionadaAlinhaTerminaisComPivoCentral),
                 ("ElectricGraph BFS percorre por conexoes validas", ElectricGraphBfsPercorreConexoesValidas),
                 ("Rotacao +90 atualiza modelo", RotacaoMaisNoventaAtualizaModelo),
                 ("Rotacao cicla quadrantes", RotacaoCiclaQuadrantes),
@@ -88,6 +95,13 @@ namespace Araci.TechnicalChecks
                 ("Cabo preserva TerminalId apos rotacao", CaboPreservaTerminalIdAposRotacao),
                 ("Cabo reancora visualmente apos rotacao", CaboReancoraVisualmenteAposRotacao),
                 ("Undo Redo da rotacao restaura elemento e cabos", UndoRedoRotacaoRestauraElementoECabos),
+                ("Rotacao reancora Carga com cabo conectado", RotacaoReancoraCargaComCaboConectado),
+                ("Rotacao reancora Gerador com cabo conectado", RotacaoReancoraGeradorComCaboConectado),
+                ("Rotacao reancora SIN em todos terminais", RotacaoReancoraSinEmTodosTerminais),
+                ("Rotacao reancora Transformador primario e secundario", RotacaoReancoraTransformadorPrimarioSecundario),
+                ("Rotacao reancora Barra em dois terminais", RotacaoReancoraBarraEmDoisTerminais),
+                ("Undo Redo da rotacao reancora terminais e cabos", UndoRedoRotacaoReancoraTerminaisECabos),
+                ("Snap encontra terminal apos rotacao com cabo", SnapEncontraTerminalAposRotacaoComCabo),
                 ("ElectricGraph build repetido apos rotacao nao altera Document", ElectricGraphBuildAposRotacaoNaoAlteraDocument),
                 ("DTO nao muda por causa da rotacao", DtoNaoMudaPorCausaDaRotacao),
                 ("RotationService aceita Barra", RotationServiceAceitaBarra),
@@ -1151,14 +1165,136 @@ namespace Araci.TechnicalChecks
                 Rotacao = 90
             };
 
-            generator.AtualizarTerminais(80, 80);
+            generator.AtualizarTerminais(
+                ElementGeometryDefaults.EquipamentoLargura,
+                ElementGeometryDefaults.EquipamentoAltura);
             Terminal topo = generator.Terminais.Single(t => t.Id == "TOPO");
             Terminal direita = generator.Terminais.Single(t => t.Id == "DIREITA");
 
-            AssertEqual(100, topo.Posicao.X, "Topo rotacionado X");
-            AssertEqual(140, topo.Posicao.Y, "Topo rotacionado Y");
-            AssertEqual(60, direita.Posicao.X, "Direita rotacionada X");
-            AssertEqual(180, direita.Posicao.Y, "Direita rotacionada Y");
+            AssertEqual(170, topo.Posicao.X, "Topo rotacionado X");
+            AssertEqual(135, topo.Posicao.Y, "Topo rotacionado Y");
+            AssertEqual(135, direita.Posicao.X, "Direita rotacionada X");
+            AssertEqual(170, direita.Posicao.Y, "Direita rotacionada Y");
+        }
+
+        private static void TerminalPlacementUsaPivoCentral()
+        {
+            var elemento = new Carga
+            {
+                PosicaoX = 100,
+                PosicaoY = 100,
+                Rotacao = 90
+            };
+
+            Point world = TerminalPlacement.ToWorld(elemento, new Point(35, 0), 70, 70);
+
+            AssertEqual(170, world.X, "Terminal central 90 X");
+            AssertEqual(135, world.Y, "Terminal central 90 Y");
+        }
+
+        private static void TerminalPlacementToLocalInverteToWorld()
+        {
+            var elemento = new Carga
+            {
+                PosicaoX = 123,
+                PosicaoY = 77
+            };
+
+            var locals = new[]
+            {
+                new Point(35, 0),
+                new Point(70, 35),
+                new Point(35, 70),
+                new Point(0, 35),
+                new Point(10, 20)
+            };
+
+            foreach (double rotation in new double[] { 0, 90, 180, 270 })
+            {
+                elemento.Rotacao = rotation;
+
+                foreach (Point local in locals)
+                {
+                    Point world = TerminalPlacement.ToWorld(elemento, local, 70, 70);
+                    Point actual = TerminalPlacement.ToLocal(elemento, world, 70, 70);
+
+                    AssertEqual(local.X, actual.X, $"ToLocal inverso {rotation}.X");
+                    AssertEqual(local.Y, actual.Y, $"ToLocal inverso {rotation}.Y");
+                }
+            }
+        }
+
+        private static void CargaRotacionadaAlinhaTerminalComPivoCentral()
+        {
+            Carga load = CreateLoad("CARGA-CENTRAL", 300, 100);
+            load.Rotacao = 90;
+            load.AtualizarTerminais(
+                ElementGeometryDefaults.EquipamentoLargura,
+                ElementGeometryDefaults.EquipamentoAltura);
+
+            AssertTerminalsUseCentralPivot(
+                load,
+                ElementGeometryDefaults.EquipamentoLargura,
+                ElementGeometryDefaults.EquipamentoAltura,
+                "Carga");
+        }
+
+        private static void GeradorRotacionadoAlinhaTerminaisComPivoCentral()
+        {
+            Gerador generator = CreateGenerator("GER-CENTRAL", 1000, 0.95);
+            generator.Rotacao = 90;
+            generator.AtualizarTerminais(
+                ElementGeometryDefaults.EquipamentoLargura,
+                ElementGeometryDefaults.EquipamentoAltura);
+
+            AssertTerminalsUseCentralPivot(
+                generator,
+                ElementGeometryDefaults.EquipamentoLargura,
+                ElementGeometryDefaults.EquipamentoAltura,
+                "Gerador");
+        }
+
+        private static void SinRotacionadoAlinhaTerminaisComPivoCentral()
+        {
+            Sin sin = CreateSin("SIN-CENTRAL");
+            sin.Rotacao = 90;
+            sin.AtualizarTerminais(
+                ElementGeometryDefaults.EquipamentoLargura,
+                ElementGeometryDefaults.EquipamentoAltura);
+
+            AssertTerminalsUseCentralPivot(
+                sin,
+                ElementGeometryDefaults.EquipamentoLargura,
+                ElementGeometryDefaults.EquipamentoAltura,
+                "SIN");
+        }
+
+        private static void TransformadorRotacionadoAlinhaTerminaisComPivoCentral()
+        {
+            Transformador transformador = CreateTransformador("TR-CENTRAL");
+            transformador.Rotacao = 90;
+            transformador.AtualizarTerminais(
+                ElementGeometryDefaults.TransformadorLargura,
+                ElementGeometryDefaults.TransformadorAltura);
+
+            AssertTerminalsUseCentralPivot(
+                transformador,
+                ElementGeometryDefaults.TransformadorLargura,
+                ElementGeometryDefaults.TransformadorAltura,
+                "Transformador");
+        }
+
+        private static void BarraRotacionadaAlinhaTerminaisComPivoCentral()
+        {
+            Barra bar = CreateBar("BARRA-CENTRAL");
+            bar.Rotacao = 90;
+            bar.AtualizarTerminais(ElementGeometryDefaults.BarraLargura);
+
+            AssertTerminalsUseCentralPivot(
+                bar,
+                ElementGeometryDefaults.BarraLargura,
+                bar.Altura,
+                "Barra");
         }
 
         private static void ElectricGraphBfsPercorreConexoesValidas()
@@ -1432,7 +1568,9 @@ namespace Araci.TechnicalChecks
                 .ToList();
 
             generator.Rotacao = 90;
-            generator.AtualizarTerminais(80, 80);
+            generator.AtualizarTerminais(
+                ElementGeometryDefaults.EquipamentoLargura,
+                ElementGeometryDefaults.EquipamentoAltura);
 
             for (int i = 0; i < before.Count; i++)
                 AssertEqual(before[i].Id, generator.Terminais[i].Id, $"Terminal {i}.Id");
@@ -1484,6 +1622,159 @@ namespace Araci.TechnicalChecks
             AssertEqual(90, circuit.Generator.Rotacao, "Rotacao apos redo");
             AssertEqual(afterVertex.X, circuit.Cable.Vertices[0].X, "Cabo X apos redo");
             AssertEqual(afterVertex.Y, circuit.Cable.Vertices[0].Y, "Cabo Y apos redo");
+        }
+
+        private static void RotacaoReancoraCargaComCaboConectado()
+        {
+            RotatedCircuit circuit = CreateRotatedCircuit();
+            string origemTerminalId = circuit.Cable.OrigemTerminalId;
+            string destinoTerminalId = circuit.Cable.DestinoTerminalId;
+            Point before = circuit.Cable.Vertices[^1];
+            Point middle = new Point(220, 140);
+            circuit.Cable.Vertices.Insert(1, middle);
+
+            RotateSelected(circuit.Context, circuit.Load);
+
+            AssertEqual(origemTerminalId, circuit.Cable.OrigemTerminalId, "OrigemTerminalId");
+            AssertEqual(destinoTerminalId, circuit.Cable.DestinoTerminalId, "DestinoTerminalId");
+            Assert(before != circuit.Cable.Vertices[^1], "Destino do cabo deve mover com a Carga.");
+            AssertCableEndpointAtTerminal(circuit.Cable, false, circuit.Load, 0, "Carga destino");
+            AssertEqual(middle.X, circuit.Cable.Vertices[1].X, "Intermediario X");
+            AssertEqual(middle.Y, circuit.Cable.Vertices[1].Y, "Intermediario Y");
+        }
+
+        private static void RotacaoReancoraGeradorComCaboConectado()
+        {
+            RotatedCircuit circuit = CreateRotatedCircuit();
+            string origemTerminalId = circuit.Cable.OrigemTerminalId;
+            Point before = circuit.Cable.Vertices[0];
+
+            RotateSelected(circuit.Context, circuit.Generator);
+
+            AssertEqual(origemTerminalId, circuit.Cable.OrigemTerminalId, "OrigemTerminalId");
+            Assert(before != circuit.Cable.Vertices[0], "Origem do cabo deve mover com o Gerador.");
+            AssertCableEndpointAtTerminal(circuit.Cable, true, circuit.Generator, 0, "Gerador origem");
+        }
+
+        private static void RotacaoReancoraSinEmTodosTerminais()
+        {
+            EditorContext context = CreateContextWithViewport();
+            Sin sin = CreateSin("SIN-ROT-ANCHORS");
+            var loads = Enumerable.Range(1, 4)
+                .Select(i => CreateLoad($"CARGA-SIN-ROT-{i}", 100 + i, 50 + i))
+                .ToList();
+            var cables = new List<Cabo>();
+
+            context.Document.AdicionarElemento(sin);
+
+            for (int i = 0; i < loads.Count; i++)
+            {
+                context.Document.AdicionarElemento(loads[i]);
+                Cabo cable = CreateCable(sin, i, loads[i], 0, $"L-SIN-ROT-{i}", 1.0 + i);
+                cables.Add(cable);
+                context.Document.AdicionarElemento(cable);
+            }
+
+            var before = cables.Select(c => c.Vertices[0]).ToList();
+            var terminalIds = cables.Select(c => c.OrigemTerminalId).ToList();
+
+            RotateSelected(context, sin);
+
+            for (int i = 0; i < cables.Count; i++)
+            {
+                AssertEqual(terminalIds[i], cables[i].OrigemTerminalId, $"SIN cabo {i}.OrigemTerminalId");
+                Assert(before[i] != cables[i].Vertices[0], $"SIN cabo {i} deve mover.");
+                AssertCableEndpointAtTerminal(cables[i], true, sin, i, $"SIN terminal {i}");
+            }
+        }
+
+        private static void RotacaoReancoraTransformadorPrimarioSecundario()
+        {
+            EditorContext context = CreateContextWithViewport();
+            Sin sin = CreateSin("SIN-TR-ROT");
+            Transformador transformador = CreateTransformador("TR-ROT-ANCHORS");
+            Carga load = CreateLoad("CARGA-TR-ROT", 300, 100);
+            Cabo primary = CreateCable(sin, 1, transformador, 0, "L-TR-ROT-P", 1.0);
+            Cabo secondary = CreateCable(transformador, 1, load, 0, "L-TR-ROT-S", 1.1);
+
+            context.Document.AdicionarElemento(sin);
+            context.Document.AdicionarElemento(transformador);
+            context.Document.AdicionarElemento(load);
+            context.Document.AdicionarElemento(primary);
+            context.Document.AdicionarElemento(secondary);
+
+            Point primaryBefore = primary.Vertices[^1];
+            Point secondaryBefore = secondary.Vertices[0];
+
+            RotateSelected(context, transformador);
+
+            Assert(primaryBefore != primary.Vertices[^1], "Primario deve reancorar.");
+            Assert(secondaryBefore != secondary.Vertices[0], "Secundario deve reancorar.");
+            AssertCableEndpointAtTerminal(primary, false, transformador, 0, "Transformador primario");
+            AssertCableEndpointAtTerminal(secondary, true, transformador, 1, "Transformador secundario");
+        }
+
+        private static void RotacaoReancoraBarraEmDoisTerminais()
+        {
+            BarRotationCircuit circuit = CreateBarRotationCircuit();
+            var terminalIds = circuit.Bar.Terminais.Select(t => t.Id).ToList();
+            Point incomingBefore = circuit.Incoming.Vertices[^1];
+            Point outgoingBefore = circuit.Outgoing.Vertices[0];
+            Point middle = new Point(230, 150);
+            circuit.Outgoing.Vertices.Insert(1, middle);
+
+            RotateSelected(circuit.Context, circuit.Bar);
+
+            AssertEqual(24, circuit.Bar.Terminais.Count, "Barra.Terminais.Count");
+
+            for (int i = 0; i < terminalIds.Count; i++)
+                AssertEqual(terminalIds[i], circuit.Bar.Terminais[i].Id, $"Barra.Terminal[{i}].Id");
+
+            Assert(incomingBefore != circuit.Incoming.Vertices[^1], "Entrada da Barra deve mover.");
+            Assert(outgoingBefore != circuit.Outgoing.Vertices[0], "Saida da Barra deve mover.");
+            AssertCableEndpointAtTerminal(circuit.Incoming, false, circuit.Bar, 0, "Barra entrada");
+            AssertCableEndpointAtTerminal(circuit.Outgoing, true, circuit.Bar, 1, "Barra saida");
+            AssertEqual(middle.X, circuit.Outgoing.Vertices[1].X, "Barra intermediario X");
+            AssertEqual(middle.Y, circuit.Outgoing.Vertices[1].Y, "Barra intermediario Y");
+        }
+
+        private static void UndoRedoRotacaoReancoraTerminaisECabos()
+        {
+            RotatedCircuit circuit = CreateRotatedCircuit();
+            Point terminalBefore = GetTerminal(circuit.Load, 0).Posicao;
+            Point vertexBefore = circuit.Cable.Vertices[^1];
+
+            RotateSelected(circuit.Context, circuit.Load);
+            Point terminalAfter = GetTerminal(circuit.Load, 0).Posicao;
+            Point vertexAfter = circuit.Cable.Vertices[^1];
+
+            circuit.Context.Commands.Undo();
+            AssertEqual(0, circuit.Load.Rotacao, "Carga.Rotacao undo");
+            AssertEqual(terminalBefore.X, GetTerminal(circuit.Load, 0).Posicao.X, "Terminal X undo");
+            AssertEqual(terminalBefore.Y, GetTerminal(circuit.Load, 0).Posicao.Y, "Terminal Y undo");
+            AssertEqual(vertexBefore.X, circuit.Cable.Vertices[^1].X, "Cabo X undo");
+            AssertEqual(vertexBefore.Y, circuit.Cable.Vertices[^1].Y, "Cabo Y undo");
+
+            circuit.Context.Commands.Redo();
+            AssertEqual(90, circuit.Load.Rotacao, "Carga.Rotacao redo");
+            AssertEqual(terminalAfter.X, GetTerminal(circuit.Load, 0).Posicao.X, "Terminal X redo");
+            AssertEqual(terminalAfter.Y, GetTerminal(circuit.Load, 0).Posicao.Y, "Terminal Y redo");
+            AssertEqual(vertexAfter.X, circuit.Cable.Vertices[^1].X, "Cabo X redo");
+            AssertEqual(vertexAfter.Y, circuit.Cable.Vertices[^1].Y, "Cabo Y redo");
+        }
+
+        private static void SnapEncontraTerminalAposRotacaoComCabo()
+        {
+            RotatedCircuit circuit = CreateRotatedCircuit();
+
+            RotateSelected(circuit.Context, circuit.Load);
+
+            Terminal expected = GetTerminal(circuit.Load, 0);
+            Terminal? snapped = circuit.Context.Snap.ObterTerminalMaisProximo(expected.Posicao);
+
+            Assert(snapped != null, "Snap deve encontrar terminal rotacionado.");
+            AssertEqual(expected.Id, snapped!.Id, "Snap.TerminalId");
+            AssertEqual(expected.Dono.Id, snapped.Dono.Id, "Snap.Dono");
         }
 
         private static void ElectricGraphBuildAposRotacaoNaoAlteraDocument()
@@ -1828,7 +2119,9 @@ namespace Araci.TechnicalChecks
                 TensaoLinha = "13.8"
             };
 
-            generator.AtualizarTerminais(80, 80);
+            generator.AtualizarTerminais(
+                ElementGeometryDefaults.EquipamentoLargura,
+                ElementGeometryDefaults.EquipamentoAltura);
 
             return generator;
         }
@@ -1852,19 +2145,23 @@ namespace Araci.TechnicalChecks
                 TensaoLinha = "13.8"
             };
 
-            load.AtualizarTerminais(80);
+            load.AtualizarTerminais(ElementGeometryDefaults.EquipamentoLargura);
 
             return load;
         }
 
         private static Barra CreateBar(string name)
         {
-            return new Barra
+            var bar = new Barra
             {
                 Nome = name,
                 PosicaoX = 200,
                 PosicaoY = 100
             };
+
+            bar.AtualizarTerminais();
+
+            return bar;
         }
 
         private static Sin CreateSin(string name)
@@ -1885,7 +2182,9 @@ namespace Araci.TechnicalChecks
                 TensaoLinha = "13.8"
             };
 
-            sin.AtualizarTerminais(80, 80);
+            sin.AtualizarTerminais(
+                ElementGeometryDefaults.EquipamentoLargura,
+                ElementGeometryDefaults.EquipamentoAltura);
 
             return sin;
         }
@@ -1959,6 +2258,68 @@ namespace Araci.TechnicalChecks
                 throw new InvalidOperationException($"Elemento '{elemento.Nome}' nao possui terminais.");
 
             return owner.Terminais[index];
+        }
+
+        private static void AssertCableEndpointAtTerminal(
+            Cabo cable,
+            bool origin,
+            Elemento elemento,
+            int terminalIndex,
+            string name)
+        {
+            Terminal terminal = GetTerminal(elemento, terminalIndex);
+            Point vertex = origin
+                ? cable.Vertices[0]
+                : cable.Vertices[^1];
+            string terminalId = origin
+                ? cable.OrigemTerminalId
+                : cable.DestinoTerminalId;
+
+            AssertEqual(terminal.Id, terminalId, $"{name}.TerminalId");
+            AssertEqual(terminal.Posicao.X, vertex.X, $"{name}.Vertice.X");
+            AssertEqual(terminal.Posicao.Y, vertex.Y, $"{name}.Vertice.Y");
+        }
+
+        private static void AssertTerminalsUseCentralPivot(
+            Elemento elemento,
+            double width,
+            double height,
+            string name)
+        {
+            if (elemento is not ITerminalOwner owner)
+                throw new InvalidOperationException($"{name}: elemento sem terminais.");
+
+            foreach (Terminal terminal in owner.Terminais)
+            {
+                Point expected = ExpectedCentralWorld(
+                    elemento,
+                    terminal.PosicaoLocal,
+                    width,
+                    height);
+
+                AssertEqual(expected.X, terminal.Posicao.X, $"{name}.{terminal.Id}.X");
+                AssertEqual(expected.Y, terminal.Posicao.Y, $"{name}.{terminal.Id}.Y");
+            }
+        }
+
+        private static Point ExpectedCentralWorld(
+            Elemento owner,
+            Point local,
+            double width,
+            double height)
+        {
+            double scale = owner.Escala == 0 ? 1 : owner.Escala;
+            double pivotX = width / 2;
+            double pivotY = height / 2;
+            double x = (local.X - pivotX) * scale;
+            double y = (local.Y - pivotY) * scale;
+            double radians = owner.Rotacao * Math.PI / 180.0;
+            double cos = Math.Cos(radians);
+            double sin = Math.Sin(radians);
+
+            return new Point(
+                owner.PosicaoX + pivotX + x * cos - y * sin,
+                owner.PosicaoY + pivotY + x * sin + y * cos);
         }
 
         private static void AssertLine(

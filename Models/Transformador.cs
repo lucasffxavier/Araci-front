@@ -51,8 +51,8 @@ namespace Araci.Models
                 terminais.Add(new Terminal(this, new Point(), TERMINAL_SECUNDARIO, TerminalKind.Electrical, TerminalDirection.South));
             }
 
-            AtualizarTerminal(TERMINAL_PRIMARIO, new Point(largura / 2, 0));
-            AtualizarTerminal(TERMINAL_SECUNDARIO, new Point(largura / 2, altura));
+            AtualizarTerminal(TERMINAL_PRIMARIO, new Point(largura / 2, 0), largura, altura);
+            AtualizarTerminal(TERMINAL_SECUNDARIO, new Point(largura / 2, altura), largura, altura);
         }
 
         private bool TerminaisPadraoPresentes()
@@ -64,11 +64,11 @@ namespace Araci.Models
                 terminais[1].Id == TERMINAL_SECUNDARIO;
         }
 
-        private void AtualizarTerminal(string id, Point posicao)
+        private void AtualizarTerminal(string id, Point posicao, double largura, double altura)
         {
             var terminal = ObterTerminaisInternos().First(t => t.Id == id);
             terminal.Barra = Barra;
-            terminal.DefinirPosicaoLocal(posicao);
+            terminal.DefinirPosicaoLocal(posicao, largura, altura);
         }
 
         public override Elemento Clonar()

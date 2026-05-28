@@ -1,5 +1,6 @@
 using System.Collections.Generic;
 using System.Windows;
+using Araci.Core.Rendering;
 using Araci.Models.Tipos;
 
 namespace Araci.Models
@@ -40,14 +41,24 @@ namespace Araci.Models
 
         public void AtualizarTerminais()
         {
+            AtualizarTerminais(ElementGeometryDefaults.BarraLargura);
+        }
+
+        public void AtualizarTerminais(double largura)
+        {
             if (_terminais.Count == 0)
                 return;
 
-            double centroX = 5;
+            double centroX = largura / 2;
             double espacamento = Altura / (_terminais.Count - 1);
 
             for (int i = 0; i < _terminais.Count; i++)
-                _terminais[i].DefinirPosicaoLocal(new Point(centroX, i * espacamento));
+            {
+                _terminais[i].DefinirPosicaoLocal(
+                    new Point(centroX, i * espacamento),
+                    largura,
+                    Altura);
+            }
         }
 
         public override Elemento Clonar()
