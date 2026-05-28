@@ -304,674 +304,6 @@ Araci Engine
 
 
 ====================================================================================================
-ARQUIVO: C:\Araci-Engine-Front\Araci Engine\Applications\Commands\CommandManager.cs
-====================================================================================================
-
-﻿using System.Collections.Generic;
-namespace Araci.Core.Commands
-{
-public class CommandManager
-{
-private readonly Stack<IUndoableCommand>
-_undoStack = new();
-private readonly Stack<IUndoableCommand>
-_redoStack = new();
-public void Execute(
-IUndoableCommand command)
-{
-command.Execute();
-_undoStack.Push(command);
-_redoStack.Clear();
-}
-public void Undo()
-{
-if (_undoStack.Count == 0)
-return;
-var command =
-_undoStack.Pop();
-command.Undo();
-_redoStack.Push(command);
-}
-public void Redo()
-{
-if (_redoStack.Count == 0)
-return;
-var command =
-_redoStack.Pop();
-command.Redo();
-_undoStack.Push(command);
-}
-public void Clear()
-{
-_undoStack.Clear();
-_redoStack.Clear();
-}
-public bool CanUndo =>
-_undoStack.Count > 0;
-public bool CanRedo =>
-_redoStack.Count > 0;
-}
-}
-
-
-====================================================================================================
-ARQUIVO: C:\Araci-Engine-Front\Araci Engine\Applications\Diagrama\InserirBarra\InserirBarra.cs
-====================================================================================================
-
-using System;
-using Araci.Applications.Diagrama;
-using Araci.Models;
-using Araci.Services;
-using Araci.ViewModels;
-namespace Araci.Applications.Diagrama.InserirBarra
-{
-public class InserirBarraApplication
-{
-private readonly EditorContext _context;
-public InserirBarraApplication(EditorContext context)
-{
-_context = context ?? throw new System.ArgumentNullException(nameof(context));
-}
-public void Executar()
-{
-_context.Input.ToolAtual = new InserirBarraTool(_context);
-}
-}
-public class InserirBarraTool : InsertElementToolBase<BarraViewModel, Barra>
-{
-public InserirBarraTool(EditorContext context)
-: base(context, context.ElementoFactory.CriarBarraVM, vm => vm.Barra)
-{
-}
-protected override string ToolName => "Inserir Barra";
-protected override Barra CriarModeloReal() => Context.ElementoFactory.CriarBarra();
-}
-}
-
-
-====================================================================================================
-ARQUIVO: C:\Araci-Engine-Front\Araci Engine\Applications\Diagrama\InserirCabo\InserirCabo.cs
-====================================================================================================
-
-using System.Windows;
-using System.Windows.Input;
-using Araci.Applications.Editar.Base;
-using Araci.Core.Commands;
-using Araci.Models;
-using Araci.Services;
-using Araci.ViewModels;
-namespace Araci.Applications.Diagrama.InserirCabo
-{
-public class InserirCaboApplication
-{
-private readonly EditorContext _context;
-public InserirCaboApplication(EditorContext context)
-{
-_context = context
-?? throw new System.ArgumentNullException(nameof(context));
-}
-public void Executar()
-{
-_context.Input.ToolAtual =
-new InserirCaboTool(_context);
-}
-}
-public class InserirCaboTool : ITool
-{
-private readonly EditorContext _context;
-private CaboViewModel? _caboAtual;
-private CaboViewModel? _previewInicial;
-private Terminal? _terminalPreviewInicial;
-private Terminal? _terminalPreviewFinal;
-private Terminal? _terminalOrigem;
-private bool _inserindo;
-public InserirCaboTool(EditorContext context)
-{
-_context = context;
-}
-public string Nome => "Inserir Cabo";
-public bool MantemBotaoAtivado => true;
-public bool IsBusy => _inserindo || _previewInicial != null;
-public void Ativar()
-{
-}
-public void Desativar()
-{
-Cancelar();
-}
-public void Cancelar()
-{
-if (_caboAtual != null)
-_context.Commands.Undo();
-LimparTerminalCapturado();
-LimparPreviewInicial();
-LimparEstado();
-}
-public void OnMouseDown(
-ElementoViewModel? vm,
-Point position,
-ToolInputState inputState)
-{
-if (ReferenceEquals(vm, _caboAtual) ||
-ReferenceEquals(vm, _previewInicial))
-{
-vm = null;
-}
-Terminal? terminal =
-ObterTerminalParaClique(vm, position);
-Point pontoSnap =
-terminal?.Posicao
-?? _context.Snap.SnapFromElemento(vm, position, _caboAtual);
-if (!_inserindo)
-{
-if (terminal == null)
-return;
-if (!OrigemValida(terminal))
-{
-LimparTerminalCapturado();
-return;
-}
-AtualizarTerminalCapturado(terminal);
-LimparPreviewInicial();
-_caboAtual =
-_context.ElementoFactory.CriarCaboVM();
-_caboAtual.Iniciar(pontoSnap);
-_context.Commands.Execute(
-new AddElementoCommand(
-_caboAtual.Modelo,
-_context));
-UsarViewModelDaCena();
-ConectarOrigem(terminal);
-_inserindo = true;
-return;
-}
-if (_caboAtual == null)
-return;
-if (terminal == null)
-{
-AdicionarVerticeIntermediario(
-AplicarOrtogonalizacao(pontoSnap, inputState));
-return;
-}
-if (!DestinoValido(terminal))
-{
-MostrarTerminalInvalido(terminal, inputState.ScreenPosition);
-return;
-}
-AtualizarTerminalCapturado(terminal);
-_caboAtual.FinalizarNoPonto(pontoSnap);
-ConectarDestino(terminal);
-Finalizar();
-}
-public void OnMouseMove(Point position, ToolInputState inputState)
-{
-if (!_inserindo)
-{
-AtualizarPreviewInicial(position);
-return;
-}
-if (_caboAtual == null)
-return;
-Terminal? terminal =
-ObterTerminalConexao(null, position);
-_terminalPreviewFinal = terminal;
-if (terminal == null)
-LimparTerminalCapturado();
-else if (DestinoValido(terminal))
-AtualizarTerminalCapturado(terminal);
-else
-MostrarTerminalInvalido(terminal, inputState.ScreenPosition);
-Point pontoSnap =
-terminal?.Posicao
-?? _context.Snap.Snap(position, _caboAtual);
-Point pontoPreview =
-terminal == null
-? AplicarOrtogonalizacao(pontoSnap, inputState)
-: pontoSnap;
-_caboAtual.AtualizarPreview(pontoPreview);
-}
-public void OnMouseUp(Point position, ToolInputState inputState)
-{
-}
-public void OnKeyDown(Key key)
-{
-if (key == Key.Enter)
-return;
-if (key == Key.Escape)
-Cancelar();
-}
-private static bool EhElementoConectavel(
-Elemento? elemento)
-{
-return elemento is ElementoEquipamento
-|| elemento is Barra;
-}
-private Terminal? ObterTerminalConexao(
-ElementoViewModel? vm,
-Point position)
-{
-Terminal? terminal =
-_context.Snap.ObterTerminalMaisProximo(vm, position);
-if (terminal != null && EhElementoConectavel(terminal.Dono))
-return terminal;
-terminal =
-_context.Snap.ObterTerminalMaisProximo(
-position,
-_caboAtual ?? _previewInicial,
-t => EhElementoConectavel(t.Dono));
-return terminal;
-}
-private Terminal? ObterTerminalParaClique(
-ElementoViewModel? vm,
-Point position)
-{
-Terminal? terminal =
-ObterTerminalConexao(vm, position);
-if (terminal != null)
-return terminal;
-Terminal? terminalPreview =
-_inserindo
-? _terminalPreviewFinal
-: _terminalPreviewInicial;
-return TerminalAindaValido(terminalPreview, position)
-? terminalPreview
-: null;
-}
-private bool TerminalAindaValido(
-Terminal? terminal,
-Point position)
-{
-if (terminal == null)
-return false;
-double dx = terminal.Posicao.X - position.X;
-double dy = terminal.Posicao.Y - position.Y;
-double tolerancia = _context.Snap.TerminalTolerance;
-return dx * dx + dy * dy <= tolerancia * tolerancia;
-}
-private void AtualizarPreviewInicial(Point position)
-{
-Terminal? terminal =
-ObterTerminalConexao(null, position);
-_terminalPreviewInicial = terminal;
-AtualizarTerminalCapturado(terminal);
-if (terminal == null)
-{
-LimparPreviewInicial();
-return;
-}
-CaboViewModel preview = ObterPreviewInicial();
-preview.Cabo.Vertices.Clear();
-preview.Cabo.Vertices.Add(terminal.Posicao);
-preview.Cabo.DefinirOrigem(terminal.Posicao);
-preview.Cabo.PreviewPonto = position;
-preview.AtualizarAposModeloAlterado();
-_context.SceneQueries.Invalidate();
-}
-private CaboViewModel ObterPreviewInicial()
-{
-if (_previewInicial != null)
-return _previewInicial;
-_previewInicial =
-_context.ElementoFactory.CriarCaboVM();
-_previewInicial.IsPreview = true;
-_context.Scene.Elementos.Add(_previewInicial);
-_context.SceneQueries.Invalidate();
-return _previewInicial;
-}
-private void LimparPreviewInicial()
-{
-if (_previewInicial == null)
-return;
-_previewInicial.IsPreview = false;
-_context.Scene.Elementos.Remove(_previewInicial);
-_previewInicial = null;
-_terminalPreviewInicial = null;
-_context.SceneQueries.Invalidate();
-}
-private void AtualizarTerminalCapturado(Terminal? terminal)
-{
-if (terminal == null)
-{
-LimparTerminalCapturado();
-return;
-}
-_context.TerminalSnap.Mostrar(terminal);
-}
-private void MostrarTerminalInvalido(Terminal terminal, Point cursor)
-{
-_context.TerminalSnap.MostrarInvalido(
-terminal,
-cursor,
-"Conexão inválida");
-}
-private void LimparTerminalCapturado()
-{
-_context.TerminalSnap.Limpar();
-}
-private void ConectarOrigem(
-Terminal? terminal)
-{
-if (_caboAtual == null || terminal == null)
-return;
-Elemento elemento = terminal.Dono;
-_caboAtual.OrigemId =
-elemento.Id.ToString();
-_caboAtual.OrigemTerminalId =
-terminal.Id;
-_caboAtual.BarraOrigem =
-ObterRotuloTerminal(terminal);
-_caboAtual.Cabo.DefinirOrigem(terminal.Posicao);
-_terminalOrigem = terminal;
-_caboAtual.NotificarParametros();
-}
-private void AdicionarVerticeIntermediario(Point ponto)
-{
-if (_caboAtual == null)
-return;
-_caboAtual.AdicionarVerticeIntermediario(ponto);
-_context.SceneQueries.Invalidate();
-}
-private Point AplicarOrtogonalizacao(
-Point ponto,
-ToolInputState inputState)
-{
-if (!inputState.IsShiftPressed ||
-_caboAtual == null ||
-_caboAtual.Cabo.Vertices.Count == 0)
-{
-return ponto;
-}
-Point origem = _caboAtual.Cabo.Vertices[^1];
-Vector delta = ponto - origem;
-if (Math.Abs(delta.X) < 0.0001 && Math.Abs(delta.Y) < 0.0001)
-return origem;
-return Math.Abs(delta.X) >= Math.Abs(delta.Y)
-? new Point(ponto.X, origem.Y)
-: new Point(origem.X, ponto.Y);
-}
-private bool OrigemValida(Terminal terminal)
-{
-return !string.IsNullOrWhiteSpace(terminal.Dono.Id.ToString()) &&
-!string.IsNullOrWhiteSpace(terminal.Id);
-}
-private bool DestinoValido(Terminal terminal)
-{
-if (_caboAtual == null || _terminalOrigem == null)
-{
-return false;
-}
-return _context.Connectivity.ValidarConexaoCabo(
-_caboAtual.Cabo,
-_terminalOrigem,
-terminal).IsValid;
-}
-private void UsarViewModelDaCena()
-{
-if (_caboAtual == null)
-return;
-if (_context.Viewport?.ObterViewModel(_caboAtual.Modelo)
-is CaboViewModel caboNaCena)
-{
-_caboAtual = caboNaCena;
-}
-}
-private void ConectarDestino(
-Terminal? terminal)
-{
-if (_caboAtual == null || terminal == null)
-return;
-Elemento elemento = terminal.Dono;
-_caboAtual.DestinoId =
-elemento.Id.ToString();
-_caboAtual.DestinoTerminalId =
-terminal.Id;
-_caboAtual.BarraDestino =
-ObterRotuloTerminal(terminal);
-_caboAtual.Cabo.DefinirDestino(terminal.Posicao);
-_caboAtual.NotificarParametros();
-}
-private static string ObterRotuloTerminal(Terminal terminal)
-{
-return string.IsNullOrWhiteSpace(terminal.Barra)
-? terminal.Dono.Nome
-: terminal.Barra;
-}
-private void Finalizar()
-{
-LimparTerminalCapturado();
-LimparPreviewInicial();
-LimparEstado();
-_context.Tools.VoltarParaSelecao();
-}
-private void LimparEstado()
-{
-_caboAtual?.RemoverPreview();
-_caboAtual = null;
-_terminalPreviewFinal = null;
-_terminalOrigem = null;
-LimparTerminalCapturado();
-_inserindo = false;
-}
-}
-}
-
-
-====================================================================================================
-ARQUIVO: C:\Araci-Engine-Front\Araci Engine\Applications\Diagrama\InserirCarga\InserirCarga.cs
-====================================================================================================
-
-using System;
-using Araci.Applications.Diagrama;
-using Araci.Models;
-using Araci.Services;
-using Araci.ViewModels;
-namespace Araci.Applications.Diagrama.InserirCarga
-{
-public class InserirCargaApplication
-{
-private readonly EditorContext _context;
-public InserirCargaApplication(EditorContext context)
-{
-_context = context ?? throw new System.ArgumentNullException(nameof(context));
-}
-public void Executar()
-{
-_context.Input.ToolAtual = new InserirCargaTool(_context);
-}
-}
-public class InserirCargaTool : InsertElementToolBase<CargaViewModel, Carga>
-{
-public InserirCargaTool(EditorContext context)
-: base(context, context.ElementoFactory.CriarCargaVM, vm => vm.Carga)
-{
-}
-protected override string ToolName => "Inserir Carga";
-protected override Carga CriarModeloReal() => Context.ElementoFactory.CriarCarga();
-}
-}
-
-
-====================================================================================================
-ARQUIVO: C:\Araci-Engine-Front\Araci Engine\Applications\Diagrama\InserirGerador\InserirGerador.cs
-====================================================================================================
-
-using System;
-using Araci.Applications.Diagrama;
-using Araci.Models;
-using Araci.Services;
-using Araci.ViewModels;
-namespace Araci.Applications.Diagrama.InserirGerador
-{
-public class InserirGeradorApplication
-{
-private readonly EditorContext _context;
-public InserirGeradorApplication(EditorContext context)
-{
-_context = context ?? throw new System.ArgumentNullException(nameof(context));
-}
-public void Executar()
-{
-_context.Input.ToolAtual = new InserirGeradorTool(_context);
-}
-}
-public class InserirGeradorTool : InsertElementToolBase<GeradorViewModel, Gerador>
-{
-public InserirGeradorTool(EditorContext context)
-: base(context, context.ElementoFactory.CriarGeradorVM, vm => vm.Gerador)
-{
-}
-protected override string ToolName => "Inserir Gerador";
-protected override Gerador CriarModeloReal() => Context.ElementoFactory.CriarGerador();
-}
-}
-
-
-====================================================================================================
-ARQUIVO: C:\Araci-Engine-Front\Araci Engine\Applications\Diagrama\InserirSin\InserirSin.cs
-====================================================================================================
-
-using System;
-using Araci.Applications.Diagrama;
-using Araci.Models;
-using Araci.Services;
-using Araci.ViewModels;
-namespace Araci.Applications.Diagrama.InserirSin
-{
-public class InserirSinApplication
-{
-private readonly EditorContext _context;
-public InserirSinApplication(EditorContext context)
-{
-_context = context ?? throw new ArgumentNullException(nameof(context));
-}
-public void Executar()
-{
-_context.Input.ToolAtual = new InserirSinTool(_context);
-}
-}
-public class InserirSinTool : InsertElementToolBase<SinViewModel, Sin>
-{
-public InserirSinTool(EditorContext context)
-: base(context, context.ElementoFactory.CriarSinVM, vm => vm.Sin)
-{
-}
-protected override string ToolName => "Inserir SIN";
-protected override Sin CriarModeloReal() => Context.ElementoFactory.CriarSin();
-}
-}
-
-
-====================================================================================================
-ARQUIVO: C:\Araci-Engine-Front\Araci Engine\Applications\Diagrama\InserirTransformador\InserirTransformador.cs
-====================================================================================================
-
-using System;
-using Araci.Applications.Diagrama;
-using Araci.Models;
-using Araci.Services;
-using Araci.ViewModels;
-namespace Araci.Applications.Diagrama.InserirTransformador
-{
-public class InserirTransformadorApplication
-{
-private readonly EditorContext _context;
-public InserirTransformadorApplication(EditorContext context)
-{
-_context = context ?? throw new ArgumentNullException(nameof(context));
-}
-public void Executar()
-{
-_context.Input.ToolAtual = new InserirTransformadorTool(_context);
-}
-}
-public class InserirTransformadorTool : InsertElementToolBase<TransformadorViewModel, Transformador>
-{
-public InserirTransformadorTool(EditorContext context)
-: base(context, context.ElementoFactory.CriarTransformadorVM, vm => vm.Transformador)
-{
-}
-protected override string ToolName => "Inserir Transformador";
-protected override Transformador CriarModeloReal() => Context.ElementoFactory.CriarTransformador();
-}
-}
-
-
-====================================================================================================
-ARQUIVO: C:\Araci-Engine-Front\Araci Engine\Applications\Editar\Base\ITool.cs
-====================================================================================================
-
-﻿using System.Windows;
-using System.Windows.Input;
-using Araci.ViewModels;
-namespace Araci.Applications.Editar.Base
-{
-public interface ITool
-{
-string Nome { get; }
-bool MantemBotaoAtivado { get; }
-bool IsBusy { get; }
-void Ativar();
-void Desativar();
-void Cancelar();
-void OnMouseDown(ElementoViewModel? vm, Point position, ToolInputState inputState);
-void OnMouseMove(Point position, ToolInputState inputState);
-void OnMouseUp(Point position, ToolInputState inputState);
-bool HandlesKey(Key key) => false;
-void OnKeyDown(Key key);
-}
-}
-
-
-====================================================================================================
-ARQUIVO: C:\Araci-Engine-Front\Araci Engine\Applications\Editar\Base\ToolInputState.cs
-====================================================================================================
-
-using System.Windows;
-using System.Windows.Input;
-namespace Araci.Applications.Editar.Base
-{
-public readonly struct ToolInputState
-{
-public ToolInputState(bool isControlPressed)
-: this(
-isControlPressed ? ModifierKeys.Control : ModifierKeys.None,
-null,
-0,
-default,
-default)
-{
-}
-public ToolInputState(
-ModifierKeys modifiers,
-MouseButton? button = null,
-int clickCount = 0,
-Point worldPosition = default,
-Point screenPosition = default)
-{
-Modifiers = modifiers;
-Button = button;
-ClickCount = clickCount;
-WorldPosition = worldPosition;
-ScreenPosition = screenPosition;
-}
-public ModifierKeys Modifiers { get; }
-public MouseButton? Button { get; }
-public int ClickCount { get; }
-public Point WorldPosition { get; }
-public Point ScreenPosition { get; }
-public bool IsControlPressed => Modifiers.HasFlag(ModifierKeys.Control);
-public bool IsShiftPressed => Modifiers.HasFlag(ModifierKeys.Shift);
-public bool IsAltPressed => Modifiers.HasFlag(ModifierKeys.Alt);
-public bool IsDoubleClick => ClickCount >= 2;
-public bool IsLeftButton => Button == MouseButton.Left;
-public bool IsMiddleButton => Button == MouseButton.Middle;
-public bool IsRightButton => Button == MouseButton.Right;
-public static ToolInputState Empty => new(ModifierKeys.None);
-}
-}
-
-
-====================================================================================================
 ARQUIVO: C:\Araci-Engine-Front\Araci Engine\Araci.TechnicalChecks\Program.cs
 ====================================================================================================
 
@@ -3582,6 +2914,554 @@ System.Windows.Input.Keyboard.Focus(Viewport);
 
 
 ====================================================================================================
+ARQUIVO: C:\Araci-Engine-Front\Araci Engine\Properties\BarraPropertiesView.xaml
+====================================================================================================
+
+<UserControl x:Class="Araci.Properties.BarraPropertiesView"
+xmlns="http:
+xmlns:x="http:
+<Grid Background="#252526">
+<ScrollViewer VerticalScrollBarVisibility="Auto">
+<StackPanel Margin="12">
+<TextBlock Text="PROPRIEDADES DA BARRA"
+Style="{StaticResource PropertyHeaderTextBlockStyle}"/>
+<Grid>
+<Grid.ColumnDefinitions>
+<ColumnDefinition Width="130"/>
+<ColumnDefinition Width="*"/>
+</Grid.ColumnDefinitions>
+<Grid.RowDefinitions>
+<RowDefinition Height="Auto"/>
+<RowDefinition Height="Auto"/>
+<RowDefinition Height="Auto"/>
+<RowDefinition Height="Auto"/>
+<RowDefinition Height="Auto"/>
+</Grid.RowDefinitions>
+<ComboBox Grid.ColumnSpan="2"
+Style="{StaticResource PropertyFullComboBoxStyle}"
+ItemsSource="{Binding TiposDisponiveis}"
+SelectedItem="{Binding Tipo}"
+DisplayMemberPath="NomeTipo"/>
+<Button Grid.Row="1"
+Grid.ColumnSpan="2"
+Style="{StaticResource PropertyFullButtonStyle}"
+Content="Visualizar propriedades de tipo"
+Command="{Binding AbrirPropriedadesTipoCommand}"/>
+<TextBlock Grid.Row="2" Text="Nome" Style="{StaticResource PropertyLabelTextBlockStyle}"/>
+<TextBox Grid.Row="2" Grid.Column="1" Text="{Binding Nome}" Style="{StaticResource PropertyValueTextBoxStyle}"/>
+<TextBlock Grid.Row="3" Text="Tensao" Style="{StaticResource PropertyLabelTextBlockStyle}"/>
+<TextBox Grid.Row="3" Grid.Column="1" Text="{Binding Tensao}" Style="{StaticResource PropertyValueTextBoxStyle}"/>
+<TextBlock Grid.Row="4" Text="Altura" Style="{StaticResource PropertyLabelTextBlockStyle}"/>
+<TextBox Grid.Row="4"
+Grid.Column="1"
+Text="{Binding Altura, UpdateSourceTrigger=PropertyChanged, ValidatesOnDataErrors=True, ValidatesOnExceptions=True, NotifyOnValidationError=True}"
+Style="{StaticResource PropertyNumericTextBoxStyle}"/>
+</Grid>
+</StackPanel>
+</ScrollViewer>
+</Grid>
+</UserControl>
+
+
+====================================================================================================
+ARQUIVO: C:\Araci-Engine-Front\Araci Engine\Properties\BarraPropertiesView.xaml.cs
+====================================================================================================
+
+﻿using System.Windows.Controls;
+namespace Araci.Properties
+{
+public partial class BarraPropertiesView : UserControl
+{
+public BarraPropertiesView()
+{
+InitializeComponent();
+}
+}
+}
+
+
+====================================================================================================
+ARQUIVO: C:\Araci-Engine-Front\Araci Engine\Properties\CaboPropertiesView.xaml
+====================================================================================================
+
+<UserControl x:Class="Araci.Properties.CaboPropertiesView"
+xmlns="http:
+xmlns:x="http:
+<Grid Background="#252526">
+<ScrollViewer VerticalScrollBarVisibility="Auto">
+<StackPanel Margin="12">
+<TextBlock Text="PROPRIEDADES DO CABO"
+Style="{StaticResource PropertyHeaderTextBlockStyle}"/>
+<Grid>
+<Grid.ColumnDefinitions>
+<ColumnDefinition Width="130"/>
+<ColumnDefinition Width="*"/>
+</Grid.ColumnDefinitions>
+<Grid.RowDefinitions>
+<RowDefinition Height="Auto"/>
+<RowDefinition Height="Auto"/>
+<RowDefinition Height="Auto"/>
+<RowDefinition Height="Auto"/>
+<RowDefinition Height="Auto"/>
+<RowDefinition Height="Auto"/>
+<RowDefinition Height="Auto"/>
+<RowDefinition Height="Auto"/>
+<RowDefinition Height="Auto"/>
+<RowDefinition Height="Auto"/>
+<RowDefinition Height="Auto"/>
+<RowDefinition Height="Auto"/>
+<RowDefinition Height="Auto"/>
+<RowDefinition Height="Auto"/>
+<RowDefinition Height="Auto"/>
+</Grid.RowDefinitions>
+<ComboBox Grid.ColumnSpan="2"
+Style="{StaticResource PropertyFullComboBoxStyle}"
+ItemsSource="{Binding TiposDisponiveis}"
+SelectedItem="{Binding Tipo}"
+DisplayMemberPath="NomeTipo"/>
+<Button Grid.Row="1"
+Grid.ColumnSpan="2"
+Style="{StaticResource PropertyFullButtonStyle}"
+Content="Visualizar propriedades de tipo"
+Command="{Binding AbrirPropriedadesTipoCommand}"/>
+<TextBlock Grid.Row="2" Text="Nome" Style="{StaticResource PropertyLabelTextBlockStyle}"/>
+<TextBox Grid.Row="2" Grid.Column="1" Text="{Binding Nome}" Style="{StaticResource PropertyValueTextBoxStyle}"/>
+<TextBlock Grid.Row="3" Text="Barra origem" Style="{StaticResource PropertyLabelTextBlockStyle}"/>
+<TextBox Grid.Row="3" Grid.Column="1" Text="{Binding BarraOrigem}" Style="{StaticResource PropertyValueTextBoxStyle}"/>
+<TextBlock Grid.Row="4" Text="Barra destino" Style="{StaticResource PropertyLabelTextBlockStyle}"/>
+<TextBox Grid.Row="4" Grid.Column="1" Text="{Binding BarraDestino}" Style="{StaticResource PropertyValueTextBoxStyle}"/>
+<TextBlock Grid.Row="5" Text="Comprimento" Style="{StaticResource PropertyLabelTextBlockStyle}"/>
+<TextBox Grid.Row="5" Grid.Column="1" Text="{Binding Comprimento, ValidatesOnDataErrors=True, ValidatesOnExceptions=True, NotifyOnValidationError=True}" Style="{StaticResource PropertyNumericTextBoxStyle}"/>
+<TextBlock Grid.Row="6" Text="Ampacidade" Style="{StaticResource PropertyLabelTextBlockStyle}"/>
+<TextBox Grid.Row="6" Grid.Column="1" Text="{Binding Ampacidade, ValidatesOnDataErrors=True, ValidatesOnExceptions=True, NotifyOnValidationError=True}" Style="{StaticResource PropertyNumericTextBoxStyle}"/>
+<TextBlock Grid.Row="7" Text="Tensao linha" Style="{StaticResource PropertyLabelTextBlockStyle}"/>
+<TextBox Grid.Row="7" Grid.Column="1" Text="{Binding TensaoLinha}" Style="{StaticResource PropertyValueTextBoxStyle}"/>
+<TextBlock Grid.Row="8" Text="Tensao fase A" Style="{StaticResource PropertyLabelTextBlockStyle}"/>
+<TextBox Grid.Row="8" Grid.Column="1" Text="{Binding TensaoFaseA}" Style="{StaticResource PropertyValueTextBoxStyle}"/>
+<TextBlock Grid.Row="9" Text="Tensao fase B" Style="{StaticResource PropertyLabelTextBlockStyle}"/>
+<TextBox Grid.Row="9" Grid.Column="1" Text="{Binding TensaoFaseB}" Style="{StaticResource PropertyValueTextBoxStyle}"/>
+<TextBlock Grid.Row="10" Text="Tensao fase C" Style="{StaticResource PropertyLabelTextBlockStyle}"/>
+<TextBox Grid.Row="10" Grid.Column="1" Text="{Binding TensaoFaseC}" Style="{StaticResource PropertyValueTextBoxStyle}"/>
+<TextBlock Grid.Row="11" Text="Corrente linha" Style="{StaticResource PropertyLabelTextBlockStyle}"/>
+<TextBox Grid.Row="11" Grid.Column="1" Text="{Binding CorrenteLinha}" Style="{StaticResource PropertyValueTextBoxStyle}"/>
+<TextBlock Grid.Row="12" Text="Corrente fase A" Style="{StaticResource PropertyLabelTextBlockStyle}"/>
+<TextBox Grid.Row="12" Grid.Column="1" Text="{Binding CorrenteFaseA}" Style="{StaticResource PropertyValueTextBoxStyle}"/>
+<TextBlock Grid.Row="13" Text="Corrente fase B" Style="{StaticResource PropertyLabelTextBlockStyle}"/>
+<TextBox Grid.Row="13" Grid.Column="1" Text="{Binding CorrenteFaseB}" Style="{StaticResource PropertyValueTextBoxStyle}"/>
+<TextBlock Grid.Row="14" Text="Corrente fase C" Style="{StaticResource PropertyLabelTextBlockStyle}"/>
+<TextBox Grid.Row="14" Grid.Column="1" Text="{Binding CorrenteFaseC}" Style="{StaticResource PropertyValueTextBoxStyle}"/>
+</Grid>
+</StackPanel>
+</ScrollViewer>
+</Grid>
+</UserControl>
+
+
+====================================================================================================
+ARQUIVO: C:\Araci-Engine-Front\Araci Engine\Properties\CaboPropertiesView.xaml.cs
+====================================================================================================
+
+﻿using System.Windows.Controls;
+namespace Araci.Properties
+{
+public partial class CaboPropertiesView : UserControl
+{
+public CaboPropertiesView()
+{
+InitializeComponent();
+}
+}
+}
+
+
+====================================================================================================
+ARQUIVO: C:\Araci-Engine-Front\Araci Engine\Properties\CargaPropertiesView.xaml
+====================================================================================================
+
+<UserControl x:Class="Araci.Properties.CargaPropertiesView"
+xmlns="http:
+xmlns:x="http:
+<Grid Background="#252526">
+<ScrollViewer VerticalScrollBarVisibility="Auto">
+<StackPanel Margin="12">
+<TextBlock Text="PROPRIEDADES DA CARGA"
+Style="{StaticResource PropertyHeaderTextBlockStyle}"/>
+<Grid>
+<Grid.ColumnDefinitions>
+<ColumnDefinition Width="130"/>
+<ColumnDefinition Width="*"/>
+</Grid.ColumnDefinitions>
+<Grid.RowDefinitions>
+<RowDefinition Height="Auto"/>
+<RowDefinition Height="Auto"/>
+<RowDefinition Height="Auto"/>
+<RowDefinition Height="Auto"/>
+<RowDefinition Height="Auto"/>
+<RowDefinition Height="Auto"/>
+<RowDefinition Height="Auto"/>
+<RowDefinition Height="Auto"/>
+<RowDefinition Height="Auto"/>
+<RowDefinition Height="Auto"/>
+<RowDefinition Height="Auto"/>
+<RowDefinition Height="Auto"/>
+<RowDefinition Height="Auto"/>
+<RowDefinition Height="Auto"/>
+</Grid.RowDefinitions>
+<ComboBox Grid.ColumnSpan="2"
+Style="{StaticResource PropertyFullComboBoxStyle}"
+ItemsSource="{Binding TiposDisponiveis}"
+SelectedItem="{Binding Tipo}"
+DisplayMemberPath="NomeTipo"/>
+<Button Grid.Row="1"
+Grid.ColumnSpan="2"
+Style="{StaticResource PropertyFullButtonStyle}"
+Content="Visualizar propriedades de tipo"
+Command="{Binding AbrirPropriedadesTipoCommand}"/>
+<TextBlock Grid.Row="2" Text="Nome" Style="{StaticResource PropertyLabelTextBlockStyle}"/>
+<TextBox Grid.Row="2" Grid.Column="1" Text="{Binding Nome, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" Style="{StaticResource PropertyValueTextBoxStyle}"/>
+<TextBlock Grid.Row="3" Text="Potencia ativa" Style="{StaticResource PropertyLabelTextBlockStyle}"/>
+<TextBox Grid.Row="3" Grid.Column="1" Text="{Binding PotenciaAtiva, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged, ValidatesOnDataErrors=True, ValidatesOnExceptions=True, NotifyOnValidationError=True}" Style="{StaticResource PropertyNumericTextBoxStyle}"/>
+<TextBlock Grid.Row="4" Text="Potencia reativa" Style="{StaticResource PropertyLabelTextBlockStyle}"/>
+<TextBox Grid.Row="4" Grid.Column="1" Text="{Binding PotenciaReativa, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged, ValidatesOnDataErrors=True, ValidatesOnExceptions=True, NotifyOnValidationError=True}" Style="{StaticResource PropertyNumericTextBoxStyle}"/>
+<TextBlock Grid.Row="5" Text="Alimentador" Style="{StaticResource PropertyLabelTextBlockStyle}"/>
+<TextBox Grid.Row="5" Grid.Column="1" Text="{Binding Alimentador, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged, ValidatesOnDataErrors=True, ValidatesOnExceptions=True, NotifyOnValidationError=True}" Style="{StaticResource PropertyNumericTextBoxStyle}"/>
+<TextBlock Grid.Row="6" Text="Corrente linha" Style="{StaticResource PropertyLabelTextBlockStyle}"/>
+<TextBox Grid.Row="6" Grid.Column="1" Text="{Binding CorrenteLinha, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" Style="{StaticResource PropertyValueTextBoxStyle}"/>
+<TextBlock Grid.Row="7" Text="Corrente fase A" Style="{StaticResource PropertyLabelTextBlockStyle}"/>
+<TextBox Grid.Row="7" Grid.Column="1" Text="{Binding CorrenteFaseA, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" Style="{StaticResource PropertyValueTextBoxStyle}"/>
+<TextBlock Grid.Row="8" Text="Corrente fase B" Style="{StaticResource PropertyLabelTextBlockStyle}"/>
+<TextBox Grid.Row="8" Grid.Column="1" Text="{Binding CorrenteFaseB, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" Style="{StaticResource PropertyValueTextBoxStyle}"/>
+<TextBlock Grid.Row="9" Text="Corrente fase C" Style="{StaticResource PropertyLabelTextBlockStyle}"/>
+<TextBox Grid.Row="9" Grid.Column="1" Text="{Binding CorrenteFaseC, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" Style="{StaticResource PropertyValueTextBoxStyle}"/>
+<TextBlock Grid.Row="10" Text="Tensao linha" Style="{StaticResource PropertyLabelTextBlockStyle}"/>
+<TextBox Grid.Row="10" Grid.Column="1" Text="{Binding TensaoLinha, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" Style="{StaticResource PropertyValueTextBoxStyle}"/>
+<TextBlock Grid.Row="11" Text="Tensao fase A" Style="{StaticResource PropertyLabelTextBlockStyle}"/>
+<TextBox Grid.Row="11" Grid.Column="1" Text="{Binding TensaoFaseA, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" Style="{StaticResource PropertyValueTextBoxStyle}"/>
+<TextBlock Grid.Row="12" Text="Tensao fase B" Style="{StaticResource PropertyLabelTextBlockStyle}"/>
+<TextBox Grid.Row="12" Grid.Column="1" Text="{Binding TensaoFaseB, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" Style="{StaticResource PropertyValueTextBoxStyle}"/>
+<TextBlock Grid.Row="13" Text="Tensao fase C" Style="{StaticResource PropertyLabelTextBlockStyle}"/>
+<TextBox Grid.Row="13" Grid.Column="1" Text="{Binding TensaoFaseC, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" Style="{StaticResource PropertyValueTextBoxStyle}"/>
+</Grid>
+</StackPanel>
+</ScrollViewer>
+</Grid>
+</UserControl>
+
+
+====================================================================================================
+ARQUIVO: C:\Araci-Engine-Front\Araci Engine\Properties\CargaPropertiesView.xaml.cs
+====================================================================================================
+
+﻿using System.Windows.Controls;
+namespace Araci.Properties
+{
+public partial class CargaPropertiesView : UserControl
+{
+public CargaPropertiesView()
+{
+InitializeComponent();
+}
+}
+}
+
+
+====================================================================================================
+ARQUIVO: C:\Araci-Engine-Front\Araci Engine\Properties\GeradorPropertiesView.xaml
+====================================================================================================
+
+<UserControl x:Class="Araci.Properties.GeradorPropertiesView"
+xmlns="http:
+xmlns:x="http:
+<Grid Background="#252526">
+<ScrollViewer VerticalScrollBarVisibility="Auto">
+<StackPanel Margin="12">
+<TextBlock Text="PROPRIEDADES DO GERADOR"
+Style="{StaticResource PropertyHeaderTextBlockStyle}"/>
+<Grid>
+<Grid.ColumnDefinitions>
+<ColumnDefinition Width="130"/>
+<ColumnDefinition Width="*"/>
+</Grid.ColumnDefinitions>
+<Grid.RowDefinitions>
+<RowDefinition Height="Auto"/>
+<RowDefinition Height="Auto"/>
+<RowDefinition Height="Auto"/>
+<RowDefinition Height="Auto"/>
+<RowDefinition Height="Auto"/>
+<RowDefinition Height="Auto"/>
+<RowDefinition Height="Auto"/>
+<RowDefinition Height="Auto"/>
+<RowDefinition Height="Auto"/>
+<RowDefinition Height="Auto"/>
+<RowDefinition Height="Auto"/>
+<RowDefinition Height="Auto"/>
+<RowDefinition Height="Auto"/>
+<RowDefinition Height="Auto"/>
+</Grid.RowDefinitions>
+<ComboBox Grid.ColumnSpan="2"
+Style="{StaticResource PropertyFullComboBoxStyle}"
+ItemsSource="{Binding TiposDisponiveis}"
+SelectedItem="{Binding Tipo}"
+DisplayMemberPath="NomeTipo"/>
+<Button Grid.Row="1"
+Grid.ColumnSpan="2"
+Style="{StaticResource PropertyFullButtonStyle}"
+Content="Visualizar propriedades de tipo"
+Command="{Binding AbrirPropriedadesTipoCommand}"/>
+<TextBlock Grid.Row="2" Text="Nome" Style="{StaticResource PropertyLabelTextBlockStyle}"/>
+<TextBox Grid.Row="2" Grid.Column="1" Text="{Binding Nome, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" Style="{StaticResource PropertyValueTextBoxStyle}"/>
+<TextBlock Grid.Row="3" Text="Potencia aparente" Style="{StaticResource PropertyLabelTextBlockStyle}"/>
+<TextBox Grid.Row="3" Grid.Column="1" Text="{Binding PotenciaAparente, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged, ValidatesOnDataErrors=True, ValidatesOnExceptions=True, NotifyOnValidationError=True}" Style="{StaticResource PropertyNumericTextBoxStyle}"/>
+<TextBlock Grid.Row="4" Text="Potencia ativa" Style="{StaticResource PropertyLabelTextBlockStyle}"/>
+<TextBox Grid.Row="4" Grid.Column="1" Text="{Binding PotenciaAtiva, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged, ValidatesOnDataErrors=True, ValidatesOnExceptions=True, NotifyOnValidationError=True}" Style="{StaticResource PropertyNumericTextBoxStyle}"/>
+<TextBlock Grid.Row="5" Text="Potencia reativa" Style="{StaticResource PropertyLabelTextBlockStyle}"/>
+<TextBox Grid.Row="5" Grid.Column="1" Text="{Binding PotenciaReativa, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged, ValidatesOnDataErrors=True, ValidatesOnExceptions=True, NotifyOnValidationError=True}" Style="{StaticResource PropertyNumericTextBoxStyle}"/>
+<TextBlock Grid.Row="6" Text="Tensao linha" Style="{StaticResource PropertyLabelTextBlockStyle}"/>
+<TextBox Grid.Row="6" Grid.Column="1" Text="{Binding TensaoLinha, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" Style="{StaticResource PropertyValueTextBoxStyle}"/>
+<TextBlock Grid.Row="7" Text="Tensao fase A" Style="{StaticResource PropertyLabelTextBlockStyle}"/>
+<TextBox Grid.Row="7" Grid.Column="1" Text="{Binding TensaoFaseA, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" Style="{StaticResource PropertyValueTextBoxStyle}"/>
+<TextBlock Grid.Row="8" Text="Tensao fase B" Style="{StaticResource PropertyLabelTextBlockStyle}"/>
+<TextBox Grid.Row="8" Grid.Column="1" Text="{Binding TensaoFaseB, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" Style="{StaticResource PropertyValueTextBoxStyle}"/>
+<TextBlock Grid.Row="9" Text="Tensao fase C" Style="{StaticResource PropertyLabelTextBlockStyle}"/>
+<TextBox Grid.Row="9" Grid.Column="1" Text="{Binding TensaoFaseC, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" Style="{StaticResource PropertyValueTextBoxStyle}"/>
+<TextBlock Grid.Row="10" Text="Corrente linha" Style="{StaticResource PropertyLabelTextBlockStyle}"/>
+<TextBox Grid.Row="10" Grid.Column="1" Text="{Binding CorrenteLinha, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" Style="{StaticResource PropertyValueTextBoxStyle}"/>
+<TextBlock Grid.Row="11" Text="Corrente fase A" Style="{StaticResource PropertyLabelTextBlockStyle}"/>
+<TextBox Grid.Row="11" Grid.Column="1" Text="{Binding CorrenteFaseA, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" Style="{StaticResource PropertyValueTextBoxStyle}"/>
+<TextBlock Grid.Row="12" Text="Corrente fase B" Style="{StaticResource PropertyLabelTextBlockStyle}"/>
+<TextBox Grid.Row="12" Grid.Column="1" Text="{Binding CorrenteFaseB, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" Style="{StaticResource PropertyValueTextBoxStyle}"/>
+<TextBlock Grid.Row="13" Text="Corrente fase C" Style="{StaticResource PropertyLabelTextBlockStyle}"/>
+<TextBox Grid.Row="13" Grid.Column="1" Text="{Binding CorrenteFaseC, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" Style="{StaticResource PropertyValueTextBoxStyle}"/>
+</Grid>
+</StackPanel>
+</ScrollViewer>
+</Grid>
+</UserControl>
+
+
+====================================================================================================
+ARQUIVO: C:\Araci-Engine-Front\Araci Engine\Properties\GeradorPropertiesView.xaml.cs
+====================================================================================================
+
+﻿using System.Windows;
+using System.Windows.Controls;
+using Araci.Models;
+namespace Araci.Properties
+{
+public partial class GeradorPropertiesView : UserControl
+{
+public GeradorPropertiesView()
+{
+InitializeComponent();
+}
+}
+}
+
+
+====================================================================================================
+ARQUIVO: C:\Araci-Engine-Front\Araci Engine\Properties\PropertiesHostView.xaml
+====================================================================================================
+
+﻿<UserControl x:Class="Araci.Properties.PropertiesHostView"
+xmlns="http:
+xmlns:x="http:
+<Border Margin="8"
+Background="#252526"
+BorderBrush="#F4F4F4"
+BorderThickness="1">
+<Grid>
+<ContentControl
+Content="{Binding Editor.ElementoSelecionado}"
+HorizontalContentAlignment="Stretch"
+VerticalContentAlignment="Stretch"/>
+</Grid>
+</Border>
+</UserControl>
+
+
+====================================================================================================
+ARQUIVO: C:\Araci-Engine-Front\Araci Engine\Properties\PropertiesHostView.xaml.cs
+====================================================================================================
+
+﻿using System.Windows.Controls;
+namespace Araci.Properties
+{
+public partial class PropertiesHostView
+: UserControl
+{
+public PropertiesHostView()
+{
+InitializeComponent();
+}
+}
+}
+
+
+====================================================================================================
+ARQUIVO: C:\Araci-Engine-Front\Araci Engine\Properties\SinPropertiesView.xaml
+====================================================================================================
+
+<UserControl x:Class="Araci.Properties.SinPropertiesView"
+xmlns="http:
+xmlns:x="http:
+<Grid Background="#252526">
+<ScrollViewer VerticalScrollBarVisibility="Auto">
+<StackPanel Margin="12">
+<TextBlock Text="PROPRIEDADES DO SIN"
+Style="{StaticResource PropertyHeaderTextBlockStyle}"/>
+<Grid>
+<Grid.ColumnDefinitions>
+<ColumnDefinition Width="130"/>
+<ColumnDefinition Width="*"/>
+</Grid.ColumnDefinitions>
+<Grid.RowDefinitions>
+<RowDefinition Height="Auto"/>
+<RowDefinition Height="Auto"/>
+<RowDefinition Height="Auto"/>
+<RowDefinition Height="Auto"/>
+<RowDefinition Height="Auto"/>
+<RowDefinition Height="Auto"/>
+</Grid.RowDefinitions>
+<ComboBox Grid.ColumnSpan="2"
+Style="{StaticResource PropertyFullComboBoxStyle}"
+ItemsSource="{Binding TiposDisponiveis}"
+SelectedItem="{Binding Tipo}"
+DisplayMemberPath="NomeTipo"/>
+<Button Grid.Row="1"
+Grid.ColumnSpan="2"
+Style="{StaticResource PropertyFullButtonStyle}"
+Content="Visualizar propriedades de tipo"
+Command="{Binding AbrirPropriedadesTipoCommand}"/>
+<TextBlock Grid.Row="2" Text="Nome" Style="{StaticResource PropertyLabelTextBlockStyle}"/>
+<TextBox Grid.Row="2" Grid.Column="1" Text="{Binding Nome, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" Style="{StaticResource PropertyValueTextBoxStyle}"/>
+<TextBlock Grid.Row="3" Text="Barra" Style="{StaticResource PropertyLabelTextBlockStyle}"/>
+<TextBox Grid.Row="3" Grid.Column="1" Text="{Binding Barra, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" Style="{StaticResource PropertyValueTextBoxStyle}"/>
+<TextBlock Grid.Row="4" Text="Tensao linha" Style="{StaticResource PropertyLabelTextBlockStyle}"/>
+<TextBox Grid.Row="4" Grid.Column="1" Text="{Binding TensaoLinha, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" Style="{StaticResource PropertyValueTextBoxStyle}"/>
+<TextBlock Grid.Row="5" Text="Alimentador" Style="{StaticResource PropertyLabelTextBlockStyle}"/>
+<TextBox Grid.Row="5" Grid.Column="1" Text="{Binding Alimentador, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged, ValidatesOnDataErrors=True, ValidatesOnExceptions=True, NotifyOnValidationError=True}" Style="{StaticResource PropertyNumericTextBoxStyle}"/>
+</Grid>
+</StackPanel>
+</ScrollViewer>
+</Grid>
+</UserControl>
+
+
+====================================================================================================
+ARQUIVO: C:\Araci-Engine-Front\Araci Engine\Properties\SinPropertiesView.xaml.cs
+====================================================================================================
+
+using System.Windows.Controls;
+namespace Araci.Properties
+{
+public partial class SinPropertiesView : UserControl
+{
+public SinPropertiesView()
+{
+InitializeComponent();
+}
+}
+}
+
+
+====================================================================================================
+ARQUIVO: C:\Araci-Engine-Front\Araci Engine\Properties\TransformadorPropertiesView.xaml
+====================================================================================================
+
+<UserControl x:Class="Araci.Properties.TransformadorPropertiesView"
+xmlns="http:
+xmlns:x="http:
+<Grid Background="#252526">
+<ScrollViewer VerticalScrollBarVisibility="Auto">
+<StackPanel Margin="12">
+<TextBlock Text="PROPRIEDADES DO TRANSFORMADOR"
+Style="{StaticResource PropertyHeaderTextBlockStyle}"/>
+<Grid>
+<Grid.ColumnDefinitions>
+<ColumnDefinition Width="130"/>
+<ColumnDefinition Width="*"/>
+</Grid.ColumnDefinitions>
+<Grid.RowDefinitions>
+<RowDefinition Height="Auto"/>
+<RowDefinition Height="Auto"/>
+<RowDefinition Height="Auto"/>
+<RowDefinition Height="Auto"/>
+<RowDefinition Height="Auto"/>
+<RowDefinition Height="Auto"/>
+<RowDefinition Height="Auto"/>
+<RowDefinition Height="Auto"/>
+<RowDefinition Height="Auto"/>
+<RowDefinition Height="Auto"/>
+<RowDefinition Height="Auto"/>
+<RowDefinition Height="Auto"/>
+<RowDefinition Height="Auto"/>
+<RowDefinition Height="Auto"/>
+<RowDefinition Height="Auto"/>
+<RowDefinition Height="Auto"/>
+</Grid.RowDefinitions>
+<ComboBox Grid.ColumnSpan="2"
+Style="{StaticResource PropertyFullComboBoxStyle}"
+ItemsSource="{Binding TiposDisponiveis}"
+SelectedItem="{Binding Tipo}"
+DisplayMemberPath="NomeTipo"/>
+<Button Grid.Row="1"
+Grid.ColumnSpan="2"
+Style="{StaticResource PropertyFullButtonStyle}"
+Content="Visualizar propriedades de tipo"
+Command="{Binding AbrirPropriedadesTipoCommand}"/>
+<TextBlock Grid.Row="2" Text="Nome" Style="{StaticResource PropertyLabelTextBlockStyle}"/>
+<TextBox Grid.Row="2" Grid.Column="1" Text="{Binding Nome}" Style="{StaticResource PropertyValueTextBoxStyle}"/>
+<TextBlock Grid.Row="3" Text="Barra" Style="{StaticResource PropertyLabelTextBlockStyle}"/>
+<TextBox Grid.Row="3" Grid.Column="1" Text="{Binding Barra}" Style="{StaticResource PropertyValueTextBoxStyle}"/>
+<TextBlock Grid.Row="4" Text="Tensao linha" Style="{StaticResource PropertyLabelTextBlockStyle}"/>
+<TextBox Grid.Row="4" Grid.Column="1" Text="{Binding TensaoLinha}" Style="{StaticResource PropertyValueTextBoxStyle}"/>
+<TextBlock Grid.Row="5" Text="Alimentador" Style="{StaticResource PropertyLabelTextBlockStyle}"/>
+<TextBox Grid.Row="5" Grid.Column="1" Text="{Binding Alimentador, ValidatesOnDataErrors=True, ValidatesOnExceptions=True, NotifyOnValidationError=True}" Style="{StaticResource PropertyNumericTextBoxStyle}"/>
+<TextBlock Grid.Row="6" Text="Fases" Style="{StaticResource PropertyLabelTextBlockStyle}"/>
+<TextBox Grid.Row="6" Grid.Column="1" Text="{Binding Fases, ValidatesOnDataErrors=True, ValidatesOnExceptions=True, NotifyOnValidationError=True}" Style="{StaticResource PropertyNumericTextBoxStyle}"/>
+<TextBlock Grid.Row="7" Text="Enrolamentos" Style="{StaticResource PropertyLabelTextBlockStyle}"/>
+<TextBox Grid.Row="7" Grid.Column="1" Text="{Binding Enrolamentos, ValidatesOnDataErrors=True, ValidatesOnExceptions=True, NotifyOnValidationError=True}" Style="{StaticResource PropertyNumericTextBoxStyle}"/>
+<TextBlock Grid.Row="8" Text="Tensao primario" Style="{StaticResource PropertyLabelTextBlockStyle}"/>
+<TextBox Grid.Row="8" Grid.Column="1" Text="{Binding TensaoPrimarioKV, ValidatesOnDataErrors=True, ValidatesOnExceptions=True, NotifyOnValidationError=True}" Style="{StaticResource PropertyNumericTextBoxStyle}"/>
+<TextBlock Grid.Row="9" Text="Tensao secundario" Style="{StaticResource PropertyLabelTextBlockStyle}"/>
+<TextBox Grid.Row="9" Grid.Column="1" Text="{Binding TensaoSecundarioKV, ValidatesOnDataErrors=True, ValidatesOnExceptions=True, NotifyOnValidationError=True}" Style="{StaticResource PropertyNumericTextBoxStyle}"/>
+<TextBlock Grid.Row="10" Text="Potencia kVA" Style="{StaticResource PropertyLabelTextBlockStyle}"/>
+<TextBox Grid.Row="10" Grid.Column="1" Text="{Binding PotenciaKVA, ValidatesOnDataErrors=True, ValidatesOnExceptions=True, NotifyOnValidationError=True}" Style="{StaticResource PropertyNumericTextBoxStyle}"/>
+<TextBlock Grid.Row="11" Text="Potencia MVA" Style="{StaticResource PropertyLabelTextBlockStyle}"/>
+<TextBox Grid.Row="11" Grid.Column="1" Text="{Binding PotenciaMVA, ValidatesOnDataErrors=True, ValidatesOnExceptions=True, NotifyOnValidationError=True}" Style="{StaticResource PropertyNumericTextBoxStyle}"/>
+<TextBlock Grid.Row="12" Text="R %" Style="{StaticResource PropertyLabelTextBlockStyle}"/>
+<TextBox Grid.Row="12" Grid.Column="1" Text="{Binding RPercentual, ValidatesOnDataErrors=True, ValidatesOnExceptions=True, NotifyOnValidationError=True}" Style="{StaticResource PropertyNumericTextBoxStyle}"/>
+<TextBlock Grid.Row="13" Text="X %" Style="{StaticResource PropertyLabelTextBlockStyle}"/>
+<TextBox Grid.Row="13" Grid.Column="1" Text="{Binding XPercentual, ValidatesOnDataErrors=True, ValidatesOnExceptions=True, NotifyOnValidationError=True}" Style="{StaticResource PropertyNumericTextBoxStyle}"/>
+<TextBlock Grid.Row="14" Text="Ligacao primario" Style="{StaticResource PropertyLabelTextBlockStyle}"/>
+<TextBox Grid.Row="14" Grid.Column="1" Text="{Binding LigacaoPrimario}" Style="{StaticResource PropertyValueTextBoxStyle}"/>
+<TextBlock Grid.Row="15" Text="Ligacao secundario" Style="{StaticResource PropertyLabelTextBlockStyle}"/>
+<TextBox Grid.Row="15" Grid.Column="1" Text="{Binding LigacaoSecundario}" Style="{StaticResource PropertyValueTextBoxStyle}"/>
+</Grid>
+</StackPanel>
+</ScrollViewer>
+</Grid>
+</UserControl>
+
+
+====================================================================================================
+ARQUIVO: C:\Araci-Engine-Front\Araci Engine\Properties\TransformadorPropertiesView.xaml.cs
+====================================================================================================
+
+using System.Windows.Controls;
+namespace Araci.Properties
+{
+public partial class TransformadorPropertiesView : UserControl
+{
+public TransformadorPropertiesView()
+{
+InitializeComponent();
+}
+}
+}
+
+
+====================================================================================================
 ARQUIVO: C:\Araci-Engine-Front\Araci Engine\Service\EditorContext.cs
 ====================================================================================================
 
@@ -3692,11 +3572,13 @@ return new TransactionScope(Commands);
 ARQUIVO: C:\Araci-Engine-Front\Araci Engine\Service\InputRouter.cs
 ====================================================================================================
 
+using System;
+using System.Linq;
 using System.Windows;
 using System.Windows.Input;
 using Araci.Applications.Editar.Base;
+using Araci.Applications.Editar.Selecionar;
 using Araci.ViewModels;
-using System.Linq;
 namespace Araci.Services
 {
 public class InputRouter
@@ -3767,6 +3649,8 @@ if (key == Key.Delete)
 _context.SafeDelete.DeleteActiveHandleOrSelection();
 return true;
 }
+if (key == Key.Escape)
+return HandleEscape();
 if (key == Key.Space)
 {
 if (ToolAtual.IsBusy ||
@@ -3778,23 +3662,21 @@ return true;
 }
 return false;
 }
-if (key == Key.Escape)
+ToolAtual.OnKeyDown(key);
+return false;
+}
+private bool HandleEscape()
+{
+if (ToolAtual is SelecionarTool)
 {
 if (ToolAtual.IsBusy)
-{
 ToolAtual.Cancelar();
-return true;
-}
-if (ToolAtual is not Araci.Applications.Editar.Selecionar.SelecionarTool)
-{
-_context.Tools.VoltarParaSelecao();
-return true;
-}
+else
 _context.Selection.Limpar();
 return true;
 }
-ToolAtual.OnKeyDown(key);
-return false;
+_context.Tools.VoltarParaSelecao();
+return true;
 }
 private static ToolInputState CapturarEstadoAtual(Point worldPosition)
 {
@@ -3804,206 +3686,6 @@ null,
 0,
 worldPosition,
 default);
-}
-}
-}
-
-
-====================================================================================================
-ARQUIVO: C:\Araci-Engine-Front\Araci Engine\Service\MoveService.cs
-====================================================================================================
-
-using System.Collections.Generic;
-using System.Linq;
-using System.Windows;
-using Araci.Core.Commands;
-using Araci.Models;
-using Araci.ViewModels;
-namespace Araci.Services
-{
-public class MoveService
-{
-private readonly EditorContext _context;
-private readonly Dictionary<ElementoViewModel, ElementoEstado>
-_estadoInicial = new();
-private bool _movendo;
-public MoveService(EditorContext context)
-{
-_context = context ??
-throw new ArgumentNullException(nameof(context));
-}
-public void BeginMove(IEnumerable<ElementoViewModel> elementos)
-{
-_estadoInicial.Clear();
-foreach (var vm in elementos.Distinct())
-CapturarEstadoInicial(vm);
-_movendo = true;
-}
-public void MoverVisual(
-ElementoViewModel vm,
-Vector delta)
-{
-if (!_movendo)
-return;
-vm.Mover(delta);
-ReancorarCabosConectados(vm.Modelo);
-_context.SceneQueries.Invalidate();
-}
-public void EndMove(IEnumerable<ElementoViewModel> elementos)
-{
-if (!_movendo)
-return;
-using var transaction =
-_context.BeginTransaction();
-foreach (var vm in elementos.Distinct())
-CapturarCabosConectados(vm.Modelo);
-foreach (var item in _estadoInicial)
-{
-var vm = item.Key;
-var antes = item.Value;
-var depois = vm.CapturarEstado();
-bool mudou =
-antes.X != depois.X ||
-antes.Y != depois.Y ||
-antes.X2 != depois.X2 ||
-antes.Y2 != depois.Y2 ||
-antes.Rotacao != depois.Rotacao ||
-!antes.Vertices.SequenceEqual(depois.Vertices);
-if (!mudou)
-continue;
-transaction.Add(
-new MoveElementoCommand(
-vm.Modelo,
-antes,
-depois,
-AtualizarElementoMovido));
-}
-transaction.Commit();
-_context.SceneQueries.Invalidate();
-_estadoInicial.Clear();
-_movendo = false;
-}
-public void AbortMove()
-{
-if (!_movendo)
-return;
-foreach (var item in _estadoInicial)
-item.Key.AplicarEstado(item.Value);
-_context.SceneQueries.Invalidate();
-_estadoInicial.Clear();
-_movendo = false;
-}
-private void AtualizarElementoMovido(Elemento elemento)
-{
-_context.Viewport?.AtualizarViewModel(elemento);
-_context.TerminalLayout.AtualizarTerminais(elemento);
-_context.SceneQueries.Invalidate();
-_context.CableVertexEdit.Refresh();
-}
-private void CapturarEstadoInicial(ElementoViewModel vm)
-{
-if (_estadoInicial.ContainsKey(vm))
-return;
-_estadoInicial[vm] = vm.CapturarEstado();
-CapturarCabosConectados(vm.Modelo);
-}
-private void CapturarCabosConectados(Elemento elemento)
-{
-if (elemento is Cabo)
-return;
-foreach (Cabo cabo in _context.Connectivity.ObterCabosConectados(elemento))
-{
-ElementoViewModel? caboVm = _context.Viewport?.ObterViewModel(cabo);
-if (caboVm != null && !_estadoInicial.ContainsKey(caboVm))
-_estadoInicial[caboVm] = caboVm.CapturarEstado();
-}
-}
-private void ReancorarCabosConectados(Elemento elemento)
-{
-if (elemento is Cabo)
-return;
-_context.TerminalLayout.AtualizarTerminais(elemento);
-foreach (Cabo cabo in _context.Connectivity.ReancorarCabosConectados(elemento))
-_context.Viewport?.AtualizarViewModel(cabo);
-}
-}
-}
-
-
-====================================================================================================
-ARQUIVO: C:\Araci-Engine-Front\Araci Engine\Service\SelectionService.cs
-====================================================================================================
-
-﻿using System.Collections.Generic;
-using System.Collections.ObjectModel;
-using System.Linq;
-using System;
-using Araci.Core.Events;
-using Araci.ViewModels;
-namespace Araci.Services
-{
-public class SelectionService
-{
-private readonly EditorContext _context;
-private readonly ObservableCollection<ElementoViewModel> _selecionados = new();
-public SelectionService(EditorContext context)
-{
-_context = context ?? throw new ArgumentNullException(nameof(context));
-}
-public IReadOnlyList<ElementoViewModel> Selecionados => _selecionados;
-public ObservableCollection<ElementoViewModel> SelecionadosObservable => _selecionados;
-public bool TemSelecionados => _selecionados.Count > 0;
-public event Action? SelectionChanged;
-public void Selecionar(ElementoViewModel vm, bool adicionarAoExistente = false)
-{
-if (!adicionarAoExistente)
-Limpar();
-if (_selecionados.Contains(vm))
-{
-AtualizarElementoSelecionado();
-return;
-}
-vm.IsSelecionado = true;
-_selecionados.Add(vm);
-AtualizarElementoSelecionado();
-PublicarAlteracao();
-}
-public void Toggle(ElementoViewModel vm)
-{
-if (_selecionados.Contains(vm))
-{
-Deselecionar(vm);
-return;
-}
-Selecionar(vm, true);
-}
-public void Deselecionar(ElementoViewModel vm)
-{
-if (!_selecionados.Contains(vm))
-return;
-vm.IsSelecionado = false;
-_selecionados.Remove(vm);
-AtualizarElementoSelecionado();
-PublicarAlteracao();
-}
-public void Limpar()
-{
-if (_selecionados.Count == 0)
-return;
-foreach (var vm in _selecionados)
-vm.IsSelecionado = false;
-_selecionados.Clear();
-AtualizarElementoSelecionado();
-PublicarAlteracao();
-}
-private void AtualizarElementoSelecionado()
-{
-_context.Editor.ElementoSelecionado = _selecionados.LastOrDefault();
-}
-private void PublicarAlteracao()
-{
-_context.Events.Publish(new SelecaoAlteradaEvent(_selecionados.ToList()));
-SelectionChanged?.Invoke();
 }
 }
 }
@@ -4065,150 +3747,318 @@ FerramentaAtual = new SelecionarTool(_context);
 
 
 ====================================================================================================
-ARQUIVO: C:\Araci-Engine-Front\Araci Engine\ViewModels\ViewportViewModel.cs
+ARQUIVO: C:\Araci-Engine-Front\Araci Engine\ViewModels\ElementoViewModel.cs
 ====================================================================================================
 
 using System;
-using System.Collections.Generic;
+using System.Collections;
 using System.Collections.ObjectModel;
-using System.Collections.Specialized;
-using System.ComponentModel;
-using System.Runtime.CompilerServices;
-using Araci.Core.Documents;
-using Araci.Core.Scenes;
+using System.Linq;
+using System.Windows;
+using System.Windows.Input;
+using System.Windows.Media;
+using Araci.Core.Rendering;
+using Araci.Core.SceneNodes;
 using Araci.Models;
+using Araci.Models.Tipos;
 using Araci.Services;
+using Araci.ViewModels.Base;
+using Araci.ViewModels.VisualStates;
 namespace Araci.ViewModels
 {
-public class ViewportViewModel : INotifyPropertyChanged
+public abstract class ElementoViewModel : ViewModelBase
 {
-private readonly EditorContext _context;
-private readonly Dictionary<Elemento, ElementoViewModel> _viewModelsPorModelo = new();
-private double _inverseZoom = 1;
-public ViewportViewModel(EditorContext context)
+private readonly ElementoNode _node;
+private readonly NameService _names;
+private readonly TypePropertiesDialogService _typePropertiesDialogs;
+private ICommand? _abrirPropriedadesTipoCommand;
+private ObservableCollection<ParameterViewModel>? _parametros;
+private bool _isPreview;
+protected ElementoViewModel(
+Elemento modelo,
+ElementoNode node,
+TypeLibraryService types,
+NameService names,
+TypePropertiesDialogService typePropertiesDialogs)
 {
-_context = context ?? throw new ArgumentNullException(nameof(context));
-Document = context.Document;
-Scene = context.Scene;
-SelectionBox = context.SelectionBox;
-TerminalSnap = context.TerminalSnap;
-CableVertexEdit = context.CableVertexEdit;
-MoveHud = context.MoveHud;
-Document.Elementos.CollectionChanged += OnDocumentElementosChanged;
-SincronizarComDocumento();
+Modelo = modelo ?? throw new ArgumentNullException(nameof(modelo));
+_node = node ?? throw new ArgumentNullException(nameof(node));
+Types = types ?? throw new ArgumentNullException(nameof(types));
+_names = names ?? throw new ArgumentNullException(nameof(names));
+_typePropertiesDialogs = typePropertiesDialogs ?? throw new ArgumentNullException(nameof(typePropertiesDialogs));
+VisualState = new ElementoVisualState();
+_node.AtualizarGeometria();
 }
-public AraciDocument Document { get; }
-public Scene Scene { get; }
-public SelectionBoxViewModel SelectionBox { get; }
-public TerminalSnapState TerminalSnap { get; }
-public CableVertexEditService CableVertexEdit { get; }
-public MoveHudService MoveHud { get; }
-public ObservableCollection<ElementoViewModel> Elementos => Scene.Elementos;
-public double InverseZoom => _inverseZoom;
-public double CableHandleVisualOffset => -5 * _inverseZoom;
-public double TerminalMarkerVisualOffset => -7 * _inverseZoom;
-public void AtualizarZoomVisual(double zoom)
+public Elemento Modelo { get; }
+public ElementoNode Node => _node;
+protected TypeLibraryService Types { get; }
+protected void RenomearModelo(string novoNome)
 {
-double inverseZoom = zoom > 0
-? 1 / zoom
-: 1;
-if (Math.Abs(_inverseZoom - inverseZoom) < 0.000001)
+_names.Renomear(Modelo, novoNome);
+}
+public TipoElemento Tipo
+{
+get => Modelo.Tipo!;
+set
+{
+if (ReferenceEquals(Modelo.Tipo, value))
 return;
-_inverseZoom = inverseZoom;
-OnPropertyChanged(nameof(InverseZoom));
-OnPropertyChanged(nameof(CableHandleVisualOffset));
-OnPropertyChanged(nameof(TerminalMarkerVisualOffset));
+Modelo.Tipo = value;
+OnPropertyChanged();
+OnPropertyChanged(nameof(TipoViewModel));
 }
-public void RegistrarViewModel(ElementoViewModel vm)
+}
+public abstract IEnumerable TiposDisponiveis { get; }
+public virtual TipoElementoViewModel? TipoViewModel =>
+TipoElementoViewModelFactory.Criar(Tipo);
+public ICommand AbrirPropriedadesTipoCommand =>
+_abrirPropriedadesTipoCommand ??= new RelayCommand(AbrirPropriedadesTipo);
+public ElementoVisualState VisualState { get; }
+public bool IsSelecionado
 {
-if (!Document.Elementos.Contains(vm.Modelo) ||
-!Elementos.Contains(vm))
+get => VisualState.IsSelecionado;
+set
 {
+if (VisualState.IsSelecionado == value)
 return;
+VisualState.AtualizarSelecao(value);
+OnPropertyChanged();
+OnPropertyChanged(nameof(Stroke));
+OnPropertyChanged(nameof(StrokeThickness));
+OnPropertyChanged(nameof(RenderData));
 }
-_viewModelsPorModelo[vm.Modelo] = vm;
 }
-public ElementoViewModel? ObterViewModel(Elemento modelo)
+public bool IsHover
 {
-if (!_viewModelsPorModelo.TryGetValue(modelo, out var vm))
-return null;
-if (Document.Elementos.Contains(modelo) &&
-Elementos.Contains(vm))
+get => VisualState.IsHover;
+set
 {
-return vm;
-}
-_viewModelsPorModelo.Remove(modelo);
-return null;
-}
-public void AtualizarViewModel(Elemento modelo)
-{
-ObterViewModel(modelo)?.AtualizarAposModeloAlterado();
-}
-private void OnDocumentElementosChanged(object? sender, NotifyCollectionChangedEventArgs e)
-{
-if (e.Action == NotifyCollectionChangedAction.Reset)
-{
-LimparViewModels();
+if (VisualState.IsHover == value)
 return;
+VisualState.AtualizarHover(value);
+OnPropertyChanged();
+OnPropertyChanged(nameof(Stroke));
+OnPropertyChanged(nameof(StrokeThickness));
+OnPropertyChanged(nameof(RenderData));
 }
-if (e.OldItems != null)
+}
+public bool IsPreview
 {
-foreach (Elemento modelo in e.OldItems)
-RemoverViewModel(modelo);
-}
-if (e.NewItems != null)
+get => _isPreview;
+set
 {
-foreach (Elemento modelo in e.NewItems)
-AdicionarViewModel(modelo);
-}
-}
-private void SincronizarComDocumento()
-{
-LimparViewModels();
-foreach (Elemento modelo in Document.Elementos)
-AdicionarViewModel(modelo);
-}
-private void AdicionarViewModel(Elemento modelo)
-{
-var vm = ObterOuCriarViewModel(modelo);
-if (vm == null || Elementos.Contains(vm))
+if (_isPreview == value)
 return;
-Elementos.Add(vm);
+_isPreview = value;
+OnPropertyChanged();
+OnPropertyChanged(nameof(RenderData));
 }
-private void RemoverViewModel(Elemento modelo)
+}
+public Brush Stroke => VisualState.Stroke;
+public double StrokeThickness => VisualState.StrokeThickness;
+public virtual ElementoRenderData RenderData => new(
+Largura,
+Altura,
+PontoLocalInicial,
+PontoLocalFinal,
+Stroke,
+StrokeThickness);
+public double Rotacao
 {
-if (!_viewModelsPorModelo.TryGetValue(modelo, out var vm))
+get => Modelo.Rotacao;
+set
+{
+if (Math.Abs(Modelo.Rotacao - value) < 0.0001)
 return;
-_context.Selection.Deselecionar(vm);
-_context.CableVertexEdit.Clear();
-_context.Hover.Clear();
-Elementos.Remove(vm);
-_viewModelsPorModelo.Remove(modelo);
-_context.SceneQueries.Invalidate();
+Modelo.Rotacao = value;
+AtualizarAposModeloAlterado();
 }
-private void LimparViewModels()
-{
-_context.Selection.Limpar();
-_context.CableVertexEdit.Clear();
-_context.Hover.Clear();
-_context.TerminalSnap.Limpar();
-Elementos.Clear();
-_viewModelsPorModelo.Clear();
-_context.SceneQueries.Invalidate();
 }
-private ElementoViewModel? ObterOuCriarViewModel(Elemento modelo)
+public virtual double X
 {
-if (_viewModelsPorModelo.TryGetValue(modelo, out var existente))
-return existente;
-var vm = _context.ElementoFactory.CriarViewModel(modelo);
-if (vm != null)
-_viewModelsPorModelo[modelo] = vm;
-return vm;
+get => Node.X;
+set
+{
+if (Math.Abs(Node.X - value) < 0.0001)
+return;
+Node.X = value;
+AtualizarNode();
 }
-public event PropertyChangedEventHandler? PropertyChanged;
-protected virtual void OnPropertyChanged([CallerMemberName] string? nome = null)
+}
+public virtual double Y
 {
-PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nome));
+get => Node.Y;
+set
+{
+if (Math.Abs(Node.Y - value) < 0.0001)
+return;
+Node.Y = value;
+AtualizarNode();
+}
+}
+public virtual double WorldX => Node.X;
+public virtual double WorldY => Node.Y;
+public virtual double Largura => Node.Largura;
+public virtual double Altura
+{
+get => Node.Altura;
+set { }
+}
+public virtual Rect Bounds => Node.Bounds;
+public virtual Point Centro => Node.Centro;
+public ObservableCollection<ParameterViewModel> Parametros =>
+_parametros ??=
+new ObservableCollection<ParameterViewModel>(
+Modelo.Parametros.Values.Select(p => new ParameterViewModel(p)));
+protected virtual Point PontoLocalInicial => new(0, 0);
+protected virtual Point PontoLocalFinal => new(Largura, Altura);
+protected void SelecionarPrimeiroTipoDisponivel()
+{
+TipoElemento? primeiroTipo = null;
+bool tipoAtualExiste = false;
+foreach (object? item in TiposDisponiveis)
+{
+if (item is not TipoElemento tipo)
+continue;
+primeiroTipo ??= tipo;
+if (ReferenceEquals(tipo, Modelo.Tipo))
+{
+tipoAtualExiste = true;
+break;
+}
+}
+if (tipoAtualExiste || primeiroTipo == null)
+return;
+Tipo = primeiroTipo;
+}
+public virtual void Mover(Vector delta)
+{
+Node.Mover(delta);
+NotificarGeometria();
+}
+public virtual ElementoEstado CapturarEstado()
+{
+return new ElementoEstado(X, Y, rotacao: Modelo.Rotacao);
+}
+public virtual void AplicarEstado(ElementoEstado estado)
+{
+Node.X = estado.X;
+Node.Y = estado.Y;
+AtualizarNode();
+}
+public virtual void AtualizarAposModeloAlterado()
+{
+AtualizarNode();
+}
+public virtual void NotificarParametros()
+{
+foreach (var parametro in Parametros)
+parametro.Atualizar();
+OnPropertyChanged(nameof(Parametros));
+}
+public void NotificarPropriedades(params string[] nomes)
+{
+foreach (string nome in nomes)
+OnPropertyChanged(nome);
+NotificarParametros();
+}
+protected virtual void AtualizarNode()
+{
+Node.AtualizarGeometria();
+NotificarGeometria();
+}
+protected virtual void NotificarGeometria()
+{
+OnPropertyChanged(nameof(X));
+OnPropertyChanged(nameof(Y));
+OnPropertyChanged(nameof(WorldX));
+OnPropertyChanged(nameof(WorldY));
+OnPropertyChanged(nameof(Largura));
+OnPropertyChanged(nameof(Altura));
+OnPropertyChanged(nameof(Bounds));
+OnPropertyChanged(nameof(Centro));
+OnPropertyChanged(nameof(Rotacao));
+OnPropertyChanged(nameof(RenderData));
+}
+private void AbrirPropriedadesTipo()
+{
+_typePropertiesDialogs.Show(TipoViewModel);
+}
+}
+}
+
+
+====================================================================================================
+ARQUIVO: C:\Araci-Engine-Front\Araci Engine\ViewModels\ParameterViewModel.cs
+====================================================================================================
+
+﻿using Araci.Models;
+using Araci.ViewModels.Base;
+namespace Araci.ViewModels
+{
+public class ParameterViewModel : ViewModelBase
+{
+private readonly Parameter _parameter;
+public ParameterViewModel(Parameter parameter)
+{
+_parameter = parameter;
+}
+public string Nome => _parameter.Nome;
+public object? Valor
+{
+get => _parameter.ValorObjeto;
+set
+{
+if (Equals(_parameter.ValorObjeto, value))
+return;
+_parameter.ValorObjeto = value;
+OnPropertyChanged();
+}
+}
+public System.Type Tipo => _parameter.Tipo;
+public void Atualizar()
+{
+OnPropertyChanged(nameof(Valor));
+}
+}
+}
+
+
+====================================================================================================
+ARQUIVO: C:\Araci-Engine-Front\Araci Engine\ViewModels\PropertiesViewModel.cs
+====================================================================================================
+
+﻿using System.ComponentModel;
+using System.Runtime.CompilerServices;
+namespace Araci.ViewModels
+{
+public class PropertiesViewModel
+: INotifyPropertyChanged
+{
+private object?
+_elementoSelecionado;
+public object?
+ElementoSelecionado
+{
+get => _elementoSelecionado;
+set
+{
+if (_elementoSelecionado != value)
+{
+_elementoSelecionado = value;
+OnPropertyChanged();
+}
+}
+}
+public event PropertyChangedEventHandler?
+PropertyChanged;
+protected virtual void OnPropertyChanged(
+[CallerMemberName]
+string? nome = null)
+{
+PropertyChanged?.Invoke(
+this,
+new PropertyChangedEventArgs(nome));
 }
 }
 }
