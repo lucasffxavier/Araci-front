@@ -1,5 +1,7 @@
-﻿using System.Collections.Generic;
-
+﻿using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Windows;
 using Araci.Core.Commands;
 using Araci.Models;
 using Araci.ViewModels;
@@ -8,99 +10,97 @@ namespace Araci.Services
 {
     public static class ClipboardService
     {
-        // =========================
-        // BUFFER
-        // =========================
+        private const double OffsetPadrao = 30;
+        private static readonly List<Elemento> _copiados = new();
 
-        private static readonly List<Elemento> _buffer = new();
-
-        // =========================
-        // OFFSET
-        // =========================
-
-        private const double OFFSET_X = 30;
-
-        private const double OFFSET_Y = 30;
-
-        // =========================
-        // COPIAR
-        // =========================
-
-        public static void CopiarSelecionados(
-            EditorContext context)
+        public static void CopiarSelecionados(EditorContext context)
         {
-            var editorContext =
-                context
-                ?? throw new System.ArgumentNullException(nameof(context));
+            ArgumentNullException.ThrowIfNull(context);
+            _copiados.Clear();
 
-            _buffer.Clear();
-
-            foreach (var item in editorContext.Selection.Selecionados)
+            foreach (ElementoViewModel vm in context.Selection.Selecionados)
             {
-                _buffer.Add(item.Modelo.Clonar());
+                Elemento clone = vm.Modelo.Clonar();
+                _copiados.Add(clone);
             }
         }
 
-        // =========================
-        // COLAR
-        // =========================
-
-        public static void Colar(
-            EditorContext context)
+        public static void Colar(EditorContext context)
         {
-            var editorContext =
-                context
-                ?? throw new System.ArgumentNullException(nameof(context));
+            ArgumentNullException.ThrowIfNull(context);
 
-            if (_buffer.Count == 0)
+            if (_copiados.Count == 0)
                 return;
 
-            var novos = new List<Elemento>();
+            var colados = new List<Elemento>();
 
-            using var transaction =
-                editorContext.BeginTransaction();
+            using var transaction = context.BeginTransaction();
 
-            foreach (var item in _buffer)
+            foreach (Elemento modeloCopiado in _copiados)
             {
-                var clone = item.Clonar();
-
-                AplicarOffset(clone);
-                LimparConectividadeDeCaboColado(clone);
-
-                novos.Add(clone);
-
-                transaction.Add(
-                    new AddElementoCommand(
-                        clone,
-                        editorContext));
+                Elemento clone = modeloCopiado.Clonar();
+                DeslocarElemento(clone, OffsetPadrao, OffsetPadrao);
+                LimparConexoesSeNecessario(clone);
+                transaction.Add(new AddElementoCommand(clone, context));
+                colados.Add(clone);
             }
 
             transaction.Commit();
 
-            AtualizarSelecao(
-                editorContext,
-                novos);
+            context.Selection.Limpar();
 
-            AtualizarBuffer(novos);
+            foreach (Elemento elemento in colados)
+            {
+                ElementoViewModel? vm = context.Viewport?.ObterViewModel(elemento);
+                if (vm != null)
+                    context.Selection.Selecionar(vm, true);
+            }
+
+            context.SceneQueries.Invalidate();
+            context.CableVertexEdit.Refresh();
         }
 
-        // =========================
-        // OFFSET
-        // =========================
-
-        private static void AplicarOffset(Elemento elemento)
+        private static void DeslocarElemento(Elemento elemento, double dx, double dy)
         {
-            elemento.PosicaoX += OFFSET_X;
-            elemento.PosicaoY += OFFSET_Y;
+            elemento.PosicaoX += dx;
+            elemento.PosicaoY += dy;
+
+            if (elemento is ElementoLinear linear)
+            {
+                linear.PosicaoX2 += dx;
+                linear.PosicaoY2 += dy;
+            }
 
             if (elemento is Cabo cabo)
+                DeslocarCabo(cabo, dx, dy);
+
+            foreach (Terminal terminal in ObterTerminais(elemento))
             {
-                cabo.PosicaoX2 += OFFSET_X;
-                cabo.PosicaoY2 += OFFSET_Y;
+                terminal.DefinirPosicaoVisual(new Point(
+                    terminal.Posicao.X + dx,
+                    terminal.Posicao.Y + dy));
             }
         }
 
-        private static void LimparConectividadeDeCaboColado(Elemento elemento)
+        private static void DeslocarCabo(Cabo cabo, double dx, double dy)
+        {
+            for (int i = 0; i < cabo.Vertices.Count; i++)
+            {
+                Point p = cabo.Vertices[i];
+                cabo.Vertices[i] = new Point(p.X + dx, p.Y + dy);
+            }
+
+            if (cabo.Vertices.Count > 0)
+                cabo.DefinirOrigem(cabo.Vertices[0]);
+
+            if (cabo.Vertices.Count > 1)
+                cabo.DefinirDestino(cabo.Vertices[^1]);
+
+            if (cabo.PreviewPonto is Point preview)
+                cabo.PreviewPonto = new Point(preview.X + dx, preview.Y + dy);
+        }
+
+        private static void LimparConexoesSeNecessario(Elemento elemento)
         {
             if (elemento is not Cabo cabo)
                 return;
@@ -109,39 +109,15 @@ namespace Araci.Services
             cabo.DestinoId = string.Empty;
             cabo.OrigemTerminalId = string.Empty;
             cabo.DestinoTerminalId = string.Empty;
+            cabo.BarraOrigem = string.Empty;
+            cabo.BarraDestino = string.Empty;
         }
 
-        // =========================
-        // SELEÇÃO
-        // =========================
-
-        private static void AtualizarSelecao(
-            EditorContext context,
-            List<Elemento> elementos)
+        private static IEnumerable<Terminal> ObterTerminais(Elemento elemento)
         {
-            context.Selection.Limpar();
-
-            foreach (var modelo in elementos)
-            {
-                var vm = context.Viewport?.ObterViewModel(modelo);
-
-                if (vm != null)
-                    context.Selection.Selecionar(vm, true);
-            }
-        }
-
-        // =========================
-        // BUFFER
-        // =========================
-
-        private static void AtualizarBuffer(List<Elemento> elementos)
-        {
-            _buffer.Clear();
-
-            foreach (var item in elementos)
-            {
-                _buffer.Add(item.Clonar());
-            }
+            return elemento is ITerminalOwner owner
+                ? owner.Terminais
+                : Enumerable.Empty<Terminal>();
         }
     }
 }
