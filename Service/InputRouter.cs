@@ -1,8 +1,10 @@
+using System;
+using System.Linq;
 using System.Windows;
 using System.Windows.Input;
 using Araci.Applications.Editar.Base;
+using Araci.Applications.Editar.Selecionar;
 using Araci.ViewModels;
-using System.Linq;
 
 namespace Araci.Services
 {
@@ -90,6 +92,9 @@ namespace Araci.Services
                 return true;
             }
 
+            if (key == Key.Escape)
+                return HandleEscape();
+
             if (key == Key.Space)
             {
                 if (ToolAtual.IsBusy ||
@@ -103,26 +108,24 @@ namespace Araci.Services
                 return false;
             }
 
-            if (key == Key.Escape)
+            ToolAtual.OnKeyDown(key);
+            return false;
+        }
+
+        private bool HandleEscape()
+        {
+            if (ToolAtual is SelecionarTool)
             {
                 if (ToolAtual.IsBusy)
-                {
                     ToolAtual.Cancelar();
-                    return true;
-                }
+                else
+                    _context.Selection.Limpar();
 
-                if (ToolAtual is not Araci.Applications.Editar.Selecionar.SelecionarTool)
-                {
-                    _context.Tools.VoltarParaSelecao();
-                    return true;
-                }
-
-                _context.Selection.Limpar();
                 return true;
             }
 
-            ToolAtual.OnKeyDown(key);
-            return false;
+            _context.Tools.VoltarParaSelecao();
+            return true;
         }
 
         private static ToolInputState CapturarEstadoAtual(Point worldPosition)
