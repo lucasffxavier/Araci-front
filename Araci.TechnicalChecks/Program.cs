@@ -112,6 +112,16 @@ namespace Araci.TechnicalChecks
                 ("ElectricGraph build repetido apos rotacao nao altera Document", ElectricGraphBuildAposRotacaoNaoAlteraDocument),
                 ("DTO nao muda por causa da rotacao", DtoNaoMudaPorCausaDaRotacao),
                 ("RotationService aceita Barra", RotationServiceAceitaBarra),
+                ("Barra nova possui altura padrao", BarraNovaPossuiAlturaPadrao),
+                ("Alterar altura da Barra muda Bounds", AlterarAlturaDaBarraMudaBounds),
+                ("Alterar altura da Barra redistribui terminais", AlterarAlturaDaBarraRedistribuiTerminais),
+                ("Cabo conectado a Barra reancora apos alterar altura", CaboConectadoABarraReancoraAposAlterarAltura),
+                ("Barra com altura alterada persiste apos reload", BarraComAlturaAlteradaPersisteAposReload),
+                ("ElectricGraph continua valido apos altura da Barra", ElectricGraphContinuaValidoAposAlturaDaBarra),
+                ("DTO nao muda por causa da altura da Barra", DtoNaoMudaPorCausaDaAlturaDaBarra),
+                ("Rotacao da Barra funciona apos altura alterada", RotacaoDaBarraFuncionaAposAlturaAlterada),
+                ("Cabo permanece ancorado apos altura rotacao movimento e reload", CaboPermaneceAncoradoAposAlturaRotacaoMovimentoEReload),
+                ("Altura invalida da Barra normaliza para minimo", AlturaInvalidaDaBarraNormalizaParaMinimo),
                 ("Barra selecionada rotaciona 0 para 90", BarraSelecionadaRotacionaZeroParaNoventa),
                 ("Barra cicla quadrantes", BarraCiclaQuadrantes),
                 ("Preview de Barra preserva rotacao", PreviewDeBarraPreservaRotacao),
@@ -1942,6 +1952,167 @@ namespace Araci.TechnicalChecks
             Assert(RotationService.PodeRotacionar(GetVm(context, bar)), "Barra deve ser aceita para rotacao.");
         }
 
+        private static void BarraNovaPossuiAlturaPadrao()
+        {
+            Barra bar = new();
+
+            AssertEqual(Barra.ALTURA_PADRAO, bar.Altura, "Altura padrao da Barra");
+            AssertEqual(24, bar.Terminais.Count, "Quantidade de terminais da Barra");
+        }
+
+        private static void AlterarAlturaDaBarraMudaBounds()
+        {
+            EditorContext context = CreateContextWithViewport();
+            Barra bar = CreateBar("BARRA-ALT-BOUNDS");
+            context.Document.AdicionarElemento(bar);
+            BarraViewModel vm = GetBarVm(context, bar);
+
+            double before = vm.Bounds.Height;
+            vm.Altura = 220;
+
+            AssertEqual(220, bar.Altura, "Barra.Altura");
+            AssertEqual(220, vm.Bounds.Height, "Bounds.Height");
+            Assert(before != vm.Bounds.Height, "Bounds deve mudar apos alterar altura.");
+        }
+
+        private static void AlterarAlturaDaBarraRedistribuiTerminais()
+        {
+            Barra bar = CreateBar("BARRA-ALT-TERMINAIS");
+            var before = bar.Terminais
+                .Select(t => (t.Id, t.Posicao, t.PosicaoLocal))
+                .ToList();
+
+            bar.Altura = 240;
+            bar.AtualizarTerminais();
+
+            AssertEqual(24, bar.Terminais.Count, "Quantidade de terminais");
+
+            for (int i = 0; i < before.Count; i++)
+                AssertEqual(before[i].Id, bar.Terminais[i].Id, $"Terminal {i}.Id");
+
+            AssertEqual(0, bar.Terminais[0].PosicaoLocal.Y, "Primeiro terminal local Y");
+            AssertEqual(240, bar.Terminais[^1].PosicaoLocal.Y, "Ultimo terminal local Y");
+            Assert(
+                before.Any(item => bar.Terminais.Single(t => t.Id == item.Id).Posicao != item.Posicao),
+                "Ao menos um terminal deve mudar de posicao apos alterar altura.");
+        }
+
+        private static void CaboConectadoABarraReancoraAposAlterarAltura()
+        {
+            BarRotationCircuit circuit = CreateBarRotationCircuit();
+            string origemId = circuit.Outgoing.OrigemId;
+            string destinoId = circuit.Outgoing.DestinoId;
+            string origemTerminalId = circuit.Outgoing.OrigemTerminalId;
+            string destinoTerminalId = circuit.Outgoing.DestinoTerminalId;
+            Point before = circuit.Outgoing.Vertices[0];
+            Point middle = new Point(230, 150);
+            circuit.Outgoing.Vertices.Insert(1, middle);
+
+            SetBarHeight(circuit.Context, circuit.Bar, 240);
+
+            Assert(before != circuit.Outgoing.Vertices[0], "Ponta conectada a Barra deve mover.");
+            AssertCableEndpointAtTerminal(circuit.Outgoing, true, circuit.Bar, 1, "Barra saida apos altura");
+            AssertEqual(middle.X, circuit.Outgoing.Vertices[1].X, "Intermediario X preservado");
+            AssertEqual(middle.Y, circuit.Outgoing.Vertices[1].Y, "Intermediario Y preservado");
+            AssertEqual(origemId, circuit.Outgoing.OrigemId, "OrigemId preservado");
+            AssertEqual(destinoId, circuit.Outgoing.DestinoId, "DestinoId preservado");
+            AssertEqual(origemTerminalId, circuit.Outgoing.OrigemTerminalId, "OrigemTerminalId preservado");
+            AssertEqual(destinoTerminalId, circuit.Outgoing.DestinoTerminalId, "DestinoTerminalId preservado");
+        }
+
+        private static void BarraComAlturaAlteradaPersisteAposReload()
+        {
+            BarRotationCircuit circuit = CreateBarRotationCircuit();
+            SetBarHeight(circuit.Context, circuit.Bar, 260);
+
+            AraciDocument loaded = SaveAndLoad(circuit.Context.Document);
+            Barra loadedBar = FindById<Barra>(loaded, circuit.Bar.Id);
+
+            AssertEqual(260, loadedBar.Altura, "Altura apos reload");
+            AssertEqual(260, loadedBar.Terminais[^1].PosicaoLocal.Y, "Ultimo terminal apos reload");
+            AssertCableEndpointAtTerminal(
+                FindById<Cabo>(loaded, circuit.Outgoing.Id),
+                true,
+                loadedBar,
+                1,
+                "Cabo saida apos reload");
+        }
+
+        private static void ElectricGraphContinuaValidoAposAlturaDaBarra()
+        {
+            BarRotationCircuit circuit = CreateBarRotationCircuit();
+            SetBarHeight(circuit.Context, circuit.Bar, 240);
+
+            ElectricGraph graph = new ElectricGraphBuilder(circuit.Context.Document).Build();
+
+            AssertEqual(2, graph.Edges.Count, "Quantidade de arestas");
+            AssertEqual(0, graph.GetInvalidEdges().Count, "Arestas invalidas");
+            AssertEqual(2, graph.GetEdgesForElement(circuit.Bar.Id.ToString()).Count, "Arestas da Barra");
+        }
+
+        private static void DtoNaoMudaPorCausaDaAlturaDaBarra()
+        {
+            BarRotationCircuit circuit = CreateBarRotationCircuit();
+            CircuitDto before = new CircuitBuilder(new ParameterReader(circuit.Context.Document)).Build();
+
+            SetBarHeight(circuit.Context, circuit.Bar, 240);
+            CircuitDto after = new CircuitBuilder(new ParameterReader(circuit.Context.Document)).Build();
+
+            AssertEqual(before.Slack!.Id, after.Slack!.Id, "Slack.Id");
+            AssertEqual(before.Lines.Count, after.Lines.Count, "Lines.Count");
+            AssertEqual(before.Loads.Count, after.Loads.Count, "Loads.Count");
+            AssertEqual(before.Lines[0].Barra1, after.Lines[0].Barra1, "Line[0].Barra1");
+            AssertEqual(before.Lines[0].Barra2, after.Lines[0].Barra2, "Line[0].Barra2");
+            AssertEqual(before.Lines[1].Barra1, after.Lines[1].Barra1, "Line[1].Barra1");
+            AssertEqual(before.Lines[1].Barra2, after.Lines[1].Barra2, "Line[1].Barra2");
+            AssertEqual(before.Loads.Single().Barra, after.Loads.Single().Barra, "Load.Barra");
+        }
+
+        private static void RotacaoDaBarraFuncionaAposAlturaAlterada()
+        {
+            BarRotationCircuit circuit = CreateBarRotationCircuit();
+            SetBarHeight(circuit.Context, circuit.Bar, 240);
+            Point before = circuit.Outgoing.Vertices[0];
+
+            RotateSelected(circuit.Context, circuit.Bar);
+
+            AssertEqual(90, circuit.Bar.Rotacao, "Rotacao da Barra");
+            Assert(before != circuit.Outgoing.Vertices[0], "Cabo deve reancorar apos rotacao com altura alterada.");
+            AssertCableEndpointAtTerminal(circuit.Outgoing, true, circuit.Bar, 1, "Barra saida apos altura e rotacao");
+        }
+
+        private static void CaboPermaneceAncoradoAposAlturaRotacaoMovimentoEReload()
+        {
+            BarRotationCircuit circuit = CreateBarRotationCircuit();
+            Point middle = new Point(230, 150);
+            circuit.Outgoing.Vertices.Insert(1, middle);
+
+            SetBarHeight(circuit.Context, circuit.Bar, 240);
+            RotateSelected(circuit.Context, circuit.Bar);
+            MoveElement(circuit.Context, circuit.Bar, new Vector(35, 20));
+
+            AraciDocument loaded = SaveAndLoad(circuit.Context.Document);
+            Barra loadedBar = FindById<Barra>(loaded, circuit.Bar.Id);
+            Cabo loadedOutgoing = FindById<Cabo>(loaded, circuit.Outgoing.Id);
+
+            AssertEqual(240, loadedBar.Altura, "Altura apos sequencia e reload");
+            AssertEqual(90, loadedBar.Rotacao, "Rotacao apos sequencia e reload");
+            AssertCableEndpointAtTerminal(loadedOutgoing, true, loadedBar, 1, "Cabo apos sequencia e reload");
+            AssertEqual(middle.X, loadedOutgoing.Vertices[1].X, "Intermediario X apos sequencia e reload");
+            AssertEqual(middle.Y, loadedOutgoing.Vertices[1].Y, "Intermediario Y apos sequencia e reload");
+        }
+
+        private static void AlturaInvalidaDaBarraNormalizaParaMinimo()
+        {
+            Barra bar = CreateBar("BARRA-ALT-MIN");
+
+            bar.Altura = -10;
+            bar.AtualizarTerminais();
+
+            AssertEqual(Barra.ALTURA_MINIMA, bar.Altura, "Altura minima");
+            AssertEqual(Barra.ALTURA_MINIMA, bar.Terminais[^1].PosicaoLocal.Y, "Ultimo terminal com altura minima");
+        }
+
         private static void BarraSelecionadaRotacionaZeroParaNoventa()
         {
             BarRotationCircuit circuit = CreateBarRotationCircuit();
@@ -2215,6 +2386,28 @@ namespace Araci.TechnicalChecks
 
             context.Selection.Selecionar(vm);
             Assert(context.Rotation.RotateSelectionClockwise(), "Rotacao da selecao deve ser aplicada.");
+        }
+
+        private static void SetBarHeight(EditorContext context, Barra bar, double height)
+        {
+            GetBarVm(context, bar).Altura = height;
+        }
+
+        private static void MoveElement(EditorContext context, Elemento elemento, Vector delta)
+        {
+            ElementoViewModel vm = GetVm(context, elemento);
+
+            context.Move.BeginMove(new[] { vm });
+            context.Move.MoverVisual(vm, delta);
+            context.Move.EndMove(new[] { vm });
+        }
+
+        private static BarraViewModel GetBarVm(EditorContext context, Barra bar)
+        {
+            if (GetVm(context, bar) is not BarraViewModel vm)
+                throw new InvalidOperationException($"ViewModel da Barra '{bar.Nome}' nao encontrado.");
+
+            return vm;
         }
 
         private static ElementoViewModel GetVm(EditorContext context, Elemento elemento)

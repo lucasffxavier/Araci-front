@@ -9,6 +9,8 @@ namespace Araci.Models
     {
         public const string PARAM_ALTURA = "Altura";
         public const string PARAM_TENSAO = "Tensao";
+        public const double ALTURA_PADRAO = 120;
+        public const double ALTURA_MINIMA = 40;
 
         private readonly List<Terminal> _terminais = new();
 
@@ -16,7 +18,7 @@ namespace Araci.Models
         {
             Nome = "BARRA-001";
 
-            DefinirParametro(new Parameter<double>(PARAM_ALTURA, 120));
+            DefinirParametro(new Parameter<double>(PARAM_ALTURA, ALTURA_PADRAO));
             DefinirParametro(new Parameter<string>(PARAM_TENSAO, "13.8∠0°"));
 
             CriarTerminais();
@@ -31,8 +33,8 @@ namespace Araci.Models
 
         public double Altura
         {
-            get => Obter<double>(PARAM_ALTURA);
-            set => Definir(PARAM_ALTURA, value);
+            get => NormalizarAltura(Obter<double>(PARAM_ALTURA));
+            set => Definir(PARAM_ALTURA, NormalizarAltura(value));
         }
 
         public string Tensao
@@ -73,6 +75,13 @@ namespace Araci.Models
             clone.AtualizarTerminais();
 
             return clone;
+        }
+
+        public static double NormalizarAltura(double value)
+        {
+            return value < ALTURA_MINIMA || double.IsNaN(value) || double.IsInfinity(value)
+                ? ALTURA_MINIMA
+                : value;
         }
 
         private void CriarTerminais()

@@ -246,6 +246,7 @@ namespace Araci.Services
             elemento.Tipo = ResolverTipo(dto.Kind, dto.Type);
 
             AplicarParametros(elemento, dto.Parameters);
+            NormalizarParametros(elemento);
             AplicarVertices(elemento, dto.Vertices);
             _context.TerminalLayout.AtualizarTerminais(elemento);
             RestaurarTerminais(elemento, dto.Terminals);
@@ -263,6 +264,12 @@ namespace Araci.Services
                 Parameter parameter = elemento.Parametros[dto.Name];
                 parameter.ValorObjeto = ConverterValor(dto, parameter.Tipo);
             }
+        }
+
+        private static void NormalizarParametros(Elemento elemento)
+        {
+            if (elemento is Barra barra)
+                barra.Altura = barra.Altura;
         }
 
         private static object? ConverterValor(ParameterDto dto, Type destino)

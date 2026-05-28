@@ -25,6 +25,8 @@ namespace Araci.ViewModels
 
         public Barra Barra => (Barra)Modelo;
 
+        public ElementGeometryUpdateService? GeometryUpdates { get; set; }
+
         public override IEnumerable TiposDisponiveis => Types.TiposBarras;
 
         public string Nome
@@ -60,13 +62,23 @@ namespace Araci.ViewModels
             get => Barra.Altura;
             set
             {
-                if (Barra.Altura == value)
+                double altura = Barra.NormalizarAltura(value);
+
+                if (Barra.Altura == altura)
                     return;
 
-                Barra.Altura = value;
+                if (GeometryUpdates == null)
+                {
+                    Barra.Altura = altura;
+                    AtualizarNode();
+                }
+                else
+                {
+                    GeometryUpdates.AplicarAlturaBarra(Barra, altura);
+                }
+
                 OnPropertyChanged();
                 NotificarParametros();
-                AtualizarNode();
             }
         }
 

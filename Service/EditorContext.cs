@@ -36,8 +36,9 @@ namespace Araci.Services
             Geometry = new ElementGeometryService(Elements);
             TerminalLayout = new TerminalLayoutService(Elements, Geometry);
             Names = new NameService(Document, Elements);
+            GeometryUpdates = new ElementGeometryUpdateService(this);
 
-            ElementoFactory = new ElementoFactory(Elements, Names, TypePropertiesDialogs, TerminalLayout);
+            ElementoFactory = new ElementoFactory(Elements, Names, TypePropertiesDialogs, TerminalLayout, GeometryUpdates);
             CableVertexEdit = new CableVertexEditService(this);
             Selection = new SelectionService(this);
             Selection.SelectionChanged += CableVertexEdit.Refresh;
@@ -128,6 +129,8 @@ namespace Araci.Services
         public ElementGeometryService Geometry { get; }
 
         public TerminalLayoutService TerminalLayout { get; }
+
+        public ElementGeometryUpdateService GeometryUpdates { get; }
 
         public ElementRegistryService Elements { get; }
 
