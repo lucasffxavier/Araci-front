@@ -1,6 +1,8 @@
 using System;
+using System.Linq;
 using System.Windows;
 using Araci.Core.SceneQueries;
+using Araci.Models;
 using Araci.Services;
 using Araci.ViewModels;
 
@@ -8,17 +10,14 @@ namespace Araci.Applications.Editar.Selecionar
 {
     public class SelectionBoxController
     {
+        private const double ToleranciaBarra = 6;
         private readonly SelectionBoxViewModel _selectionBox;
         private readonly ISceneQueryService _queries;
         private readonly SelectionService _selection;
-
         private Point _inicio;
         private bool _adicionarAoExistente;
 
-        public SelectionBoxController(
-            SelectionBoxViewModel selectionBox,
-            ISceneQueryService queries,
-            SelectionService selection)
+        public SelectionBoxController(SelectionBoxViewModel selectionBox, ISceneQueryService queries, SelectionService selection)
         {
             _selectionBox = selectionBox ?? throw new ArgumentNullException(nameof(selectionBox));
             _queries = queries ?? throw new ArgumentNullException(nameof(queries));
@@ -30,13 +29,10 @@ namespace Araci.Applications.Editar.Selecionar
         public void Begin(Point position, bool adicionarAoExistente)
         {
             _adicionarAoExistente = adicionarAoExistente;
-
             if (!_adicionarAoExistente)
                 _selection.Limpar();
-
             _inicio = position;
             IsActive = true;
-
             _selectionBox.Visivel = true;
             _selectionBox.Atualizar(position, position);
         }
@@ -45,7 +41,6 @@ namespace Araci.Applications.Editar.Selecionar
         {
             if (!IsActive)
                 return;
-
             _selectionBox.Atualizar(_inicio, position);
         }
 
@@ -54,11 +49,10 @@ namespace Araci.Applications.Editar.Selecionar
             if (!IsActive)
                 return;
 
-            Rect bounds = _selectionBox.Bounds;
-
-            foreach (ElementoViewModel item in _queries.Query(bounds))
+            Rect area = _selectionBox.Bounds;
+            foreach (ElementoViewModel item in _queries.Query(area))
             {
-                if (IntersectaSelecao(item, bounds))
+                if (IntersectaSelecao(item, area))
                     _selection.Selecionar(item, true);
             }
 
@@ -76,13 +70,54 @@ namespace Araci.Applications.Editar.Selecionar
             if (vm is CaboViewModel cabo)
                 return IntersectaCabo(cabo, area);
 
+            if (vm.Modelo is Barra barra)
+                return IntersectaBarra(barra, area);
+
             return vm.Bounds.IntersectsWith(area);
+        }
+
+        private static bool IntersectaBarra(Barra barra, Rect area)
+        {
+            Terminal[] terminais = barra.Terminais.ToArray();
+            if (terminais.Length == 0)
+                return false;
+
+            Rect areaComTolerancia = Expandir(area, ToleranciaBarra);
+            foreach (Terminal terminal in terminais)
+            {
+                if (areaComTolerancia.Contains(terminal.Posicao))
+                    return true;
+            }
+
+            if (terminais.Length == 1)
+                return false;
+
+            Point a = terminais[0].Posicao;
+            Point b = terminais[1].Posicao;
+            double maiorDistancia = DistanciaQuadrada(a, b);
+
+            for (int i = 0; i < terminais.Length; i++)
+            {
+                for (int j = i + 1; j < terminais.Length; j++)
+                {
+                    Point p1 = terminais[i].Posicao;
+                    Point p2 = terminais[j].Posicao;
+                    double distancia = DistanciaQuadrada(p1, p2);
+                    if (distancia > maiorDistancia)
+                    {
+                        maiorDistancia = distancia;
+                        a = p1;
+                        b = p2;
+                    }
+                }
+            }
+
+            return SegmentoIntersectaRect(a, b, areaComTolerancia);
         }
 
         private static bool IntersectaCabo(CaboViewModel cabo, Rect area)
         {
             var vertices = cabo.Cabo.Vertices;
-
             if (vertices.Count < 2)
                 return cabo.Bounds.IntersectsWith(area);
 
@@ -99,6 +134,22 @@ namespace Araci.Applications.Editar.Selecionar
             }
 
             return false;
+        }
+
+        private static Rect Expandir(Rect rect, double margem)
+        {
+            return new Rect(
+                rect.Left - margem,
+                rect.Top - margem,
+                rect.Width + margem * 2,
+                rect.Height + margem * 2);
+        }
+
+        private static double DistanciaQuadrada(Point a, Point b)
+        {
+            double dx = a.X - b.X;
+            double dy = a.Y - b.Y;
+            return dx * dx + dy * dy;
         }
 
         private static bool SegmentoIntersectaRect(Point a, Point b, Rect rect)
