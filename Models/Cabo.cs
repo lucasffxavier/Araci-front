@@ -36,10 +36,10 @@ namespace Araci.Models
             DefinirParametro(new Parameter<string>(PARAM_BARRA_DESTINO, "CARGA-001"));
             DefinirParametro(new Parameter<double>(PARAM_COMPRIMENTO, 1));
             DefinirParametro(new Parameter<double>(PARAM_AMPACIDADE, 520));
-            DefinirParametro(new Parameter<string>(PARAM_TENSAO_LINHA, "12.47∠0°"));
-            DefinirParametro(new Parameter<string>(PARAM_TENSAO_FASE_A, "7.2∠0°"));
-            DefinirParametro(new Parameter<string>(PARAM_TENSAO_FASE_B, "7.2∠-120°"));
-            DefinirParametro(new Parameter<string>(PARAM_TENSAO_FASE_C, "7.2∠120°"));
+            DefinirParametro(new Parameter<string>(PARAM_TENSAO_LINHA, "12,47∠0°"));
+            DefinirParametro(new Parameter<string>(PARAM_TENSAO_FASE_A, "7,2∠0°"));
+            DefinirParametro(new Parameter<string>(PARAM_TENSAO_FASE_B, "7,2∠-120°"));
+            DefinirParametro(new Parameter<string>(PARAM_TENSAO_FASE_C, "7,2∠120°"));
             DefinirParametro(new Parameter<string>(PARAM_CORRENTE_LINHA, "0∠0°"));
             DefinirParametro(new Parameter<string>(PARAM_CORRENTE_FASE_A, "0∠0°"));
             DefinirParametro(new Parameter<string>(PARAM_CORRENTE_FASE_B, "0∠-120°"));

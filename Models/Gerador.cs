@@ -33,10 +33,10 @@ namespace Araci.Models
             PotenciaAparente = 1020;
             PotenciaAtiva = 1000;
             PotenciaReativa = 203;
-            TensaoLinha = "12.47∠0°";
-            TensaoFaseA = "7.2∠0°";
-            TensaoFaseB = "7.2∠-120°";
-            TensaoFaseC = "7.2∠120°";
+            TensaoLinha = "12,47∠0°";
+            TensaoFaseA = "7,2∠0°";
+            TensaoFaseB = "7,2∠-120°";
+            TensaoFaseC = "7,2∠120°";
             CorrenteLinha = "0∠0°";
             CorrenteFaseA = "0∠0°";
             CorrenteFaseB = "0∠-120°";

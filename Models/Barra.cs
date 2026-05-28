@@ -19,7 +19,7 @@ namespace Araci.Models
             Nome = "BARRA-001";
 
             DefinirParametro(new Parameter<double>(PARAM_ALTURA, ALTURA_PADRAO));
-            DefinirParametro(new Parameter<string>(PARAM_TENSAO, "13.8∠0°"));
+            DefinirParametro(new Parameter<string>(PARAM_TENSAO, "13,8∠0°"));
 
             CriarTerminais();
             AtualizarTerminais();

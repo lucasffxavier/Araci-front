@@ -18,10 +18,10 @@ namespace Araci.Models
             CorrenteFaseA = "0∠0°";
             CorrenteFaseB = "0∠-120°";
             CorrenteFaseC = "0∠120°";
-            TensaoLinha = "12.47∠0°";
-            TensaoFaseA = "7.2∠0°";
-            TensaoFaseB = "7.2∠-120°";
-            TensaoFaseC = "7.2∠120°";
+            TensaoLinha = "12,47∠0°";
+            TensaoFaseA = "7,2∠0°";
+            TensaoFaseB = "7,2∠-120°";
+            TensaoFaseC = "7,2∠120°";
 
             PosicaoX = 500;
             PosicaoY = 250;
