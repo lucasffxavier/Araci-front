@@ -116,39 +116,27 @@ namespace Araci.DTOs
                     Enrolamentos = ReadIntWithDefault(transformador, 2, "Enrolamentos"),
                     BarraPrimario = ResolverBarraTransformador(transformador, Transformador.TERMINAL_PRIMARIO),
                     BarraSecundario = ResolverBarraTransformador(transformador, Transformador.TERMINAL_SECUNDARIO),
-                    TensaoPrimarioKV = ReadKvWithDefault(
-                        transformador,
-                        13.8,
-                        "TensaoPrimarioKV",
-                        "TensaoPrimariaKV",
-                        "TensaoAltaKV",
-                        "TensaoATKV"),
-                    TensaoSecundarioKV = ReadKvWithDefault(
-                        transformador,
-                        0.38,
-                        "TensaoSecundarioKV",
-                        "TensaoSecundariaKV",
-                        "TensaoBaixaKV",
-                        "TensaoBTKV"),
-                    PotenciaKVA = ReadPowerKva(transformador),
+                    TensaoPrimarioKV = ReadKvFromInstanceWithDefault(transformador, 13.8, "TensaoPrimarioKV", "TensaoPrimariaKV", "TensaoAltaKV", "TensaoATKV"),
+                    TensaoSecundarioKV = ReadKvFromInstanceWithDefault(transformador, 0.38, "TensaoSecundarioKV", "TensaoSecundariaKV", "TensaoBaixaKV", "TensaoBTKV"),
+                    PotenciaKVA = ReadPowerKvaFromInstance(transformador),
                     RPercentual = ReadDoubleWithDefault(transformador, 1, "RPercentual", "ResistenciaPercentual", "PercentR"),
                     XPercentual = ReadDoubleWithDefault(transformador, 5, "XPercentual", "ReatanciaPercentual", "PercentX"),
-                    LigacaoPrimario = ReadStringWithDefault(
-                        transformador,
-                        "Wye",
-                        "LigacaoPrimario",
-                        "LigacaoPrimaria",
-                        "ConexaoPrimario",
-                        "ConexaoPrimaria"),
-                    LigacaoSecundario = ReadStringWithDefault(
-                        transformador,
-                        "Wye",
-                        "LigacaoSecundario",
-                        "LigacaoSecundaria",
-                        "ConexaoSecundario",
-                        "ConexaoSecundaria")
+                    LigacaoPrimario = ReadStringWithDefault(transformador, "Wye", "LigacaoPrimario", "LigacaoPrimaria", "ConexaoPrimario", "ConexaoPrimaria"),
+                    LigacaoSecundario = ReadStringWithDefault(transformador, "Wye", "LigacaoSecundario", "LigacaoSecundaria", "ConexaoSecundario", "ConexaoSecundaria")
                 })
                 .ToList();
+        }
+
+        private static double ReadPowerKvaFromInstance(Elemento elemento)
+        {
+            double aparente = ReadDoubleFrom(elemento.Parametros, "PotenciaAparente", "PotenciaAparenteKVA", "PotenciaKVA", "PotenciaNominalKVA");
+            return aparente > 0 ? aparente : 500;
+        }
+
+        private static double ReadKvFromInstanceWithDefault(Elemento elemento, double defaultValue, params string[] names)
+        {
+            double modelValue = ReadKvFrom(elemento.Parametros, names);
+            return modelValue > 0 ? modelValue : defaultValue;
         }
 
         public IList<GeneratorData> GetGenerators()

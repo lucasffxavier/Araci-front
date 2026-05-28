@@ -18,7 +18,6 @@ namespace Araci.ViewModels
             {
                 if (TipoTransformador.Fases == value)
                     return;
-
                 TipoTransformador.Fases = value;
                 OnPropertyChanged();
             }
@@ -31,60 +30,55 @@ namespace Araci.ViewModels
             {
                 if (TipoTransformador.Enrolamentos == value)
                     return;
-
                 TipoTransformador.Enrolamentos = value;
                 OnPropertyChanged();
             }
         }
 
-        public double TensaoPrimarioKV
+        public double RPercentual
         {
-            get => TipoTransformador.TensaoPrimarioKV;
+            get => TipoTransformador.RPercentual;
             set
             {
-                if (TipoTransformador.TensaoPrimarioKV == value)
+                if (TipoTransformador.RPercentual == value)
                     return;
-
-                TipoTransformador.TensaoPrimarioKV = value;
+                TipoTransformador.RPercentual = value;
                 OnPropertyChanged();
             }
         }
 
-        public double TensaoSecundarioKV
+        public double XPercentual
         {
-            get => TipoTransformador.TensaoSecundarioKV;
+            get => TipoTransformador.XPercentual;
             set
             {
-                if (TipoTransformador.TensaoSecundarioKV == value)
+                if (TipoTransformador.XPercentual == value)
                     return;
-
-                TipoTransformador.TensaoSecundarioKV = value;
+                TipoTransformador.XPercentual = value;
                 OnPropertyChanged();
             }
         }
 
-        public double PotenciaKVA
+        public string LigacaoPrimario
         {
-            get => TipoTransformador.PotenciaKVA;
+            get => TipoTransformador.LigacaoPrimario;
             set
             {
-                if (TipoTransformador.PotenciaKVA == value)
+                if (TipoTransformador.LigacaoPrimario == value)
                     return;
-
-                TipoTransformador.PotenciaKVA = value;
+                TipoTransformador.LigacaoPrimario = value;
                 OnPropertyChanged();
             }
         }
 
-        public double PotenciaMVA
+        public string LigacaoSecundario
         {
-            get => TipoTransformador.PotenciaMVA;
+            get => TipoTransformador.LigacaoSecundario;
             set
             {
-                if (TipoTransformador.PotenciaMVA == value)
+                if (TipoTransformador.LigacaoSecundario == value)
                     return;
-
-                TipoTransformador.PotenciaMVA = value;
+                TipoTransformador.LigacaoSecundario = value;
                 OnPropertyChanged();
             }
         }

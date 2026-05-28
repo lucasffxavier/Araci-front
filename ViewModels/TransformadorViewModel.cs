@@ -3,7 +3,6 @@ using System.Windows;
 using Araci.Core.Rendering;
 using Araci.Core.SceneNodes;
 using Araci.Models;
-using Araci.Models.Tipos;
 using Araci.Services;
 
 namespace Araci.ViewModels
@@ -34,7 +33,6 @@ namespace Araci.ViewModels
         }
 
         public Transformador Transformador => (Transformador)Modelo;
-
         public override IEnumerable TiposDisponiveis => Types.TiposTransformadores;
 
         public string Nome
@@ -44,7 +42,6 @@ namespace Araci.ViewModels
             {
                 if (Transformador.Nome == value)
                     return;
-
                 RenomearModelo(value);
                 OnPropertyChanged();
                 NotificarParametros();
@@ -58,22 +55,7 @@ namespace Araci.ViewModels
             {
                 if (Transformador.Barra == value)
                     return;
-
                 Transformador.Barra = value;
-                OnPropertyChanged();
-                NotificarParametros();
-            }
-        }
-
-        public string TensaoLinha
-        {
-            get => Transformador.TensaoLinha;
-            set
-            {
-                if (Transformador.TensaoLinha == value)
-                    return;
-
-                Transformador.TensaoLinha = value;
                 OnPropertyChanged();
                 NotificarParametros();
             }
@@ -86,7 +68,6 @@ namespace Araci.ViewModels
             {
                 if (Transformador.Alimentador == value)
                     return;
-
                 Transformador.Alimentador = value;
                 OnPropertyChanged();
                 NotificarParametros();
@@ -95,62 +76,56 @@ namespace Araci.ViewModels
 
         public int Fases
         {
-            get => Transformador.Obter<int>(TipoTransformador.PARAM_FASES);
-            set => DefinirParametro(TipoTransformador.PARAM_FASES, value <= 0 ? 1 : value);
+            get => Transformador.Fases;
+            set => DefinirParametro(Transformador.PARAM_FASES, value <= 0 ? 3 : value);
         }
 
         public int Enrolamentos
         {
-            get => Transformador.Obter<int>(TipoTransformador.PARAM_ENROLAMENTOS);
-            set => DefinirParametro(TipoTransformador.PARAM_ENROLAMENTOS, value <= 0 ? 2 : value);
+            get => Transformador.Enrolamentos;
+            set => DefinirParametro(Transformador.PARAM_ENROLAMENTOS, value <= 0 ? 2 : value);
         }
 
         public double TensaoPrimarioKV
         {
-            get => Transformador.Obter<double>(TipoTransformador.PARAM_TENSAO_PRIMARIO_KV);
-            set => DefinirParametro(TipoTransformador.PARAM_TENSAO_PRIMARIO_KV, value);
+            get => Transformador.TensaoPrimarioKV;
+            set => DefinirParametro(Transformador.PARAM_TENSAO_PRIMARIO_KV, value > 0 ? value : 13.8);
         }
 
         public double TensaoSecundarioKV
         {
-            get => Transformador.Obter<double>(TipoTransformador.PARAM_TENSAO_SECUNDARIO_KV);
-            set => DefinirParametro(TipoTransformador.PARAM_TENSAO_SECUNDARIO_KV, value);
+            get => Transformador.TensaoSecundarioKV;
+            set => DefinirParametro(Transformador.PARAM_TENSAO_SECUNDARIO_KV, value > 0 ? value : 0.38);
         }
 
-        public double PotenciaKVA
+        public double PotenciaAparente
         {
-            get => Transformador.Obter<double>(TipoTransformador.PARAM_POTENCIA_KVA);
-            set => DefinirParametro(TipoTransformador.PARAM_POTENCIA_KVA, value);
-        }
-
-        public double PotenciaMVA
-        {
-            get => Transformador.Obter<double>(TipoTransformador.PARAM_POTENCIA_MVA);
-            set => DefinirParametro(TipoTransformador.PARAM_POTENCIA_MVA, value);
+            get => Transformador.PotenciaAparente;
+            set => DefinirParametro(Transformador.PARAM_POTENCIA_APARENTE, value > 0 ? value : 500);
         }
 
         public double RPercentual
         {
-            get => Transformador.Obter<double>(TipoTransformador.PARAM_R_PERCENTUAL);
-            set => DefinirParametro(TipoTransformador.PARAM_R_PERCENTUAL, value);
+            get => Transformador.RPercentual;
+            set => DefinirParametro(Transformador.PARAM_R_PERCENTUAL, value < 0 ? 0 : value);
         }
 
         public double XPercentual
         {
-            get => Transformador.Obter<double>(TipoTransformador.PARAM_X_PERCENTUAL);
-            set => DefinirParametro(TipoTransformador.PARAM_X_PERCENTUAL, value);
+            get => Transformador.XPercentual;
+            set => DefinirParametro(Transformador.PARAM_X_PERCENTUAL, value < 0 ? 0 : value);
         }
 
         public string LigacaoPrimario
         {
-            get => Transformador.Obter<string>(TipoTransformador.PARAM_LIGACAO_PRIMARIO);
-            set => DefinirParametro(TipoTransformador.PARAM_LIGACAO_PRIMARIO, value);
+            get => Transformador.LigacaoPrimario;
+            set => DefinirParametro(Transformador.PARAM_LIGACAO_PRIMARIO, value);
         }
 
         public string LigacaoSecundario
         {
-            get => Transformador.Obter<string>(TipoTransformador.PARAM_LIGACAO_SECUNDARIO);
-            set => DefinirParametro(TipoTransformador.PARAM_LIGACAO_SECUNDARIO, value);
+            get => Transformador.LigacaoSecundario;
+            set => DefinirParametro(Transformador.PARAM_LIGACAO_SECUNDARIO, value);
         }
 
         protected override void AtualizarNode()

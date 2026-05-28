@@ -17,27 +17,17 @@ namespace Araci.Services
         }
 
         public ObservableCollection<TipoCabo> TiposCabos { get; } = new();
-
         public ObservableCollection<TipoCarga> TiposCargas { get; } = new();
-
         public ObservableCollection<TipoGerador> TiposGeradores { get; } = new();
-
         public ObservableCollection<TipoSin> TiposSin { get; } = new();
-
         public ObservableCollection<TipoTransformador> TiposTransformadores { get; } = new();
-
         public ObservableCollection<TipoBarra> TiposBarras { get; } = new();
 
         public TipoCabo? TipoCaboPadrao => TiposCabos.FirstOrDefault();
-
         public TipoCarga? TipoCargaPadrao => TiposCargas.FirstOrDefault();
-
         public TipoGerador? TipoGeradorPadrao => TiposGeradores.FirstOrDefault();
-
         public TipoSin? TipoSinPadrao => TiposSin.FirstOrDefault();
-
         public TipoTransformador? TipoTransformadorPadrao => TiposTransformadores.FirstOrDefault();
-
         public TipoBarra? TipoBarraPadrao => TiposBarras.FirstOrDefault();
 
         private void InicializarCabos()
@@ -114,9 +104,10 @@ namespace Araci.Services
                     Categoria = "Transformadores",
                     Fases = 3,
                     Enrolamentos = 2,
-                    TensaoPrimarioKV = 13.8,
-                    TensaoSecundarioKV = 0.38,
-                    PotenciaKVA = 500
+                    RPercentual = 1,
+                    XPercentual = 5,
+                    LigacaoPrimario = "Wye",
+                    LigacaoSecundario = "Wye"
                 });
         }
 
