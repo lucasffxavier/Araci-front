@@ -99,7 +99,6 @@ namespace Araci.Services
                     Familia = "Fontes",
                     Categoria = "SIN",
                     Fases = 3,
-                    TensaoKV = 12.47,
                     PotenciaCurtoMVA = 500,
                     RelacaoXR = 10
                 });

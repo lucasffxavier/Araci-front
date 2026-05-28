@@ -18,21 +18,7 @@ namespace Araci.ViewModels
             {
                 if (TipoSin.Fases == value)
                     return;
-
                 TipoSin.Fases = value;
-                OnPropertyChanged();
-            }
-        }
-
-        public double TensaoKV
-        {
-            get => TipoSin.TensaoKV;
-            set
-            {
-                if (TipoSin.TensaoKV == value)
-                    return;
-
-                TipoSin.TensaoKV = value;
                 OnPropertyChanged();
             }
         }
@@ -44,7 +30,6 @@ namespace Araci.ViewModels
             {
                 if (TipoSin.PotenciaCurtoMVA == value)
                     return;
-
                 TipoSin.PotenciaCurtoMVA = value;
                 OnPropertyChanged();
             }
@@ -57,7 +42,6 @@ namespace Araci.ViewModels
             {
                 if (TipoSin.RelacaoXR == value)
                     return;
-
                 TipoSin.RelacaoXR = value;
                 OnPropertyChanged();
             }
