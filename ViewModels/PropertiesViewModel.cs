@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Collections;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.ComponentModel;
@@ -6,23 +7,28 @@ using System.Globalization;
 using System.Linq;
 using System.Reflection;
 using System.Runtime.CompilerServices;
+using System.Windows.Input;
+using Araci.Models.Tipos;
 
 namespace Araci.ViewModels
 {
     public class PropertiesViewModel : INotifyPropertyChanged
     {
+        private readonly IReadOnlyList<ElementoViewModel> _selecionados;
         private object? _elementoSelecionado;
+        private ICommand? _abrirPropriedadesTipoCommand;
 
         public PropertiesViewModel()
         {
+            _selecionados = Array.Empty<ElementoViewModel>();
         }
 
         public PropertiesViewModel(IEnumerable<ElementoViewModel> selecionados)
         {
-            var itens = selecionados?.Where(e => e != null).ToList() ?? new List<ElementoViewModel>();
-            QuantidadeSelecionada = itens.Count;
-            Titulo = CriarTitulo(itens);
-            Propriedades = new ObservableCollection<PropertyDescriptorViewModel>(CriarDescritores(itens));
+            _selecionados = selecionados?.Where(e => e != null).ToList() ?? new List<ElementoViewModel>();
+            QuantidadeSelecionada = _selecionados.Count;
+            Titulo = CriarTitulo(_selecionados);
+            Propriedades = new ObservableCollection<PropertyDescriptorViewModel>(CriarDescritores(_selecionados));
         }
 
         public object? ElementoSelecionado
@@ -41,6 +47,44 @@ namespace Araci.ViewModels
         public int QuantidadeSelecionada { get; }
         public string Titulo { get; } = "Propriedades";
         public ObservableCollection<PropertyDescriptorViewModel> Propriedades { get; } = new();
+        public bool MesmoTipo => _selecionados.Count > 0 && _selecionados.All(e => e.GetType() == _selecionados[0].GetType());
+        public bool ExibirSeletorTipo => MesmoTipo;
+        public IEnumerable TiposDisponiveis => MesmoTipo ? _selecionados[0].TiposDisponiveis : Array.Empty<object>();
+        public bool PodeAbrirPropriedadesTipo => MesmoTipo && Tipo != null;
+
+        public TipoElemento? Tipo
+        {
+            get
+            {
+                if (!MesmoTipo || _selecionados.Count == 0)
+                    return null;
+
+                var primeiro = _selecionados[0].Tipo;
+                return _selecionados.All(e => ReferenceEquals(e.Tipo, primeiro)) ? primeiro : null;
+            }
+            set
+            {
+                if (!MesmoTipo || value == null)
+                    return;
+
+                foreach (var elemento in _selecionados)
+                    elemento.Tipo = value;
+
+                OnPropertyChanged();
+                OnPropertyChanged(nameof(PodeAbrirPropriedadesTipo));
+            }
+        }
+
+        public ICommand AbrirPropriedadesTipoCommand =>
+            _abrirPropriedadesTipoCommand ??= new SimpleCommand(AbrirPropriedadesTipo, () => PodeAbrirPropriedadesTipo);
+
+        private void AbrirPropriedadesTipo()
+        {
+            if (!PodeAbrirPropriedadesTipo)
+                return;
+
+            _selecionados[0].AbrirPropriedadesTipoCommand.Execute(null);
+        }
 
         private static string CriarTitulo(IReadOnlyList<ElementoViewModel> itens)
         {
@@ -211,6 +255,36 @@ namespace Araci.ViewModels
         protected virtual void OnPropertyChanged([CallerMemberName] string? nome = null)
         {
             PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nome));
+        }
+
+        private sealed class SimpleCommand : ICommand
+        {
+            private readonly Action _execute;
+            private readonly Func<bool>? _canExecute;
+
+            public SimpleCommand(Action execute, Func<bool>? canExecute = null)
+            {
+                _execute = execute ?? throw new ArgumentNullException(nameof(execute));
+                _canExecute = canExecute;
+            }
+
+            public bool CanExecute(object? parameter)
+            {
+                return _canExecute?.Invoke() ?? true;
+            }
+
+            public void Execute(object? parameter)
+            {
+                if (CanExecute(parameter))
+                    _execute();
+            }
+
+            public event EventHandler? CanExecuteChanged;
+
+            public void RaiseCanExecuteChanged()
+            {
+                CanExecuteChanged?.Invoke(this, EventArgs.Empty);
+            }
         }
     }
 
