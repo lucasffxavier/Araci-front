@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Windows;
 using Araci.Models;
 using Araci.Models.Tipos;
@@ -28,7 +29,8 @@ namespace Araci.Services
             int ordemRibbon = 0,
             bool exibirNoRibbon = true,
             string? atalho = null,
-            bool usaFerramentaEspecial = false)
+            bool usaFerramentaEspecial = false,
+            IEnumerable<InstancePropertyDescriptor>? propriedadesInstancia = null)
         {
             Kind = kind ?? throw new ArgumentNullException(nameof(kind));
             NomeAmigavel = nomeAmigavel ?? throw new ArgumentNullException(nameof(nomeAmigavel));
@@ -49,6 +51,7 @@ namespace Araci.Services
             ExibirNoRibbon = exibirNoRibbon;
             Atalho = string.IsNullOrWhiteSpace(atalho) ? string.Empty : atalho.Trim().ToUpperInvariant();
             UsaFerramentaEspecial = usaFerramentaEspecial;
+            PropriedadesInstancia = propriedadesInstancia == null ? Array.Empty<InstancePropertyDescriptor>() : propriedadesInstancia.OrderBy(p => p.Order).ThenBy(p => p.DisplayName).ToList();
         }
 
         public string Kind { get; }
@@ -64,6 +67,7 @@ namespace Araci.Services
         public bool ExibirNoRibbon { get; }
         public string Atalho { get; }
         public bool UsaFerramentaEspecial { get; }
+        public IReadOnlyList<InstancePropertyDescriptor> PropriedadesInstancia { get; }
         public Func<Elemento> CriarModelo { get; }
         public Func<Elemento, NameService, TypePropertiesDialogService, TerminalLayoutService, ElementoViewModel?> CriarViewModel { get; }
         public Func<TipoElemento?> ObterTipoPadrao { get; }

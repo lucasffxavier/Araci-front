@@ -33,6 +33,7 @@ namespace Araci.Services
             TypePropertiesDialogs = new TypePropertiesDialogService();
             Dialogs = new DialogService();
             Elements = new ElementRegistryService(Types);
+            InstancePropertyCatalog.Configure(Elements);
             Geometry = new ElementGeometryService(Elements);
             TerminalLayout = new TerminalLayoutService(Elements, Geometry);
             Names = new NameService(Document, Elements);
