@@ -130,13 +130,36 @@ namespace Araci.ViewModels
                     continue;
 
                 Type tipoValor = props[0]!.PropertyType;
-                bool editavel = mesmoTipo && descriptor.IsEditable && props.All(p => p != null && p.CanWrite && EhTipoEditavel(p.PropertyType));
+                bool editavelMesmoTipo = mesmoTipo && descriptor.IsEditable;
+                bool editavelTiposDiferentes = !mesmoTipo && InstancePropertyCatalog.CanEditAcrossMixedTypes(itens, descriptor.PropertyName);
+                bool editavel = (editavelMesmoTipo || editavelTiposDiferentes) && props.All(p => p != null && p.CanWrite && EhTipoEditavel(p.PropertyType)) && TiposCompativeis(props);
                 var valores = itens.Select(i => ObterValor(i, descriptor.PropertyName)).ToList();
                 object? primeiro = valores[0];
                 bool varia = valores.Skip(1).Any(v => !ValoresIguais(primeiro, v));
 
                 yield return new PropertyDescriptorViewModel(itens, descriptor, tipoValor, varia, editavel, commands);
             }
+        }
+
+        private static bool TiposCompativeis(IReadOnlyList<PropertyInfo?> props)
+        {
+            if (props.Count == 0 || props[0] == null)
+                return false;
+
+            Type primeiro = Nullable.GetUnderlyingType(props[0]!.PropertyType) ?? props[0]!.PropertyType;
+
+            foreach (var prop in props.Skip(1))
+            {
+                if (prop == null)
+                    return false;
+
+                Type atual = Nullable.GetUnderlyingType(prop.PropertyType) ?? prop.PropertyType;
+
+                if (atual != primeiro)
+                    return false;
+            }
+
+            return true;
         }
 
         private static PropertyInfo? ObterPropriedade(ElementoViewModel item, string nomePropriedade)

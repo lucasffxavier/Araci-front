@@ -21,55 +21,55 @@ namespace Araci.ViewModels
                 Prop<CaboViewModel>("BarraDestino", "Barra destino", 30),
                 Prop<CaboViewModel>("Comprimento", "Comprimento (m)", 40),
                 Prop<CaboViewModel>("Ampacidade", "Ampacidade (A)", 50),
-                Prop<CaboViewModel>("TensaoLinha", "Tensão linha (kV)", 60),
-                Prop<CaboViewModel>("TensaoFaseA", "Tensão fase A (kV)", 70),
-                Prop<CaboViewModel>("TensaoFaseB", "Tensão fase B (kV)", 80),
-                Prop<CaboViewModel>("TensaoFaseC", "Tensão fase C (kV)", 90),
-                Prop<CaboViewModel>("CorrenteLinha", "Corrente linha (A)", 100),
-                Prop<CaboViewModel>("CorrenteFaseA", "Corrente fase A (A)", 110),
-                Prop<CaboViewModel>("CorrenteFaseB", "Corrente fase B (A)", 120),
-                Prop<CaboViewModel>("CorrenteFaseC", "Corrente fase C (A)", 130)
+                Prop<CaboViewModel>("TensaoLinha", "Tensão linha (kV)", 60, allowMixedTypeEdit: true),
+                Prop<CaboViewModel>("TensaoFaseA", "Tensão fase A (kV)", 70, allowMixedTypeEdit: true),
+                Prop<CaboViewModel>("TensaoFaseB", "Tensão fase B (kV)", 80, allowMixedTypeEdit: true),
+                Prop<CaboViewModel>("TensaoFaseC", "Tensão fase C (kV)", 90, allowMixedTypeEdit: true),
+                Prop<CaboViewModel>("CorrenteLinha", "Corrente linha (A)", 100, allowMixedTypeEdit: true),
+                Prop<CaboViewModel>("CorrenteFaseA", "Corrente fase A (A)", 110, allowMixedTypeEdit: true),
+                Prop<CaboViewModel>("CorrenteFaseB", "Corrente fase B (A)", 120, allowMixedTypeEdit: true),
+                Prop<CaboViewModel>("CorrenteFaseC", "Corrente fase C (A)", 130, allowMixedTypeEdit: true)
             },
             [typeof(CargaViewModel)] = new[]
             {
                 Prop<CargaViewModel>("Nome", "Nome", 10),
-                Prop<CargaViewModel>("PotenciaAtiva", "Potência ativa (kW)", 20),
-                Prop<CargaViewModel>("PotenciaReativa", "Potência reativa (kVAr)", 30),
-                Prop<CargaViewModel>("Alimentador", "Alimentador", 40),
-                Prop<CargaViewModel>("CorrenteLinha", "Corrente linha (A)", 50),
-                Prop<CargaViewModel>("CorrenteFaseA", "Corrente fase A (A)", 60),
-                Prop<CargaViewModel>("CorrenteFaseB", "Corrente fase B (A)", 70),
-                Prop<CargaViewModel>("CorrenteFaseC", "Corrente fase C (A)", 80),
-                Prop<CargaViewModel>("TensaoLinha", "Tensão linha (kV)", 90),
-                Prop<CargaViewModel>("TensaoFaseA", "Tensão fase A (kV)", 100),
-                Prop<CargaViewModel>("TensaoFaseB", "Tensão fase B (kV)", 110),
-                Prop<CargaViewModel>("TensaoFaseC", "Tensão fase C (kV)", 120)
+                Prop<CargaViewModel>("PotenciaAtiva", "Potência ativa (kW)", 20, allowMixedTypeEdit: true),
+                Prop<CargaViewModel>("PotenciaReativa", "Potência reativa (kVAr)", 30, allowMixedTypeEdit: true),
+                Prop<CargaViewModel>("Alimentador", "Alimentador", 40, allowMixedTypeEdit: true),
+                Prop<CargaViewModel>("CorrenteLinha", "Corrente linha (A)", 50, allowMixedTypeEdit: true),
+                Prop<CargaViewModel>("CorrenteFaseA", "Corrente fase A (A)", 60, allowMixedTypeEdit: true),
+                Prop<CargaViewModel>("CorrenteFaseB", "Corrente fase B (A)", 70, allowMixedTypeEdit: true),
+                Prop<CargaViewModel>("CorrenteFaseC", "Corrente fase C (A)", 80, allowMixedTypeEdit: true),
+                Prop<CargaViewModel>("TensaoLinha", "Tensão linha (kV)", 90, allowMixedTypeEdit: true),
+                Prop<CargaViewModel>("TensaoFaseA", "Tensão fase A (kV)", 100, allowMixedTypeEdit: true),
+                Prop<CargaViewModel>("TensaoFaseB", "Tensão fase B (kV)", 110, allowMixedTypeEdit: true),
+                Prop<CargaViewModel>("TensaoFaseC", "Tensão fase C (kV)", 120, allowMixedTypeEdit: true)
             },
             [typeof(GeradorViewModel)] = new[]
             {
                 Prop<GeradorViewModel>("Nome", "Nome", 10),
                 Prop<GeradorViewModel>("PotenciaAparente", "Potência aparente (kVA)", 20),
-                Prop<GeradorViewModel>("PotenciaAtiva", "Potência ativa (kW)", 30),
-                Prop<GeradorViewModel>("PotenciaReativa", "Potência reativa (kVAr)", 40),
-                Prop<GeradorViewModel>("TensaoLinha", "Tensão linha (kV)", 50),
-                Prop<GeradorViewModel>("TensaoFaseA", "Tensão fase A (kV)", 60),
-                Prop<GeradorViewModel>("TensaoFaseB", "Tensão fase B (kV)", 70),
-                Prop<GeradorViewModel>("TensaoFaseC", "Tensão fase C (kV)", 80),
-                Prop<GeradorViewModel>("CorrenteLinha", "Corrente linha (A)", 90),
-                Prop<GeradorViewModel>("CorrenteFaseA", "Corrente fase A (A)", 100),
-                Prop<GeradorViewModel>("CorrenteFaseB", "Corrente fase B (A)", 110),
-                Prop<GeradorViewModel>("CorrenteFaseC", "Corrente fase C (A)", 120)
+                Prop<GeradorViewModel>("PotenciaAtiva", "Potência ativa (kW)", 30, allowMixedTypeEdit: true),
+                Prop<GeradorViewModel>("PotenciaReativa", "Potência reativa (kVAr)", 40, allowMixedTypeEdit: true),
+                Prop<GeradorViewModel>("TensaoLinha", "Tensão linha (kV)", 50, allowMixedTypeEdit: true),
+                Prop<GeradorViewModel>("TensaoFaseA", "Tensão fase A (kV)", 60, allowMixedTypeEdit: true),
+                Prop<GeradorViewModel>("TensaoFaseB", "Tensão fase B (kV)", 70, allowMixedTypeEdit: true),
+                Prop<GeradorViewModel>("TensaoFaseC", "Tensão fase C (kV)", 80, allowMixedTypeEdit: true),
+                Prop<GeradorViewModel>("CorrenteLinha", "Corrente linha (A)", 90, allowMixedTypeEdit: true),
+                Prop<GeradorViewModel>("CorrenteFaseA", "Corrente fase A (A)", 100, allowMixedTypeEdit: true),
+                Prop<GeradorViewModel>("CorrenteFaseB", "Corrente fase B (A)", 110, allowMixedTypeEdit: true),
+                Prop<GeradorViewModel>("CorrenteFaseC", "Corrente fase C (A)", 120, allowMixedTypeEdit: true)
             },
             [typeof(SinViewModel)] = new[]
             {
                 Prop<SinViewModel>("Nome", "Nome", 10),
-                Prop<SinViewModel>("TensaoLinha", "Tensão linha (kV)", 20)
+                Prop<SinViewModel>("TensaoLinha", "Tensão linha (kV)", 20, allowMixedTypeEdit: true)
             },
             [typeof(TransformadorViewModel)] = new[]
             {
                 Prop<TransformadorViewModel>("Nome", "Nome", 10),
                 Prop<TransformadorViewModel>("Barra", "Barra", 20),
-                Prop<TransformadorViewModel>("Alimentador", "Alimentador", 30),
+                Prop<TransformadorViewModel>("Alimentador", "Alimentador", 30, allowMixedTypeEdit: true),
                 Prop<TransformadorViewModel>("Fases", "Fases", 40),
                 Prop<TransformadorViewModel>("Enrolamentos", "Enrolamentos", 50),
                 Prop<TransformadorViewModel>("TensaoPrimarioKV", "Tensão primário (kV)", 60),
@@ -109,10 +109,18 @@ namespace Araci.ViewModels
                 .ToList();
         }
 
-        private static InstancePropertyDescriptor Prop<T>(string propertyName, string displayName, int order, bool isEditable = true)
+        public static bool CanEditAcrossMixedTypes(IReadOnlyList<ElementoViewModel> elementos, string propertyName)
+        {
+            if (elementos.Count == 0 || string.IsNullOrWhiteSpace(propertyName))
+                return false;
+
+            return elementos.All(e => GetFor(e).Any(p => p.PropertyName == propertyName && p.IsEditable && p.AllowMixedTypeEdit));
+        }
+
+        private static InstancePropertyDescriptor Prop<T>(string propertyName, string displayName, int order, bool isEditable = true, bool allowMixedTypeEdit = false)
             where T : ElementoViewModel
         {
-            return new InstancePropertyDescriptor(typeof(T), propertyName, displayName, order, isEditable);
+            return new InstancePropertyDescriptor(typeof(T), propertyName, displayName, order, isEditable, allowMixedTypeEdit);
         }
     }
 }
