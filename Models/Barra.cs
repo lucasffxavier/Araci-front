@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using System.Windows;
 using Araci.Core.Rendering;
@@ -11,24 +12,20 @@ namespace Araci.Models
         public const string PARAM_TENSAO = "Tensao";
         public const double ALTURA_PADRAO = 120;
         public const double ALTURA_MINIMA = 40;
-
+        private const int TERMINAIS_PADRAO = 24;
+        private const double ESPACAMENTO_TERMINAIS = ALTURA_PADRAO / (TERMINAIS_PADRAO - 1);
         private readonly List<Terminal> _terminais = new();
 
         public Barra()
         {
             Nome = "BARRA-001";
-
             DefinirParametro(new Parameter<double>(PARAM_ALTURA, ALTURA_PADRAO));
             DefinirParametro(new Parameter<string>(PARAM_TENSAO, "13,8∠0°"));
-
-            CriarTerminais();
             AtualizarTerminais();
         }
 
         public IReadOnlyList<Terminal> Terminais => _terminais;
-
         public override ElementoDomainRole DomainRole => ElementoDomainRole.EletricoTopologico;
-
         public TipoBarra TipoBarra => (TipoBarra)Tipo!;
 
         public double Altura
@@ -50,56 +47,54 @@ namespace Araci.Models
 
         public void AtualizarTerminais(double largura)
         {
-            if (_terminais.Count == 0)
-                return;
-
+            int quantidade = CalcularQuantidadeTerminais(Altura);
+            AjustarQuantidadeTerminais(quantidade);
             double centroX = largura / 2;
-            double espacamento = Altura / (_terminais.Count - 1);
 
             for (int i = 0; i < _terminais.Count; i++)
             {
-                _terminais[i].DefinirPosicaoLocal(
-                    new Point(centroX, i * espacamento),
-                    largura,
-                    Altura);
+                double y = CalcularYTerminal(i, Altura);
+                _terminais[i].DefinirPosicaoLocal(new Point(centroX, y), largura, Altura);
             }
         }
 
         public override Elemento Clonar()
         {
             var clone = new Barra();
-
             CopiarBasePara(clone);
             clone.Altura = Altura;
             clone.Tensao = Tensao;
             clone.AtualizarTerminais();
-
             return clone;
         }
 
         public static double NormalizarAltura(double value)
         {
-            return value < ALTURA_MINIMA || double.IsNaN(value) || double.IsInfinity(value)
-                ? ALTURA_MINIMA
-                : value;
+            return value < ALTURA_MINIMA || double.IsNaN(value) || double.IsInfinity(value) ? ALTURA_MINIMA : value;
         }
 
-        private void CriarTerminais()
+        private static int CalcularQuantidadeTerminais(double altura)
         {
-            _terminais.Clear();
+            altura = NormalizarAltura(altura);
+            return Math.Max(2, (int)Math.Floor(altura / ESPACAMENTO_TERMINAIS) + 1);
+        }
 
-            int quantidade = 24;
+        private static double CalcularYTerminal(int index, double altura)
+        {
+            double y = index * ESPACAMENTO_TERMINAIS;
+            return y > altura ? altura : y;
+        }
 
-            for (int i = 0; i < quantidade; i++)
+        private void AjustarQuantidadeTerminais(int quantidade)
+        {
+            while (_terminais.Count < quantidade)
             {
-                _terminais.Add(
-                    new Terminal(
-                        this,
-                        new Point(),
-                        $"BARRA-{i + 1:00}",
-                        TerminalKind.Electrical,
-                        TerminalDirection.East));
+                int index = _terminais.Count;
+                _terminais.Add(new Terminal(this, new Point(), $"BARRA-{index + 1:00}", TerminalKind.Electrical, TerminalDirection.East));
             }
+
+            while (_terminais.Count > quantidade)
+                _terminais.RemoveAt(_terminais.Count - 1);
         }
     }
 }
