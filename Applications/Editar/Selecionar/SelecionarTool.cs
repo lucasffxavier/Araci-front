@@ -42,6 +42,7 @@ namespace Araci.Applications.Editar.Selecionar
 
         public string Nome => "Selecionar";
         public bool MantemBotaoAtivado => true;
+
         public bool IsBusy =>
             _barraResize.IsResizing ||
             _dragMove.IsActive ||
@@ -73,6 +74,7 @@ namespace Araci.Applications.Editar.Selecionar
         public void OnMouseDown(ElementoViewModel? vm, Point position, ToolInputState inputState)
         {
             bool ctrl = inputState.IsControlPressed;
+            bool shift = inputState.IsShiftPressed;
 
             if (!_modoSoMover && _barraResize.TryBegin(position))
                 return;
@@ -91,9 +93,14 @@ namespace Araci.Applications.Editar.Selecionar
             if (hit != null)
             {
                 if (!_modoSoMover)
-                    _selection.Select(hit, ctrl);
+                {
+                    bool podeMover = _selection.Select(hit, ctrl, shift);
+                    _cableVertexEdit.Clear();
 
-                _cableVertexEdit.Clear();
+                    if (!podeMover)
+                        return;
+                }
+
                 _dragMove.Begin(position);
                 return;
             }

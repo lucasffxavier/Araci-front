@@ -13,19 +13,29 @@ namespace Araci.Applications.Editar.Selecionar
             _selection = selection ?? throw new ArgumentNullException(nameof(selection));
         }
 
-        public void Select(ElementoViewModel vm, bool ctrl)
+        public bool Select(ElementoViewModel vm, bool ctrl, bool shift)
         {
             if (vm == null)
                 throw new ArgumentNullException(nameof(vm));
 
+            if (shift)
+            {
+                if (EstaSelecionado(vm))
+                    _selection.Deselecionar(vm);
+
+                return false;
+            }
+
             if (ctrl)
             {
                 _selection.Toggle(vm);
-                return;
+                return true;
             }
 
             if (!EstaSelecionado(vm))
                 _selection.Selecionar(vm);
+
+            return true;
         }
 
         private bool EstaSelecionado(ElementoViewModel vm)
