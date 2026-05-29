@@ -1,7 +1,7 @@
-﻿using System.Collections.Generic;
+﻿using System;
+using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Linq;
-using System;
 using Araci.Core.Events;
 using Araci.ViewModels;
 
@@ -18,11 +18,8 @@ namespace Araci.Services
         }
 
         public IReadOnlyList<ElementoViewModel> Selecionados => _selecionados;
-
         public ObservableCollection<ElementoViewModel> SelecionadosObservable => _selecionados;
-
         public bool TemSelecionados => _selecionados.Count > 0;
-
         public event Action? SelectionChanged;
 
         public void Selecionar(ElementoViewModel vm, bool adicionarAoExistente = false)
@@ -37,9 +34,7 @@ namespace Araci.Services
             }
 
             vm.IsSelecionado = true;
-
             _selecionados.Add(vm);
-
             AtualizarElementoSelecionado();
             PublicarAlteracao();
         }
@@ -61,9 +56,7 @@ namespace Araci.Services
                 return;
 
             vm.IsSelecionado = false;
-
             _selecionados.Remove(vm);
-
             AtualizarElementoSelecionado();
             PublicarAlteracao();
         }
@@ -77,14 +70,18 @@ namespace Araci.Services
                 vm.IsSelecionado = false;
 
             _selecionados.Clear();
-
             AtualizarElementoSelecionado();
             PublicarAlteracao();
         }
 
         private void AtualizarElementoSelecionado()
         {
-            _context.Editor.ElementoSelecionado = _selecionados.LastOrDefault();
+            _context.Editor.ElementoSelecionado = _selecionados.Count switch
+            {
+                0 => null,
+                1 => _selecionados[0],
+                _ => new PropertiesViewModel(_selecionados)
+            };
         }
 
         private void PublicarAlteracao()
