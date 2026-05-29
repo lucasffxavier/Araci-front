@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Linq;
 using System.Windows;
+using System.Windows.Input;
 using Araci.Core.Commands;
 using Araci.Core.Rendering;
 using Araci.Models;
@@ -27,6 +28,21 @@ namespace Araci.Services
         }
 
         public bool IsResizing { get; private set; }
+
+        public Cursor? GetCursor(Point position)
+        {
+            BarraViewModel? barraVm = IsResizing
+                ? _vm
+                : _context.Selection.Selecionados.Count == 1
+                    ? _context.Selection.Selecionados.FirstOrDefault() as BarraViewModel
+                    : null;
+
+            if (barraVm == null)
+                return null;
+
+            ResizeBarraHandle handle = IsResizing ? _handle : HitTestHandle(barraVm, position);
+            return handle == ResizeBarraHandle.None ? null : GetResizeCursor(barraVm.Barra.Rotacao);
+        }
 
         public bool TryBegin(Point position)
         {
@@ -101,6 +117,20 @@ namespace Araci.Services
             IsResizing = false;
             _vm = null;
             _handle = ResizeBarraHandle.None;
+        }
+
+        private static Cursor GetResizeCursor(double rotacao)
+        {
+            double angle = NormalizeAngle(rotacao);
+            if (angle is >= 45 and < 135 or >= 225 and < 315)
+                return Cursors.SizeWE;
+            return Cursors.SizeNS;
+        }
+
+        private static double NormalizeAngle(double value)
+        {
+            double angle = value % 360;
+            return angle < 0 ? angle + 360 : angle;
         }
 
         private static ResizeBarraHandle HitTestHandle(BarraViewModel vm, Point position)
