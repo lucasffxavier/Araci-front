@@ -26,7 +26,9 @@ namespace Araci.Services
             string? categoriaRibbon = null,
             string? icone = null,
             int ordemRibbon = 0,
-            bool exibirNoRibbon = true)
+            bool exibirNoRibbon = true,
+            string? atalho = null,
+            bool usaFerramentaEspecial = false)
         {
             Kind = kind ?? throw new ArgumentNullException(nameof(kind));
             NomeAmigavel = nomeAmigavel ?? throw new ArgumentNullException(nameof(nomeAmigavel));
@@ -42,9 +44,11 @@ namespace Araci.Services
             AtualizarTerminais = atualizarTerminais ?? throw new ArgumentNullException(nameof(atualizarTerminais));
             NomeRibbon = string.IsNullOrWhiteSpace(nomeRibbon) ? nomeAmigavel : nomeRibbon;
             CategoriaRibbon = string.IsNullOrWhiteSpace(categoriaRibbon) ? "Inserir" : categoriaRibbon;
-            Icone = icone ?? string.Empty;
+            Icone = NormalizarIcone(icone);
             OrdemRibbon = ordemRibbon;
             ExibirNoRibbon = exibirNoRibbon;
+            Atalho = string.IsNullOrWhiteSpace(atalho) ? string.Empty : atalho.Trim().ToUpperInvariant();
+            UsaFerramentaEspecial = usaFerramentaEspecial;
         }
 
         public string Kind { get; }
@@ -58,6 +62,8 @@ namespace Araci.Services
         public string Icone { get; }
         public int OrdemRibbon { get; }
         public bool ExibirNoRibbon { get; }
+        public string Atalho { get; }
+        public bool UsaFerramentaEspecial { get; }
         public Func<Elemento> CriarModelo { get; }
         public Func<Elemento, NameService, TypePropertiesDialogService, TerminalLayoutService, ElementoViewModel?> CriarViewModel { get; }
         public Func<TipoElemento?> ObterTipoPadrao { get; }
@@ -73,6 +79,19 @@ namespace Araci.Services
         public bool AceitaViewModel(ElementoViewModel viewModel)
         {
             return ViewModelType.IsInstanceOfType(viewModel);
+        }
+
+        private static string NormalizarIcone(string? icone)
+        {
+            if (string.IsNullOrWhiteSpace(icone))
+                return string.Empty;
+
+            string valor = icone.Trim();
+
+            if (valor.StartsWith("pack://", StringComparison.OrdinalIgnoreCase))
+                return valor;
+
+            return $"pack://application:,,,/Resources/Icons/{valor}";
         }
     }
 }

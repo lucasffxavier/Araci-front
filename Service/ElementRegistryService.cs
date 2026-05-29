@@ -52,6 +52,15 @@ namespace Araci.Services
                     : null;
         }
 
+        public ElementDefinition? FindByShortcut(string shortcut)
+        {
+            if (string.IsNullOrWhiteSpace(shortcut))
+                return null;
+
+            string normalized = shortcut.Trim().ToUpperInvariant();
+            return _definitions.FirstOrDefault(d => string.Equals(d.Atalho, normalized, StringComparison.OrdinalIgnoreCase));
+        }
+
         public ElementDefinition? FindByModel(Elemento elemento)
         {
             return _definitions.FirstOrDefault(d => d.AceitaModelo(elemento));
@@ -163,24 +172,6 @@ namespace Araci.Services
         private void RegistrarElementosPadrao()
         {
             Register(new ElementDefinition(
-                KindBarra,
-                "Barra",
-                "BARRA",
-                typeof(Barra),
-                typeof(BarraViewModel),
-                typeof(TipoBarra),
-                CriarBarra,
-                (m, n, d, l) => new BarraViewModel((Barra)m, Types, n, d, l),
-                () => Types.TipoBarraPadrao,
-                () => Types.TiposBarras,
-                e => new Size(ElementGeometryDefaults.BarraLargura, ((Barra)e).Altura),
-                e => ((Barra)e).AtualizarTerminais(ElementGeometryDefaults.BarraLargura),
-                "Barra",
-                "Inserir",
-                "barra.png",
-                60));
-
-            Register(new ElementDefinition(
                 KindCabo,
                 "Cabo",
                 "CABO",
@@ -196,7 +187,10 @@ namespace Araci.Services
                 "Cabo",
                 "Inserir",
                 "cabo.png",
-                10));
+                10,
+                true,
+                "CB",
+                true));
 
             Register(new ElementDefinition(
                 KindCarga,
@@ -214,7 +208,9 @@ namespace Araci.Services
                 "Carga",
                 "Inserir",
                 "carga.png",
-                20));
+                20,
+                true,
+                "CG"));
 
             Register(new ElementDefinition(
                 KindGerador,
@@ -232,7 +228,9 @@ namespace Araci.Services
                 "Gerador",
                 "Inserir",
                 "gerador.png",
-                30));
+                30,
+                true,
+                "GE"));
 
             Register(new ElementDefinition(
                 KindSin,
@@ -250,7 +248,9 @@ namespace Araci.Services
                 "SIN",
                 "Inserir",
                 "sin.png",
-                40));
+                40,
+                true,
+                "SI"));
 
             Register(new ElementDefinition(
                 KindTransformador,
@@ -268,7 +268,29 @@ namespace Araci.Services
                 "Trafo",
                 "Inserir",
                 "transformador.png",
-                50));
+                50,
+                true,
+                "TR"));
+
+            Register(new ElementDefinition(
+                KindBarra,
+                "Barra",
+                "BARRA",
+                typeof(Barra),
+                typeof(BarraViewModel),
+                typeof(TipoBarra),
+                CriarBarra,
+                (m, n, d, l) => new BarraViewModel((Barra)m, Types, n, d, l),
+                () => Types.TipoBarraPadrao,
+                () => Types.TiposBarras,
+                e => new Size(ElementGeometryDefaults.BarraLargura, ((Barra)e).Altura),
+                e => ((Barra)e).AtualizarTerminais(ElementGeometryDefaults.BarraLargura),
+                "Barra",
+                "Inserir",
+                "barra.png",
+                60,
+                true,
+                "BA"));
         }
 
         private Barra CriarBarra()

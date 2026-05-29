@@ -3,12 +3,6 @@ using System.Linq;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
-using Araci.Applications.Diagrama.InserirBarra;
-using Araci.Applications.Diagrama.InserirCabo;
-using Araci.Applications.Diagrama.InserirCarga;
-using Araci.Applications.Diagrama.InserirGerador;
-using Araci.Applications.Diagrama.InserirSin;
-using Araci.Applications.Diagrama.InserirTransformador;
 using Araci.Applications.Editar.Base;
 using Araci.Applications.Editar.Mover;
 using Araci.Applications.Editar.Selecionar;
@@ -57,10 +51,12 @@ namespace Araci.Services
         public void MouseMove(Point position, ToolInputState inputState)
         {
             AtualizarUltimaPosicao(position);
+
             if (ToolAtual.IsBusy)
                 _context.Hover.Clear();
             else
                 _context.Hover.Update(position);
+
             ToolAtual.OnMouseMove(position, inputState);
         }
 
@@ -78,53 +74,64 @@ namespace Araci.Services
         public bool KeyDown(Key key)
         {
             bool control = Keyboard.Modifiers.HasFlag(ModifierKeys.Control);
+
             if (control && key == Key.Z)
             {
                 LimparAtalho();
                 _context.Commands.Undo();
                 return true;
             }
+
             if (control && key == Key.Y)
             {
                 LimparAtalho();
                 _context.Commands.Redo();
                 return true;
             }
+
             if (control && key == Key.C)
             {
                 LimparAtalho();
                 ClipboardService.CopiarSelecionados(_context);
                 return true;
             }
+
             if (control && key == Key.V)
             {
                 LimparAtalho();
                 ClipboardService.Colar(_context);
                 return true;
             }
+
             if (key == Key.Delete)
             {
                 LimparAtalho();
                 _context.SafeDelete.DeleteActiveHandleOrSelection();
                 return true;
             }
+
             if (key == Key.Escape)
             {
                 LimparAtalho();
                 return HandleEscape();
             }
+
             if (key == Key.Space)
             {
                 LimparAtalho();
+
                 if (ToolAtual.IsBusy || ToolAtual.HandlesKey(key) || _context.Selection.Selecionados.Any(RotationService.PodeRotacionar))
                 {
                     ToolAtual.OnKeyDown(key);
                     return true;
                 }
+
                 return false;
             }
+
             if (TryHandleTwoKeyShortcut(key))
                 return true;
+
             ToolAtual.OnKeyDown(key);
             return false;
         }
@@ -136,23 +143,32 @@ namespace Araci.Services
                 LimparAtalho();
                 return false;
             }
+
             if (Keyboard.FocusedElement is TextBox)
             {
                 LimparAtalho();
                 return false;
             }
+
             char? c = KeyToChar(key);
+
             if (c == null)
                 return false;
+
             DateTime now = DateTime.Now;
+
             if (now - _lastShortcutKeyTime > ShortcutTimeout)
                 _shortcutBuffer = string.Empty;
+
             _lastShortcutKeyTime = now;
             _shortcutBuffer = (_shortcutBuffer + c.Value).ToUpperInvariant();
+
             if (_shortcutBuffer.Length > 2)
                 _shortcutBuffer = _shortcutBuffer[^2..];
+
             if (_shortcutBuffer.Length < 2)
                 return true;
+
             bool handled = ExecutarAtalho(_shortcutBuffer);
             LimparAtalho();
             return handled;
@@ -160,26 +176,13 @@ namespace Araci.Services
 
         private bool ExecutarAtalho(string shortcut)
         {
+            ElementDefinition? definition = _context.Elements.FindByShortcut(shortcut);
+
+            if (definition != null)
+                return _context.Tools.AtivarInsercaoElemento(definition.Kind);
+
             switch (shortcut)
             {
-                case "CB":
-                    new InserirCaboApplication(_context).Executar();
-                    return true;
-                case "CG":
-                    new InserirCargaApplication(_context).Executar();
-                    return true;
-                case "GE":
-                    new InserirGeradorApplication(_context).Executar();
-                    return true;
-                case "BA":
-                    new InserirBarraApplication(_context).Executar();
-                    return true;
-                case "SI":
-                    new InserirSinApplication(_context).Executar();
-                    return true;
-                case "TR":
-                    new InserirTransformadorApplication(_context).Executar();
-                    return true;
                 case "SE":
                     _context.Tools.VoltarParaSelecao();
                     return true;
@@ -195,6 +198,7 @@ namespace Araci.Services
         {
             if (key >= Key.A && key <= Key.Z)
                 return (char)('A' + (key - Key.A));
+
             return null;
         }
 
@@ -212,8 +216,10 @@ namespace Araci.Services
                     ToolAtual.Cancelar();
                 else
                     _context.Selection.Limpar();
+
                 return true;
             }
+
             _context.Tools.VoltarParaSelecao();
             return true;
         }
