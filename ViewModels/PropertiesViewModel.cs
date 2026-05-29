@@ -22,7 +22,7 @@ namespace Araci.ViewModels
             var itens = selecionados?.Where(e => e != null).ToList() ?? new List<ElementoViewModel>();
             QuantidadeSelecionada = itens.Count;
             Titulo = CriarTitulo(itens);
-            Propriedades = new ObservableCollection<PropertyRowViewModel>(CriarLinhas(itens));
+            Propriedades = new ObservableCollection<PropertyDescriptorViewModel>(CriarDescritores(itens));
         }
 
         public object? ElementoSelecionado
@@ -40,7 +40,7 @@ namespace Araci.ViewModels
 
         public int QuantidadeSelecionada { get; }
         public string Titulo { get; } = "Propriedades";
-        public ObservableCollection<PropertyRowViewModel> Propriedades { get; } = new();
+        public ObservableCollection<PropertyDescriptorViewModel> Propriedades { get; } = new();
 
         private static string CriarTitulo(IReadOnlyList<ElementoViewModel> itens)
         {
@@ -55,93 +55,39 @@ namespace Araci.ViewModels
             return $"{itens.Count} elementos selecionados";
         }
 
-        private static IEnumerable<PropertyRowViewModel> CriarLinhas(IReadOnlyList<ElementoViewModel> itens)
+        private static IEnumerable<PropertyDescriptorViewModel> CriarDescritores(IReadOnlyList<ElementoViewModel> itens)
         {
             if (itens.Count == 0)
                 yield break;
 
-            foreach (string nomePropriedade in ObterNomesComunsExibiveis(itens))
+            bool mesmoTipo = itens.All(i => i.GetType() == itens[0].GetType());
+
+            foreach (var descriptor in InstancePropertyCatalog.GetCommonFor(itens))
             {
-                var valores = itens.Select(i => ObterValor(i, nomePropriedade)).ToList();
+                var props = itens.Select(i => ObterPropriedade(i, descriptor.PropertyName)).ToList();
+
+                if (props.Any(p => p == null))
+                    continue;
+
+                Type tipoValor = props[0]!.PropertyType;
+                bool editavel = mesmoTipo && descriptor.IsEditable && props.All(p => p != null && p.CanWrite && EhTipoEditavel(p.PropertyType));
+                var valores = itens.Select(i => ObterValor(i, descriptor.PropertyName)).ToList();
                 object? primeiro = valores[0];
                 bool varia = valores.Skip(1).Any(v => !ValoresIguais(primeiro, v));
-                string valor = varia ? "<varia>" : FormatarValor(primeiro);
-                yield return new PropertyRowViewModel(FormatarNome(nomePropriedade), valor, varia);
+
+                yield return new PropertyDescriptorViewModel(itens, descriptor, tipoValor, varia, editavel);
             }
         }
 
-        private static IEnumerable<string> ObterNomesComunsExibiveis(IReadOnlyList<ElementoViewModel> itens)
+        private static PropertyInfo? ObterPropriedade(ElementoViewModel item, string nomePropriedade)
         {
-            HashSet<string>? comuns = null;
-
-            foreach (ElementoViewModel item in itens)
-            {
-                var nomes = ObterNomesExibiveis(item).ToHashSet();
-
-                if (comuns == null)
-                {
-                    comuns = nomes;
-                    continue;
-                }
-
-                comuns.IntersectWith(nomes);
-            }
-
-            return Ordenar(comuns ?? new HashSet<string>());
-        }
-
-        private static IEnumerable<string> ObterNomesExibiveis(ElementoViewModel item)
-        {
-            return item switch
-            {
-                BarraViewModel => new[] { "Nome", "Tensao", "Altura" },
-                CaboViewModel => new[] { "Nome", "BarraOrigem", "BarraDestino", "Comprimento", "Ampacidade", "TensaoLinha", "TensaoFaseA", "TensaoFaseB", "TensaoFaseC", "CorrenteLinha", "CorrenteFaseA", "CorrenteFaseB", "CorrenteFaseC" },
-                CargaViewModel => new[] { "Nome", "PotenciaAtiva", "PotenciaReativa", "Alimentador", "CorrenteLinha", "CorrenteFaseA", "CorrenteFaseB", "CorrenteFaseC", "TensaoLinha", "TensaoFaseA", "TensaoFaseB", "TensaoFaseC" },
-                GeradorViewModel => new[] { "Nome", "PotenciaAparente", "PotenciaAtiva", "PotenciaReativa", "TensaoLinha", "TensaoFaseA", "TensaoFaseB", "TensaoFaseC", "CorrenteLinha", "CorrenteFaseA", "CorrenteFaseB", "CorrenteFaseC" },
-                SinViewModel => new[] { "Nome", "TensaoLinha" },
-                TransformadorViewModel => new[] { "Nome", "Alimentador", "Fases", "Enrolamentos", "TensaoPrimarioKV", "TensaoSecundarioKV", "PotenciaAparente", "RPercentual", "XPercentual", "LigacaoPrimario", "LigacaoSecundario" },
-                _ => Array.Empty<string>()
-            };
+            var prop = item.GetType().GetProperty(nomePropriedade, BindingFlags.Instance | BindingFlags.Public);
+            return prop == null || prop.GetIndexParameters().Length > 0 ? null : prop;
         }
 
         private static object? ObterValor(ElementoViewModel item, string nomePropriedade)
         {
-            PropertyInfo? prop = item.GetType().GetProperty(nomePropriedade, BindingFlags.Instance | BindingFlags.Public);
-            return prop == null || prop.GetIndexParameters().Length > 0 ? null : prop.GetValue(item);
-        }
-
-        private static IEnumerable<string> Ordenar(IEnumerable<string> propriedades)
-        {
-            string[] prioridade =
-            {
-                "Nome",
-                "BarraOrigem",
-                "BarraDestino",
-                "Alimentador",
-                "Fases",
-                "Enrolamentos",
-                "Tensao",
-                "TensaoLinha",
-                "TensaoPrimarioKV",
-                "TensaoSecundarioKV",
-                "PotenciaAparente",
-                "PotenciaAtiva",
-                "PotenciaReativa",
-                "Comprimento",
-                "Ampacidade",
-                "RPercentual",
-                "XPercentual",
-                "LigacaoPrimario",
-                "LigacaoSecundario"
-            };
-
-            return propriedades
-                .OrderBy(p =>
-                {
-                    int index = Array.IndexOf(prioridade, p);
-                    return index >= 0 ? index : 1000;
-                })
-                .ThenBy(p => p);
+            return ObterPropriedade(item, nomePropriedade)?.GetValue(item);
         }
 
         private static bool ValoresIguais(object? a, object? b)
@@ -161,7 +107,7 @@ namespace Araci.ViewModels
             return Equals(a, b);
         }
 
-        private static string FormatarValor(object? valor)
+        internal static string FormatarValor(object? valor)
         {
             if (valor == null)
                 return string.Empty;
@@ -175,52 +121,84 @@ namespace Araci.ViewModels
             };
         }
 
-        private static string FormatarNome(string nome)
+        internal static bool TentarConverterValor(string valor, Type tipoDestino, out object? convertido)
         {
-            return nome switch
+            convertido = null;
+            Type tipo = Nullable.GetUnderlyingType(tipoDestino) ?? tipoDestino;
+
+            try
             {
-                "Tensao" => "Tensão",
-                "TensaoLinha" => "Tensão linha",
-                "TensaoFaseA" => "Tensão fase A",
-                "TensaoFaseB" => "Tensão fase B",
-                "TensaoFaseC" => "Tensão fase C",
-                "TensaoPrimarioKV" => "Tensão primário",
-                "TensaoSecundarioKV" => "Tensão secundário",
-                "PotenciaAparente" => "Potência aparente",
-                "PotenciaAtiva" => "Potência ativa",
-                "PotenciaReativa" => "Potência reativa",
-                "CorrenteLinha" => "Corrente linha",
-                "CorrenteFaseA" => "Corrente fase A",
-                "CorrenteFaseB" => "Corrente fase B",
-                "CorrenteFaseC" => "Corrente fase C",
-                "BarraOrigem" => "Barra origem",
-                "BarraDestino" => "Barra destino",
-                "RPercentual" => "R",
-                "XPercentual" => "X",
-                "LigacaoPrimario" => "Ligação primário",
-                "LigacaoSecundario" => "Ligação secundário",
-                _ => SepararCamelCase(nome)
-            };
+                if (tipo == typeof(string))
+                {
+                    convertido = valor;
+                    return true;
+                }
+
+                if (tipo == typeof(int))
+                {
+                    if (!int.TryParse(valor, NumberStyles.Integer, CultureInfo.CurrentCulture, out int i))
+                        return false;
+
+                    convertido = i;
+                    return true;
+                }
+
+                if (tipo == typeof(double))
+                {
+                    if (!double.TryParse(valor, NumberStyles.Float | NumberStyles.AllowThousands, CultureInfo.CurrentCulture, out double d))
+                        return false;
+
+                    convertido = d;
+                    return true;
+                }
+
+                if (tipo == typeof(float))
+                {
+                    if (!float.TryParse(valor, NumberStyles.Float | NumberStyles.AllowThousands, CultureInfo.CurrentCulture, out float f))
+                        return false;
+
+                    convertido = f;
+                    return true;
+                }
+
+                if (tipo == typeof(decimal))
+                {
+                    if (!decimal.TryParse(valor, NumberStyles.Float | NumberStyles.AllowThousands, CultureInfo.CurrentCulture, out decimal m))
+                        return false;
+
+                    convertido = m;
+                    return true;
+                }
+
+                if (tipo == typeof(bool))
+                {
+                    if (!bool.TryParse(valor, out bool b))
+                        return false;
+
+                    convertido = b;
+                    return true;
+                }
+
+                if (tipo.IsEnum)
+                {
+                    convertido = Enum.Parse(tipo, valor, true);
+                    return true;
+                }
+
+                convertido = Convert.ChangeType(valor, tipo, CultureInfo.CurrentCulture);
+                return true;
+            }
+            catch
+            {
+                convertido = null;
+                return false;
+            }
         }
 
-        private static string SepararCamelCase(string nome)
+        private static bool EhTipoEditavel(Type tipo)
         {
-            if (string.IsNullOrWhiteSpace(nome))
-                return string.Empty;
-
-            var resultado = new List<char>();
-
-            for (int i = 0; i < nome.Length; i++)
-            {
-                char c = nome[i];
-
-                if (i > 0 && char.IsUpper(c) && !char.IsUpper(nome[i - 1]))
-                    resultado.Add(' ');
-
-                resultado.Add(c);
-            }
-
-            return new string(resultado.ToArray());
+            Type t = Nullable.GetUnderlyingType(tipo) ?? tipo;
+            return t == typeof(string) || t == typeof(int) || t == typeof(double) || t == typeof(float) || t == typeof(decimal) || t == typeof(bool) || t.IsEnum;
         }
 
         private static string ObterNomeTipoAmigavel(ElementoViewModel vm)
@@ -236,17 +214,140 @@ namespace Araci.ViewModels
         }
     }
 
-    public class PropertyRowViewModel
+    public class PropertyDescriptorViewModel : INotifyPropertyChanged
     {
-        public PropertyRowViewModel(string nome, string valor, bool varia)
+        private readonly IReadOnlyList<ElementoViewModel> _elementos;
+        private readonly InstancePropertyDescriptor _descriptor;
+        private readonly Type _tipoValor;
+        private string _valor;
+        private bool _varia;
+        private bool _temErro;
+        private string _mensagemErro = string.Empty;
+
+        public PropertyDescriptorViewModel(IReadOnlyList<ElementoViewModel> elementos, InstancePropertyDescriptor descriptor, Type tipoValor, bool varia, bool isEditable)
         {
-            Nome = nome;
-            Valor = valor;
-            Varia = varia;
+            _elementos = elementos;
+            _descriptor = descriptor;
+            _tipoValor = tipoValor;
+            Nome = descriptor.DisplayName;
+            DisplayName = descriptor.DisplayName;
+            PropertyName = descriptor.PropertyName;
+            IsEditable = isEditable;
+            IsReadOnly = !isEditable;
+            _varia = varia;
+            _valor = varia ? "<varia>" : PropertiesViewModel.FormatarValor(ObterValorAtual());
         }
 
         public string Nome { get; }
-        public string Valor { get; }
-        public bool Varia { get; }
+        public string DisplayName { get; }
+        public string PropertyName { get; }
+        public Type ValueType => _tipoValor;
+        public bool IsEditable { get; }
+        public bool IsReadOnly { get; }
+        public bool IsMixed => _varia;
+        public bool Varia => _varia;
+
+        public string Valor
+        {
+            get => _valor;
+            set => AplicarValor(value);
+        }
+
+        public string Value
+        {
+            get => _valor;
+            set => AplicarValor(value);
+        }
+
+        public bool TemErro
+        {
+            get => _temErro;
+            private set
+            {
+                if (_temErro == value)
+                    return;
+
+                _temErro = value;
+                OnPropertyChanged();
+            }
+        }
+
+        public string MensagemErro
+        {
+            get => _mensagemErro;
+            private set
+            {
+                if (_mensagemErro == value)
+                    return;
+
+                _mensagemErro = value;
+                OnPropertyChanged();
+            }
+        }
+
+        private void AplicarValor(string novoValor)
+        {
+            if (!IsEditable)
+                return;
+
+            if (string.Equals(novoValor, _valor, StringComparison.Ordinal))
+                return;
+
+            if (string.Equals(novoValor, "<varia>", StringComparison.OrdinalIgnoreCase))
+                return;
+
+            if (!PropertiesViewModel.TentarConverterValor(novoValor, _tipoValor, out object? convertido))
+            {
+                TemErro = true;
+                MensagemErro = "Valor inválido";
+                _valor = novoValor;
+                OnPropertyChanged(nameof(Valor));
+                OnPropertyChanged(nameof(Value));
+                return;
+            }
+
+            foreach (ElementoViewModel elemento in _elementos)
+            {
+                PropertyInfo? prop = elemento.GetType().GetProperty(_descriptor.PropertyName, BindingFlags.Instance | BindingFlags.Public);
+
+                if (prop == null || !prop.CanWrite || prop.GetIndexParameters().Length > 0)
+                    continue;
+
+                prop.SetValue(elemento, convertido);
+            }
+
+            TemErro = false;
+            MensagemErro = string.Empty;
+            _varia = false;
+            _valor = PropertiesViewModel.FormatarValor(convertido);
+            OnPropertyChanged(nameof(Valor));
+            OnPropertyChanged(nameof(Value));
+            OnPropertyChanged(nameof(IsMixed));
+            OnPropertyChanged(nameof(Varia));
+        }
+
+        private object? ObterValorAtual()
+        {
+            if (_elementos.Count == 0)
+                return null;
+
+            PropertyInfo? prop = _elementos[0].GetType().GetProperty(_descriptor.PropertyName, BindingFlags.Instance | BindingFlags.Public);
+            return prop == null || prop.GetIndexParameters().Length > 0 ? null : prop.GetValue(_elementos[0]);
+        }
+
+        public event PropertyChangedEventHandler? PropertyChanged;
+
+        protected virtual void OnPropertyChanged([CallerMemberName] string? nome = null)
+        {
+            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nome));
+        }
+    }
+
+    public class PropertyRowViewModel : PropertyDescriptorViewModel
+    {
+        public PropertyRowViewModel(string nome, string valor, bool varia)
+            : base(Array.Empty<ElementoViewModel>(), new InstancePropertyDescriptor(typeof(ElementoViewModel), string.Empty, nome, 0, false), typeof(string), varia, false)
+        {
+        }
     }
 }
