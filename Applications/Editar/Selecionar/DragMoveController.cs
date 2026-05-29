@@ -1,8 +1,10 @@
 using System;
+using System.Collections.Generic;
 using System.Linq;
 using System.Windows;
 using Araci.Applications.Editar.Base;
 using Araci.Services;
+using Araci.ViewModels;
 
 namespace Araci.Applications.Editar.Selecionar
 {
@@ -10,25 +12,19 @@ namespace Araci.Applications.Editar.Selecionar
     {
         private readonly SelectionService _selection;
         private readonly MoveService _move;
-        private readonly MoveHudService _hud;
+        private readonly MoveHudService _moveHud;
         private readonly AlignmentGuideService _alignmentGuides;
         private readonly MoveConstraintService _constraints;
         private readonly bool _mostrarHud;
-        private Point _ultimoPontoMouse;
-        private Point _ultimoPontoEfetivo;
-        private Point _pontoInicialArrasto;
+        private readonly List<ElementoViewModel> _elementos = new();
+        private Point _start;
+        private Vector _deltaAplicado;
 
-        public DragMoveController(
-            SelectionService selection,
-            MoveService move,
-            MoveHudService hud,
-            AlignmentGuideService alignmentGuides,
-            MoveConstraintService constraints,
-            bool mostrarHud)
+        public DragMoveController(SelectionService selection, MoveService move, MoveHudService moveHud, AlignmentGuideService alignmentGuides, MoveConstraintService constraints, bool mostrarHud)
         {
             _selection = selection ?? throw new ArgumentNullException(nameof(selection));
             _move = move ?? throw new ArgumentNullException(nameof(move));
-            _hud = hud ?? throw new ArgumentNullException(nameof(hud));
+            _moveHud = moveHud ?? throw new ArgumentNullException(nameof(moveHud));
             _alignmentGuides = alignmentGuides ?? throw new ArgumentNullException(nameof(alignmentGuides));
             _constraints = constraints ?? throw new ArgumentNullException(nameof(constraints));
             _mostrarHud = mostrarHud;
@@ -38,20 +34,25 @@ namespace Araci.Applications.Editar.Selecionar
 
         public void Begin(Point position)
         {
-            IsActive = true;
-            _ultimoPontoMouse = position;
-            _ultimoPontoEfetivo = position;
-            _pontoInicialArrasto = position;
-            _constraints.Begin(position);
-            _move.BeginMove(_selection.Selecionados);
-            _alignmentGuides.Atualizar(_selection.Selecionados);
+            _elementos.Clear();
+            _elementos.AddRange(_selection.Selecionados.Distinct().Where(e => !e.IsPreview));
 
-            if (!_mostrarHud)
+            if (_elementos.Count == 0)
                 return;
 
-            _hud.Reset();
-            _hud.AtualizarPosicao(CalcularBoundsSelecionados());
-            _hud.Visivel = true;
+            _start = position;
+            _deltaAplicado = default;
+            IsActive = true;
+            _constraints.Begin(position);
+            _move.BeginMove(_elementos);
+            _alignmentGuides.Limpar();
+
+            if (_mostrarHud)
+            {
+                _moveHud.Reset();
+                _moveHud.Visivel = true;
+                AtualizarHud();
+            }
         }
 
         public void Update(Point position, ToolInputState inputState)
@@ -59,22 +60,22 @@ namespace Araci.Applications.Editar.Selecionar
             if (!IsActive)
                 return;
 
-            Point pontoEfetivo = _constraints.Apply(position, inputState);
-            Vector delta = pontoEfetivo - _ultimoPontoEfetivo;
+            Point constrained = _constraints.Apply(position, inputState);
+            Vector deltaPretendido = constrained - _start;
+            Vector incrementoPretendido = deltaPretendido - _deltaAplicado;
+            Vector incremento = _alignmentGuides.AplicarSnap(_elementos, incrementoPretendido);
 
-            if (delta.X != 0 || delta.Y != 0)
+            if (Math.Abs(incremento.X) < 0.000001 && Math.Abs(incremento.Y) < 0.000001)
             {
-                foreach (var item in _selection.Selecionados.ToList())
-                    _move.MoverVisual(item, delta);
+                AtualizarHud();
+                return;
             }
 
-            _alignmentGuides.Atualizar(_selection.Selecionados);
+            foreach (ElementoViewModel vm in _elementos)
+                _move.MoverVisual(vm, incremento);
 
-            if (_mostrarHud)
-                AtualizarHud(pontoEfetivo);
-
-            _ultimoPontoMouse = position;
-            _ultimoPontoEfetivo = pontoEfetivo;
+            _deltaAplicado += incremento;
+            AtualizarHud();
         }
 
         public void End()
@@ -82,49 +83,56 @@ namespace Araci.Applications.Editar.Selecionar
             if (!IsActive)
                 return;
 
-            _move.EndMove(_selection.Selecionados.ToList());
-            IsActive = false;
+            _move.EndMove(_elementos);
             _constraints.End();
-            LimparHud();
             _alignmentGuides.Limpar();
+            OcultarHud();
+            _elementos.Clear();
+            _deltaAplicado = default;
+            IsActive = false;
         }
 
         public void Cancel()
         {
-            IsActive = false;
-            _constraints.Cancel();
+            if (!IsActive)
+                return;
+
             _move.AbortMove();
-            LimparHud();
+            _constraints.Cancel();
             _alignmentGuides.Limpar();
+            OcultarHud();
+            _elementos.Clear();
+            _deltaAplicado = default;
+            IsActive = false;
         }
 
-        private void AtualizarHud(Point position)
+        private void AtualizarHud()
         {
-            Vector delta = position - _pontoInicialArrasto;
-            _hud.DeltaX = delta.X;
-            _hud.DeltaY = delta.Y;
-            _hud.AtualizarPosicao(CalcularBoundsSelecionados());
+            if (!_mostrarHud || _elementos.Count == 0)
+                return;
+
+            _moveHud.DeltaX = _deltaAplicado.X;
+            _moveHud.DeltaY = _deltaAplicado.Y;
+            _moveHud.AtualizarPosicao(CalcularBounds(_elementos));
         }
 
-        private void LimparHud()
+        private void OcultarHud()
         {
-            _hud.Visivel = false;
-            _hud.Reset();
+            if (!_mostrarHud)
+                return;
+
+            _moveHud.Reset();
+            _moveHud.Visivel = false;
         }
 
-        private Rect CalcularBoundsSelecionados()
+        private static Rect CalcularBounds(IReadOnlyList<ElementoViewModel> elementos)
         {
-            var items = _selection.Selecionados;
+            Rect total = elementos[0].Bounds;
 
-            if (items.Count == 0)
-                return Rect.Empty;
+            for (int i = 1; i < elementos.Count; i++)
+                total.Union(elementos[i].Bounds);
 
-            double minX = items.Min(i => i.Bounds.Left);
-            double minY = items.Min(i => i.Bounds.Top);
-            double maxX = items.Max(i => i.Bounds.Right);
-            double maxY = items.Max(i => i.Bounds.Bottom);
-
-            return new Rect(minX, minY, maxX - minX, maxY - minY);
+            return total;
         }
     }
 }

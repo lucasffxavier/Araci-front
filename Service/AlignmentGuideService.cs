@@ -20,10 +20,48 @@ namespace Araci.Services
 
         public ObservableCollection<AlignmentGuideLineViewModel> Linhas { get; } = new();
 
+        public Vector AplicarSnap(IEnumerable<ElementoViewModel> selecionados, Vector deltaPretendido)
+        {
+            Linhas.Clear();
+            var selecionadosList = selecionados.Distinct().Where(e => !e.IsPreview && !e.Bounds.IsEmpty).ToList();
+
+            if (selecionadosList.Count == 0)
+                return deltaPretendido;
+
+            var referencias = _context.Scene.Elementos
+                .Where(e => !e.IsPreview && !selecionadosList.Contains(e) && !e.Bounds.IsEmpty)
+                .ToList();
+
+            if (referencias.Count == 0)
+                return deltaPretendido;
+
+            Rect boundsAtual = CalcularBounds(selecionadosList);
+            Rect boundsPretendido = Deslocar(boundsAtual, deltaPretendido);
+            AlignmentVertical? vertical = EncontrarMelhorVertical(referencias, boundsPretendido);
+            AlignmentHorizontal? horizontal = EncontrarMelhorHorizontal(referencias, boundsPretendido);
+            Vector deltaFinal = deltaPretendido;
+
+            if (vertical.HasValue)
+            {
+                deltaFinal.X += vertical.Value.Ajuste;
+                Rect ajustado = Deslocar(boundsAtual, deltaFinal);
+                AdicionarVertical(vertical.Value.X, ajustado, vertical.Value.Bounds);
+            }
+
+            if (horizontal.HasValue)
+            {
+                deltaFinal.Y += horizontal.Value.Ajuste;
+                Rect ajustado = Deslocar(boundsAtual, deltaFinal);
+                AdicionarHorizontal(horizontal.Value.Y, ajustado, horizontal.Value.Bounds);
+            }
+
+            return deltaFinal;
+        }
+
         public void Atualizar(IEnumerable<ElementoViewModel> selecionados)
         {
             Linhas.Clear();
-            var selecionadosList = selecionados.Distinct().Where(e => !e.IsPreview).ToList();
+            var selecionadosList = selecionados.Distinct().Where(e => !e.IsPreview && !e.Bounds.IsEmpty).ToList();
 
             if (selecionadosList.Count == 0)
                 return;
@@ -36,15 +74,8 @@ namespace Araci.Services
                 return;
 
             Rect boundsSelecionados = CalcularBounds(selecionadosList);
-            double left = boundsSelecionados.Left;
-            double centerX = boundsSelecionados.Left + boundsSelecionados.Width / 2;
-            double right = boundsSelecionados.Right;
-            double top = boundsSelecionados.Top;
-            double centerY = boundsSelecionados.Top + boundsSelecionados.Height / 2;
-            double bottom = boundsSelecionados.Bottom;
-
-            var vertical = EncontrarMelhorVertical(referencias, left, centerX, right);
-            var horizontal = EncontrarMelhorHorizontal(referencias, top, centerY, bottom);
+            AlignmentVertical? vertical = EncontrarMelhorVertical(referencias, boundsSelecionados);
+            AlignmentHorizontal? horizontal = EncontrarMelhorHorizontal(referencias, boundsSelecionados);
 
             if (vertical.HasValue)
                 AdicionarVertical(vertical.Value.X, boundsSelecionados, vertical.Value.Bounds);
@@ -58,9 +89,12 @@ namespace Araci.Services
             Linhas.Clear();
         }
 
-        private static AlignmentVertical? EncontrarMelhorVertical(IEnumerable<ElementoViewModel> referencias, double left, double centerX, double right)
+        private static AlignmentVertical? EncontrarMelhorVertical(IEnumerable<ElementoViewModel> referencias, Rect boundsSelecionados)
         {
             AlignmentVertical? melhor = null;
+            double left = boundsSelecionados.Left;
+            double centerX = boundsSelecionados.Left + boundsSelecionados.Width / 2;
+            double right = boundsSelecionados.Right;
 
             foreach (ElementoViewModel vm in referencias)
             {
@@ -79,9 +113,12 @@ namespace Araci.Services
             return melhor;
         }
 
-        private static AlignmentHorizontal? EncontrarMelhorHorizontal(IEnumerable<ElementoViewModel> referencias, double top, double centerY, double bottom)
+        private static AlignmentHorizontal? EncontrarMelhorHorizontal(IEnumerable<ElementoViewModel> referencias, Rect boundsSelecionados)
         {
             AlignmentHorizontal? melhor = null;
+            double top = boundsSelecionados.Top;
+            double centerY = boundsSelecionados.Top + boundsSelecionados.Height / 2;
+            double bottom = boundsSelecionados.Bottom;
 
             foreach (ElementoViewModel vm in referencias)
             {
@@ -102,30 +139,33 @@ namespace Araci.Services
 
         private static void TestarVertical(ref AlignmentVertical? melhor, double valorSelecionado, double valorReferencia, Rect boundsReferencia)
         {
-            double distancia = Math.Abs(valorSelecionado - valorReferencia);
+            double ajuste = valorReferencia - valorSelecionado;
+            double distancia = Math.Abs(ajuste);
 
             if (distancia > Tolerancia)
                 return;
 
             if (!melhor.HasValue || distancia < melhor.Value.Distancia)
-                melhor = new AlignmentVertical(valorReferencia, distancia, boundsReferencia);
+                melhor = new AlignmentVertical(valorReferencia, ajuste, distancia, boundsReferencia);
         }
 
         private static void TestarHorizontal(ref AlignmentHorizontal? melhor, double valorSelecionado, double valorReferencia, Rect boundsReferencia)
         {
-            double distancia = Math.Abs(valorSelecionado - valorReferencia);
+            double ajuste = valorReferencia - valorSelecionado;
+            double distancia = Math.Abs(ajuste);
 
             if (distancia > Tolerancia)
                 return;
 
             if (!melhor.HasValue || distancia < melhor.Value.Distancia)
-                melhor = new AlignmentHorizontal(valorReferencia, distancia, boundsReferencia);
+                melhor = new AlignmentHorizontal(valorReferencia, ajuste, distancia, boundsReferencia);
         }
 
         private void AdicionarVertical(double x, Rect boundsSelecionados, Rect boundsReferencia)
         {
             double y1 = Math.Min(boundsSelecionados.Top, boundsReferencia.Top) - Margem;
             double y2 = Math.Max(boundsSelecionados.Bottom, boundsReferencia.Bottom) + Margem;
+
             Linhas.Add(new AlignmentGuideLineViewModel
             {
                 X1 = x,
@@ -139,6 +179,7 @@ namespace Araci.Services
         {
             double x1 = Math.Min(boundsSelecionados.Left, boundsReferencia.Left) - Margem;
             double x2 = Math.Max(boundsSelecionados.Right, boundsReferencia.Right) + Margem;
+
             Linhas.Add(new AlignmentGuideLineViewModel
             {
                 X1 = x1,
@@ -158,7 +199,12 @@ namespace Araci.Services
             return total;
         }
 
-        private readonly record struct AlignmentVertical(double X, double Distancia, Rect Bounds);
-        private readonly record struct AlignmentHorizontal(double Y, double Distancia, Rect Bounds);
+        private static Rect Deslocar(Rect rect, Vector delta)
+        {
+            return new Rect(rect.X + delta.X, rect.Y + delta.Y, rect.Width, rect.Height);
+        }
+
+        private readonly record struct AlignmentVertical(double X, double Ajuste, double Distancia, Rect Bounds);
+        private readonly record struct AlignmentHorizontal(double Y, double Ajuste, double Distancia, Rect Bounds);
     }
 }
