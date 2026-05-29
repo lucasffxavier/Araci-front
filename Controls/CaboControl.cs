@@ -1,4 +1,5 @@
-﻿using System.Collections.Specialized;
+﻿using System.Collections.Generic;
+using System.Collections.Specialized;
 using System.ComponentModel;
 using System.Windows;
 using System.Windows.Controls;
@@ -11,10 +12,11 @@ namespace Araci.Controls
 {
     public class CaboControl : ElementoControlBase
     {
+        private const double VertexHandleSize = 12;
         private readonly Canvas _root;
         private readonly Polyline _polyline;
         private readonly Polyline _hitArea;
-
+        private readonly List<Ellipse> _vertexHandles = new();
         private CaboViewModel? _vmAtual;
 
         public CaboControl()
@@ -47,9 +49,7 @@ namespace Araci.Controls
 
             _root.Children.Add(_hitArea);
             _root.Children.Add(_polyline);
-
             Content = _root;
-
             Loaded += OnLoaded;
             Unloaded += OnUnloaded;
         }
@@ -74,10 +74,8 @@ namespace Araci.Controls
                 return;
 
             _vmAtual = vm;
-
             vm.PropertyChanged += OnViewModelChanged;
             vm.Cabo.Vertices.CollectionChanged += OnVerticesChanged;
-
             AtualizarPolyline();
             AplicarEstadoVisual(vm);
         }
@@ -120,7 +118,6 @@ namespace Araci.Controls
                 return;
 
             var cabo = _vmAtual.Cabo;
-
             _polyline.Points.Clear();
             _hitArea.Points.Clear();
 
@@ -130,7 +127,6 @@ namespace Araci.Controls
             foreach (var p in cabo.Vertices)
             {
                 var local = new Point(p.X - offsetX, p.Y - offsetY);
-
                 _polyline.Points.Add(local);
                 _hitArea.Points.Add(local);
             }
@@ -144,15 +140,88 @@ namespace Araci.Controls
                     AdicionarPonto(preview, offsetX, offsetY);
             }
 
+            AtualizarHandlesVertices();
             InvalidateVisual();
         }
 
         private void AdicionarPonto(Point ponto, double offsetX, double offsetY)
         {
             var local = new Point(ponto.X - offsetX, ponto.Y - offsetY);
-
             _polyline.Points.Add(local);
             _hitArea.Points.Add(local);
+        }
+
+        private void AtualizarHandlesVertices()
+        {
+            if (_vmAtual == null)
+                return;
+
+            var cabo = _vmAtual.Cabo;
+            int quantidade = ObterQuantidadeHandles();
+            GarantirQuantidadeHandles(quantidade);
+
+            double offsetX = _vmAtual.WorldX;
+            double offsetY = _vmAtual.WorldY;
+
+            for (int i = 0; i < _vertexHandles.Count; i++)
+            {
+                var handle = _vertexHandles[i];
+
+                if (i >= quantidade)
+                {
+                    handle.Visibility = Visibility.Collapsed;
+                    continue;
+                }
+
+                int indiceVertice = i + 1;
+                Point ponto = cabo.Vertices[indiceVertice];
+                Canvas.SetLeft(handle, ponto.X - offsetX - VertexHandleSize / 2);
+                Canvas.SetTop(handle, ponto.Y - offsetY - VertexHandleSize / 2);
+                handle.Visibility = DeveMostrarHandles() ? Visibility.Visible : Visibility.Collapsed;
+            }
+        }
+
+        private int ObterQuantidadeHandles()
+        {
+            if (_vmAtual == null)
+                return 0;
+
+            var cabo = _vmAtual.Cabo;
+
+            if (cabo.Vertices.Count <= 1)
+                return 0;
+
+            int limiteExclusivo = cabo.PreviewPonto.HasValue ? cabo.Vertices.Count : cabo.Vertices.Count - 1;
+            return limiteExclusivo <= 1 ? 0 : limiteExclusivo - 1;
+        }
+
+        private void GarantirQuantidadeHandles(int quantidade)
+        {
+            while (_vertexHandles.Count < quantidade)
+            {
+                var handle = CriarHandleVertice();
+                _vertexHandles.Add(handle);
+                _root.Children.Add(handle);
+            }
+        }
+
+        private static Ellipse CriarHandleVertice()
+        {
+            return new Ellipse
+            {
+                Width = VertexHandleSize,
+                Height = VertexHandleSize,
+                Fill = Brushes.DeepSkyBlue,
+                Stroke = Brushes.White,
+                StrokeThickness = 2,
+                IsHitTestVisible = false,
+                Visibility = Visibility.Collapsed
+            };
+        }
+
+        private bool DeveMostrarHandles()
+        {
+            return _vmAtual != null && !_vmAtual.IsPreview && (_vmAtual.IsSelecionado || _vmAtual.IsHover);
         }
 
         protected override void AplicarEstadoVisual(ElementoViewModel vm)
@@ -168,6 +237,7 @@ namespace Araci.Controls
                 _polyline.StrokeThickness = 3;
                 _polyline.Opacity = 0.65;
                 _hitArea.IsHitTestVisible = false;
+                AtualizarHandlesVertices();
                 return;
             }
 
@@ -175,6 +245,7 @@ namespace Araci.Controls
             _polyline.StrokeThickness = cabo.StrokeThickness;
             _polyline.Opacity = 1;
             _hitArea.IsHitTestVisible = true;
+            AtualizarHandlesVertices();
         }
     }
 }
