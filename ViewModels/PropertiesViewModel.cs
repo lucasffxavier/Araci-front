@@ -9,12 +9,15 @@ using System.Reflection;
 using System.Runtime.CompilerServices;
 using System.Windows.Input;
 using Araci.Models.Tipos;
+using AraciCommandManager = Araci.Core.Commands.CommandManager;
+using BulkPropertyChangeCommand = Araci.Core.Commands.BulkPropertyChangeCommand;
 
 namespace Araci.ViewModels
 {
     public class PropertiesViewModel : INotifyPropertyChanged
     {
         private readonly IReadOnlyList<ElementoViewModel> _selecionados;
+        private readonly AraciCommandManager? _commands;
         private object? _elementoSelecionado;
         private ICommand? _abrirPropriedadesTipoCommand;
 
@@ -23,12 +26,13 @@ namespace Araci.ViewModels
             _selecionados = Array.Empty<ElementoViewModel>();
         }
 
-        public PropertiesViewModel(IEnumerable<ElementoViewModel> selecionados)
+        public PropertiesViewModel(IEnumerable<ElementoViewModel> selecionados, AraciCommandManager? commands = null)
         {
             _selecionados = selecionados?.Where(e => e != null).ToList() ?? new List<ElementoViewModel>();
+            _commands = commands;
             QuantidadeSelecionada = _selecionados.Count;
             Titulo = CriarTitulo(_selecionados);
-            Propriedades = new ObservableCollection<PropertyDescriptorViewModel>(CriarDescritores(_selecionados));
+            Propriedades = new ObservableCollection<PropertyDescriptorViewModel>(CriarDescritores(_selecionados, _commands));
         }
 
         public object? ElementoSelecionado
@@ -67,8 +71,20 @@ namespace Araci.ViewModels
                 if (!MesmoTipo || value == null)
                     return;
 
-                foreach (var elemento in _selecionados)
-                    elemento.Tipo = value;
+                var items = _selecionados
+                    .Where(e => !ReferenceEquals(e.Tipo, value))
+                    .Select(e => new BulkPropertyChangeCommand.Item(e, nameof(ElementoViewModel.Tipo), e.Tipo, value))
+                    .ToList();
+
+                if (items.Count == 0)
+                    return;
+
+                var command = new BulkPropertyChangeCommand(items);
+
+                if (_commands == null)
+                    command.Execute();
+                else
+                    _commands.Execute(command);
 
                 OnPropertyChanged();
                 OnPropertyChanged(nameof(PodeAbrirPropriedadesTipo));
@@ -99,7 +115,7 @@ namespace Araci.ViewModels
             return $"{itens.Count} elementos selecionados";
         }
 
-        private static IEnumerable<PropertyDescriptorViewModel> CriarDescritores(IReadOnlyList<ElementoViewModel> itens)
+        private static IEnumerable<PropertyDescriptorViewModel> CriarDescritores(IReadOnlyList<ElementoViewModel> itens, AraciCommandManager? commands)
         {
             if (itens.Count == 0)
                 yield break;
@@ -119,7 +135,7 @@ namespace Araci.ViewModels
                 object? primeiro = valores[0];
                 bool varia = valores.Skip(1).Any(v => !ValoresIguais(primeiro, v));
 
-                yield return new PropertyDescriptorViewModel(itens, descriptor, tipoValor, varia, editavel);
+                yield return new PropertyDescriptorViewModel(itens, descriptor, tipoValor, varia, editavel, commands);
             }
         }
 
@@ -129,12 +145,12 @@ namespace Araci.ViewModels
             return prop == null || prop.GetIndexParameters().Length > 0 ? null : prop;
         }
 
-        private static object? ObterValor(ElementoViewModel item, string nomePropriedade)
+        internal static object? ObterValor(ElementoViewModel item, string nomePropriedade)
         {
             return ObterPropriedade(item, nomePropriedade)?.GetValue(item);
         }
 
-        private static bool ValoresIguais(object? a, object? b)
+        internal static bool ValoresIguais(object? a, object? b)
         {
             if (a == null && b == null)
                 return true;
@@ -293,16 +309,18 @@ namespace Araci.ViewModels
         private readonly IReadOnlyList<ElementoViewModel> _elementos;
         private readonly InstancePropertyDescriptor _descriptor;
         private readonly Type _tipoValor;
+        private readonly AraciCommandManager? _commands;
         private string _valor;
         private bool _varia;
         private bool _temErro;
         private string _mensagemErro = string.Empty;
 
-        public PropertyDescriptorViewModel(IReadOnlyList<ElementoViewModel> elementos, InstancePropertyDescriptor descriptor, Type tipoValor, bool varia, bool isEditable)
+        public PropertyDescriptorViewModel(IReadOnlyList<ElementoViewModel> elementos, InstancePropertyDescriptor descriptor, Type tipoValor, bool varia, bool isEditable, AraciCommandManager? commands = null)
         {
             _elementos = elementos;
             _descriptor = descriptor;
             _tipoValor = tipoValor;
+            _commands = commands;
             Nome = descriptor.DisplayName;
             DisplayName = descriptor.DisplayName;
             PropertyName = descriptor.PropertyName;
@@ -380,20 +398,40 @@ namespace Araci.ViewModels
                 return;
             }
 
-            foreach (ElementoViewModel elemento in _elementos)
+            var items = _elementos
+                .Select(e => new
+                {
+                    Elemento = e,
+                    Antes = PropertiesViewModel.ObterValor(e, _descriptor.PropertyName)
+                })
+                .Where(x => !PropertiesViewModel.ValoresIguais(x.Antes, convertido))
+                .Select(x => new BulkPropertyChangeCommand.Item(x.Elemento, _descriptor.PropertyName, x.Antes, convertido))
+                .ToList();
+
+            if (items.Count == 0)
             {
-                PropertyInfo? prop = elemento.GetType().GetProperty(_descriptor.PropertyName, BindingFlags.Instance | BindingFlags.Public);
-
-                if (prop == null || !prop.CanWrite || prop.GetIndexParameters().Length > 0)
-                    continue;
-
-                prop.SetValue(elemento, convertido);
+                _valor = PropertiesViewModel.FormatarValor(convertido);
+                _varia = false;
+                AtualizarEstadoValido();
+                return;
             }
 
-            TemErro = false;
-            MensagemErro = string.Empty;
+            var command = new BulkPropertyChangeCommand(items);
+
+            if (_commands == null)
+                command.Execute();
+            else
+                _commands.Execute(command);
+
             _varia = false;
             _valor = PropertiesViewModel.FormatarValor(convertido);
+            AtualizarEstadoValido();
+        }
+
+        private void AtualizarEstadoValido()
+        {
+            TemErro = false;
+            MensagemErro = string.Empty;
             OnPropertyChanged(nameof(Valor));
             OnPropertyChanged(nameof(Value));
             OnPropertyChanged(nameof(IsMixed));
@@ -405,8 +443,7 @@ namespace Araci.ViewModels
             if (_elementos.Count == 0)
                 return null;
 
-            PropertyInfo? prop = _elementos[0].GetType().GetProperty(_descriptor.PropertyName, BindingFlags.Instance | BindingFlags.Public);
-            return prop == null || prop.GetIndexParameters().Length > 0 ? null : prop.GetValue(_elementos[0]);
+            return PropertiesViewModel.ObterValor(_elementos[0], _descriptor.PropertyName);
         }
 
         public event PropertyChangedEventHandler? PropertyChanged;
