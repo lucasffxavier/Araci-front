@@ -56,6 +56,35 @@ namespace Araci.Services
             return CalcularAjusteETracejado(preview.Bounds, referencias, out _, out _);
         }
 
+        public Point AplicarSnapPontoCabo(Point ponto, Point origem, ElementoViewModel? ignorar = null)
+        {
+            Linhas.Clear();
+            var referencias = ObterReferenciasParaPonto(ignorar);
+            AlignmentVertical? vertical = EncontrarMelhorVerticalPonto(referencias, ponto.X);
+            AlignmentHorizontal? horizontal = EncontrarMelhorHorizontalPonto(referencias, ponto.Y);
+            Point ajustado = ponto;
+
+            if (Math.Abs(origem.X - ponto.X) <= Tolerancia)
+                vertical = EscolherMelhorVertical(vertical, new AlignmentVertical(origem.X, origem.X - ponto.X, Math.Abs(origem.X - ponto.X), CriarBoundsPonto(origem)));
+
+            if (Math.Abs(origem.Y - ponto.Y) <= Tolerancia)
+                horizontal = EscolherMelhorHorizontal(horizontal, new AlignmentHorizontal(origem.Y, origem.Y - ponto.Y, Math.Abs(origem.Y - ponto.Y), CriarBoundsPonto(origem)));
+
+            if (vertical.HasValue)
+                ajustado.X += vertical.Value.Ajuste;
+
+            if (horizontal.HasValue)
+                ajustado.Y += horizontal.Value.Ajuste;
+
+            if (vertical.HasValue)
+                AdicionarVertical(vertical.Value.X, CriarBoundsSegmento(origem, ajustado), vertical.Value.Bounds);
+
+            if (horizontal.HasValue)
+                AdicionarHorizontal(horizontal.Value.Y, CriarBoundsSegmento(origem, ajustado), horizontal.Value.Bounds);
+
+            return ajustado;
+        }
+
         public void Atualizar(IEnumerable<ElementoViewModel> selecionados)
         {
             Linhas.Clear();
@@ -109,6 +138,13 @@ namespace Araci.Services
                 .ToList();
         }
 
+        private IReadOnlyList<ElementoViewModel> ObterReferenciasParaPonto(ElementoViewModel? ignorar)
+        {
+            return _context.Scene.Elementos
+                .Where(e => !e.IsPreview && !ReferenceEquals(e, ignorar) && !e.Bounds.IsEmpty)
+                .ToList();
+        }
+
         private static AlignmentVertical? EncontrarMelhorVertical(IEnumerable<ElementoViewModel> referencias, Rect boundsSelecionados)
         {
             AlignmentVertical? melhor = null;
@@ -157,6 +193,36 @@ namespace Araci.Services
             return melhor;
         }
 
+        private static AlignmentVertical? EncontrarMelhorVerticalPonto(IEnumerable<ElementoViewModel> referencias, double x)
+        {
+            AlignmentVertical? melhor = null;
+
+            foreach (ElementoViewModel vm in referencias)
+            {
+                Rect b = vm.Bounds;
+                TestarVertical(ref melhor, x, b.Left, b);
+                TestarVertical(ref melhor, x, b.Left + b.Width / 2, b);
+                TestarVertical(ref melhor, x, b.Right, b);
+            }
+
+            return melhor;
+        }
+
+        private static AlignmentHorizontal? EncontrarMelhorHorizontalPonto(IEnumerable<ElementoViewModel> referencias, double y)
+        {
+            AlignmentHorizontal? melhor = null;
+
+            foreach (ElementoViewModel vm in referencias)
+            {
+                Rect b = vm.Bounds;
+                TestarHorizontal(ref melhor, y, b.Top, b);
+                TestarHorizontal(ref melhor, y, b.Top + b.Height / 2, b);
+                TestarHorizontal(ref melhor, y, b.Bottom, b);
+            }
+
+            return melhor;
+        }
+
         private static void TestarVertical(ref AlignmentVertical? melhor, double valorSelecionado, double valorReferencia, Rect boundsReferencia)
         {
             double ajuste = valorReferencia - valorSelecionado;
@@ -179,6 +245,16 @@ namespace Araci.Services
 
             if (!melhor.HasValue || distancia < melhor.Value.Distancia)
                 melhor = new AlignmentHorizontal(valorReferencia, ajuste, distancia, boundsReferencia);
+        }
+
+        private static AlignmentVertical EscolherMelhorVertical(AlignmentVertical? atual, AlignmentVertical candidato)
+        {
+            return !atual.HasValue || candidato.Distancia < atual.Value.Distancia ? candidato : atual.Value;
+        }
+
+        private static AlignmentHorizontal EscolherMelhorHorizontal(AlignmentHorizontal? atual, AlignmentHorizontal candidato)
+        {
+            return !atual.HasValue || candidato.Distancia < atual.Value.Distancia ? candidato : atual.Value;
         }
 
         private void AdicionarVertical(double x, Rect boundsSelecionados, Rect boundsReferencia)
@@ -222,6 +298,20 @@ namespace Araci.Services
         private static Rect Deslocar(Rect rect, Vector delta)
         {
             return new Rect(rect.X + delta.X, rect.Y + delta.Y, rect.Width, rect.Height);
+        }
+
+        private static Rect CriarBoundsPonto(Point ponto)
+        {
+            return new Rect(ponto.X, ponto.Y, 1, 1);
+        }
+
+        private static Rect CriarBoundsSegmento(Point a, Point b)
+        {
+            double x = Math.Min(a.X, b.X);
+            double y = Math.Min(a.Y, b.Y);
+            double largura = Math.Max(1, Math.Abs(a.X - b.X));
+            double altura = Math.Max(1, Math.Abs(a.Y - b.Y));
+            return new Rect(x, y, largura, altura);
         }
 
         private readonly record struct AlignmentVertical(double X, double Ajuste, double Distancia, Rect Bounds);

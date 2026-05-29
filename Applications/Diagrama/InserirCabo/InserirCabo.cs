@@ -99,7 +99,7 @@ namespace Araci.Applications.Diagrama.InserirCabo
 
             if (terminal == null)
             {
-                AdicionarVerticeIntermediario(AplicarOrtogonalizacao(pontoSnap, inputState));
+                AdicionarVerticeIntermediario(AplicarAlinhamentoCabo(pontoSnap, inputState));
                 return;
             }
 
@@ -121,6 +121,7 @@ namespace Araci.Applications.Diagrama.InserirCabo
         {
             if (!_inserindo)
             {
+                _context.AlignmentGuides.Limpar();
                 AtualizarPreviewInicial(position);
                 return;
             }
@@ -146,7 +147,11 @@ namespace Araci.Applications.Diagrama.InserirCabo
             }
 
             Point pontoSnap = terminal?.Posicao ?? _context.Snap.Snap(position, _caboAtual);
-            Point pontoPreview = terminal == null ? AplicarOrtogonalizacao(pontoSnap, inputState) : pontoSnap;
+            Point pontoPreview = terminal == null ? AplicarAlinhamentoCabo(pontoSnap, inputState) : pontoSnap;
+
+            if (terminal != null)
+                _context.AlignmentGuides.Limpar();
+
             _caboAtual.AtualizarPreview(pontoPreview);
         }
 
@@ -300,12 +305,25 @@ namespace Araci.Applications.Diagrama.InserirCabo
             _context.SceneQueries.Invalidate();
         }
 
-        private Point AplicarOrtogonalizacao(Point ponto, ToolInputState inputState)
+        private Point AplicarAlinhamentoCabo(Point ponto, ToolInputState inputState)
         {
-            if (!inputState.IsShiftPressed || _caboAtual == null || _caboAtual.Cabo.Vertices.Count == 0)
+            if (_caboAtual == null || _caboAtual.Cabo.Vertices.Count == 0)
                 return ponto;
 
             Point origem = _caboAtual.Cabo.Vertices[^1];
+
+            if (inputState.IsShiftPressed)
+            {
+                Point ortogonal = AplicarOrtogonalizacao(ponto, origem);
+                _context.AlignmentGuides.AplicarSnapPontoCabo(ortogonal, origem, _caboAtual);
+                return ortogonal;
+            }
+
+            return _context.AlignmentGuides.AplicarSnapPontoCabo(ponto, origem, _caboAtual);
+        }
+
+        private static Point AplicarOrtogonalizacao(Point ponto, Point origem)
+        {
             Vector delta = ponto - origem;
 
             if (Math.Abs(delta.X) < 0.0001 && Math.Abs(delta.Y) < 0.0001)
@@ -382,6 +400,7 @@ namespace Araci.Applications.Diagrama.InserirCabo
             _terminalPreviewFinal = null;
             _terminalOrigem = null;
             LimparTerminalCapturado();
+            _context.AlignmentGuides.Limpar();
             _inserindo = false;
         }
     }
