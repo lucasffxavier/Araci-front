@@ -10,7 +10,7 @@ namespace Araci.Services
 {
     public class BarraResizeService
     {
-        private const double HandleTolerance = 10;
+        private const double HandleTolerance = 12;
         private readonly EditorContext _context;
         private BarraViewModel? _vm;
         private ResizeBarraHandle _handle;
@@ -32,15 +32,11 @@ namespace Araci.Services
         {
             if (_context.Selection.Selecionados.Count != 1)
                 return false;
-
             if (_context.Selection.Selecionados.FirstOrDefault() is not BarraViewModel barraVm)
                 return false;
-
             ResizeBarraHandle handle = HitTestHandle(barraVm, position);
-
             if (handle == ResizeBarraHandle.None)
                 return false;
-
             _vm = barraVm;
             _handle = handle;
             _startMouse = position;
@@ -57,21 +53,14 @@ namespace Araci.Services
         {
             if (!IsResizing || _vm == null)
                 return;
-
             Vector eixoLocal = GetLocalVerticalAxis(_vm.Barra.Rotacao);
             Vector mouseDelta = position - _startMouse;
             double delta = Dot(mouseDelta, eixoLocal);
-
-            double novaAltura = _handle == ResizeBarraHandle.Top
-                ? _startHeight - delta
-                : _startHeight + delta;
-
+            double novaAltura = _handle == ResizeBarraHandle.Top ? _startHeight - delta : _startHeight + delta;
             novaAltura = Barra.NormalizarAltura(novaAltura);
-
             Point novoTopoEsquerdo = _handle == ResizeBarraHandle.Top
                 ? CalcularTopoEsquerdoMantendoBottom(_vm.Barra, novaAltura, _startBottomWorld)
                 : CalcularTopoEsquerdoMantendoTop(_vm.Barra, novaAltura, _startTopWorld);
-
             _vm.Barra.PosicaoX = novoTopoEsquerdo.X;
             _vm.Barra.PosicaoY = novoTopoEsquerdo.Y;
             _context.GeometryUpdates.AplicarAlturaBarra(_vm.Barra, novaAltura);
@@ -85,29 +74,14 @@ namespace Araci.Services
                 Cancel();
                 return;
             }
-
             double alturaDepois = _vm.Barra.Altura;
             double xDepois = _vm.Barra.PosicaoX;
             double yDepois = _vm.Barra.PosicaoY;
-
-            bool mudou = Math.Abs(_startHeight - alturaDepois) > 0.0001 ||
-                Math.Abs(_startX - xDepois) > 0.0001 ||
-                Math.Abs(_startY - yDepois) > 0.0001;
-
+            bool mudou = Math.Abs(_startHeight - alturaDepois) > 0.0001 || Math.Abs(_startX - xDepois) > 0.0001 || Math.Abs(_startY - yDepois) > 0.0001;
             if (mudou)
             {
-                _context.Commands.Execute(
-                    new ResizeBarraCommand(
-                        _vm.Barra,
-                        _startHeight,
-                        _startX,
-                        _startY,
-                        alturaDepois,
-                        xDepois,
-                        yDepois,
-                        _context.GeometryUpdates));
+                _context.Commands.Execute(new ResizeBarraCommand(_vm.Barra, _startHeight, _startX, _startY, alturaDepois, xDepois, yDepois, _context.GeometryUpdates));
             }
-
             Limpar();
         }
 
@@ -119,7 +93,6 @@ namespace Araci.Services
                 _vm.Barra.PosicaoY = _startY;
                 _context.GeometryUpdates.AplicarAlturaBarra(_vm.Barra, _startHeight);
             }
-
             Limpar();
         }
 
@@ -134,57 +107,40 @@ namespace Araci.Services
         {
             Point top = GetTopHandleWorld(vm.Barra);
             Point bottom = GetBottomHandleWorld(vm.Barra);
-
             if (Distance(position, top) <= HandleTolerance)
                 return ResizeBarraHandle.Top;
-
             if (Distance(position, bottom) <= HandleTolerance)
                 return ResizeBarraHandle.Bottom;
-
             return ResizeBarraHandle.None;
         }
 
         private static Point GetTopHandleWorld(Barra barra)
         {
-            return RotateAround(
-                new Point(barra.PosicaoX + ElementGeometryDefaults.BarraLargura / 2, barra.PosicaoY),
-                GetCenter(barra),
-                barra.Rotacao);
+            return RotateAround(new Point(barra.PosicaoX + ElementGeometryDefaults.BarraLargura / 2, barra.PosicaoY), GetCenter(barra), barra.Rotacao);
         }
 
         private static Point GetBottomHandleWorld(Barra barra)
         {
-            return RotateAround(
-                new Point(barra.PosicaoX + ElementGeometryDefaults.BarraLargura / 2, barra.PosicaoY + barra.Altura),
-                GetCenter(barra),
-                barra.Rotacao);
+            return RotateAround(new Point(barra.PosicaoX + ElementGeometryDefaults.BarraLargura / 2, barra.PosicaoY + barra.Altura), GetCenter(barra), barra.Rotacao);
         }
 
         private static Point GetCenter(Barra barra)
         {
-            return new Point(
-                barra.PosicaoX + ElementGeometryDefaults.BarraLargura / 2,
-                barra.PosicaoY + barra.Altura / 2);
+            return new Point(barra.PosicaoX + ElementGeometryDefaults.BarraLargura / 2, barra.PosicaoY + barra.Altura / 2);
         }
 
         private static Point CalcularTopoEsquerdoMantendoTop(Barra barra, double novaAltura, Point topWorld)
         {
             Vector offsetCentroParaTop = RotateVector(new Vector(0, -novaAltura / 2), barra.Rotacao);
             Point novoCentro = topWorld - offsetCentroParaTop;
-
-            return new Point(
-                novoCentro.X - ElementGeometryDefaults.BarraLargura / 2,
-                novoCentro.Y - novaAltura / 2);
+            return new Point(novoCentro.X - ElementGeometryDefaults.BarraLargura / 2, novoCentro.Y - novaAltura / 2);
         }
 
         private static Point CalcularTopoEsquerdoMantendoBottom(Barra barra, double novaAltura, Point bottomWorld)
         {
             Vector offsetCentroParaBottom = RotateVector(new Vector(0, novaAltura / 2), barra.Rotacao);
             Point novoCentro = bottomWorld - offsetCentroParaBottom;
-
-            return new Point(
-                novoCentro.X - ElementGeometryDefaults.BarraLargura / 2,
-                novoCentro.Y - novaAltura / 2);
+            return new Point(novoCentro.X - ElementGeometryDefaults.BarraLargura / 2, novoCentro.Y - novaAltura / 2);
         }
 
         private static Vector GetLocalVerticalAxis(double rotacao)
@@ -197,10 +153,7 @@ namespace Araci.Services
             double radians = angle * Math.PI / 180.0;
             double cos = Math.Cos(radians);
             double sin = Math.Sin(radians);
-
-            return new Vector(
-                vector.X * cos - vector.Y * sin,
-                vector.X * sin + vector.Y * cos);
+            return new Vector(vector.X * cos - vector.Y * sin, vector.X * sin + vector.Y * cos);
         }
 
         private static Point RotateAround(Point point, Point center, double angle)
