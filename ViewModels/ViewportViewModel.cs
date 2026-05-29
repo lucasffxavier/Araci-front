@@ -4,6 +4,7 @@ using System.Collections.ObjectModel;
 using System.Collections.Specialized;
 using System.ComponentModel;
 using System.Runtime.CompilerServices;
+using System.Windows;
 using Araci.Core.Documents;
 using Araci.Core.Scenes;
 using Araci.Models;
@@ -41,7 +42,14 @@ namespace Araci.ViewModels
         public ObservableCollection<ElementoViewModel> Elementos => Scene.Elementos;
         public double InverseZoom => _inverseZoom;
         public double CableHandleVisualOffset => -5 * _inverseZoom;
-        public double TerminalMarkerVisualOffset => -7 * _inverseZoom;
+        public double TerminalMarkerVisualSize => 20 * _inverseZoom;
+        public double TerminalMarkerVisualOffset => -10 * _inverseZoom;
+        public double TerminalMarkerStrokeThickness => 2 * _inverseZoom;
+        public double TerminalMessageVisualOffsetX => 16 * _inverseZoom;
+        public double TerminalMessageVisualOffsetY => -34 * _inverseZoom;
+        public double TerminalMessageFontSize => 12 * _inverseZoom;
+        public Thickness TerminalMessagePadding => new(7 * _inverseZoom, 4 * _inverseZoom, 7 * _inverseZoom, 4 * _inverseZoom);
+        public CornerRadius TerminalMessageCornerRadius => new(5 * _inverseZoom);
 
         public void AtualizarZoomVisual(double zoom)
         {
@@ -53,7 +61,14 @@ namespace Araci.ViewModels
             _inverseZoom = inverseZoom;
             OnPropertyChanged(nameof(InverseZoom));
             OnPropertyChanged(nameof(CableHandleVisualOffset));
+            OnPropertyChanged(nameof(TerminalMarkerVisualSize));
             OnPropertyChanged(nameof(TerminalMarkerVisualOffset));
+            OnPropertyChanged(nameof(TerminalMarkerStrokeThickness));
+            OnPropertyChanged(nameof(TerminalMessageVisualOffsetX));
+            OnPropertyChanged(nameof(TerminalMessageVisualOffsetY));
+            OnPropertyChanged(nameof(TerminalMessageFontSize));
+            OnPropertyChanged(nameof(TerminalMessagePadding));
+            OnPropertyChanged(nameof(TerminalMessageCornerRadius));
         }
 
         public void RegistrarViewModel(ElementoViewModel vm)

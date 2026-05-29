@@ -35,10 +35,7 @@ namespace Araci.Services
                 return null;
 
             Elemento? elemento = ObterElementoPorId(endpoint.ElementId);
-
-            return elemento == null
-                ? null
-                : ObterTerminal(elemento, endpoint.TerminalId);
+            return elemento == null ? null : ObterTerminal(elemento, endpoint.TerminalId);
         }
 
         public string ResolverBusName(Elemento elemento)
@@ -88,9 +85,7 @@ namespace Araci.Services
         public string ResolverBusNameParaEquipamentoEstrito(ElementoEquipamento equipamento)
         {
             if (!string.IsNullOrWhiteSpace(equipamento.BarraId))
-                return ResolverBusNamePorIdEstrito(
-                    equipamento.BarraId,
-                    $"Equipamento '{ResolverBusName(equipamento)}'");
+                return ResolverBusNamePorIdEstrito(equipamento.BarraId, $"Equipamento '{ResolverBusName(equipamento)}'");
 
             return ResolverBusName(equipamento);
         }
@@ -110,9 +105,7 @@ namespace Araci.Services
 
         public string ResolverBus1Estrito(Cabo cabo)
         {
-            return ResolverBusNamePorIdEstrito(
-                cabo.OrigemId,
-                $"Cabo '{ResolverBusName(cabo)}' origem");
+            return ResolverBusNamePorIdEstrito(cabo.OrigemId, $"Cabo '{ResolverBusName(cabo)}' origem");
         }
 
         public string ResolverBus2(Cabo cabo)
@@ -130,9 +123,7 @@ namespace Araci.Services
 
         public string ResolverBus2Estrito(Cabo cabo)
         {
-            return ResolverBusNamePorIdEstrito(
-                cabo.DestinoId,
-                $"Cabo '{ResolverBusName(cabo)}' destino");
+            return ResolverBusNamePorIdEstrito(cabo.DestinoId, $"Cabo '{ResolverBusName(cabo)}' destino");
         }
 
         public IReadOnlyList<Cabo> ObterCabosConectados(Elemento elemento)
@@ -154,9 +145,7 @@ namespace Araci.Services
 
             return _document.Elementos
                 .OfType<Cabo>()
-                .Where(c =>
-                    c.OrigemEndpoint == endpoint ||
-                    c.DestinoEndpoint == endpoint)
+                .Where(c => c.OrigemEndpoint == endpoint || c.DestinoEndpoint == endpoint)
                 .ToList();
         }
 
@@ -168,17 +157,11 @@ namespace Araci.Services
             {
                 bool alterou = false;
 
-                if (EhMesmoElemento(cabo.OrigemId, elemento) &&
-                    ReancorarOrigem(cabo, elemento))
-                {
+                if (EhMesmoElemento(cabo.OrigemId, elemento) && ReancorarOrigem(cabo, elemento))
                     alterou = true;
-                }
 
-                if (EhMesmoElemento(cabo.DestinoId, elemento) &&
-                    ReancorarDestino(cabo, elemento))
-                {
+                if (EhMesmoElemento(cabo.DestinoId, elemento) && ReancorarDestino(cabo, elemento))
                     alterou = true;
-                }
 
                 if (alterou)
                     alterados.Add(cabo);
@@ -187,33 +170,49 @@ namespace Araci.Services
             return alterados;
         }
 
-        public ConnectionValidationResult ValidarConexaoCabo(
-            Cabo? caboAtual,
-            Terminal? origem,
-            Terminal? destino)
+        public ConnectionValidationResult ValidarTerminalDisponivel(Cabo? caboAtual, Terminal? terminal)
         {
-            if (origem == null)
-                return ConnectionValidationResult.Invalid("Origem sem terminal valido.");
+            if (terminal == null)
+                return ConnectionValidationResult.Invalid("Conexão inválida");
 
-            if (destino == null)
-                return ConnectionValidationResult.Invalid("Destino sem terminal valido.");
+            TerminalEndpoint endpoint = TerminalEndpoint.FromTerminal(terminal);
+
+            if (!endpoint.IsComplete)
+                return ConnectionValidationResult.Invalid("Conexão inválida");
+
+            return ExisteCaboNoTerminal(caboAtual, endpoint)
+                ? ConnectionValidationResult.Invalid("Conexão ocupada")
+                : ConnectionValidationResult.Valid();
+        }
+
+        public bool TerminalEstaOcupado(Terminal terminal, Cabo? caboIgnorado = null)
+        {
+            TerminalEndpoint endpoint = TerminalEndpoint.FromTerminal(terminal);
+            return endpoint.IsComplete && ExisteCaboNoTerminal(caboIgnorado, endpoint);
+        }
+
+        public ConnectionValidationResult ValidarConexaoCabo(Cabo? caboAtual, Terminal? origem, Terminal? destino)
+        {
+            if (origem == null || destino == null)
+                return ConnectionValidationResult.Invalid("Conexão inválida");
 
             TerminalEndpoint origemEndpoint = TerminalEndpoint.FromTerminal(origem);
             TerminalEndpoint destinoEndpoint = TerminalEndpoint.FromTerminal(destino);
 
             if (!origemEndpoint.IsComplete || !destinoEndpoint.IsComplete)
-            {
-                return ConnectionValidationResult.Invalid("Conexao sem ElementoId ou TerminalId valido.");
-            }
+                return ConnectionValidationResult.Invalid("Conexão inválida");
 
             if (string.Equals(origemEndpoint.ElementId, destinoEndpoint.ElementId, StringComparison.OrdinalIgnoreCase))
-                return ConnectionValidationResult.Invalid("Origem e destino pertencem ao mesmo elemento.");
+                return ConnectionValidationResult.Invalid("Conexão inválida");
 
             if (origemEndpoint == destinoEndpoint)
-                return ConnectionValidationResult.Invalid("Origem e destino usam o mesmo terminal.");
+                return ConnectionValidationResult.Invalid("Conexão inválida");
+
+            if (ExisteCaboNoTerminal(caboAtual, origemEndpoint) || ExisteCaboNoTerminal(caboAtual, destinoEndpoint))
+                return ConnectionValidationResult.Invalid("Conexão ocupada");
 
             if (ExisteCaboDuplicado(caboAtual, origemEndpoint, destinoEndpoint))
-                return ConnectionValidationResult.Invalid("Ja existe cabo entre estes terminais.");
+                return ConnectionValidationResult.Invalid("Conexão inválida");
 
             return ConnectionValidationResult.Valid();
         }
@@ -222,14 +221,8 @@ namespace Araci.Services
         {
             foreach (Cabo anterior in anteriores)
             {
-                if (MesmoParDeTerminais(
-                    cabo.OrigemEndpoint,
-                    cabo.DestinoEndpoint,
-                    anterior.OrigemEndpoint,
-                    anterior.DestinoEndpoint))
-                {
+                if (MesmoParDeTerminais(cabo.OrigemEndpoint, cabo.DestinoEndpoint, anterior.OrigemEndpoint, anterior.DestinoEndpoint))
                     return true;
-                }
             }
 
             return false;
@@ -237,42 +230,32 @@ namespace Araci.Services
 
         private static bool EhMesmoElemento(string id, Elemento elemento)
         {
-            return string.Equals(
-                id,
-                elemento.Id.ToString(),
-                StringComparison.OrdinalIgnoreCase);
+            return string.Equals(id, elemento.Id.ToString(), StringComparison.OrdinalIgnoreCase);
         }
 
-        private bool ExisteCaboDuplicado(
-            Cabo? caboAtual,
-            TerminalEndpoint origem,
-            TerminalEndpoint destino)
+        private bool ExisteCaboNoTerminal(Cabo? caboAtual, TerminalEndpoint endpoint)
+        {
+            if (!endpoint.IsComplete)
+                return false;
+
+            return _document.Elementos.OfType<Cabo>().Any(c =>
+                !ReferenceEquals(c, caboAtual) &&
+                (c.OrigemEndpoint == endpoint || c.DestinoEndpoint == endpoint));
+        }
+
+        private bool ExisteCaboDuplicado(Cabo? caboAtual, TerminalEndpoint origem, TerminalEndpoint destino)
         {
             return _document.Elementos.OfType<Cabo>().Any(c =>
                 !ReferenceEquals(c, caboAtual) &&
-                MesmoParDeTerminais(
-                    origem,
-                    destino,
-                    c.OrigemEndpoint,
-                    c.DestinoEndpoint));
+                MesmoParDeTerminais(origem, destino, c.OrigemEndpoint, c.DestinoEndpoint));
         }
 
-        private static bool MesmoParDeTerminais(
-            TerminalEndpoint origemA,
-            TerminalEndpoint destinoA,
-            TerminalEndpoint origemB,
-            TerminalEndpoint destinoB)
+        private static bool MesmoParDeTerminais(TerminalEndpoint origemA, TerminalEndpoint destinoA, TerminalEndpoint origemB, TerminalEndpoint destinoB)
         {
-            if (!origemA.IsComplete ||
-                !destinoA.IsComplete ||
-                !origemB.IsComplete ||
-                !destinoB.IsComplete)
+            if (!origemA.IsComplete || !destinoA.IsComplete || !origemB.IsComplete || !destinoB.IsComplete)
                 return false;
 
-            return string.Equals(
-                TerminalEndpoint.PairKey(origemA, destinoA),
-                TerminalEndpoint.PairKey(origemB, destinoB),
-                StringComparison.OrdinalIgnoreCase);
+            return string.Equals(TerminalEndpoint.PairKey(origemA, destinoA), TerminalEndpoint.PairKey(origemB, destinoB), StringComparison.OrdinalIgnoreCase);
         }
 
         private static bool ReancorarOrigem(Cabo cabo, Elemento elemento)
@@ -299,17 +282,11 @@ namespace Araci.Services
                 return false;
 
             if (cabo.Vertices.Count == 0)
-            {
                 cabo.Vertices.Add(terminal.Posicao);
-            }
             else if (cabo.Vertices.Count == 1)
-            {
                 cabo.Vertices.Add(terminal.Posicao);
-            }
             else
-            {
                 cabo.Vertices[^1] = terminal.Posicao;
-            }
 
             cabo.DefinirDestino(terminal.Posicao);
             return true;
@@ -317,11 +294,8 @@ namespace Araci.Services
 
         private static Terminal? ObterTerminal(Elemento elemento, string terminalId)
         {
-            if (elemento is not ITerminalOwner owner ||
-                string.IsNullOrWhiteSpace(terminalId))
-            {
+            if (elemento is not ITerminalOwner owner || string.IsNullOrWhiteSpace(terminalId))
                 return null;
-            }
 
             return owner.Terminais.FirstOrDefault(t =>
                 string.Equals(t.Id, terminalId, StringComparison.OrdinalIgnoreCase));

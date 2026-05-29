@@ -1,5 +1,6 @@
 using System.ComponentModel;
 using System.Runtime.CompilerServices;
+using System.Windows;
 using Araci.Models;
 
 namespace Araci.ViewModels
@@ -74,7 +75,6 @@ namespace Araci.ViewModels
         }
 
         public bool MarcadorValidoVisivel => Visivel && !Invalido;
-
         public bool MarcadorInvalidoVisivel => Visivel && Invalido;
 
         public bool MensagemVisivel
@@ -159,6 +159,8 @@ namespace Araci.ViewModels
         {
             X = terminal.Posicao.X;
             Y = terminal.Posicao.Y;
+            MensagemX = terminal.Posicao.X;
+            MensagemY = terminal.Posicao.Y;
             TerminalId = terminal.Id;
             ElementoId = terminal.Dono.Id.ToString();
             Invalido = false;
@@ -167,16 +169,16 @@ namespace Araci.ViewModels
             Visivel = true;
         }
 
-        public void MostrarInvalido(Terminal terminal, System.Windows.Point cursor, string mensagem)
+        public void MostrarInvalido(Terminal terminal, Point cursor, string mensagem)
         {
             X = terminal.Posicao.X;
             Y = terminal.Posicao.Y;
+            MensagemX = terminal.Posicao.X;
+            MensagemY = terminal.Posicao.Y;
             TerminalId = terminal.Id;
             ElementoId = terminal.Dono.Id.ToString();
             Invalido = true;
             Mensagem = mensagem;
-            MensagemX = cursor.X + 14;
-            MensagemY = cursor.Y + 14;
             MensagemVisivel = true;
             Visivel = true;
         }
