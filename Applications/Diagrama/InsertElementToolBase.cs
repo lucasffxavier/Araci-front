@@ -15,26 +15,16 @@ namespace Araci.Applications.Diagrama
     {
         private readonly InsertPreviewController<TViewModel, TModel> _preview;
 
-        protected InsertElementToolBase(
-            EditorContext context,
-            Func<TViewModel> criarPreview,
-            Func<TViewModel, TModel> obterModeloPreview)
+        protected InsertElementToolBase(EditorContext context, Func<TViewModel> criarPreview, Func<TViewModel, TModel> obterModeloPreview)
         {
             Context = context ?? throw new ArgumentNullException(nameof(context));
-            _preview = new InsertPreviewController<TViewModel, TModel>(
-                Context,
-                criarPreview,
-                obterModeloPreview);
+            _preview = new InsertPreviewController<TViewModel, TModel>(Context, criarPreview, obterModeloPreview);
         }
 
         protected EditorContext Context { get; }
-
         protected abstract string ToolName { get; }
-
         public string Nome => ToolName;
-
         public bool MantemBotaoAtivado => true;
-
         public bool IsBusy => _preview.HasPreview;
 
         public void Ativar() { }
@@ -54,14 +44,13 @@ namespace Araci.Applications.Diagrama
             if (_preview.IsPreview(vm))
                 vm = null;
 
-            Point pontoSnap = Context.Snap.SnapFromElemento(vm, position, _preview.Preview);
+            _preview.Update(position, vm);
+            TModel modeloPreview = _preview.ObterModeloPreview();
             TModel modelo = CriarModeloReal();
-            Point posicao = Context.Geometry.CalcularTopoEsquerdoPorCentro(modelo, pontoSnap);
-            modelo.PosicaoX = posicao.X;
-            modelo.PosicaoY = posicao.Y;
+            modelo.PosicaoX = modeloPreview.PosicaoX;
+            modelo.PosicaoY = modeloPreview.PosicaoY;
             modelo.Rotacao = _preview.CurrentRotation;
             Context.TerminalLayout.AtualizarTerminais(modelo);
-
             _preview.Clear();
             Context.Commands.Execute(new AddElementoCommand(modelo, Context));
             Context.Tools.VoltarParaSelecao();

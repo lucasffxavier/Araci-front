@@ -28,34 +28,32 @@ namespace Araci.Services
             if (selecionadosList.Count == 0)
                 return deltaPretendido;
 
-            var referencias = _context.Scene.Elementos
-                .Where(e => !e.IsPreview && !selecionadosList.Contains(e) && !e.Bounds.IsEmpty)
-                .ToList();
+            var referencias = ObterReferencias(selecionadosList);
 
             if (referencias.Count == 0)
                 return deltaPretendido;
 
             Rect boundsAtual = CalcularBounds(selecionadosList);
             Rect boundsPretendido = Deslocar(boundsAtual, deltaPretendido);
-            AlignmentVertical? vertical = EncontrarMelhorVertical(referencias, boundsPretendido);
-            AlignmentHorizontal? horizontal = EncontrarMelhorHorizontal(referencias, boundsPretendido);
-            Vector deltaFinal = deltaPretendido;
+            Vector ajuste = CalcularAjusteETracejado(boundsPretendido, referencias, out _, out _);
+            return deltaPretendido + ajuste;
+        }
 
-            if (vertical.HasValue)
-            {
-                deltaFinal.X += vertical.Value.Ajuste;
-                Rect ajustado = Deslocar(boundsAtual, deltaFinal);
-                AdicionarVertical(vertical.Value.X, ajustado, vertical.Value.Bounds);
-            }
+        public Vector AplicarSnapPreview(ElementoViewModel preview)
+        {
+            Linhas.Clear();
 
-            if (horizontal.HasValue)
-            {
-                deltaFinal.Y += horizontal.Value.Ajuste;
-                Rect ajustado = Deslocar(boundsAtual, deltaFinal);
-                AdicionarHorizontal(horizontal.Value.Y, ajustado, horizontal.Value.Bounds);
-            }
+            if (preview == null || preview.Bounds.IsEmpty)
+                return default;
 
-            return deltaFinal;
+            var referencias = _context.Scene.Elementos
+                .Where(e => !ReferenceEquals(e, preview) && !e.IsPreview && !e.Bounds.IsEmpty)
+                .ToList();
+
+            if (referencias.Count == 0)
+                return default;
+
+            return CalcularAjusteETracejado(preview.Bounds, referencias, out _, out _);
         }
 
         public void Atualizar(IEnumerable<ElementoViewModel> selecionados)
@@ -66,27 +64,49 @@ namespace Araci.Services
             if (selecionadosList.Count == 0)
                 return;
 
-            var referencias = _context.Scene.Elementos
-                .Where(e => !e.IsPreview && !selecionadosList.Contains(e) && !e.Bounds.IsEmpty)
-                .ToList();
+            var referencias = ObterReferencias(selecionadosList);
 
             if (referencias.Count == 0)
                 return;
 
             Rect boundsSelecionados = CalcularBounds(selecionadosList);
-            AlignmentVertical? vertical = EncontrarMelhorVertical(referencias, boundsSelecionados);
-            AlignmentHorizontal? horizontal = EncontrarMelhorHorizontal(referencias, boundsSelecionados);
-
-            if (vertical.HasValue)
-                AdicionarVertical(vertical.Value.X, boundsSelecionados, vertical.Value.Bounds);
-
-            if (horizontal.HasValue)
-                AdicionarHorizontal(horizontal.Value.Y, boundsSelecionados, horizontal.Value.Bounds);
+            CalcularAjusteETracejado(boundsSelecionados, referencias, out _, out _);
         }
 
         public void Limpar()
         {
             Linhas.Clear();
+        }
+
+        private Vector CalcularAjusteETracejado(Rect boundsAlvo, IReadOnlyList<ElementoViewModel> referencias, out AlignmentVertical? vertical, out AlignmentHorizontal? horizontal)
+        {
+            vertical = EncontrarMelhorVertical(referencias, boundsAlvo);
+            horizontal = EncontrarMelhorHorizontal(referencias, boundsAlvo);
+            Vector ajuste = default;
+            Rect boundsAjustado = boundsAlvo;
+
+            if (vertical.HasValue)
+            {
+                ajuste.X = vertical.Value.Ajuste;
+                boundsAjustado = Deslocar(boundsAjustado, new Vector(vertical.Value.Ajuste, 0));
+                AdicionarVertical(vertical.Value.X, boundsAjustado, vertical.Value.Bounds);
+            }
+
+            if (horizontal.HasValue)
+            {
+                ajuste.Y = horizontal.Value.Ajuste;
+                boundsAjustado = Deslocar(boundsAjustado, new Vector(0, horizontal.Value.Ajuste));
+                AdicionarHorizontal(horizontal.Value.Y, boundsAjustado, horizontal.Value.Bounds);
+            }
+
+            return ajuste;
+        }
+
+        private IReadOnlyList<ElementoViewModel> ObterReferencias(IReadOnlyList<ElementoViewModel> ignorar)
+        {
+            return _context.Scene.Elementos
+                .Where(e => !e.IsPreview && !ignorar.Contains(e) && !e.Bounds.IsEmpty)
+                .ToList();
         }
 
         private static AlignmentVertical? EncontrarMelhorVertical(IEnumerable<ElementoViewModel> referencias, Rect boundsSelecionados)
