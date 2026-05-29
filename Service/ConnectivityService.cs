@@ -181,7 +181,7 @@ namespace Araci.Services
                 return ConnectionValidationResult.Invalid("Conexão inválida");
 
             return ExisteCaboNoTerminal(caboAtual, endpoint)
-                ? ConnectionValidationResult.Invalid("Conexão ocupada")
+                ? ConnectionValidationResult.Invalid("Conexão inválida")
                 : ConnectionValidationResult.Valid();
         }
 
