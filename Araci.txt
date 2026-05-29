@@ -193,6 +193,7 @@ Araci Engine
 │   │   ├── mover.png
 │   │   ├── novo.png
 │   │   ├── offset.png
+│   │   ├── propriedades.png
 │   │   ├── recortar.png
 │   │   ├── refazer.png
 │   │   ├── rotacionar.png
@@ -345,12 +346,14 @@ Height="160"/>
 <Grid>
 <Grid.ColumnDefinitions>
 <ColumnDefinition Width="*"/>
-<ColumnDefinition Width="320"/>
+<ColumnDefinition x:Name="PropertiesColumn" Width="320"/>
 </Grid.ColumnDefinitions>
 <views:ViewportView x:Name="Viewport"
 Grid.Column="0"
 Margin="10,10,0,10"/>
-<properties:PropertiesHostView Grid.Column="1"/>
+<properties:PropertiesHostView x:Name="PropertiesHost"
+Grid.Column="1"
+CloseRequested="OnPropertiesCloseRequested"/>
 </Grid>
 </DockPanel>
 <Popup x:Name="ArquivoPopup"
@@ -376,6 +379,7 @@ namespace Araci
 public partial class MainWindow : Window
 {
 private readonly EditorContext _context;
+private readonly GridLength _propertiesColumnWidth = new(320);
 public MainWindow()
 {
 InitializeComponent();
@@ -388,18 +392,15 @@ private void InicializarRibbon()
 DataContext = _context;
 ArquivoMenu.DataContext = _context;
 }
-public void ToggleArquivoMenu(
-UIElement referencia)
+public void ToggleArquivoMenu(UIElement referencia)
 {
 if (ArquivoPopup.IsOpen)
 {
 ArquivoPopup.IsOpen = false;
 return;
 }
-ArquivoPopup.PlacementTarget =
-referencia;
-ArquivoPopup.Placement =
-PlacementMode.Bottom;
+ArquivoPopup.PlacementTarget = referencia;
+ArquivoPopup.Placement = PlacementMode.Bottom;
 ArquivoPopup.IsOpen = true;
 }
 public void FocarViewport()
@@ -407,289 +408,16 @@ public void FocarViewport()
 Viewport.Focus();
 System.Windows.Input.Keyboard.Focus(Viewport);
 }
+public void MostrarPropriedades()
+{
+PropertiesColumn.Width = _propertiesColumnWidth;
+PropertiesHost.Visibility = Visibility.Visible;
 }
-}
-
-
-====================================================================================================
-ARQUIVO: C:\Araci-Engine-Front\Araci Engine\Properties\PropertiesHostView.xaml
-====================================================================================================
-
-﻿<UserControl x:Class="Araci.Properties.PropertiesHostView"
-xmlns="http:
-xmlns:x="http:
-<Border Margin="8"
-Background="#252526"
-BorderBrush="#F4F4F4"
-BorderThickness="1">
-<Grid>
-<ContentControl
-Content="{Binding Editor.ElementoSelecionado}"
-HorizontalContentAlignment="Stretch"
-VerticalContentAlignment="Stretch"/>
-</Grid>
-</Border>
-</UserControl>
-
-
-====================================================================================================
-ARQUIVO: C:\Araci-Engine-Front\Araci Engine\Properties\PropertiesHostView.xaml.cs
-====================================================================================================
-
-﻿using System.Windows;
-using System.Windows.Controls;
-using System.Windows.Data;
-using System.Windows.Input;
-namespace Araci.Properties
+private void OnPropertiesCloseRequested(object sender, RoutedEventArgs e)
 {
-public partial class PropertiesHostView : UserControl
-{
-public PropertiesHostView()
-{
-InitializeComponent();
-AddHandler(Keyboard.PreviewKeyDownEvent, new KeyEventHandler(OnPreviewKeyDown), true);
-}
-private void OnPreviewKeyDown(object sender, KeyEventArgs e)
-{
-if (e.Key != Key.Enter)
-return;
-if (Keyboard.FocusedElement is not TextBox textBox)
-return;
-BindingExpression? binding = textBox.GetBindingExpression(TextBox.TextProperty);
-binding?.UpdateSource();
-FocusManager.SetFocusedElement(FocusManager.GetFocusScope(textBox), null);
-Keyboard.ClearFocus();
-e.Handled = true;
-}
-}
-}
-
-
-====================================================================================================
-ARQUIVO: C:\Araci-Engine-Front\Araci Engine\Service\EditorContext.cs
-====================================================================================================
-
-using Araci.Core.Commands;
-using Araci.Core.Documents;
-using Araci.Core.Events;
-using Araci.Core.SceneQueries;
-using Araci.Core.Scenes;
-using Araci.Core.Transactions;
-using Araci.ViewModels;
-namespace Araci.Services
-{
-public class EditorContext
-{
-public EditorContext()
-: this(new EventBus())
-{
-}
-public EditorContext(IEventBus eventBus)
-{
-Events = eventBus;
-Scene = new Scene();
-SceneQueries = new SceneQueryService(Scene);
-Hover = new HoverService(SceneQueries);
-Snap = new SnapService(SceneQueries, Settings);
-Connectivity = new ConnectivityService(this);
-ElectricGraph = new ElectricGraphBuilder(this);
-OperationalState = new OperationalGraphStateBuilder();
-Topology = new TopologyValidator(this);
-SimulationResults = new SimulationResultApplier(this);
-Simulation = new SimulationPipeline(this);
-SimulationExport = new SimulationExportService();
-SimulationMessages = new SimulationMessageBuilder();
-TypePropertiesDialogs = new TypePropertiesDialogService();
-Dialogs = new DialogService();
-Elements = new ElementRegistryService(Types);
-Geometry = new ElementGeometryService(Elements);
-TerminalLayout = new TerminalLayoutService(Elements, Geometry);
-Names = new NameService(Document, Elements);
-GeometryUpdates = new ElementGeometryUpdateService(this);
-ElementoFactory = new ElementoFactory(Elements, Names, TypePropertiesDialogs, TerminalLayout, GeometryUpdates);
-CableVertexEdit = new CableVertexEditService(this);
-Selection = new SelectionService(this);
-Selection.SelectionChanged += CableVertexEdit.Refresh;
-SafeDelete = new SafeDeleteService(this);
-Projects = new ProjectPersistenceService(this);
-MoveHud = new MoveHudService(this);
-AlignmentGuides = new AlignmentGuideService(this);
-MoveConstraints = new MoveConstraintService(Settings);
-Move = new MoveService(this);
-BarraResize = new BarraResizeService(this);
-Rotation = new RotationService(this);
-Tools = new ToolService(this);
-Input = new InputRouter(this);
-Navigation = new ViewportNavigationService(this);
-}
-public IEventBus Events { get; }
-public AraciDocument Document { get; } = new AraciDocument();
-public Scene Scene { get; } = new Scene();
-public ISceneQueryService SceneQueries { get; }
-public HoverService Hover { get; }
-public ToolService Tools { get; }
-public InputRouter Input { get; }
-public ViewportNavigationService Navigation { get; }
-public ViewportService? Viewport { get; private set; }
-public void InicializarViewport(ViewportViewModel viewportViewModel)
-{
-Viewport = new ViewportService(viewportViewModel);
-}
-public EditorState Editor { get; } = new EditorState();
-public EditorSettings Settings { get; } = new EditorSettings();
-public MoveHudService MoveHud { get; }
-public AlignmentGuideService AlignmentGuides { get; }
-public MoveConstraintService MoveConstraints { get; }
-public SelectionBoxViewModel SelectionBox { get; } = new SelectionBoxViewModel();
-public TerminalSnapState TerminalSnap { get; } = new TerminalSnapState();
-public CableVertexEditService CableVertexEdit { get; }
-public CommandManager Commands { get; } = new CommandManager();
-public SafeDeleteService SafeDelete { get; }
-public ProjectPersistenceService Projects { get; }
-public SelectionService Selection { get; }
-public MoveService Move { get; }
-public BarraResizeService BarraResize { get; }
-public RotationService Rotation { get; }
-public SnapService Snap { get; }
-public NameService Names { get; }
-public ConnectivityService Connectivity { get; }
-public ElectricGraphBuilder ElectricGraph { get; }
-public OperationalGraphStateBuilder OperationalState { get; }
-public TopologyValidator Topology { get; }
-public SimulationResultApplier SimulationResults { get; }
-public SimulationPipeline Simulation { get; }
-public SimulationExportService SimulationExport { get; }
-public SimulationMessageBuilder SimulationMessages { get; }
-public TypePropertiesDialogService TypePropertiesDialogs { get; }
-public DialogService Dialogs { get; }
-public ElementGeometryService Geometry { get; }
-public TerminalLayoutService TerminalLayout { get; }
-public ElementGeometryUpdateService GeometryUpdates { get; }
-public ElementRegistryService Elements { get; }
-public TypeLibraryService Types { get; } = new TypeLibraryService();
-public ElementoFactory ElementoFactory { get; }
-public TransactionScope BeginTransaction()
-{
-return new TransactionScope(Commands);
-}
-}
-}
-
-
-====================================================================================================
-ARQUIVO: C:\Araci-Engine-Front\Araci Engine\Service\SelectionService.cs
-====================================================================================================
-
-﻿using System.Collections.Generic;
-using System.Collections.ObjectModel;
-using System.Linq;
-using System;
-using Araci.Core.Events;
-using Araci.ViewModels;
-namespace Araci.Services
-{
-public class SelectionService
-{
-private readonly EditorContext _context;
-private readonly ObservableCollection<ElementoViewModel> _selecionados = new();
-public SelectionService(EditorContext context)
-{
-_context = context ?? throw new ArgumentNullException(nameof(context));
-}
-public IReadOnlyList<ElementoViewModel> Selecionados => _selecionados;
-public ObservableCollection<ElementoViewModel> SelecionadosObservable => _selecionados;
-public bool TemSelecionados => _selecionados.Count > 0;
-public event Action? SelectionChanged;
-public void Selecionar(ElementoViewModel vm, bool adicionarAoExistente = false)
-{
-if (!adicionarAoExistente)
-Limpar();
-if (_selecionados.Contains(vm))
-{
-AtualizarElementoSelecionado();
-return;
-}
-vm.IsSelecionado = true;
-_selecionados.Add(vm);
-AtualizarElementoSelecionado();
-PublicarAlteracao();
-}
-public void Toggle(ElementoViewModel vm)
-{
-if (_selecionados.Contains(vm))
-{
-Deselecionar(vm);
-return;
-}
-Selecionar(vm, true);
-}
-public void Deselecionar(ElementoViewModel vm)
-{
-if (!_selecionados.Contains(vm))
-return;
-vm.IsSelecionado = false;
-_selecionados.Remove(vm);
-AtualizarElementoSelecionado();
-PublicarAlteracao();
-}
-public void Limpar()
-{
-if (_selecionados.Count == 0)
-return;
-foreach (var vm in _selecionados)
-vm.IsSelecionado = false;
-_selecionados.Clear();
-AtualizarElementoSelecionado();
-PublicarAlteracao();
-}
-private void AtualizarElementoSelecionado()
-{
-_context.Editor.ElementoSelecionado = _selecionados.LastOrDefault();
-}
-private void PublicarAlteracao()
-{
-_context.Events.Publish(new SelecaoAlteradaEvent(_selecionados.ToList()));
-SelectionChanged?.Invoke();
-}
-}
-}
-
-
-====================================================================================================
-ARQUIVO: C:\Araci-Engine-Front\Araci Engine\ViewModels\PropertiesViewModel.cs
-====================================================================================================
-
-﻿using System.ComponentModel;
-using System.Runtime.CompilerServices;
-namespace Araci.ViewModels
-{
-public class PropertiesViewModel
-: INotifyPropertyChanged
-{
-private object?
-_elementoSelecionado;
-public object?
-ElementoSelecionado
-{
-get => _elementoSelecionado;
-set
-{
-if (_elementoSelecionado != value)
-{
-_elementoSelecionado = value;
-OnPropertyChanged();
-}
-}
-}
-public event PropertyChangedEventHandler?
-PropertyChanged;
-protected virtual void OnPropertyChanged(
-[CallerMemberName]
-string? nome = null)
-{
-PropertyChanged?.Invoke(
-this,
-new PropertyChangedEventArgs(nome));
+PropertiesColumn.Width = new GridLength(0);
+PropertiesHost.Visibility = Visibility.Collapsed;
+FocarViewport();
 }
 }
 }

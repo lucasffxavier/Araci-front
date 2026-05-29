@@ -1,4 +1,5 @@
-﻿using System.Windows.Controls;
+﻿using System.Windows;
+using System.Windows.Controls;
 
 namespace Araci.Ribbon.Tabs
 {
@@ -7,6 +8,12 @@ namespace Araci.Ribbon.Tabs
         public GerenciarTab()
         {
             InitializeComponent();
+        }
+
+        private void PropriedadesButton_Click(object sender, RoutedEventArgs e)
+        {
+            if (Window.GetWindow(this) is MainWindow mainWindow)
+                mainWindow.MostrarPropriedades();
         }
     }
 }
