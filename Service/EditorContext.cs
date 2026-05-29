@@ -37,7 +37,6 @@ namespace Araci.Services
             TerminalLayout = new TerminalLayoutService(Elements, Geometry);
             Names = new NameService(Document, Elements);
             GeometryUpdates = new ElementGeometryUpdateService(this);
-
             ElementoFactory = new ElementoFactory(Elements, Names, TypePropertiesDialogs, TerminalLayout, GeometryUpdates);
             CableVertexEdit = new CableVertexEditService(this);
             Selection = new SelectionService(this);
@@ -47,6 +46,7 @@ namespace Araci.Services
             MoveHud = new MoveHudService(this);
             MoveConstraints = new MoveConstraintService(Settings);
             Move = new MoveService(this);
+            BarraResize = new BarraResizeService(this);
             Rotation = new RotationService(this);
             Tools = new ToolService(this);
             Input = new InputRouter(this);
@@ -54,21 +54,13 @@ namespace Araci.Services
         }
 
         public IEventBus Events { get; }
-
         public AraciDocument Document { get; } = new AraciDocument();
-
         public Scene Scene { get; } = new Scene();
-
         public ISceneQueryService SceneQueries { get; }
-
         public HoverService Hover { get; }
-
         public ToolService Tools { get; }
-
         public InputRouter Input { get; }
-
         public ViewportNavigationService Navigation { get; }
-
         public ViewportService? Viewport { get; private set; }
 
         public void InicializarViewport(ViewportViewModel viewportViewModel)
@@ -77,65 +69,36 @@ namespace Araci.Services
         }
 
         public EditorState Editor { get; } = new EditorState();
-
         public EditorSettings Settings { get; } = new EditorSettings();
-
         public MoveHudService MoveHud { get; }
-
         public MoveConstraintService MoveConstraints { get; }
-
         public SelectionBoxViewModel SelectionBox { get; } = new SelectionBoxViewModel();
-
         public TerminalSnapState TerminalSnap { get; } = new TerminalSnapState();
-
         public CableVertexEditService CableVertexEdit { get; }
-
         public CommandManager Commands { get; } = new CommandManager();
-
         public SafeDeleteService SafeDelete { get; }
-
         public ProjectPersistenceService Projects { get; }
-
         public SelectionService Selection { get; }
-
         public MoveService Move { get; }
-
+        public BarraResizeService BarraResize { get; }
         public RotationService Rotation { get; }
-
         public SnapService Snap { get; }
-
         public NameService Names { get; }
-
         public ConnectivityService Connectivity { get; }
-
         public ElectricGraphBuilder ElectricGraph { get; }
-
         public OperationalGraphStateBuilder OperationalState { get; }
-
         public TopologyValidator Topology { get; }
-
         public SimulationResultApplier SimulationResults { get; }
-
         public SimulationPipeline Simulation { get; }
-
         public SimulationExportService SimulationExport { get; }
-
         public SimulationMessageBuilder SimulationMessages { get; }
-
         public TypePropertiesDialogService TypePropertiesDialogs { get; }
-
         public DialogService Dialogs { get; }
-
         public ElementGeometryService Geometry { get; }
-
         public TerminalLayoutService TerminalLayout { get; }
-
         public ElementGeometryUpdateService GeometryUpdates { get; }
-
         public ElementRegistryService Elements { get; }
-
         public TypeLibraryService Types { get; } = new TypeLibraryService();
-
         public ElementoFactory ElementoFactory { get; }
 
         public TransactionScope BeginTransaction()

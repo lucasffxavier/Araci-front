@@ -15,6 +15,7 @@ namespace Araci.Applications.Editar.Selecionar
         private readonly SelectionBoxController _selectionBox;
         private readonly DragMoveController _dragMove;
         private readonly CableVertexEditService _cableVertexEdit;
+        private readonly BarraResizeService _barraResize;
         private readonly EditorContext _context;
         private readonly bool _modoSoMover;
 
@@ -28,6 +29,7 @@ namespace Araci.Applications.Editar.Selecionar
             _selection = new SelectionController(context.Selection);
             _selectionBox = new SelectionBoxController(context.SelectionBox, _queries, context.Selection);
             _cableVertexEdit = context.CableVertexEdit;
+            _barraResize = context.BarraResize;
             _dragMove = new DragMoveController(
                 context.Selection,
                 context.Move,
@@ -40,6 +42,7 @@ namespace Araci.Applications.Editar.Selecionar
         public string Nome => "Selecionar";
         public bool MantemBotaoAtivado => true;
         public bool IsBusy =>
+            _barraResize.IsResizing ||
             _dragMove.IsActive ||
             _selectionBox.IsActive ||
             _cableVertexEdit.IsEditing;
@@ -58,6 +61,7 @@ namespace Araci.Applications.Editar.Selecionar
 
         public void Cancelar()
         {
+            _barraResize.Cancel();
             _dragMove.Cancel();
             _selectionBox.Cancel();
             _cableVertexEdit.Cancel();
@@ -67,6 +71,9 @@ namespace Araci.Applications.Editar.Selecionar
         public void OnMouseDown(ElementoViewModel? vm, Point position, ToolInputState inputState)
         {
             bool ctrl = inputState.IsControlPressed;
+
+            if (!_modoSoMover && _barraResize.TryBegin(position))
+                return;
 
             if (!_modoSoMover && inputState.IsAltPressed && _cableVertexEdit.TryRemoveHandle(position))
                 return;
@@ -97,6 +104,12 @@ namespace Araci.Applications.Editar.Selecionar
 
         public void OnMouseMove(Point position, ToolInputState inputState)
         {
+            if (_barraResize.IsResizing)
+            {
+                _barraResize.Update(position);
+                return;
+            }
+
             if (_cableVertexEdit.IsEditing)
             {
                 _cableVertexEdit.Update(position, inputState);
@@ -115,6 +128,13 @@ namespace Araci.Applications.Editar.Selecionar
 
         public void OnMouseUp(Point position, ToolInputState inputState)
         {
+            if (_barraResize.IsResizing)
+            {
+                _barraResize.End();
+                _cableVertexEdit.Refresh();
+                return;
+            }
+
             if (_cableVertexEdit.IsEditing)
             {
                 _cableVertexEdit.End();

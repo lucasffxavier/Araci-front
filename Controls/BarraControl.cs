@@ -15,6 +15,8 @@ namespace Araci.Controls
         private readonly SvgViewbox _svg;
         private readonly Border _overlay;
         private readonly Border _previewOverlay;
+        private readonly Border _topHandle;
+        private readonly Border _bottomHandle;
 
         public BarraControl()
         {
@@ -23,7 +25,7 @@ namespace Araci.Controls
             _svg = new SvgViewbox
             {
                 Stretch = Stretch.Fill,
-                Source = new Uri("pack://application:,,,/Araci;component/Assets/Svg/barra.svg", UriKind.Absolute)
+                Source = new Uri("pack://application:,,,/Assets/Svg/barra.svg")
             };
 
             _overlay = new Border
@@ -41,13 +43,17 @@ namespace Araci.Controls
                 IsHitTestVisible = false
             };
 
+            _topHandle = CriarHandle(VerticalAlignment.Top);
+            _bottomHandle = CriarHandle(VerticalAlignment.Bottom);
+
             _root = new Grid();
             _root.Children.Add(_svg);
             _root.Children.Add(_previewOverlay);
             _root.Children.Add(_overlay);
+            _root.Children.Add(_topHandle);
+            _root.Children.Add(_bottomHandle);
 
             Content = _root;
-
             Loaded += OnLoaded;
             ConfigurarBindings();
         }
@@ -58,6 +64,26 @@ namespace Araci.Controls
         {
             _overlay.OpacityMask = new VisualBrush(_svg);
             _previewOverlay.OpacityMask = new VisualBrush(_svg);
+        }
+
+        private static Border CriarHandle(VerticalAlignment verticalAlignment)
+        {
+            return new Border
+            {
+                Width = 12,
+                Height = 12,
+                CornerRadius = new CornerRadius(6),
+                BorderThickness = new Thickness(2),
+                BorderBrush = Brushes.White,
+                Background = Brushes.DeepSkyBlue,
+                HorizontalAlignment = HorizontalAlignment.Center,
+                VerticalAlignment = verticalAlignment,
+                Visibility = Visibility.Collapsed,
+                IsHitTestVisible = false,
+                Margin = verticalAlignment == VerticalAlignment.Top
+                    ? new Thickness(0, -6, 0, 0)
+                    : new Thickness(0, 0, 0, -6)
+            };
         }
 
         private void ConfigurarBindings()
@@ -83,11 +109,19 @@ namespace Araci.Controls
             {
                 Converter = new SelectionOrHoverToVisibilityConverter()
             };
-
             multi.Bindings.Add(new Binding("IsSelecionado"));
             multi.Bindings.Add(new Binding("IsHover"));
-
             _overlay.SetBinding(VisibilityProperty, multi);
+
+            _topHandle.SetBinding(VisibilityProperty, new Binding("IsSelecionado")
+            {
+                Converter = new BooleanToVisibilityConverter()
+            });
+
+            _bottomHandle.SetBinding(VisibilityProperty, new Binding("IsSelecionado")
+            {
+                Converter = new BooleanToVisibilityConverter()
+            });
         }
     }
 }
