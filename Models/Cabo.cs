@@ -23,7 +23,6 @@ namespace Araci.Models
         public const string PARAM_CORRENTE_FASE_A = "CorrenteFaseA";
         public const string PARAM_CORRENTE_FASE_B = "CorrenteFaseB";
         public const string PARAM_CORRENTE_FASE_C = "CorrenteFaseC";
-
         private readonly List<Terminal> _terminais = new();
 
         public Cabo()
@@ -44,22 +43,15 @@ namespace Araci.Models
             DefinirParametro(new Parameter<string>(PARAM_CORRENTE_FASE_A, "0∠0°"));
             DefinirParametro(new Parameter<string>(PARAM_CORRENTE_FASE_B, "0∠-120°"));
             DefinirParametro(new Parameter<string>(PARAM_CORRENTE_FASE_C, "0∠120°"));
-
             Nome = "L1";
         }
 
         public IReadOnlyList<Terminal> Terminais => _terminais;
-
         public override ElementoDomainRole DomainRole => ElementoDomainRole.EletricoTopologico;
-
         public ObservableCollection<Point> Vertices { get; } = new();
-
         public Point? PreviewPonto { get; set; }
-
         public TipoCabo TipoCabo => (TipoCabo)Tipo!;
-
         public Terminal? Origem => _terminais.Count > 0 ? _terminais[0] : null;
-
         public Terminal? Destino => _terminais.Count > 1 ? _terminais[1] : null;
 
         public string OrigemId
@@ -86,11 +78,8 @@ namespace Araci.Models
             set => Definir(PARAM_DESTINO_TERMINAL_ID, value);
         }
 
-        public TerminalEndpoint OrigemEndpoint =>
-            new(OrigemId, OrigemTerminalId);
-
-        public TerminalEndpoint DestinoEndpoint =>
-            new(DestinoId, DestinoTerminalId);
+        public TerminalEndpoint OrigemEndpoint => new(OrigemId, OrigemTerminalId);
+        public TerminalEndpoint DestinoEndpoint => new(DestinoId, DestinoTerminalId);
 
         public string BarraOrigem
         {
@@ -164,24 +153,57 @@ namespace Araci.Models
             set => Definir(PARAM_CORRENTE_FASE_C, value);
         }
 
+        public bool PossuiOrigemConectada => OrigemEndpoint.IsComplete;
+        public bool PossuiDestinoConectado => DestinoEndpoint.IsComplete;
+        public bool PossuiDuasPontasConectadas => PossuiOrigemConectada && PossuiDestinoConectado;
+        public bool PossuiVerticesIntermediarios => Vertices.Count > 2;
+
+        public bool MoverPreservandoAncoras(Vector delta)
+        {
+            if (delta.X == 0 && delta.Y == 0 || Vertices.Count == 0)
+                return false;
+
+            int inicio = PossuiOrigemConectada ? 1 : 0;
+            int fimExclusivo = PossuiDestinoConectado ? Vertices.Count - 1 : Vertices.Count;
+
+            if (inicio >= fimExclusivo)
+                return false;
+
+            for (int i = inicio; i < fimExclusivo; i++)
+            {
+                Point p = Vertices[i];
+                Vertices[i] = new Point(p.X + delta.X, p.Y + delta.Y);
+            }
+
+            if (PreviewPonto.HasValue && !PossuiDestinoConectado)
+            {
+                Point preview = PreviewPonto.Value;
+                PreviewPonto = new Point(preview.X + delta.X, preview.Y + delta.Y);
+            }
+
+            AtualizarTerminaisPelasPontas();
+            return true;
+        }
+
+        public void AtualizarTerminaisPelasPontas()
+        {
+            if (Vertices.Count > 0)
+                DefinirOrigem(Vertices[0]);
+
+            if (Vertices.Count > 1)
+                DefinirDestino(Vertices[^1]);
+        }
+
         public void DefinirOrigem(Point p)
         {
             if (_terminais.Count == 0)
             {
-                _terminais.Add(
-                    new Terminal(
-                        this,
-                        p,
-                        "ORIGEM",
-                        TerminalKind.CableEnd,
-                        TerminalDirection.West)
-                    {
-                        Barra = BarraOrigem
-                    });
+                _terminais.Add(new Terminal(this, p, "ORIGEM", TerminalKind.CableEnd, TerminalDirection.West) { Barra = BarraOrigem });
             }
             else
             {
                 _terminais[0].DefinirPosicaoVisual(p);
+                _terminais[0].Barra = BarraOrigem;
             }
         }
 
@@ -189,28 +211,35 @@ namespace Araci.Models
         {
             if (_terminais.Count < 2)
             {
-                _terminais.Add(
-                    new Terminal(
-                        this,
-                        p,
-                        "DESTINO",
-                        TerminalKind.CableEnd,
-                        TerminalDirection.East)
-                    {
-                        Barra = BarraDestino
-                    });
+                _terminais.Add(new Terminal(this, p, "DESTINO", TerminalKind.CableEnd, TerminalDirection.East) { Barra = BarraDestino });
             }
             else
             {
                 _terminais[1].DefinirPosicaoVisual(p);
+                _terminais[1].Barra = BarraDestino;
             }
         }
 
         public override Elemento Clonar()
         {
             var clone = new Cabo();
-
             CopiarLinearPara(clone);
+            clone.OrigemId = OrigemId;
+            clone.DestinoId = DestinoId;
+            clone.OrigemTerminalId = OrigemTerminalId;
+            clone.DestinoTerminalId = DestinoTerminalId;
+            clone.BarraOrigem = BarraOrigem;
+            clone.BarraDestino = BarraDestino;
+            clone.Comprimento = Comprimento;
+            clone.Ampacidade = Ampacidade;
+            clone.TensaoLinha = TensaoLinha;
+            clone.TensaoFaseA = TensaoFaseA;
+            clone.TensaoFaseB = TensaoFaseB;
+            clone.TensaoFaseC = TensaoFaseC;
+            clone.CorrenteLinha = CorrenteLinha;
+            clone.CorrenteFaseA = CorrenteFaseA;
+            clone.CorrenteFaseB = CorrenteFaseB;
+            clone.CorrenteFaseC = CorrenteFaseC;
 
             foreach (Point p in Vertices)
                 clone.Vertices.Add(p);
@@ -220,11 +249,10 @@ namespace Araci.Models
 
             foreach (Terminal t in _terminais)
             {
-                clone._terminais.Add(
-                    new Terminal(clone, t.Posicao, t.Id, t.Kind, t.Direction)
-                    {
-                        Barra = t.Barra
-                    });
+                clone._terminais.Add(new Terminal(clone, t.Posicao, t.Id, t.Kind, t.Direction)
+                {
+                    Barra = t.Barra
+                });
             }
 
             return clone;
