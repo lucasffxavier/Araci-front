@@ -13,12 +13,14 @@ namespace Araci.Applications.Diagrama
         where TViewModel : ElementoViewModel
         where TModel : Elemento
     {
+        private readonly string _kind;
         private readonly InsertPreviewController<TViewModel, TModel> _preview;
 
-        protected InsertElementToolBase(EditorContext context, Func<TViewModel> criarPreview, Func<TViewModel, TModel> obterModeloPreview)
+        protected InsertElementToolBase(EditorContext context, string kind, Func<TViewModel, TModel> obterModeloPreview)
         {
             Context = context ?? throw new ArgumentNullException(nameof(context));
-            _preview = new InsertPreviewController<TViewModel, TModel>(Context, criarPreview, obterModeloPreview);
+            _kind = string.IsNullOrWhiteSpace(kind) ? throw new ArgumentNullException(nameof(kind)) : kind;
+            _preview = new InsertPreviewController<TViewModel, TModel>(Context, CriarPreview, obterModeloPreview ?? throw new ArgumentNullException(nameof(obterModeloPreview)));
         }
 
         protected EditorContext Context { get; }
@@ -81,6 +83,14 @@ namespace Araci.Applications.Diagrama
                 _preview.RotateClockwise();
         }
 
-        protected abstract TModel CriarModeloReal();
+        protected virtual TModel CriarModeloReal()
+        {
+            return Context.ElementoFactory.CriarModelo<TModel>(_kind);
+        }
+
+        private TViewModel CriarPreview()
+        {
+            return Context.ElementoFactory.CriarViewModel<TViewModel>(_kind);
+        }
     }
 }

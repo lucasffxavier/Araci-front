@@ -11,24 +11,31 @@ namespace Araci.Services
 {
     public class ElementRegistryService
     {
-        private readonly Dictionary<string, ElementDefinition> _porKind =
-            new(StringComparer.OrdinalIgnoreCase);
+        public const string KindBarra = "Barra";
+        public const string KindCarga = "Carga";
+        public const string KindGerador = "Gerador";
+        public const string KindSin = "Sin";
+        public const string KindTransformador = "Transformador";
+        public const string KindCabo = "Cabo";
 
+        private readonly Dictionary<string, ElementDefinition> _porKind = new(StringComparer.OrdinalIgnoreCase);
         private readonly List<ElementDefinition> _definitions = new();
 
         public ElementRegistryService(TypeLibraryService types)
         {
             Types = types ?? throw new ArgumentNullException(nameof(types));
-
             RegistrarElementosPadrao();
         }
 
         private TypeLibraryService Types { get; }
-
         public IReadOnlyList<ElementDefinition> Definitions => _definitions;
+        public IEnumerable<ElementDefinition> RibbonDefinitions => _definitions.Where(d => d.ExibirNoRibbon).OrderBy(d => d.OrdemRibbon).ThenBy(d => d.NomeRibbon);
 
         public void Register(ElementDefinition definition)
         {
+            if (definition == null)
+                throw new ArgumentNullException(nameof(definition));
+
             if (_porKind.ContainsKey(definition.Kind))
                 throw new InvalidOperationException($"Elemento ja registrado: {definition.Kind}.");
 
@@ -50,6 +57,11 @@ namespace Araci.Services
             return _definitions.FirstOrDefault(d => d.AceitaModelo(elemento));
         }
 
+        public ElementDefinition? FindByModelType<T>() where T : Elemento
+        {
+            return _definitions.FirstOrDefault(d => d.ModelType == typeof(T));
+        }
+
         public string GetKind(Elemento elemento)
         {
             return FindByModel(elemento)?.Kind ?? elemento.GetType().Name;
@@ -60,40 +72,48 @@ namespace Araci.Services
             return FindByModel(elemento)?.PrefixoNome ?? "ELM";
         }
 
-        public Elemento? CreateModel(string kind)
+        public Elemento CreateModel(string kind)
         {
-            ElementDefinition? definition = FindByKind(kind);
-            return definition == null ? null : CreateModel(definition);
+            ElementDefinition definition = FindByKind(kind) ?? throw new InvalidOperationException($"Elemento nao registrado: {kind}.");
+            return CreateModel(definition);
         }
 
         public T CreateModel<T>() where T : Elemento
         {
-            ElementDefinition? definition =
-                _definitions.FirstOrDefault(d => d.ModelType == typeof(T));
-
-            if (definition == null)
-                throw new InvalidOperationException($"Elemento nao registrado: {typeof(T).Name}.");
-
+            ElementDefinition definition = FindByModelType<T>() ?? throw new InvalidOperationException($"Elemento nao registrado: {typeof(T).Name}.");
             return (T)CreateModel(definition);
         }
 
-        public ElementoViewModel? CreateViewModel(
-            Elemento modelo,
-            NameService names,
-            TypePropertiesDialogService typePropertiesDialogs,
-            TerminalLayoutService terminalLayout)
+        public T CreateModel<T>(string kind) where T : Elemento
         {
-            return FindByModel(modelo)?.CriarViewModel(
-                modelo,
-                names,
-                typePropertiesDialogs,
-                terminalLayout);
+            Elemento modelo = CreateModel(kind);
+
+            if (modelo is not T typed)
+                throw new InvalidOperationException($"O elemento '{kind}' nao cria modelo do tipo {typeof(T).Name}.");
+
+            return typed;
+        }
+
+        public ElementoViewModel? CreateViewModel(Elemento modelo, NameService names, TypePropertiesDialogService typePropertiesDialogs, TerminalLayoutService terminalLayout)
+        {
+            return FindByModel(modelo)?.CriarViewModel(modelo, names, typePropertiesDialogs, terminalLayout);
+        }
+
+        public TViewModel CreateViewModel<TViewModel>(string kind, NameService names, TypePropertiesDialogService typePropertiesDialogs, TerminalLayoutService terminalLayout)
+            where TViewModel : ElementoViewModel
+        {
+            Elemento modelo = CreateModel(kind);
+            ElementoViewModel? viewModel = CreateViewModel(modelo, names, typePropertiesDialogs, terminalLayout);
+
+            if (viewModel is not TViewModel typed)
+                throw new InvalidOperationException($"O elemento '{kind}' nao cria ViewModel do tipo {typeof(TViewModel).Name}.");
+
+            return typed;
         }
 
         public IEnumerable<TipoElemento> GetTypes(string kind)
         {
-            return FindByKind(kind)?.ObterTipos()
-                ?? Enumerable.Empty<TipoElemento>();
+            return FindByKind(kind)?.ObterTipos() ?? Enumerable.Empty<TipoElemento>();
         }
 
         public TipoElemento? GetDefaultType(string kind)
@@ -101,11 +121,7 @@ namespace Araci.Services
             return FindByKind(kind)?.ObterTipoPadrao();
         }
 
-        public TipoElemento? ResolveType(
-            string kind,
-            string? nomeTipo,
-            string? familia,
-            string? categoria)
+        public TipoElemento? ResolveType(string kind, string? nomeTipo, string? familia, string? categoria)
         {
             TipoElemento? tipo = null;
 
@@ -147,7 +163,7 @@ namespace Araci.Services
         private void RegistrarElementosPadrao()
         {
             Register(new ElementDefinition(
-                "Barra",
+                KindBarra,
                 "Barra",
                 "BARRA",
                 typeof(Barra),
@@ -158,74 +174,14 @@ namespace Araci.Services
                 () => Types.TipoBarraPadrao,
                 () => Types.TiposBarras,
                 e => new Size(ElementGeometryDefaults.BarraLargura, ((Barra)e).Altura),
-                e => ((Barra)e).AtualizarTerminais(ElementGeometryDefaults.BarraLargura)));
+                e => ((Barra)e).AtualizarTerminais(ElementGeometryDefaults.BarraLargura),
+                "Barra",
+                "Inserir",
+                "barra.png",
+                60));
 
             Register(new ElementDefinition(
-                "Carga",
-                "Carga",
-                "CARGA",
-                typeof(Carga),
-                typeof(CargaViewModel),
-                typeof(TipoCarga),
-                CriarCarga,
-                (m, n, d, l) => new CargaViewModel((Carga)m, Types, n, d, l),
-                () => Types.TipoCargaPadrao,
-                () => Types.TiposCargas,
-                _ => EquipamentoSize(),
-                e => ((Carga)e).AtualizarTerminais(
-                    ElementGeometryDefaults.EquipamentoLargura,
-                    ElementGeometryDefaults.EquipamentoAltura)));
-
-            Register(new ElementDefinition(
-                "Gerador",
-                "Gerador",
-                "GERADOR",
-                typeof(Gerador),
-                typeof(GeradorViewModel),
-                typeof(TipoGerador),
-                CriarGerador,
-                (m, n, d, l) => new GeradorViewModel((Gerador)m, Types, n, d, l),
-                () => Types.TipoGeradorPadrao,
-                () => Types.TiposGeradores,
-                _ => EquipamentoSize(),
-                e => ((Gerador)e).AtualizarTerminais(
-                    ElementGeometryDefaults.EquipamentoLargura,
-                    ElementGeometryDefaults.EquipamentoAltura)));
-
-            Register(new ElementDefinition(
-                "Sin",
-                "SIN",
-                "SIN",
-                typeof(Sin),
-                typeof(SinViewModel),
-                typeof(TipoSin),
-                CriarSin,
-                (m, n, d, l) => new SinViewModel((Sin)m, Types, n, d, l),
-                () => Types.TipoSinPadrao,
-                () => Types.TiposSin,
-                _ => EquipamentoSize(),
-                e => ((Sin)e).AtualizarTerminais(
-                    ElementGeometryDefaults.EquipamentoLargura,
-                    ElementGeometryDefaults.EquipamentoAltura)));
-
-            Register(new ElementDefinition(
-                "Transformador",
-                "Transformador",
-                "TR",
-                typeof(Transformador),
-                typeof(TransformadorViewModel),
-                typeof(TipoTransformador),
-                CriarTransformador,
-                (m, n, d, l) => new TransformadorViewModel((Transformador)m, Types, n, d, l),
-                () => Types.TipoTransformadorPadrao,
-                () => Types.TiposTransformadores,
-                _ => TransformadorSize(),
-                e => ((Transformador)e).AtualizarTerminais(
-                    ElementGeometryDefaults.TransformadorLargura,
-                    ElementGeometryDefaults.TransformadorAltura)));
-
-            Register(new ElementDefinition(
-                "Cabo",
+                KindCabo,
                 "Cabo",
                 "CABO",
                 typeof(Cabo),
@@ -236,85 +192,141 @@ namespace Araci.Services
                 () => Types.TipoCaboPadrao,
                 () => Types.TiposCabos,
                 _ => Size.Empty,
-                e => AtualizarTerminaisCabo((Cabo)e)));
+                e => AtualizarTerminaisCabo((Cabo)e),
+                "Cabo",
+                "Inserir",
+                "cabo.png",
+                10));
+
+            Register(new ElementDefinition(
+                KindCarga,
+                "Carga",
+                "CARGA",
+                typeof(Carga),
+                typeof(CargaViewModel),
+                typeof(TipoCarga),
+                CriarCarga,
+                (m, n, d, l) => new CargaViewModel((Carga)m, Types, n, d, l),
+                () => Types.TipoCargaPadrao,
+                () => Types.TiposCargas,
+                _ => EquipamentoSize(),
+                e => ((Carga)e).AtualizarTerminais(ElementGeometryDefaults.EquipamentoLargura, ElementGeometryDefaults.EquipamentoAltura),
+                "Carga",
+                "Inserir",
+                "carga.png",
+                20));
+
+            Register(new ElementDefinition(
+                KindGerador,
+                "Gerador",
+                "GERADOR",
+                typeof(Gerador),
+                typeof(GeradorViewModel),
+                typeof(TipoGerador),
+                CriarGerador,
+                (m, n, d, l) => new GeradorViewModel((Gerador)m, Types, n, d, l),
+                () => Types.TipoGeradorPadrao,
+                () => Types.TiposGeradores,
+                _ => EquipamentoSize(),
+                e => ((Gerador)e).AtualizarTerminais(ElementGeometryDefaults.EquipamentoLargura, ElementGeometryDefaults.EquipamentoAltura),
+                "Gerador",
+                "Inserir",
+                "gerador.png",
+                30));
+
+            Register(new ElementDefinition(
+                KindSin,
+                "SIN",
+                "SIN",
+                typeof(Sin),
+                typeof(SinViewModel),
+                typeof(TipoSin),
+                CriarSin,
+                (m, n, d, l) => new SinViewModel((Sin)m, Types, n, d, l),
+                () => Types.TipoSinPadrao,
+                () => Types.TiposSin,
+                _ => EquipamentoSize(),
+                e => ((Sin)e).AtualizarTerminais(ElementGeometryDefaults.EquipamentoLargura, ElementGeometryDefaults.EquipamentoAltura),
+                "SIN",
+                "Inserir",
+                "sin.png",
+                40));
+
+            Register(new ElementDefinition(
+                KindTransformador,
+                "Transformador",
+                "TR",
+                typeof(Transformador),
+                typeof(TransformadorViewModel),
+                typeof(TipoTransformador),
+                CriarTransformador,
+                (m, n, d, l) => new TransformadorViewModel((Transformador)m, Types, n, d, l),
+                () => Types.TipoTransformadorPadrao,
+                () => Types.TiposTransformadores,
+                _ => TransformadorSize(),
+                e => ((Transformador)e).AtualizarTerminais(ElementGeometryDefaults.TransformadorLargura, ElementGeometryDefaults.TransformadorAltura),
+                "Trafo",
+                "Inserir",
+                "transformador.png",
+                50));
         }
 
         private Barra CriarBarra()
         {
-            var barra = new Barra
+            return new Barra
             {
-                Tipo = Types.TipoBarraPadrao
-                    ?? throw new InvalidOperationException("Nenhum tipo de barra cadastrado.")
+                Tipo = Types.TipoBarraPadrao ?? throw new InvalidOperationException("Nenhum tipo de barra cadastrado.")
             };
-
-            return barra;
         }
 
         private Carga CriarCarga()
         {
-            var carga = new Carga
+            return new Carga
             {
-                Tipo = Types.TipoCargaPadrao
-                    ?? throw new InvalidOperationException("Nenhum tipo de carga cadastrado.")
+                Tipo = Types.TipoCargaPadrao ?? throw new InvalidOperationException("Nenhum tipo de carga cadastrado.")
             };
-
-            return carga;
         }
 
         private Gerador CriarGerador()
         {
-            var gerador = new Gerador
+            return new Gerador
             {
-                Tipo = Types.TipoGeradorPadrao
-                    ?? throw new InvalidOperationException("Nenhum tipo de gerador cadastrado.")
+                Tipo = Types.TipoGeradorPadrao ?? throw new InvalidOperationException("Nenhum tipo de gerador cadastrado.")
             };
-
-            return gerador;
         }
 
         private Sin CriarSin()
         {
-            var sin = new Sin
+            return new Sin
             {
-                Tipo = Types.TipoSinPadrao
-                    ?? throw new InvalidOperationException("Nenhum tipo de SIN cadastrado.")
+                Tipo = Types.TipoSinPadrao ?? throw new InvalidOperationException("Nenhum tipo de SIN cadastrado.")
             };
-
-            return sin;
         }
 
         private Transformador CriarTransformador()
         {
-            var transformador = new Transformador
+            return new Transformador
             {
-                Tipo = Types.TipoTransformadorPadrao
-                    ?? throw new InvalidOperationException("Nenhum tipo de transformador cadastrado.")
+                Tipo = Types.TipoTransformadorPadrao ?? throw new InvalidOperationException("Nenhum tipo de transformador cadastrado.")
             };
-
-            return transformador;
         }
 
         private Cabo CriarCabo()
         {
             return new Cabo
             {
-                Tipo = Types.TipoCaboPadrao
-                    ?? throw new InvalidOperationException("Nenhum tipo de cabo cadastrado.")
+                Tipo = Types.TipoCaboPadrao ?? throw new InvalidOperationException("Nenhum tipo de cabo cadastrado.")
             };
         }
 
         private static Size EquipamentoSize()
         {
-            return new Size(
-                ElementGeometryDefaults.EquipamentoLargura,
-                ElementGeometryDefaults.EquipamentoAltura);
+            return new Size(ElementGeometryDefaults.EquipamentoLargura, ElementGeometryDefaults.EquipamentoAltura);
         }
 
         private static Size TransformadorSize()
         {
-            return new Size(
-                ElementGeometryDefaults.TransformadorLargura,
-                ElementGeometryDefaults.TransformadorAltura);
+            return new Size(ElementGeometryDefaults.TransformadorLargura, ElementGeometryDefaults.TransformadorAltura);
         }
 
         private static Size GetFallbackSize(Elemento elemento)

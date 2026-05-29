@@ -12,7 +12,7 @@ namespace Araci.Applications.Diagrama.InserirCarga
 
         public InserirCargaApplication(EditorContext context)
         {
-            _context = context ?? throw new System.ArgumentNullException(nameof(context));
+            _context = context ?? throw new ArgumentNullException(nameof(context));
         }
 
         public void Executar()
@@ -24,12 +24,10 @@ namespace Araci.Applications.Diagrama.InserirCarga
     public class InserirCargaTool : InsertElementToolBase<CargaViewModel, Carga>
     {
         public InserirCargaTool(EditorContext context)
-            : base(context, context.ElementoFactory.CriarCargaVM, vm => vm.Carga)
+            : base(context, ElementRegistryService.KindCarga, vm => vm.Carga)
         {
         }
 
         protected override string ToolName => "Inserir Carga";
-
-        protected override Carga CriarModeloReal() => Context.ElementoFactory.CriarCarga();
     }
 }

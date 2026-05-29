@@ -24,12 +24,10 @@ namespace Araci.Applications.Diagrama.InserirSin
     public class InserirSinTool : InsertElementToolBase<SinViewModel, Sin>
     {
         public InserirSinTool(EditorContext context)
-            : base(context, context.ElementoFactory.CriarSinVM, vm => vm.Sin)
+            : base(context, ElementRegistryService.KindSin, vm => vm.Sin)
         {
         }
 
         protected override string ToolName => "Inserir SIN";
-
-        protected override Sin CriarModeloReal() => Context.ElementoFactory.CriarSin();
     }
 }

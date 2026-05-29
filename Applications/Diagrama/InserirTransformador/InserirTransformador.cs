@@ -24,12 +24,10 @@ namespace Araci.Applications.Diagrama.InserirTransformador
     public class InserirTransformadorTool : InsertElementToolBase<TransformadorViewModel, Transformador>
     {
         public InserirTransformadorTool(EditorContext context)
-            : base(context, context.ElementoFactory.CriarTransformadorVM, vm => vm.Transformador)
+            : base(context, ElementRegistryService.KindTransformador, vm => vm.Transformador)
         {
         }
 
         protected override string ToolName => "Inserir Transformador";
-
-        protected override Transformador CriarModeloReal() => Context.ElementoFactory.CriarTransformador();
     }
 }

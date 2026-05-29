@@ -12,7 +12,7 @@ namespace Araci.Applications.Diagrama.InserirGerador
 
         public InserirGeradorApplication(EditorContext context)
         {
-            _context = context ?? throw new System.ArgumentNullException(nameof(context));
+            _context = context ?? throw new ArgumentNullException(nameof(context));
         }
 
         public void Executar()
@@ -24,12 +24,10 @@ namespace Araci.Applications.Diagrama.InserirGerador
     public class InserirGeradorTool : InsertElementToolBase<GeradorViewModel, Gerador>
     {
         public InserirGeradorTool(EditorContext context)
-            : base(context, context.ElementoFactory.CriarGeradorVM, vm => vm.Gerador)
+            : base(context, ElementRegistryService.KindGerador, vm => vm.Gerador)
         {
         }
 
         protected override string ToolName => "Inserir Gerador";
-
-        protected override Gerador CriarModeloReal() => Context.ElementoFactory.CriarGerador();
     }
 }

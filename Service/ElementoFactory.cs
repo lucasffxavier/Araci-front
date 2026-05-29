@@ -26,78 +26,100 @@ namespace Araci.Services
             _geometryUpdates = geometryUpdates ?? throw new ArgumentNullException(nameof(geometryUpdates));
         }
 
+        public Elemento CriarModelo(string kind)
+        {
+            return _registry.CreateModel(kind);
+        }
+
+        public TModel CriarModelo<TModel>(string kind) where TModel : Elemento
+        {
+            return _registry.CreateModel<TModel>(kind);
+        }
+
         public ElementoViewModel? CriarViewModel(Elemento modelo)
         {
-            ElementoViewModel? vm = _registry.CreateViewModel(
-                modelo,
-                _names,
-                _typePropertiesDialogs,
-                _terminalLayout);
-
-            if (vm is BarraViewModel barra)
-                barra.GeometryUpdates = _geometryUpdates;
-
+            ElementoViewModel? vm = _registry.CreateViewModel(modelo, _names, _typePropertiesDialogs, _terminalLayout);
+            ConfigurarViewModel(vm);
             return vm;
+        }
+
+        public TViewModel CriarViewModel<TViewModel>(string kind) where TViewModel : ElementoViewModel
+        {
+            TViewModel vm = _registry.CreateViewModel<TViewModel>(kind, _names, _typePropertiesDialogs, _terminalLayout);
+            ConfigurarViewModel(vm);
+            return vm;
+        }
+
+        public ElementoViewModel CriarViewModel(string kind)
+        {
+            Elemento modelo = CriarModelo(kind);
+            return CriarViewModel(modelo) ?? throw new InvalidOperationException($"Nao foi possivel criar ViewModel para o elemento '{kind}'.");
         }
 
         public Cabo CriarCabo()
         {
-            return _registry.CreateModel<Cabo>();
+            return CriarModelo<Cabo>(ElementRegistryService.KindCabo);
         }
 
         public CaboViewModel CriarCaboVM()
         {
-            return (CaboViewModel)CriarViewModel(CriarCabo())!;
+            return CriarViewModel<CaboViewModel>(ElementRegistryService.KindCabo);
         }
 
         public Carga CriarCarga()
         {
-            return _registry.CreateModel<Carga>();
+            return CriarModelo<Carga>(ElementRegistryService.KindCarga);
         }
 
         public CargaViewModel CriarCargaVM()
         {
-            return (CargaViewModel)CriarViewModel(CriarCarga())!;
+            return CriarViewModel<CargaViewModel>(ElementRegistryService.KindCarga);
         }
 
         public Gerador CriarGerador()
         {
-            return _registry.CreateModel<Gerador>();
+            return CriarModelo<Gerador>(ElementRegistryService.KindGerador);
         }
 
         public GeradorViewModel CriarGeradorVM()
         {
-            return (GeradorViewModel)CriarViewModel(CriarGerador())!;
+            return CriarViewModel<GeradorViewModel>(ElementRegistryService.KindGerador);
         }
 
         public Sin CriarSin()
         {
-            return _registry.CreateModel<Sin>();
+            return CriarModelo<Sin>(ElementRegistryService.KindSin);
         }
 
         public SinViewModel CriarSinVM()
         {
-            return (SinViewModel)CriarViewModel(CriarSin())!;
+            return CriarViewModel<SinViewModel>(ElementRegistryService.KindSin);
         }
 
         public Transformador CriarTransformador()
         {
-            return _registry.CreateModel<Transformador>();
+            return CriarModelo<Transformador>(ElementRegistryService.KindTransformador);
         }
 
         public TransformadorViewModel CriarTransformadorVM()
         {
-            return (TransformadorViewModel)CriarViewModel(CriarTransformador())!;
+            return CriarViewModel<TransformadorViewModel>(ElementRegistryService.KindTransformador);
         }
 
         public Barra CriarBarra()
         {
-            return _registry.CreateModel<Barra>();
+            return CriarModelo<Barra>(ElementRegistryService.KindBarra);
         }
 
         public BarraViewModel CriarBarraVM()
         {
-            return (BarraViewModel)CriarViewModel(CriarBarra())!;
+            return CriarViewModel<BarraViewModel>(ElementRegistryService.KindBarra);
+        }
+
+        private void ConfigurarViewModel(ElementoViewModel? vm)
+        {
+            if (vm is BarraViewModel barra)
+                barra.GeometryUpdates = _geometryUpdates;
         }
     }
 }

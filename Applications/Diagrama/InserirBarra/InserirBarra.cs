@@ -12,7 +12,7 @@ namespace Araci.Applications.Diagrama.InserirBarra
 
         public InserirBarraApplication(EditorContext context)
         {
-            _context = context ?? throw new System.ArgumentNullException(nameof(context));
+            _context = context ?? throw new ArgumentNullException(nameof(context));
         }
 
         public void Executar()
@@ -24,12 +24,10 @@ namespace Araci.Applications.Diagrama.InserirBarra
     public class InserirBarraTool : InsertElementToolBase<BarraViewModel, Barra>
     {
         public InserirBarraTool(EditorContext context)
-            : base(context, context.ElementoFactory.CriarBarraVM, vm => vm.Barra)
+            : base(context, ElementRegistryService.KindBarra, vm => vm.Barra)
         {
         }
 
         protected override string ToolName => "Inserir Barra";
-
-        protected override Barra CriarModeloReal() => Context.ElementoFactory.CriarBarra();
     }
 }
