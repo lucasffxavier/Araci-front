@@ -34,6 +34,7 @@ namespace Araci.Applications.Editar.Selecionar
                 context.Selection,
                 context.Move,
                 context.MoveHud,
+                context.AlignmentGuides,
                 context.MoveConstraints,
                 mostrarHud);
             _modoSoMover = modoSoMover;
@@ -66,6 +67,7 @@ namespace Araci.Applications.Editar.Selecionar
             _selectionBox.Cancel();
             _cableVertexEdit.Cancel();
             _cableVertexEdit.Refresh();
+            _context.AlignmentGuides.Limpar();
         }
 
         public void OnMouseDown(ElementoViewModel? vm, Point position, ToolInputState inputState)

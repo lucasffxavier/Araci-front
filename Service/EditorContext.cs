@@ -44,6 +44,7 @@ namespace Araci.Services
             SafeDelete = new SafeDeleteService(this);
             Projects = new ProjectPersistenceService(this);
             MoveHud = new MoveHudService(this);
+            AlignmentGuides = new AlignmentGuideService(this);
             MoveConstraints = new MoveConstraintService(Settings);
             Move = new MoveService(this);
             BarraResize = new BarraResizeService(this);
@@ -71,6 +72,7 @@ namespace Araci.Services
         public EditorState Editor { get; } = new EditorState();
         public EditorSettings Settings { get; } = new EditorSettings();
         public MoveHudService MoveHud { get; }
+        public AlignmentGuideService AlignmentGuides { get; }
         public MoveConstraintService MoveConstraints { get; }
         public SelectionBoxViewModel SelectionBox { get; } = new SelectionBoxViewModel();
         public TerminalSnapState TerminalSnap { get; } = new TerminalSnapState();

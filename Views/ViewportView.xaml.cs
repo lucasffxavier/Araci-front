@@ -35,7 +35,9 @@ namespace Araci.Views
         {
             if (_context?.Viewport == null)
                 return;
+
             WorldLayer.RenderTransform = _cameraTransform;
+            AlignmentGuideLayer.RenderTransform = _cameraTransform;
             SelectionLayer.RenderTransform = _cameraTransform;
             CableVertexHandleLayer.RenderTransform = _cameraTransform;
             TerminalSnapLayer.RenderTransform = _cameraTransform;
@@ -52,6 +54,7 @@ namespace Araci.Views
         {
             if (_context?.Viewport == null)
                 return;
+
             var camera = _context.Viewport.Camera;
             _cameraTransform.Matrix = new Matrix(camera.Zoom, 0, 0, camera.Zoom, camera.Offset.X, camera.Offset.Y);
             _viewportViewModel?.AtualizarZoomVisual(camera.Zoom);
@@ -69,13 +72,16 @@ namespace Araci.Views
         {
             if (_context?.Viewport == null)
                 return;
+
             double largura = ActualWidth;
             double altura = ActualHeight;
+
             if (RootBorder != null)
             {
                 largura -= RootBorder.BorderThickness.Left + RootBorder.BorderThickness.Right;
                 altura -= RootBorder.BorderThickness.Top + RootBorder.BorderThickness.Bottom;
             }
+
             largura = Math.Max(0, largura);
             altura = Math.Max(0, altura);
             _context.Viewport.AtualizarTamanho(new Size(largura, altura));
@@ -91,6 +97,7 @@ namespace Araci.Views
         {
             if (_context == null)
                 return;
+
             if (_context.Navigation.TryHandleMiddleDoubleClick(e))
             {
                 AtualizarCursorNavegacao();
@@ -98,6 +105,7 @@ namespace Araci.Views
                 e.Handled = true;
                 return;
             }
+
             if (_context.Navigation.TryBeginMiddlePan(e, this))
             {
                 Focus();
@@ -112,6 +120,7 @@ namespace Araci.Views
         {
             if (_context == null)
                 return;
+
             if (_context.Navigation.TryBeginSpaceLeftPan(e, this))
             {
                 Focus();
@@ -121,11 +130,13 @@ namespace Araci.Views
                 e.Handled = true;
                 return;
             }
+
             if (_context.Navigation.IsPanning)
             {
                 e.Handled = true;
                 return;
             }
+
             Focus();
             Keyboard.Focus(this);
             var vm = EncontrarElemento(e.OriginalSource as DependencyObject);
@@ -144,8 +155,10 @@ namespace Araci.Views
                 e.Handled = true;
                 return;
             }
+
             if (_context == null)
                 return;
+
             Point worldPosition = GetWorldPos(e);
             _context.Input.MouseMove(worldPosition, CriarInputState(e));
             AtualizarCursorInteracao(worldPosition);
@@ -155,6 +168,7 @@ namespace Araci.Views
         {
             if (_context?.Navigation.TryEndMiddlePan(e) != true)
                 return;
+
             AtualizarCursorNavegacao();
             LiberarCapturaMouse();
             e.Handled = true;
@@ -169,22 +183,26 @@ namespace Araci.Views
                 e.Handled = true;
                 return;
             }
+
             if (_context?.Navigation.ConsumeSuppressNextLeftButtonUp() == true)
             {
                 e.Handled = true;
                 return;
             }
+
             if (_context?.Navigation.IsPanning == true)
             {
                 e.Handled = true;
                 return;
             }
+
             if (_context != null)
             {
                 Point worldPosition = GetWorldPos(e);
                 _context.Input.MouseUp(worldPosition, CriarInputState(e, e.ChangedButton, e.ClickCount));
                 AtualizarCursorInteracao(worldPosition);
             }
+
             LiberarCapturaMouse();
         }
 
@@ -192,6 +210,7 @@ namespace Araci.Views
         {
             if (_context?.Navigation.TryHandleMouseWheel(e, this) != true)
                 return;
+
             e.Handled = true;
         }
 
@@ -202,15 +221,19 @@ namespace Araci.Views
                 e.Handled = true;
                 return;
             }
+
             if (_context?.Navigation.TryHandleKeyDown(e) == true)
             {
                 AtualizarCursorNavegacao();
                 e.Handled = true;
                 return;
             }
+
             if (_context == null)
                 return;
+
             e.Handled = _context.Input.KeyDown(e.Key);
+
             if (e.Handled && e.Key == Key.Escape)
                 LiberarCapturaMouse();
         }
@@ -219,6 +242,7 @@ namespace Araci.Views
         {
             if (_context?.Navigation.TryHandleKeyUp(e) != true)
                 return;
+
             AtualizarCursorNavegacao();
             LiberarCapturaMouse();
             e.Handled = true;
@@ -228,6 +252,7 @@ namespace Araci.Views
         {
             _context?.Hover.Clear();
             _context?.TerminalSnap.Limpar();
+            _context?.AlignmentGuides.Limpar();
             _context?.Navigation.CancelPan();
             AtualizarCursorNavegacao();
         }
@@ -235,8 +260,10 @@ namespace Araci.Views
         private void OnUnloaded(object sender, RoutedEventArgs e)
         {
             _context?.Navigation.Reset();
+            _context?.AlignmentGuides.Limpar();
             LiberarCapturaMouse();
             Cursor = Cursors.Arrow;
+
             if (_context?.Viewport != null)
                 _context.Viewport.Camera.PropertyChanged -= OnCameraChanged;
         }
@@ -248,6 +275,7 @@ namespace Araci.Views
                 Cursor = Cursors.ScrollAll;
                 return;
             }
+
             Cursor = _context?.BarraResize.GetCursor(worldPosition) ?? Cursors.Arrow;
         }
 
@@ -278,8 +306,10 @@ namespace Araci.Views
             {
                 if (origem is FrameworkElement fe && fe.DataContext is ElementoViewModel vm)
                     return vm;
+
                 origem = VisualTreeHelper.GetParent(origem);
             }
+
             return null;
         }
     }

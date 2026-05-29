@@ -20,16 +20,14 @@ namespace Araci.ViewModels
         public ViewportViewModel(EditorContext context)
         {
             _context = context ?? throw new ArgumentNullException(nameof(context));
-
             Document = context.Document;
             Scene = context.Scene;
             SelectionBox = context.SelectionBox;
             TerminalSnap = context.TerminalSnap;
             CableVertexEdit = context.CableVertexEdit;
             MoveHud = context.MoveHud;
-
+            AlignmentGuides = context.AlignmentGuides.Linhas;
             Document.Elementos.CollectionChanged += OnDocumentElementosChanged;
-
             SincronizarComDocumento();
         }
 
@@ -39,20 +37,15 @@ namespace Araci.ViewModels
         public TerminalSnapState TerminalSnap { get; }
         public CableVertexEditService CableVertexEdit { get; }
         public MoveHudService MoveHud { get; }
-
+        public ObservableCollection<AlignmentGuideLineViewModel> AlignmentGuides { get; }
         public ObservableCollection<ElementoViewModel> Elementos => Scene.Elementos;
-
         public double InverseZoom => _inverseZoom;
-
         public double CableHandleVisualOffset => -5 * _inverseZoom;
-
         public double TerminalMarkerVisualOffset => -7 * _inverseZoom;
 
         public void AtualizarZoomVisual(double zoom)
         {
-            double inverseZoom = zoom > 0
-                ? 1 / zoom
-                : 1;
+            double inverseZoom = zoom > 0 ? 1 / zoom : 1;
 
             if (Math.Abs(_inverseZoom - inverseZoom) < 0.000001)
                 return;
@@ -65,11 +58,8 @@ namespace Araci.ViewModels
 
         public void RegistrarViewModel(ElementoViewModel vm)
         {
-            if (!Document.Elementos.Contains(vm.Modelo) ||
-                !Elementos.Contains(vm))
-            {
+            if (!Document.Elementos.Contains(vm.Modelo) || !Elementos.Contains(vm))
                 return;
-            }
 
             _viewModelsPorModelo[vm.Modelo] = vm;
         }
@@ -79,11 +69,8 @@ namespace Araci.ViewModels
             if (!_viewModelsPorModelo.TryGetValue(modelo, out var vm))
                 return null;
 
-            if (Document.Elementos.Contains(modelo) &&
-                Elementos.Contains(vm))
-            {
+            if (Document.Elementos.Contains(modelo) && Elementos.Contains(vm))
                 return vm;
-            }
 
             _viewModelsPorModelo.Remove(modelo);
             return null;
@@ -152,6 +139,7 @@ namespace Araci.ViewModels
             _context.CableVertexEdit.Clear();
             _context.Hover.Clear();
             _context.TerminalSnap.Limpar();
+            _context.AlignmentGuides.Limpar();
             Elementos.Clear();
             _viewModelsPorModelo.Clear();
             _context.SceneQueries.Invalidate();

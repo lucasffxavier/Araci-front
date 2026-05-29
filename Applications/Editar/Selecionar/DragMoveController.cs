@@ -11,9 +11,9 @@ namespace Araci.Applications.Editar.Selecionar
         private readonly SelectionService _selection;
         private readonly MoveService _move;
         private readonly MoveHudService _hud;
+        private readonly AlignmentGuideService _alignmentGuides;
         private readonly MoveConstraintService _constraints;
         private readonly bool _mostrarHud;
-
         private Point _ultimoPontoMouse;
         private Point _ultimoPontoEfetivo;
         private Point _pontoInicialArrasto;
@@ -22,12 +22,14 @@ namespace Araci.Applications.Editar.Selecionar
             SelectionService selection,
             MoveService move,
             MoveHudService hud,
+            AlignmentGuideService alignmentGuides,
             MoveConstraintService constraints,
             bool mostrarHud)
         {
             _selection = selection ?? throw new ArgumentNullException(nameof(selection));
             _move = move ?? throw new ArgumentNullException(nameof(move));
             _hud = hud ?? throw new ArgumentNullException(nameof(hud));
+            _alignmentGuides = alignmentGuides ?? throw new ArgumentNullException(nameof(alignmentGuides));
             _constraints = constraints ?? throw new ArgumentNullException(nameof(constraints));
             _mostrarHud = mostrarHud;
         }
@@ -41,8 +43,8 @@ namespace Araci.Applications.Editar.Selecionar
             _ultimoPontoEfetivo = position;
             _pontoInicialArrasto = position;
             _constraints.Begin(position);
-
             _move.BeginMove(_selection.Selecionados);
+            _alignmentGuides.Atualizar(_selection.Selecionados);
 
             if (!_mostrarHud)
                 return;
@@ -58,7 +60,6 @@ namespace Araci.Applications.Editar.Selecionar
                 return;
 
             Point pontoEfetivo = _constraints.Apply(position, inputState);
-
             Vector delta = pontoEfetivo - _ultimoPontoEfetivo;
 
             if (delta.X != 0 || delta.Y != 0)
@@ -66,6 +67,8 @@ namespace Araci.Applications.Editar.Selecionar
                 foreach (var item in _selection.Selecionados.ToList())
                     _move.MoverVisual(item, delta);
             }
+
+            _alignmentGuides.Atualizar(_selection.Selecionados);
 
             if (_mostrarHud)
                 AtualizarHud(pontoEfetivo);
@@ -83,6 +86,7 @@ namespace Araci.Applications.Editar.Selecionar
             IsActive = false;
             _constraints.End();
             LimparHud();
+            _alignmentGuides.Limpar();
         }
 
         public void Cancel()
@@ -91,12 +95,12 @@ namespace Araci.Applications.Editar.Selecionar
             _constraints.Cancel();
             _move.AbortMove();
             LimparHud();
+            _alignmentGuides.Limpar();
         }
 
         private void AtualizarHud(Point position)
         {
             Vector delta = position - _pontoInicialArrasto;
-
             _hud.DeltaX = delta.X;
             _hud.DeltaY = delta.Y;
             _hud.AtualizarPosicao(CalcularBoundsSelecionados());
@@ -122,6 +126,5 @@ namespace Araci.Applications.Editar.Selecionar
 
             return new Rect(minX, minY, maxX - minX, maxY - minY);
         }
-
     }
 }
