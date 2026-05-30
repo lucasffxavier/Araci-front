@@ -16,21 +16,22 @@ namespace Araci.Properties
 
         public object? ConvertBack(object value, Type targetType, object parameter, CultureInfo culture)
         {
+            UnitKind unit = ObterUnidade(parameter);
             string text = value?.ToString() ?? string.Empty;
-            string stripped = UnitFormatter.StripUnit(text, ObterUnidade(parameter));
+            string stripped = UnitFormatter.StripUnit(text, unit);
             Type type = Nullable.GetUnderlyingType(targetType) ?? targetType;
 
             if (type == typeof(string))
                 return stripped;
 
             if (type == typeof(double))
-                return double.TryParse(stripped, NumberStyles.Float | NumberStyles.AllowThousands, culture, out double d) ? d : Binding.DoNothing;
+                return double.TryParse(stripped, NumberStyles.Float | NumberStyles.AllowThousands, culture, out double d) ? UnitFormatter.FromDisplay(d, unit) : Binding.DoNothing;
 
             if (type == typeof(float))
-                return float.TryParse(stripped, NumberStyles.Float | NumberStyles.AllowThousands, culture, out float f) ? f : Binding.DoNothing;
+                return float.TryParse(stripped, NumberStyles.Float | NumberStyles.AllowThousands, culture, out float f) ? (float)UnitFormatter.FromDisplay(f, unit) : Binding.DoNothing;
 
             if (type == typeof(decimal))
-                return decimal.TryParse(stripped, NumberStyles.Float | NumberStyles.AllowThousands, culture, out decimal m) ? m : Binding.DoNothing;
+                return decimal.TryParse(stripped, NumberStyles.Float | NumberStyles.AllowThousands, culture, out decimal m) ? (decimal)UnitFormatter.FromDisplay((double)m, unit) : Binding.DoNothing;
 
             if (type == typeof(int))
                 return int.TryParse(stripped, NumberStyles.Integer, culture, out int i) ? i : Binding.DoNothing;

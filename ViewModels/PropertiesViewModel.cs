@@ -238,7 +238,7 @@ namespace Araci.ViewModels
                     if (!double.TryParse(valorSemUnidade, NumberStyles.Float | NumberStyles.AllowThousands, CultureInfo.CurrentCulture, out double d))
                         return false;
 
-                    convertido = d;
+                    convertido = UnitFormatter.FromDisplay(d, unit);
                     return true;
                 }
 
@@ -247,7 +247,7 @@ namespace Araci.ViewModels
                     if (!float.TryParse(valorSemUnidade, NumberStyles.Float | NumberStyles.AllowThousands, CultureInfo.CurrentCulture, out float f))
                         return false;
 
-                    convertido = f;
+                    convertido = (float)UnitFormatter.FromDisplay(f, unit);
                     return true;
                 }
 
@@ -256,7 +256,7 @@ namespace Araci.ViewModels
                     if (!decimal.TryParse(valorSemUnidade, NumberStyles.Float | NumberStyles.AllowThousands, CultureInfo.CurrentCulture, out decimal m))
                         return false;
 
-                    convertido = m;
+                    convertido = (decimal)UnitFormatter.FromDisplay((double)m, unit);
                     return true;
                 }
 

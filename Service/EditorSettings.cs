@@ -17,5 +17,20 @@ namespace Araci.Services
         public UnitKind ReactivePower { get; set; } = UnitKind.ReactivePowerKVAr;
         public UnitKind ApparentPower { get; set; } = UnitKind.ApparentPowerKVA;
         public UnitKind Percent { get; set; } = UnitKind.Percent;
+
+        public UnitKind Resolve(UnitQuantityKind quantity)
+        {
+            return quantity switch
+            {
+                UnitQuantityKind.Length => Length,
+                UnitQuantityKind.Voltage => Voltage,
+                UnitQuantityKind.Current => Current,
+                UnitQuantityKind.ActivePower => ActivePower,
+                UnitQuantityKind.ReactivePower => ReactivePower,
+                UnitQuantityKind.ApparentPower => ApparentPower,
+                UnitQuantityKind.Percent => Percent,
+                _ => UnitKind.None
+            };
+        }
     }
 }
