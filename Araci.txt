@@ -263,6 +263,8 @@ Araci Engine
 │   ├── TopologyValidator.cs
 │   ├── TypeLibraryService.cs
 │   ├── TypePropertiesDialogService.cs
+│   ├── UnitFormatter.cs
+│   ├── UnitKind.cs
 │   ├── ViewportNavigationService.cs
 │   └── ViewportService.cs
 ├── ViewModels
@@ -313,85 +315,6 @@ Araci Engine
 ├── GlobalUsings.cs
 ├── MainWindow.xaml
 └── MainWindow.xaml.cs
-
-
-====================================================================================================
-ARQUIVO: C:\Araci-Engine-Front\Araci Engine\Models\Parameter.cs
-====================================================================================================
-
-﻿using System;
-
-namespace Araci.Models
-{
-    public abstract class Parameter
-    {
-        protected Parameter(string nome, Type tipo)
-        {
-            Nome = nome;
-            Tipo = tipo;
-        }
-
-        public string Nome { get; }
-
-        public Type Tipo { get; }
-
-        public abstract object? ValorObjeto { get; set; }
-
-        public abstract Parameter Clonar();
-    }
-
-    public sealed class Parameter<T> : Parameter
-    {
-        private T _valor;
-
-        public Parameter(string nome, T valor)
-            : base(nome, typeof(T))
-        {
-            _valor = valor;
-        }
-
-        public T Valor
-        {
-            get => _valor;
-            set => _valor = value;
-        }
-
-        public override object? ValorObjeto
-        {
-            get => _valor;
-            set
-            {
-                if (value == null)
-                {
-                    _valor = default!;
-                    return;
-                }
-
-                if (value is T typed)
-                {
-                    _valor = typed;
-                    return;
-                }
-
-                try
-                {
-                    _valor = (T)Convert.ChangeType(value, typeof(T));
-                }
-                catch
-                {
-                    throw new InvalidCastException(
-                        $"Valor inválido para parâmetro '{Nome}'. Esperado: {typeof(T).Name}");
-                }
-            }
-        }
-
-        public override Parameter Clonar()
-        {
-            return new Parameter<T>(Nome, _valor);
-        }
-    }
-}
-
 
 
 ====================================================================================================
@@ -631,109 +554,6 @@ ARQUIVO: C:\Araci-Engine-Front\Araci Engine\Properties\GeradorPropertiesView.xam
 
 
 ====================================================================================================
-ARQUIVO: C:\Araci-Engine-Front\Araci Engine\Properties\PropertiesHostView.xaml
-====================================================================================================
-
-﻿<UserControl x:Class="Araci.Properties.PropertiesHostView"
-             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
-             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
-    <Border Margin="8"
-            Background="#252526"
-            BorderBrush="#F4F4F4"
-            BorderThickness="1">
-        <Grid>
-            <Grid.RowDefinitions>
-                <RowDefinition Height="38"/>
-                <RowDefinition Height="*"/>
-            </Grid.RowDefinitions>
-            <Border Grid.Row="0"
-                    Background="#1E1E1E"
-                    BorderBrush="#3A3A3A"
-                    BorderThickness="0,0,0,1">
-                <Grid>
-                    <TextBlock Text="Propriedades"
-                               Foreground="#F4F4F4"
-                               FontWeight="SemiBold"
-                               VerticalAlignment="Center"
-                               Margin="12,0,42,0"/>
-                    <Button Content="×"
-                            Width="28"
-                            Height="28"
-                            HorizontalAlignment="Right"
-                            VerticalAlignment="Center"
-                            Margin="0,0,6,0"
-                            FontSize="18"
-                            FontWeight="SemiBold"
-                            Foreground="#F4F4F4"
-                            Background="Transparent"
-                            BorderBrush="Transparent"
-                            Click="OnCloseClick"/>
-                </Grid>
-            </Border>
-            <ContentControl Grid.Row="1"
-                            Content="{Binding Editor.ElementoSelecionado}"
-                            HorizontalContentAlignment="Stretch"
-                            VerticalContentAlignment="Stretch"/>
-        </Grid>
-    </Border>
-</UserControl>
-
-
-====================================================================================================
-ARQUIVO: C:\Araci-Engine-Front\Araci Engine\Properties\PropertiesHostView.xaml.cs
-====================================================================================================
-
-﻿using System.Windows;
-using System.Windows.Controls;
-using System.Windows.Data;
-using System.Windows.Input;
-
-namespace Araci.Properties
-{
-    public partial class PropertiesHostView : UserControl
-    {
-        public static readonly RoutedEvent CloseRequestedEvent = EventManager.RegisterRoutedEvent(
-            nameof(CloseRequested),
-            RoutingStrategy.Bubble,
-            typeof(RoutedEventHandler),
-            typeof(PropertiesHostView));
-
-        public event RoutedEventHandler CloseRequested
-        {
-            add => AddHandler(CloseRequestedEvent, value);
-            remove => RemoveHandler(CloseRequestedEvent, value);
-        }
-
-        public PropertiesHostView()
-        {
-            InitializeComponent();
-            AddHandler(Keyboard.PreviewKeyDownEvent, new KeyEventHandler(OnPreviewKeyDown), true);
-        }
-
-        private void OnCloseClick(object sender, RoutedEventArgs e)
-        {
-            RaiseEvent(new RoutedEventArgs(CloseRequestedEvent));
-        }
-
-        private void OnPreviewKeyDown(object sender, KeyEventArgs e)
-        {
-            if (e.Key != Key.Enter)
-                return;
-
-            if (Keyboard.FocusedElement is not TextBox textBox)
-                return;
-
-            BindingExpression? binding = textBox.GetBindingExpression(TextBox.TextProperty);
-            binding?.UpdateSource();
-            FocusManager.SetFocusedElement(FocusManager.GetFocusScope(textBox), null);
-            Keyboard.ClearFocus();
-            e.Handled = true;
-        }
-    }
-}
-
-
-====================================================================================================
 ARQUIVO: C:\Araci-Engine-Front\Araci Engine\Properties\SinPropertiesView.xaml
 ====================================================================================================
 
@@ -908,991 +728,1298 @@ ARQUIVO: C:\Araci-Engine-Front\Araci Engine\Resources\Styles\PropertyStyles.xaml
 
 
 ====================================================================================================
-ARQUIVO: C:\Araci-Engine-Front\Araci Engine\Service\EditorSettings.cs
+ARQUIVO: C:\Araci-Engine-Front\Araci Engine\ViewModels\BarraViewModel.cs
 ====================================================================================================
 
-namespace Araci.Services
-{
-    public class EditorSettings
-    {
-        public double GridStep { get; set; } = 10.0;
-
-        public bool GridSnapEnabled { get; set; } = true;
-
-        public double ElectricalSnapTolerance { get; set; } = 15.0;
-    }
-}
-
-
-
-====================================================================================================
-ARQUIVO: C:\Araci-Engine-Front\Araci Engine\Service\ElementRegistryService.cs
-====================================================================================================
-
-using System;
-using System.Collections.Generic;
-using System.Linq;
+using System.Collections;
 using System.Windows;
-using Araci.Core.Rendering;
+using Araci.Core.SceneNodes;
 using Araci.Models;
-using Araci.Models.Tipos;
-using Araci.ViewModels;
-
-namespace Araci.Services
-{
-    public class ElementRegistryService
-    {
-        public const string KindBarra = "Barra";
-        public const string KindCarga = "Carga";
-        public const string KindGerador = "Gerador";
-        public const string KindSin = "Sin";
-        public const string KindTransformador = "Transformador";
-        public const string KindCabo = "Cabo";
-        private readonly Dictionary<string, ElementDefinition> _porKind = new(StringComparer.OrdinalIgnoreCase);
-        private readonly List<ElementDefinition> _definitions = new();
-
-        public ElementRegistryService(TypeLibraryService types)
-        {
-            Types = types ?? throw new ArgumentNullException(nameof(types));
-            RegistrarElementosPadrao();
-        }
-
-        private TypeLibraryService Types { get; }
-        public IReadOnlyList<ElementDefinition> Definitions => _definitions;
-        public IEnumerable<ElementDefinition> RibbonDefinitions => _definitions.Where(d => d.ExibirNoRibbon).OrderBy(d => d.OrdemRibbon).ThenBy(d => d.NomeRibbon);
-
-        public void Register(ElementDefinition definition)
-        {
-            if (definition == null)
-                throw new ArgumentNullException(nameof(definition));
-
-            if (_porKind.ContainsKey(definition.Kind))
-                throw new InvalidOperationException($"Elemento ja registrado: {definition.Kind}.");
-
-            _porKind[definition.Kind] = definition;
-            _definitions.Add(definition);
-        }
-
-        public ElementDefinition? FindByKind(string kind)
-        {
-            return string.IsNullOrWhiteSpace(kind) ? null : _porKind.TryGetValue(kind.Trim(), out ElementDefinition? definition) ? definition : null;
-        }
-
-        public ElementDefinition? FindByShortcut(string shortcut)
-        {
-            if (string.IsNullOrWhiteSpace(shortcut))
-                return null;
-
-            string normalized = shortcut.Trim().ToUpperInvariant();
-            return _definitions.FirstOrDefault(d => string.Equals(d.Atalho, normalized, StringComparison.OrdinalIgnoreCase));
-        }
-
-        public ElementDefinition? FindByModel(Elemento elemento)
-        {
-            return _definitions.FirstOrDefault(d => d.AceitaModelo(elemento));
-        }
-
-        public ElementDefinition? FindByModelType<T>() where T : Elemento
-        {
-            return _definitions.FirstOrDefault(d => d.ModelType == typeof(T));
-        }
-
-        public ElementDefinition? FindByViewModel(ElementoViewModel viewModel)
-        {
-            return _definitions.FirstOrDefault(d => d.AceitaViewModel(viewModel));
-        }
-
-        public ElementDefinition? FindByViewModelType(Type viewModelType)
-        {
-            return _definitions.FirstOrDefault(d => d.ViewModelType == viewModelType);
-        }
-
-        public string GetKind(Elemento elemento)
-        {
-            return FindByModel(elemento)?.Kind ?? elemento.GetType().Name;
-        }
-
-        public string GetNamePrefix(Elemento elemento)
-        {
-            return FindByModel(elemento)?.PrefixoNome ?? "ELM";
-        }
-
-        public Elemento CreateModel(string kind)
-        {
-            ElementDefinition definition = FindByKind(kind) ?? throw new InvalidOperationException($"Elemento nao registrado: {kind}.");
-            return CreateModel(definition);
-        }
-
-        public T CreateModel<T>() where T : Elemento
-        {
-            ElementDefinition definition = FindByModelType<T>() ?? throw new InvalidOperationException($"Elemento nao registrado: {typeof(T).Name}.");
-            return (T)CreateModel(definition);
-        }
-
-        public T CreateModel<T>(string kind) where T : Elemento
-        {
-            Elemento modelo = CreateModel(kind);
-
-            if (modelo is not T typed)
-                throw new InvalidOperationException($"O elemento '{kind}' nao cria modelo do tipo {typeof(T).Name}.");
-
-            return typed;
-        }
-
-        public ElementoViewModel? CreateViewModel(Elemento modelo, NameService names, TypePropertiesDialogService typePropertiesDialogs, TerminalLayoutService terminalLayout)
-        {
-            return FindByModel(modelo)?.CriarViewModel(modelo, names, typePropertiesDialogs, terminalLayout);
-        }
-
-        public TViewModel CreateViewModel<TViewModel>(string kind, NameService names, TypePropertiesDialogService typePropertiesDialogs, TerminalLayoutService terminalLayout) where TViewModel : ElementoViewModel
-        {
-            Elemento modelo = CreateModel(kind);
-            ElementoViewModel? viewModel = CreateViewModel(modelo, names, typePropertiesDialogs, terminalLayout);
-
-            if (viewModel is not TViewModel typed)
-                throw new InvalidOperationException($"O elemento '{kind}' nao cria ViewModel do tipo {typeof(TViewModel).Name}.");
-
-            return typed;
-        }
-
-        public IEnumerable<TipoElemento> GetTypes(string kind)
-        {
-            return FindByKind(kind)?.ObterTipos() ?? Enumerable.Empty<TipoElemento>();
-        }
-
-        public TipoElemento? GetDefaultType(string kind)
-        {
-            return FindByKind(kind)?.ObterTipoPadrao();
-        }
-
-        public TipoElemento? ResolveType(string kind, string? nomeTipo, string? familia, string? categoria)
-        {
-            TipoElemento? tipo = null;
-
-            if (!string.IsNullOrWhiteSpace(nomeTipo))
-            {
-                tipo = GetTypes(kind).FirstOrDefault(t =>
-                    string.Equals(t.NomeTipo, nomeTipo, StringComparison.OrdinalIgnoreCase) &&
-                    string.Equals(t.Familia, familia, StringComparison.OrdinalIgnoreCase) &&
-                    string.Equals(t.Categoria, categoria, StringComparison.OrdinalIgnoreCase));
-            }
-
-            return tipo ?? GetDefaultType(kind);
-        }
-
-        public Size GetSize(Elemento elemento)
-        {
-            ElementDefinition? definition = FindByModel(elemento);
-            return definition?.ObterTamanho(elemento) ?? GetFallbackSize(elemento);
-        }
-
-        public bool UpdateTerminals(Elemento elemento)
-        {
-            ElementDefinition? definition = FindByModel(elemento);
-
-            if (definition == null)
-                return false;
-
-            definition.AtualizarTerminais(elemento);
-            return true;
-        }
-
-        public IReadOnlyList<InstancePropertyDescriptor> GetInstanceProperties(ElementoViewModel elemento)
-        {
-            return FindByViewModel(elemento)?.PropriedadesInstancia ?? Array.Empty<InstancePropertyDescriptor>();
-        }
-
-        public IReadOnlyList<InstancePropertyDescriptor> GetInstanceProperties(Type viewModelType)
-        {
-            return FindByViewModelType(viewModelType)?.PropriedadesInstancia ?? Array.Empty<InstancePropertyDescriptor>();
-        }
-
-        public IReadOnlyList<InstancePropertyDescriptor> GetCommonInstanceProperties(IReadOnlyList<ElementoViewModel> elementos)
-        {
-            if (elementos.Count == 0)
-                return Array.Empty<InstancePropertyDescriptor>();
-
-            var commonNames = new HashSet<string>(GetInstanceProperties(elementos[0]).Select(p => p.PropertyName));
-
-            foreach (ElementoViewModel elemento in elementos.Skip(1))
-                commonNames.IntersectWith(GetInstanceProperties(elemento).Select(p => p.PropertyName));
-
-            return GetInstanceProperties(elementos[0])
-                .Where(p => commonNames.Contains(p.PropertyName))
-                .OrderBy(p => p.Order)
-                .ThenBy(p => p.DisplayName)
-                .ToList();
-        }
-
-        public bool CanEditAcrossMixedTypes(IReadOnlyList<ElementoViewModel> elementos, string propertyName)
-        {
-            if (elementos.Count == 0 || string.IsNullOrWhiteSpace(propertyName))
-                return false;
-
-            return elementos.All(e => GetInstanceProperties(e).Any(p => p.PropertyName == propertyName && p.IsEditable && p.AllowMixedTypeEdit));
-        }
-
-        private static Elemento CreateModel(ElementDefinition definition)
-        {
-            Elemento elemento = definition.CriarModelo();
-            definition.AtualizarTerminais(elemento);
-            return elemento;
-        }
-
-        private void RegistrarElementosPadrao()
-        {
-            Register(new ElementDefinition(KindCabo, "Cabo", "CABO", typeof(Cabo), typeof(CaboViewModel), typeof(TipoCabo), CriarCabo, (m, n, d, l) => new CaboViewModel((Cabo)m, Types, n, d), () => Types.TipoCaboPadrao, () => Types.TiposCabos, _ => Size.Empty, e => AtualizarTerminaisCabo((Cabo)e), "Cabo", "Inserir", "cabo.png", 10, true, "CB", true, new[]
-            {
-                Prop<CaboViewModel>("Nome", "Nome", 10, false),
-                Prop<CaboViewModel>("BarraOrigem", "Barra origem", 20, false),
-                Prop<CaboViewModel>("BarraDestino", "Barra destino", 30, false),
-                Prop<CaboViewModel>("Comprimento", "Comprimento (m)", 40),
-                Prop<CaboViewModel>("Ampacidade", "Ampacidade (A)", 50),
-                Prop<CaboViewModel>("TensaoLinha", "Tensão linha (kV)", 60, allowMixedTypeEdit: true),
-                Prop<CaboViewModel>("TensaoFaseA", "Tensão fase A (kV)", 70, allowMixedTypeEdit: true),
-                Prop<CaboViewModel>("TensaoFaseB", "Tensão fase B (kV)", 80, allowMixedTypeEdit: true),
-                Prop<CaboViewModel>("TensaoFaseC", "Tensão fase C (kV)", 90, allowMixedTypeEdit: true),
-                Prop<CaboViewModel>("CorrenteLinha", "Corrente linha (A)", 100, allowMixedTypeEdit: true),
-                Prop<CaboViewModel>("CorrenteFaseA", "Corrente fase A (A)", 110, allowMixedTypeEdit: true),
-                Prop<CaboViewModel>("CorrenteFaseB", "Corrente fase B (A)", 120, allowMixedTypeEdit: true),
-                Prop<CaboViewModel>("CorrenteFaseC", "Corrente fase C (A)", 130, allowMixedTypeEdit: true)
-            }));
-
-            Register(new ElementDefinition(KindCarga, "Carga", "CARGA", typeof(Carga), typeof(CargaViewModel), typeof(TipoCarga), CriarCarga, (m, n, d, l) => new CargaViewModel((Carga)m, Types, n, d, l), () => Types.TipoCargaPadrao, () => Types.TiposCargas, _ => EquipamentoSize(), e => ((Carga)e).AtualizarTerminais(ElementGeometryDefaults.EquipamentoLargura, ElementGeometryDefaults.EquipamentoAltura), "Carga", "Inserir", "carga.png", 20, true, "CG", false, new[]
-            {
-                Prop<CargaViewModel>("Nome", "Nome", 10, false),
-                Prop<CargaViewModel>("PotenciaAtiva", "Potência ativa (kW)", 20, allowMixedTypeEdit: true),
-                Prop<CargaViewModel>("PotenciaReativa", "Potência reativa (kVAr)", 30, allowMixedTypeEdit: true),
-                Prop<CargaViewModel>("Alimentador", "Alimentador", 40, allowMixedTypeEdit: true),
-                Prop<CargaViewModel>("CorrenteLinha", "Corrente linha (A)", 50, allowMixedTypeEdit: true),
-                Prop<CargaViewModel>("CorrenteFaseA", "Corrente fase A (A)", 60, allowMixedTypeEdit: true),
-                Prop<CargaViewModel>("CorrenteFaseB", "Corrente fase B (A)", 70, allowMixedTypeEdit: true),
-                Prop<CargaViewModel>("CorrenteFaseC", "Corrente fase C (A)", 80, allowMixedTypeEdit: true),
-                Prop<CargaViewModel>("TensaoLinha", "Tensão linha (kV)", 90, allowMixedTypeEdit: true),
-                Prop<CargaViewModel>("TensaoFaseA", "Tensão fase A (kV)", 100, allowMixedTypeEdit: true),
-                Prop<CargaViewModel>("TensaoFaseB", "Tensão fase B (kV)", 110, allowMixedTypeEdit: true),
-                Prop<CargaViewModel>("TensaoFaseC", "Tensão fase C (kV)", 120, allowMixedTypeEdit: true)
-            }));
-
-            Register(new ElementDefinition(KindGerador, "Gerador", "GERADOR", typeof(Gerador), typeof(GeradorViewModel), typeof(TipoGerador), CriarGerador, (m, n, d, l) => new GeradorViewModel((Gerador)m, Types, n, d, l), () => Types.TipoGeradorPadrao, () => Types.TiposGeradores, _ => EquipamentoSize(), e => ((Gerador)e).AtualizarTerminais(ElementGeometryDefaults.EquipamentoLargura, ElementGeometryDefaults.EquipamentoAltura), "Gerador", "Inserir", "gerador.png", 30, true, "GE", false, new[]
-            {
-                Prop<GeradorViewModel>("Nome", "Nome", 10, false),
-                Prop<GeradorViewModel>("PotenciaAparente", "Potência aparente (kVA)", 20),
-                Prop<GeradorViewModel>("PotenciaAtiva", "Potência ativa (kW)", 30, allowMixedTypeEdit: true),
-                Prop<GeradorViewModel>("PotenciaReativa", "Potência reativa (kVAr)", 40, allowMixedTypeEdit: true),
-                Prop<GeradorViewModel>("Alimentador", "Alimentador", 45, allowMixedTypeEdit: true),
-                Prop<GeradorViewModel>("TensaoLinha", "Tensão linha (kV)", 50, allowMixedTypeEdit: true),
-                Prop<GeradorViewModel>("TensaoFaseA", "Tensão fase A (kV)", 60, allowMixedTypeEdit: true),
-                Prop<GeradorViewModel>("TensaoFaseB", "Tensão fase B (kV)", 70, allowMixedTypeEdit: true),
-                Prop<GeradorViewModel>("TensaoFaseC", "Tensão fase C (kV)", 80, allowMixedTypeEdit: true),
-                Prop<GeradorViewModel>("CorrenteLinha", "Corrente linha (A)", 90, allowMixedTypeEdit: true),
-                Prop<GeradorViewModel>("CorrenteFaseA", "Corrente fase A (A)", 100, allowMixedTypeEdit: true),
-                Prop<GeradorViewModel>("CorrenteFaseB", "Corrente fase B (A)", 110, allowMixedTypeEdit: true),
-                Prop<GeradorViewModel>("CorrenteFaseC", "Corrente fase C (A)", 120, allowMixedTypeEdit: true)
-            }));
-
-            Register(new ElementDefinition(KindSin, "SIN", "SIN", typeof(Sin), typeof(SinViewModel), typeof(TipoSin), CriarSin, (m, n, d, l) => new SinViewModel((Sin)m, Types, n, d, l), () => Types.TipoSinPadrao, () => Types.TiposSin, _ => EquipamentoSize(), e => ((Sin)e).AtualizarTerminais(ElementGeometryDefaults.EquipamentoLargura, ElementGeometryDefaults.EquipamentoAltura), "SIN", "Inserir", "sin.png", 40, true, "SI", false, new[]
-            {
-                Prop<SinViewModel>("Nome", "Nome", 10, false),
-                Prop<SinViewModel>("TensaoLinha", "Tensão linha (kV)", 20, allowMixedTypeEdit: true)
-            }));
-
-            Register(new ElementDefinition(KindTransformador, "Transformador", "TR", typeof(Transformador), typeof(TransformadorViewModel), typeof(TipoTransformador), CriarTransformador, (m, n, d, l) => new TransformadorViewModel((Transformador)m, Types, n, d, l), () => Types.TipoTransformadorPadrao, () => Types.TiposTransformadores, _ => TransformadorSize(), e => ((Transformador)e).AtualizarTerminais(ElementGeometryDefaults.TransformadorLargura, ElementGeometryDefaults.TransformadorAltura), "Trafo", "Inserir", "transformador.png", 50, true, "TR", false, new[]
-            {
-                Prop<TransformadorViewModel>("Nome", "Nome", 10, false),
-                Prop<TransformadorViewModel>("Alimentador", "Alimentador", 30, allowMixedTypeEdit: true),
-                Prop<TransformadorViewModel>("Fases", "Fases", 40),
-                Prop<TransformadorViewModel>("Enrolamentos", "Enrolamentos", 50),
-                Prop<TransformadorViewModel>("TensaoPrimarioKV", "Tensão primário (kV)", 60),
-                Prop<TransformadorViewModel>("TensaoSecundarioKV", "Tensão secundário (kV)", 70),
-                Prop<TransformadorViewModel>("PotenciaAparente", "Potência aparente (kVA)", 80),
-                Prop<TransformadorViewModel>("RPercentual", "R (%)", 90),
-                Prop<TransformadorViewModel>("XPercentual", "X (%)", 100),
-                Prop<TransformadorViewModel>("LigacaoPrimario", "Ligação primário", 110),
-                Prop<TransformadorViewModel>("LigacaoSecundario", "Ligação secundário", 120)
-            }));
-
-            Register(new ElementDefinition(KindBarra, "Barra", "BARRA", typeof(Barra), typeof(BarraViewModel), typeof(TipoBarra), CriarBarra, (m, n, d, l) => new BarraViewModel((Barra)m, Types, n, d, l), () => Types.TipoBarraPadrao, () => Types.TiposBarras, e => new Size(ElementGeometryDefaults.BarraLargura, ((Barra)e).Altura), e => ((Barra)e).AtualizarTerminais(ElementGeometryDefaults.BarraLargura), "Barra", "Inserir", "barra.png", 60, true, "BA", false, new[]
-            {
-                Prop<BarraViewModel>("Nome", "Nome", 10, false),
-                Prop<BarraViewModel>("Tensao", "Tensão (kV)", 20),
-                Prop<BarraViewModel>("Altura", "Altura (m)", 30)
-            }));
-        }
-
-        private Barra CriarBarra()
-        {
-            return new Barra { Tipo = Types.TipoBarraPadrao ?? throw new InvalidOperationException("Nenhum tipo de barra cadastrado.") };
-        }
-
-        private Carga CriarCarga()
-        {
-            return new Carga { Tipo = Types.TipoCargaPadrao ?? throw new InvalidOperationException("Nenhum tipo de carga cadastrado.") };
-        }
-
-        private Gerador CriarGerador()
-        {
-            return new Gerador { Tipo = Types.TipoGeradorPadrao ?? throw new InvalidOperationException("Nenhum tipo de gerador cadastrado.") };
-        }
-
-        private Sin CriarSin()
-        {
-            return new Sin { Tipo = Types.TipoSinPadrao ?? throw new InvalidOperationException("Nenhum tipo de SIN cadastrado.") };
-        }
-
-        private Transformador CriarTransformador()
-        {
-            return new Transformador { Tipo = Types.TipoTransformadorPadrao ?? throw new InvalidOperationException("Nenhum tipo de transformador cadastrado.") };
-        }
-
-        private Cabo CriarCabo()
-        {
-            return new Cabo { Tipo = Types.TipoCaboPadrao ?? throw new InvalidOperationException("Nenhum tipo de cabo cadastrado.") };
-        }
-
-        private static Size EquipamentoSize()
-        {
-            return new Size(ElementGeometryDefaults.EquipamentoLargura, ElementGeometryDefaults.EquipamentoAltura);
-        }
-
-        private static Size TransformadorSize()
-        {
-            return new Size(ElementGeometryDefaults.TransformadorLargura, ElementGeometryDefaults.TransformadorAltura);
-        }
-
-        private static Size GetFallbackSize(Elemento elemento)
-        {
-            return elemento switch
-            {
-                Barra barra => new Size(ElementGeometryDefaults.BarraLargura, barra.Altura),
-                ElementoEquipamento => EquipamentoSize(),
-                ElementoLinear => Size.Empty,
-                _ => EquipamentoSize()
-            };
-        }
-
-        private static void AtualizarTerminaisCabo(Cabo cabo)
-        {
-            if (cabo.Vertices.Count > 0)
-                cabo.DefinirOrigem(cabo.Vertices[0]);
-
-            if (cabo.Vertices.Count > 1)
-                cabo.DefinirDestino(cabo.Vertices[^1]);
-        }
-
-        private static InstancePropertyDescriptor Prop<T>(string propertyName, string displayName, int order, bool isEditable = true, bool allowMixedTypeEdit = false) where T : ElementoViewModel
-        {
-            return new InstancePropertyDescriptor(typeof(T), propertyName, displayName, order, isEditable, allowMixedTypeEdit);
-        }
-    }
-}
-
-
-====================================================================================================
-ARQUIVO: C:\Araci-Engine-Front\Araci Engine\ViewModels\InstancePropertyCatalog.cs
-====================================================================================================
-
-﻿using System;
-using System.Collections.Generic;
 using Araci.Services;
 
 namespace Araci.ViewModels
 {
-    public static class InstancePropertyCatalog
+    public class BarraViewModel : ElementoViewModel
     {
-        private static ElementRegistryService? _registry;
+        private readonly TerminalLayoutService _terminalLayout;
 
-        public static void Configure(ElementRegistryService registry)
+        public BarraViewModel(
+            Barra modelo,
+            TypeLibraryService types,
+            NameService names,
+            TypePropertiesDialogService typePropertiesDialogs,
+            TerminalLayoutService terminalLayout)
+            : base(modelo, new BarraNode(modelo), types, names, typePropertiesDialogs)
         {
-            _registry = registry ?? throw new ArgumentNullException(nameof(registry));
+            _terminalLayout = terminalLayout;
+            SelecionarPrimeiroTipoDisponivel();
+            AtualizarTerminais();
         }
 
-        public static IReadOnlyList<InstancePropertyDescriptor> GetFor(ElementoViewModel elemento)
+        public Barra Barra => (Barra)Modelo;
+
+        public ElementGeometryUpdateService? GeometryUpdates { get; set; }
+
+        public override IEnumerable TiposDisponiveis => Types.TiposBarras;
+
+        public string Nome
         {
-            return _registry?.GetInstanceProperties(elemento) ?? Array.Empty<InstancePropertyDescriptor>();
-        }
-
-        public static IReadOnlyList<InstancePropertyDescriptor> GetFor(Type type)
-        {
-            return _registry?.GetInstanceProperties(type) ?? Array.Empty<InstancePropertyDescriptor>();
-        }
-
-        public static IReadOnlyList<InstancePropertyDescriptor> GetCommonFor(IReadOnlyList<ElementoViewModel> elementos)
-        {
-            return _registry?.GetCommonInstanceProperties(elementos) ?? Array.Empty<InstancePropertyDescriptor>();
-        }
-
-        public static bool CanEditAcrossMixedTypes(IReadOnlyList<ElementoViewModel> elementos, string propertyName)
-        {
-            return _registry?.CanEditAcrossMixedTypes(elementos, propertyName) ?? false;
-        }
-    }
-}
-
-
-====================================================================================================
-ARQUIVO: C:\Araci-Engine-Front\Araci Engine\ViewModels\InstancePropertyDescriptor.cs
-====================================================================================================
-
-﻿using System;
-
-namespace Araci.ViewModels
-{
-    public sealed class InstancePropertyDescriptor
-    {
-        public InstancePropertyDescriptor(Type ownerType, string propertyName, string displayName, int order, bool isEditable = true, bool allowMixedTypeEdit = false)
-        {
-            OwnerType = ownerType ?? throw new ArgumentNullException(nameof(ownerType));
-            PropertyName = propertyName ?? throw new ArgumentNullException(nameof(propertyName));
-            DisplayName = displayName ?? throw new ArgumentNullException(nameof(displayName));
-            Order = order;
-            IsEditable = isEditable;
-            AllowMixedTypeEdit = allowMixedTypeEdit;
-        }
-
-        public Type OwnerType { get; }
-        public string PropertyName { get; }
-        public string DisplayName { get; }
-        public int Order { get; }
-        public bool IsEditable { get; }
-        public bool AllowMixedTypeEdit { get; }
-    }
-}
-
-
-====================================================================================================
-ARQUIVO: C:\Araci-Engine-Front\Araci Engine\ViewModels\ParameterViewModel.cs
-====================================================================================================
-
-﻿using Araci.Models;
-using Araci.ViewModels.Base;
-
-namespace Araci.ViewModels
-{
-    public class ParameterViewModel : ViewModelBase
-    {
-        private readonly Parameter _parameter;
-
-        public ParameterViewModel(Parameter parameter)
-        {
-            _parameter = parameter;
-        }
-
-        public string Nome => _parameter.Nome;
-
-        public object? Valor
-        {
-            get => _parameter.ValorObjeto;
-
+            get => Barra.Nome;
             set
             {
-                if (Equals(_parameter.ValorObjeto, value))
+                if (Barra.Nome == value)
                     return;
 
-                _parameter.ValorObjeto = value;
-
+                RenomearModelo(value);
                 OnPropertyChanged();
+                NotificarParametros();
             }
         }
 
-        public System.Type Tipo => _parameter.Tipo;
-
-        public void Atualizar()
+        public string Tensao
         {
-            OnPropertyChanged(nameof(Valor));
-        }
-    }
-}
-
-
-====================================================================================================
-ARQUIVO: C:\Araci-Engine-Front\Araci Engine\ViewModels\PropertiesViewModel.cs
-====================================================================================================
-
-﻿using System;
-using System.Collections;
-using System.Collections.Generic;
-using System.Collections.ObjectModel;
-using System.ComponentModel;
-using System.Globalization;
-using System.Linq;
-using System.Reflection;
-using System.Runtime.CompilerServices;
-using System.Windows.Input;
-using Araci.Models.Tipos;
-using AraciCommandManager = Araci.Core.Commands.CommandManager;
-using BulkPropertyChangeCommand = Araci.Core.Commands.BulkPropertyChangeCommand;
-
-namespace Araci.ViewModels
-{
-    public class PropertiesViewModel : INotifyPropertyChanged
-    {
-        private readonly IReadOnlyList<ElementoViewModel> _selecionados;
-        private readonly AraciCommandManager? _commands;
-        private object? _elementoSelecionado;
-        private ICommand? _abrirPropriedadesTipoCommand;
-
-        public PropertiesViewModel()
-        {
-            _selecionados = Array.Empty<ElementoViewModel>();
-        }
-
-        public PropertiesViewModel(IEnumerable<ElementoViewModel> selecionados, AraciCommandManager? commands = null)
-        {
-            _selecionados = selecionados?.Where(e => e != null).ToList() ?? new List<ElementoViewModel>();
-            _commands = commands;
-            QuantidadeSelecionada = _selecionados.Count;
-            Titulo = CriarTitulo(_selecionados);
-            Propriedades = new ObservableCollection<PropertyDescriptorViewModel>(CriarDescritores(_selecionados, _commands));
-        }
-
-        public object? ElementoSelecionado
-        {
-            get => _elementoSelecionado;
+            get => Barra.Tensao;
             set
             {
-                if (_elementoSelecionado == value)
+                if (Barra.Tensao == value)
                     return;
 
-                _elementoSelecionado = value;
+                Barra.Tensao = value;
                 OnPropertyChanged();
+                NotificarParametros();
             }
         }
 
-        public int QuantidadeSelecionada { get; }
-        public string Titulo { get; } = "Propriedades";
-        public ObservableCollection<PropertyDescriptorViewModel> Propriedades { get; } = new();
-        public bool MesmoTipo => _selecionados.Count > 0 && _selecionados.All(e => e.GetType() == _selecionados[0].GetType());
-        public bool ExibirSeletorTipo => MesmoTipo;
-        public IEnumerable TiposDisponiveis => MesmoTipo ? _selecionados[0].TiposDisponiveis : Array.Empty<object>();
-        public bool PodeAbrirPropriedadesTipo => MesmoTipo && Tipo != null;
-
-        public TipoElemento? Tipo
+        public override double Altura
         {
-            get
-            {
-                if (!MesmoTipo || _selecionados.Count == 0)
-                    return null;
-
-                var primeiro = _selecionados[0].Tipo;
-                return _selecionados.All(e => ReferenceEquals(e.Tipo, primeiro)) ? primeiro : null;
-            }
+            get => Barra.Altura;
             set
             {
-                if (!MesmoTipo || value == null)
+                double altura = Barra.NormalizarAltura(value);
+
+                if (Barra.Altura == altura)
                     return;
 
-                var items = _selecionados
-                    .Where(e => !ReferenceEquals(e.Tipo, value))
-                    .Select(e => new BulkPropertyChangeCommand.Item(e, nameof(ElementoViewModel.Tipo), e.Tipo, value))
-                    .ToList();
-
-                if (items.Count == 0)
-                    return;
-
-                var command = new BulkPropertyChangeCommand(items);
-
-                if (_commands == null)
-                    command.Execute();
+                if (GeometryUpdates == null)
+                {
+                    Barra.Altura = altura;
+                    AtualizarNode();
+                }
                 else
-                    _commands.Execute(command);
+                {
+                    GeometryUpdates.AplicarAlturaBarra(Barra, altura);
+                }
 
                 OnPropertyChanged();
-                OnPropertyChanged(nameof(PodeAbrirPropriedadesTipo));
+                NotificarParametros();
             }
         }
 
-        public ICommand AbrirPropriedadesTipoCommand =>
-            _abrirPropriedadesTipoCommand ??= new SimpleCommand(AbrirPropriedadesTipo, () => PodeAbrirPropriedadesTipo);
-
-        private void AbrirPropriedadesTipo()
+        protected override void AtualizarNode()
         {
-            if (!PodeAbrirPropriedadesTipo)
-                return;
-
-            _selecionados[0].AbrirPropriedadesTipoCommand.Execute(null);
+            base.AtualizarNode();
+            AtualizarTerminais();
         }
 
-        private static string CriarTitulo(IReadOnlyList<ElementoViewModel> itens)
+        public override void Mover(Vector delta)
         {
-            if (itens.Count == 0)
-                return "Nenhum elemento selecionado";
-
-            string tipo = ObterNomeTipoAmigavel(itens[0]);
-
-            if (itens.All(i => i.GetType() == itens[0].GetType()))
-                return $"{itens.Count} {tipo}{(itens.Count > 1 ? "s" : "")} selecionados";
-
-            return $"{itens.Count} elementos selecionados";
+            base.Mover(delta);
+            AtualizarTerminais();
         }
 
-        private static IEnumerable<PropertyDescriptorViewModel> CriarDescritores(IReadOnlyList<ElementoViewModel> itens, AraciCommandManager? commands)
+        private void AtualizarTerminais()
         {
-            if (itens.Count == 0)
-                yield break;
-
-            bool mesmoTipo = itens.All(i => i.GetType() == itens[0].GetType());
-
-            foreach (var descriptor in InstancePropertyCatalog.GetCommonFor(itens))
-            {
-                var props = itens.Select(i => ObterPropriedade(i, descriptor.PropertyName)).ToList();
-
-                if (props.Any(p => p == null))
-                    continue;
-
-                Type tipoValor = props[0]!.PropertyType;
-                bool editavelMesmoTipo = mesmoTipo && descriptor.IsEditable;
-                bool editavelTiposDiferentes = !mesmoTipo && InstancePropertyCatalog.CanEditAcrossMixedTypes(itens, descriptor.PropertyName);
-                bool editavel = (editavelMesmoTipo || editavelTiposDiferentes) && props.All(p => p != null && p.CanWrite && EhTipoEditavel(p.PropertyType)) && TiposCompativeis(props);
-                var valores = itens.Select(i => ObterValor(i, descriptor.PropertyName)).ToList();
-                object? primeiro = valores[0];
-                bool varia = valores.Skip(1).Any(v => !ValoresIguais(primeiro, v));
-
-                yield return new PropertyDescriptorViewModel(itens, descriptor, tipoValor, varia, editavel, commands);
-            }
-        }
-
-        private static bool TiposCompativeis(IReadOnlyList<PropertyInfo?> props)
-        {
-            if (props.Count == 0 || props[0] == null)
-                return false;
-
-            Type primeiro = Nullable.GetUnderlyingType(props[0]!.PropertyType) ?? props[0]!.PropertyType;
-
-            foreach (var prop in props.Skip(1))
-            {
-                if (prop == null)
-                    return false;
-
-                Type atual = Nullable.GetUnderlyingType(prop.PropertyType) ?? prop.PropertyType;
-
-                if (atual != primeiro)
-                    return false;
-            }
-
-            return true;
-        }
-
-        private static PropertyInfo? ObterPropriedade(ElementoViewModel item, string nomePropriedade)
-        {
-            var prop = item.GetType().GetProperty(nomePropriedade, BindingFlags.Instance | BindingFlags.Public);
-            return prop == null || prop.GetIndexParameters().Length > 0 ? null : prop;
-        }
-
-        internal static object? ObterValor(ElementoViewModel item, string nomePropriedade)
-        {
-            return ObterPropriedade(item, nomePropriedade)?.GetValue(item);
-        }
-
-        internal static bool ValoresIguais(object? a, object? b)
-        {
-            if (a == null && b == null)
-                return true;
-
-            if (a == null || b == null)
-                return false;
-
-            if (a is double da && b is double db)
-                return Math.Abs(da - db) < 0.000001;
-
-            if (a is float fa && b is float fb)
-                return Math.Abs(fa - fb) < 0.000001f;
-
-            return Equals(a, b);
-        }
-
-        internal static string FormatarValor(object? valor)
-        {
-            if (valor == null)
-                return string.Empty;
-
-            return valor switch
-            {
-                double d => d.ToString("N2", CultureInfo.CurrentCulture),
-                float f => f.ToString("N2", CultureInfo.CurrentCulture),
-                decimal m => m.ToString("N2", CultureInfo.CurrentCulture),
-                _ => valor.ToString() ?? string.Empty
-            };
-        }
-
-        internal static bool TentarConverterValor(string valor, Type tipoDestino, out object? convertido)
-        {
-            convertido = null;
-            Type tipo = Nullable.GetUnderlyingType(tipoDestino) ?? tipoDestino;
-
-            try
-            {
-                if (tipo == typeof(string))
-                {
-                    convertido = valor;
-                    return true;
-                }
-
-                if (tipo == typeof(int))
-                {
-                    if (!int.TryParse(valor, NumberStyles.Integer, CultureInfo.CurrentCulture, out int i))
-                        return false;
-
-                    convertido = i;
-                    return true;
-                }
-
-                if (tipo == typeof(double))
-                {
-                    if (!double.TryParse(valor, NumberStyles.Float | NumberStyles.AllowThousands, CultureInfo.CurrentCulture, out double d))
-                        return false;
-
-                    convertido = d;
-                    return true;
-                }
-
-                if (tipo == typeof(float))
-                {
-                    if (!float.TryParse(valor, NumberStyles.Float | NumberStyles.AllowThousands, CultureInfo.CurrentCulture, out float f))
-                        return false;
-
-                    convertido = f;
-                    return true;
-                }
-
-                if (tipo == typeof(decimal))
-                {
-                    if (!decimal.TryParse(valor, NumberStyles.Float | NumberStyles.AllowThousands, CultureInfo.CurrentCulture, out decimal m))
-                        return false;
-
-                    convertido = m;
-                    return true;
-                }
-
-                if (tipo == typeof(bool))
-                {
-                    if (!bool.TryParse(valor, out bool b))
-                        return false;
-
-                    convertido = b;
-                    return true;
-                }
-
-                if (tipo.IsEnum)
-                {
-                    convertido = Enum.Parse(tipo, valor, true);
-                    return true;
-                }
-
-                convertido = Convert.ChangeType(valor, tipo, CultureInfo.CurrentCulture);
-                return true;
-            }
-            catch
-            {
-                convertido = null;
-                return false;
-            }
-        }
-
-        private static bool EhTipoEditavel(Type tipo)
-        {
-            Type t = Nullable.GetUnderlyingType(tipo) ?? tipo;
-            return t == typeof(string) || t == typeof(int) || t == typeof(double) || t == typeof(float) || t == typeof(decimal) || t == typeof(bool) || t.IsEnum;
-        }
-
-        private static string ObterNomeTipoAmigavel(ElementoViewModel vm)
-        {
-            return vm.GetType().Name.Replace("ViewModel", string.Empty);
-        }
-
-        public event PropertyChangedEventHandler? PropertyChanged;
-
-        protected virtual void OnPropertyChanged([CallerMemberName] string? nome = null)
-        {
-            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nome));
-        }
-
-        private sealed class SimpleCommand : ICommand
-        {
-            private readonly Action _execute;
-            private readonly Func<bool>? _canExecute;
-
-            public SimpleCommand(Action execute, Func<bool>? canExecute = null)
-            {
-                _execute = execute ?? throw new ArgumentNullException(nameof(execute));
-                _canExecute = canExecute;
-            }
-
-            public bool CanExecute(object? parameter)
-            {
-                return _canExecute?.Invoke() ?? true;
-            }
-
-            public void Execute(object? parameter)
-            {
-                if (CanExecute(parameter))
-                    _execute();
-            }
-
-            public event EventHandler? CanExecuteChanged;
-
-            public void RaiseCanExecuteChanged()
-            {
-                CanExecuteChanged?.Invoke(this, EventArgs.Empty);
-            }
+            _terminalLayout.AtualizarTerminais(Barra);
         }
     }
+}
 
-    public class PropertyDescriptorViewModel : INotifyPropertyChanged
+
+
+====================================================================================================
+ARQUIVO: C:\Araci-Engine-Front\Araci Engine\ViewModels\CaboViewModel.cs
+====================================================================================================
+
+using System.Collections;
+using System.Windows;
+using Araci.Core.SceneNodes;
+using Araci.Models;
+using Araci.Services;
+
+namespace Araci.ViewModels
+{
+    public class CaboViewModel : ElementoViewModel
     {
-        private readonly IReadOnlyList<ElementoViewModel> _elementos;
-        private readonly InstancePropertyDescriptor _descriptor;
-        private readonly Type _tipoValor;
-        private readonly AraciCommandManager? _commands;
-        private string _valor;
-        private bool _varia;
-        private bool _temErro;
-        private string _mensagemErro = string.Empty;
+        private bool _possuiPreview;
 
-        public PropertyDescriptorViewModel(IReadOnlyList<ElementoViewModel> elementos, InstancePropertyDescriptor descriptor, Type tipoValor, bool varia, bool isEditable, AraciCommandManager? commands = null)
+        public CaboViewModel(
+            Cabo modelo,
+            TypeLibraryService types,
+            NameService names,
+            TypePropertiesDialogService typePropertiesDialogs)
+            : base(modelo, new CaboNode(modelo), types, names, typePropertiesDialogs)
         {
-            _elementos = elementos;
-            _descriptor = descriptor;
-            _tipoValor = tipoValor;
-            _commands = commands;
-            Nome = descriptor.DisplayName;
-            DisplayName = descriptor.DisplayName;
-            PropertyName = descriptor.PropertyName;
-            IsEditable = isEditable;
-            IsReadOnly = !isEditable;
-            _varia = varia;
-            _valor = varia ? "<varia>" : PropertiesViewModel.FormatarValor(ObterValorAtual());
+            SelecionarPrimeiroTipoDisponivel();
         }
 
-        public string Nome { get; }
-        public string DisplayName { get; }
-        public string PropertyName { get; }
-        public Type ValueType => _tipoValor;
-        public bool IsEditable { get; }
-        public bool IsReadOnly { get; }
-        public bool IsMixed => _varia;
-        public bool Varia => _varia;
+        public Cabo Cabo => (Cabo)Modelo;
 
-        public string Valor
-        {
-            get => _valor;
-            set => AplicarValor(value);
-        }
+        public override IEnumerable TiposDisponiveis => Types.TiposCabos;
 
-        public string Value
+        public string OrigemId
         {
-            get => _valor;
-            set => AplicarValor(value);
-        }
-
-        public bool TemErro
-        {
-            get => _temErro;
-            private set
+            get => Cabo.OrigemId;
+            set
             {
-                if (_temErro == value)
+                if (Cabo.OrigemId == value)
                     return;
 
-                _temErro = value;
+                Cabo.OrigemId = value;
                 OnPropertyChanged();
+                NotificarParametros();
             }
         }
 
-        public string MensagemErro
+        public string DestinoId
         {
-            get => _mensagemErro;
-            private set
+            get => Cabo.DestinoId;
+            set
             {
-                if (_mensagemErro == value)
+                if (Cabo.DestinoId == value)
                     return;
 
-                _mensagemErro = value;
+                Cabo.DestinoId = value;
                 OnPropertyChanged();
+                NotificarParametros();
             }
         }
 
-        private void AplicarValor(string novoValor)
+        public string OrigemTerminalId
         {
-            if (!IsEditable)
-                return;
-
-            if (string.Equals(novoValor, _valor, StringComparison.Ordinal))
-                return;
-
-            if (string.Equals(novoValor, "<varia>", StringComparison.OrdinalIgnoreCase))
-                return;
-
-            if (!PropertiesViewModel.TentarConverterValor(novoValor, _tipoValor, out object? convertido))
+            get => Cabo.OrigemTerminalId;
+            set
             {
-                TemErro = true;
-                MensagemErro = "Valor inválido";
-                _valor = novoValor;
-                OnPropertyChanged(nameof(Valor));
-                OnPropertyChanged(nameof(Value));
-                return;
+                if (Cabo.OrigemTerminalId == value)
+                    return;
+
+                Cabo.OrigemTerminalId = value;
+                OnPropertyChanged();
+                NotificarParametros();
             }
+        }
 
-            var items = _elementos
-                .Select(e => new
-                {
-                    Elemento = e,
-                    Antes = PropertiesViewModel.ObterValor(e, _descriptor.PropertyName)
-                })
-                .Where(x => !PropertiesViewModel.ValoresIguais(x.Antes, convertido))
-                .Select(x => new BulkPropertyChangeCommand.Item(x.Elemento, _descriptor.PropertyName, x.Antes, convertido))
-                .ToList();
-
-            if (items.Count == 0)
+        public string DestinoTerminalId
+        {
+            get => Cabo.DestinoTerminalId;
+            set
             {
-                _valor = PropertiesViewModel.FormatarValor(convertido);
-                _varia = false;
-                AtualizarEstadoValido();
+                if (Cabo.DestinoTerminalId == value)
+                    return;
+
+                Cabo.DestinoTerminalId = value;
+                OnPropertyChanged();
+                NotificarParametros();
+            }
+        }
+
+        public string Nome
+        {
+            get => Cabo.Nome;
+            set
+            {
+                if (Cabo.Nome == value)
+                    return;
+
+                RenomearModelo(value);
+                OnPropertyChanged();
+                NotificarParametros();
+            }
+        }
+
+        public string BarraOrigem
+        {
+            get => Cabo.BarraOrigem;
+            set
+            {
+                if (Cabo.BarraOrigem == value)
+                    return;
+
+                Cabo.BarraOrigem = value;
+                OnPropertyChanged();
+                NotificarParametros();
+            }
+        }
+
+        public string BarraDestino
+        {
+            get => Cabo.BarraDestino;
+            set
+            {
+                if (Cabo.BarraDestino == value)
+                    return;
+
+                Cabo.BarraDestino = value;
+                OnPropertyChanged();
+                NotificarParametros();
+            }
+        }
+
+        public double Comprimento
+        {
+            get => Cabo.Comprimento;
+            set
+            {
+                if (Cabo.Comprimento == value)
+                    return;
+
+                Cabo.Comprimento = value;
+                OnPropertyChanged();
+                NotificarParametros();
+            }
+        }
+
+        public double Ampacidade
+        {
+            get => Cabo.Ampacidade;
+            set
+            {
+                if (Cabo.Ampacidade == value)
+                    return;
+
+                Cabo.Ampacidade = value;
+                OnPropertyChanged();
+                NotificarParametros();
+            }
+        }
+
+        public string TensaoLinha
+        {
+            get => Cabo.TensaoLinha;
+            set
+            {
+                if (Cabo.TensaoLinha == value)
+                    return;
+
+                Cabo.TensaoLinha = value;
+                OnPropertyChanged();
+                NotificarParametros();
+            }
+        }
+
+        public string TensaoFaseA
+        {
+            get => Cabo.TensaoFaseA;
+            set
+            {
+                if (Cabo.TensaoFaseA == value)
+                    return;
+
+                Cabo.TensaoFaseA = value;
+                OnPropertyChanged();
+                NotificarParametros();
+            }
+        }
+
+        public string TensaoFaseB
+        {
+            get => Cabo.TensaoFaseB;
+            set
+            {
+                if (Cabo.TensaoFaseB == value)
+                    return;
+
+                Cabo.TensaoFaseB = value;
+                OnPropertyChanged();
+                NotificarParametros();
+            }
+        }
+
+        public string TensaoFaseC
+        {
+            get => Cabo.TensaoFaseC;
+            set
+            {
+                if (Cabo.TensaoFaseC == value)
+                    return;
+
+                Cabo.TensaoFaseC = value;
+                OnPropertyChanged();
+                NotificarParametros();
+            }
+        }
+
+        public string CorrenteLinha
+        {
+            get => Cabo.CorrenteLinha;
+            set
+            {
+                if (Cabo.CorrenteLinha == value)
+                    return;
+
+                Cabo.CorrenteLinha = value;
+                OnPropertyChanged();
+                NotificarParametros();
+            }
+        }
+
+        public string CorrenteFaseA
+        {
+            get => Cabo.CorrenteFaseA;
+            set
+            {
+                if (Cabo.CorrenteFaseA == value)
+                    return;
+
+                Cabo.CorrenteFaseA = value;
+                OnPropertyChanged();
+                NotificarParametros();
+            }
+        }
+
+        public string CorrenteFaseB
+        {
+            get => Cabo.CorrenteFaseB;
+            set
+            {
+                if (Cabo.CorrenteFaseB == value)
+                    return;
+
+                Cabo.CorrenteFaseB = value;
+                OnPropertyChanged();
+                NotificarParametros();
+            }
+        }
+
+        public string CorrenteFaseC
+        {
+            get => Cabo.CorrenteFaseC;
+            set
+            {
+                if (Cabo.CorrenteFaseC == value)
+                    return;
+
+                Cabo.CorrenteFaseC = value;
+                OnPropertyChanged();
+                NotificarParametros();
+            }
+        }
+
+        public override double WorldX => Bounds.X;
+
+        public override double WorldY => Bounds.Y;
+
+        public void Iniciar(Point p)
+        {
+            Cabo.Vertices.Clear();
+            Cabo.Vertices.Add(p);
+            Cabo.DefinirOrigem(p);
+            Cabo.PreviewPonto = p;
+            _possuiPreview = true;
+            Atualizar();
+        }
+
+        public void AtualizarPreview(Point p)
+        {
+            if (!_possuiPreview && Cabo.Vertices.Count == 0)
                 return;
+
+            _possuiPreview = true;
+
+            if (Cabo.PreviewPonto.HasValue && Cabo.PreviewPonto.Value == p)
+                return;
+
+            Cabo.PreviewPonto = p;
+            Atualizar();
+        }
+
+        public void FinalizarNoPonto(Point p)
+        {
+            if (Cabo.Vertices.Count == 0)
+                return;
+
+            Cabo.PreviewPonto = null;
+            _possuiPreview = false;
+
+            var ultimo = Cabo.Vertices[^1];
+
+            if (ultimo != p)
+                Cabo.Vertices.Add(p);
+
+            Cabo.DefinirDestino(p);
+            Atualizar();
+        }
+
+        public void AdicionarVerticeIntermediario(Point p)
+        {
+            if (Cabo.Vertices.Count == 0)
+                return;
+
+            var ultimo = Cabo.Vertices[^1];
+
+            if (DistanciaQuadrada(ultimo, p) < 0.0001)
+                return;
+
+            Cabo.Vertices.Add(p);
+            Cabo.PreviewPonto = p;
+            _possuiPreview = true;
+            Atualizar();
+        }
+
+        public void RemoverPreview()
+        {
+            if (!_possuiPreview && Cabo.PreviewPonto == null)
+                return;
+
+            _possuiPreview = false;
+            Cabo.PreviewPonto = null;
+            Atualizar();
+        }
+
+        public override void Mover(Vector delta)
+        {
+            CaboNode.Mover(delta);
+
+            foreach (var t in Cabo.Terminais)
+            {
+                t.DefinirPosicaoVisual(new Point(
+                    t.Posicao.X + delta.X,
+                    t.Posicao.Y + delta.Y));
             }
 
-            var command = new BulkPropertyChangeCommand(items);
-
-            if (_commands == null)
-                command.Execute();
-            else
-                _commands.Execute(command);
-
-            _varia = false;
-            _valor = PropertiesViewModel.FormatarValor(convertido);
-            AtualizarEstadoValido();
+            Atualizar();
         }
 
-        private void AtualizarEstadoValido()
+        public override ElementoEstado CapturarEstado()
         {
-            TemErro = false;
-            MensagemErro = string.Empty;
-            OnPropertyChanged(nameof(Valor));
-            OnPropertyChanged(nameof(Value));
-            OnPropertyChanged(nameof(IsMixed));
-            OnPropertyChanged(nameof(Varia));
+            return new ElementoEstado(WorldX, WorldY, rotacao: Cabo.Rotacao, vertices: Cabo.Vertices);
         }
 
-        private object? ObterValorAtual()
+        public override void AplicarEstado(ElementoEstado estado)
         {
-            if (_elementos.Count == 0)
-                return null;
+            Cabo.Vertices.Clear();
 
-            return PropertiesViewModel.ObterValor(_elementos[0], _descriptor.PropertyName);
+            foreach (var p in estado.Vertices)
+                Cabo.Vertices.Add(p);
+
+            if (Cabo.Vertices.Count > 0)
+            {
+                Cabo.DefinirOrigem(Cabo.Vertices[0]);
+                Cabo.DefinirDestino(Cabo.Vertices[^1]);
+            }
+
+            Atualizar();
         }
 
-        public event PropertyChangedEventHandler? PropertyChanged;
-
-        protected virtual void OnPropertyChanged([CallerMemberName] string? nome = null)
+        public override void AtualizarAposModeloAlterado()
         {
-            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nome));
+            Atualizar();
+        }
+
+        private CaboNode CaboNode => (CaboNode)Node;
+
+        private void Atualizar()
+        {
+            CaboNode.AtualizarGeometria();
+
+            OnPropertyChanged(nameof(WorldX));
+            OnPropertyChanged(nameof(WorldY));
+            OnPropertyChanged(nameof(Bounds));
+
+            NotificarGeometria();
+        }
+
+        private static double DistanciaQuadrada(Point a, Point b)
+        {
+            double dx = a.X - b.X;
+            double dy = a.Y - b.Y;
+
+            return dx * dx + dy * dy;
         }
     }
+}
 
-    public class PropertyRowViewModel : PropertyDescriptorViewModel
+
+
+====================================================================================================
+ARQUIVO: C:\Araci-Engine-Front\Araci Engine\ViewModels\CargaViewModel.cs
+====================================================================================================
+
+using System.Collections;
+using System.Windows;
+using Araci.Core.SceneNodes;
+using Araci.Models;
+using Araci.Services;
+
+namespace Araci.ViewModels
+{
+    public class CargaViewModel : ElementoViewModel
     {
-        public PropertyRowViewModel(string nome, string valor, bool varia)
-            : base(Array.Empty<ElementoViewModel>(), new InstancePropertyDescriptor(typeof(ElementoViewModel), string.Empty, nome, 0, false), typeof(string), varia, false)
+        private readonly TerminalLayoutService _terminalLayout;
+
+        public CargaViewModel(
+            Carga modelo,
+            TypeLibraryService types,
+            NameService names,
+            TypePropertiesDialogService typePropertiesDialogs,
+            TerminalLayoutService terminalLayout)
+            : base(modelo, new EquipamentoNode(modelo), types, names, typePropertiesDialogs)
         {
+            _terminalLayout = terminalLayout;
+            SelecionarPrimeiroTipoDisponivel();
+            AtualizarTerminais();
+        }
+
+        public Carga Carga => (Carga)Modelo;
+
+        public override IEnumerable TiposDisponiveis => Types.TiposCargas;
+
+        public string Barra
+        {
+            get => Carga.Barra;
+            set
+            {
+                if (Carga.Barra == value)
+                    return;
+
+                Carga.Barra = value;
+                OnPropertyChanged();
+                NotificarParametros();
+            }
+        }
+
+        public string BarraId
+        {
+            get => Carga.BarraId;
+            set
+            {
+                if (Carga.BarraId == value)
+                    return;
+
+                Carga.BarraId = value;
+                OnPropertyChanged();
+                NotificarParametros();
+            }
+        }
+
+        public string Nome
+        {
+            get => Carga.Nome;
+            set
+            {
+                if (Carga.Nome == value)
+                    return;
+
+                RenomearModelo(value);
+                OnPropertyChanged();
+                NotificarParametros();
+            }
+        }
+
+        public double PotenciaAtiva
+        {
+            get => Carga.PotenciaAtiva;
+            set
+            {
+                if (Carga.PotenciaAtiva == value)
+                    return;
+
+                Carga.PotenciaAtiva = value;
+                OnPropertyChanged();
+                NotificarParametros();
+            }
+        }
+
+        public double PotenciaReativa
+        {
+            get => Carga.PotenciaReativa;
+            set
+            {
+                if (Carga.PotenciaReativa == value)
+                    return;
+
+                Carga.PotenciaReativa = value;
+                OnPropertyChanged();
+                NotificarParametros();
+            }
+        }
+
+        public int Alimentador
+        {
+            get => Carga.Alimentador;
+            set
+            {
+                if (Carga.Alimentador == value)
+                    return;
+
+                Carga.Alimentador = value;
+                OnPropertyChanged();
+                NotificarParametros();
+            }
+        }
+
+        public string CorrenteLinha
+        {
+            get => Carga.CorrenteLinha;
+            set
+            {
+                if (Carga.CorrenteLinha == value)
+                    return;
+
+                Carga.CorrenteLinha = value;
+                OnPropertyChanged();
+                NotificarParametros();
+            }
+        }
+
+        public string CorrenteFaseA
+        {
+            get => Carga.CorrenteFaseA;
+            set
+            {
+                if (Carga.CorrenteFaseA == value)
+                    return;
+
+                Carga.CorrenteFaseA = value;
+                OnPropertyChanged();
+                NotificarParametros();
+            }
+        }
+
+        public string CorrenteFaseB
+        {
+            get => Carga.CorrenteFaseB;
+            set
+            {
+                if (Carga.CorrenteFaseB == value)
+                    return;
+
+                Carga.CorrenteFaseB = value;
+                OnPropertyChanged();
+                NotificarParametros();
+            }
+        }
+
+        public string CorrenteFaseC
+        {
+            get => Carga.CorrenteFaseC;
+            set
+            {
+                if (Carga.CorrenteFaseC == value)
+                    return;
+
+                Carga.CorrenteFaseC = value;
+                OnPropertyChanged();
+                NotificarParametros();
+            }
+        }
+
+        public string TensaoLinha
+        {
+            get => Carga.TensaoLinha;
+            set
+            {
+                if (Carga.TensaoLinha == value)
+                    return;
+
+                Carga.TensaoLinha = value;
+                OnPropertyChanged();
+                NotificarParametros();
+            }
+        }
+
+        public string TensaoFaseA
+        {
+            get => Carga.TensaoFaseA;
+            set
+            {
+                if (Carga.TensaoFaseA == value)
+                    return;
+
+                Carga.TensaoFaseA = value;
+                OnPropertyChanged();
+                NotificarParametros();
+            }
+        }
+
+        public string TensaoFaseB
+        {
+            get => Carga.TensaoFaseB;
+            set
+            {
+                if (Carga.TensaoFaseB == value)
+                    return;
+
+                Carga.TensaoFaseB = value;
+                OnPropertyChanged();
+                NotificarParametros();
+            }
+        }
+
+        public string TensaoFaseC
+        {
+            get => Carga.TensaoFaseC;
+            set
+            {
+                if (Carga.TensaoFaseC == value)
+                    return;
+
+                Carga.TensaoFaseC = value;
+                OnPropertyChanged();
+                NotificarParametros();
+            }
+        }
+
+        protected override void AtualizarNode()
+        {
+            base.AtualizarNode();
+            AtualizarTerminais();
+        }
+
+        public override void Mover(Vector delta)
+        {
+            base.Mover(delta);
+            AtualizarTerminais();
+        }
+
+        private void AtualizarTerminais()
+        {
+            _terminalLayout.AtualizarTerminais(Carga);
+        }
+    }
+}
+
+
+
+====================================================================================================
+ARQUIVO: C:\Araci-Engine-Front\Araci Engine\ViewModels\GeradorViewModel.cs
+====================================================================================================
+
+using System.Collections;
+using System.Windows;
+using Araci.Core.SceneNodes;
+using Araci.Models;
+using Araci.Services;
+
+namespace Araci.ViewModels
+{
+    public class GeradorViewModel : ElementoViewModel
+    {
+        private readonly TerminalLayoutService _terminalLayout;
+
+        public GeradorViewModel(
+            Gerador modelo,
+            TypeLibraryService types,
+            NameService names,
+            TypePropertiesDialogService typePropertiesDialogs,
+            TerminalLayoutService terminalLayout)
+            : base(modelo, new EquipamentoNode(modelo), types, names, typePropertiesDialogs)
+        {
+            _terminalLayout = terminalLayout;
+            SelecionarPrimeiroTipoDisponivel();
+            AtualizarTerminais();
+        }
+
+        public Gerador Gerador => (Gerador)Modelo;
+
+        public override IEnumerable TiposDisponiveis => Types.TiposGeradores;
+
+        public string Barra
+        {
+            get => Gerador.Barra;
+            set
+            {
+                if (Gerador.Barra == value)
+                    return;
+
+                Gerador.Barra = value;
+                OnPropertyChanged();
+                NotificarParametros();
+            }
+        }
+
+        public string BarraId
+        {
+            get => Gerador.BarraId;
+            set
+            {
+                if (Gerador.BarraId == value)
+                    return;
+
+                Gerador.BarraId = value;
+                OnPropertyChanged();
+                NotificarParametros();
+            }
+        }
+
+        public string Nome
+        {
+            get => Gerador.Nome;
+            set
+            {
+                if (Gerador.Nome == value)
+                    return;
+
+                RenomearModelo(value);
+                OnPropertyChanged();
+                NotificarParametros();
+            }
+        }
+
+        public double PotenciaAparente
+        {
+            get => Gerador.PotenciaAparente;
+            set
+            {
+                if (Gerador.PotenciaAparente == value)
+                    return;
+
+                Gerador.PotenciaAparente = value;
+                OnPropertyChanged();
+                NotificarParametros();
+            }
+        }
+
+        public double PotenciaAtiva
+        {
+            get => Gerador.PotenciaAtiva;
+            set
+            {
+                if (Gerador.PotenciaAtiva == value)
+                    return;
+
+                Gerador.PotenciaAtiva = value;
+                OnPropertyChanged();
+                NotificarParametros();
+            }
+        }
+
+        public double PotenciaReativa
+        {
+            get => Gerador.PotenciaReativa;
+            set
+            {
+                if (Gerador.PotenciaReativa == value)
+                    return;
+
+                Gerador.PotenciaReativa = value;
+                OnPropertyChanged();
+                NotificarParametros();
+            }
+        }
+
+        public string TensaoLinha
+        {
+            get => Gerador.TensaoLinha;
+            set
+            {
+                if (Gerador.TensaoLinha == value)
+                    return;
+
+                Gerador.TensaoLinha = value;
+                OnPropertyChanged();
+                NotificarParametros();
+            }
+        }
+
+        public string TensaoFaseA
+        {
+            get => Gerador.TensaoFaseA;
+            set
+            {
+                if (Gerador.TensaoFaseA == value)
+                    return;
+
+                Gerador.TensaoFaseA = value;
+                OnPropertyChanged();
+                NotificarParametros();
+            }
+        }
+
+        public string TensaoFaseB
+        {
+            get => Gerador.TensaoFaseB;
+            set
+            {
+                if (Gerador.TensaoFaseB == value)
+                    return;
+
+                Gerador.TensaoFaseB = value;
+                OnPropertyChanged();
+                NotificarParametros();
+            }
+        }
+
+        public string TensaoFaseC
+        {
+            get => Gerador.TensaoFaseC;
+            set
+            {
+                if (Gerador.TensaoFaseC == value)
+                    return;
+
+                Gerador.TensaoFaseC = value;
+                OnPropertyChanged();
+                NotificarParametros();
+            }
+        }
+
+        public string CorrenteLinha
+        {
+            get => Gerador.CorrenteLinha;
+            set
+            {
+                if (Gerador.CorrenteLinha == value)
+                    return;
+
+                Gerador.CorrenteLinha = value;
+                OnPropertyChanged();
+                NotificarParametros();
+            }
+        }
+
+        public string CorrenteFaseA
+        {
+            get => Gerador.CorrenteFaseA;
+            set
+            {
+                if (Gerador.CorrenteFaseA == value)
+                    return;
+
+                Gerador.CorrenteFaseA = value;
+                OnPropertyChanged();
+                NotificarParametros();
+            }
+        }
+
+        public string CorrenteFaseB
+        {
+            get => Gerador.CorrenteFaseB;
+            set
+            {
+                if (Gerador.CorrenteFaseB == value)
+                    return;
+
+                Gerador.CorrenteFaseB = value;
+                OnPropertyChanged();
+                NotificarParametros();
+            }
+        }
+
+        public string CorrenteFaseC
+        {
+            get => Gerador.CorrenteFaseC;
+            set
+            {
+                if (Gerador.CorrenteFaseC == value)
+                    return;
+
+                Gerador.CorrenteFaseC = value;
+                OnPropertyChanged();
+                NotificarParametros();
+            }
+        }
+
+        public int Alimentador
+        {
+            get => Gerador.Alimentador;
+            set
+            {
+                if (Gerador.Alimentador == value)
+                    return;
+
+                Gerador.Alimentador = value;
+                OnPropertyChanged();
+                NotificarParametros();
+            }
+        }
+
+        protected override void AtualizarNode()
+        {
+            base.AtualizarNode();
+            AtualizarTerminais();
+        }
+
+        public override void Mover(Vector delta)
+        {
+            base.Mover(delta);
+            AtualizarTerminais();
+        }
+
+        private void AtualizarTerminais()
+        {
+            _terminalLayout.AtualizarTerminais(Gerador);
+        }
+    }
+}
+
+
+
+====================================================================================================
+ARQUIVO: C:\Araci-Engine-Front\Araci Engine\ViewModels\SinViewModel.cs
+====================================================================================================
+
+using System.Collections;
+using System.Windows;
+using Araci.Core.SceneNodes;
+using Araci.Models;
+using Araci.Services;
+
+namespace Araci.ViewModels
+{
+    public class SinViewModel : ElementoViewModel
+    {
+        private readonly TerminalLayoutService _terminalLayout;
+
+        public SinViewModel(
+            Sin modelo,
+            TypeLibraryService types,
+            NameService names,
+            TypePropertiesDialogService typePropertiesDialogs,
+            TerminalLayoutService terminalLayout)
+            : base(modelo, new EquipamentoNode(modelo), types, names, typePropertiesDialogs)
+        {
+            _terminalLayout = terminalLayout;
+            SelecionarPrimeiroTipoDisponivel();
+            AtualizarTerminais();
+        }
+
+        public Sin Sin => (Sin)Modelo;
+
+        public override IEnumerable TiposDisponiveis => Types.TiposSin;
+
+        public string Nome
+        {
+            get => Sin.Nome;
+            set
+            {
+                if (Sin.Nome == value)
+                    return;
+
+                RenomearModelo(value);
+                OnPropertyChanged();
+                NotificarParametros();
+            }
+        }
+
+        public string Barra
+        {
+            get => Sin.Barra;
+            set
+            {
+                if (Sin.Barra == value)
+                    return;
+
+                Sin.Barra = value;
+                OnPropertyChanged();
+                NotificarParametros();
+            }
+        }
+
+        public string TensaoLinha
+        {
+            get => Sin.TensaoLinha;
+            set
+            {
+                if (Sin.TensaoLinha == value)
+                    return;
+
+                Sin.TensaoLinha = value;
+                OnPropertyChanged();
+                NotificarParametros();
+            }
+        }
+
+        public int Alimentador
+        {
+            get => Sin.Alimentador;
+            set
+            {
+                if (Sin.Alimentador == value)
+                    return;
+
+                Sin.Alimentador = value;
+                OnPropertyChanged();
+                NotificarParametros();
+            }
+        }
+
+        protected override void AtualizarNode()
+        {
+            base.AtualizarNode();
+            AtualizarTerminais();
+        }
+
+        public override void Mover(Vector delta)
+        {
+            base.Mover(delta);
+            AtualizarTerminais();
+        }
+
+        private void AtualizarTerminais()
+        {
+            _terminalLayout.AtualizarTerminais(Sin);
+        }
+    }
+}
+
+
+
+====================================================================================================
+ARQUIVO: C:\Araci-Engine-Front\Araci Engine\ViewModels\TransformadorViewModel.cs
+====================================================================================================
+
+using System.Collections;
+using System.Windows;
+using Araci.Core.Rendering;
+using Araci.Core.SceneNodes;
+using Araci.Models;
+using Araci.Services;
+
+namespace Araci.ViewModels
+{
+    public class TransformadorViewModel : ElementoViewModel
+    {
+        private readonly TerminalLayoutService _terminalLayout;
+
+        public TransformadorViewModel(
+            Transformador modelo,
+            TypeLibraryService types,
+            NameService names,
+            TypePropertiesDialogService typePropertiesDialogs,
+            TerminalLayoutService terminalLayout)
+            : base(
+                modelo,
+                new EquipamentoNode(
+                    modelo,
+                    ElementGeometryDefaults.TransformadorLargura,
+                    ElementGeometryDefaults.TransformadorAltura),
+                types,
+                names,
+                typePropertiesDialogs)
+        {
+            _terminalLayout = terminalLayout;
+            SelecionarPrimeiroTipoDisponivel();
+            AtualizarTerminais();
+        }
+
+        public Transformador Transformador => (Transformador)Modelo;
+        public override IEnumerable TiposDisponiveis => Types.TiposTransformadores;
+
+        public string Nome
+        {
+            get => Transformador.Nome;
+            set
+            {
+                if (Transformador.Nome == value)
+                    return;
+                RenomearModelo(value);
+                OnPropertyChanged();
+                NotificarParametros();
+            }
+        }
+
+        public string Barra
+        {
+            get => Transformador.Barra;
+            set
+            {
+                if (Transformador.Barra == value)
+                    return;
+                Transformador.Barra = value;
+                OnPropertyChanged();
+                NotificarParametros();
+            }
+        }
+
+        public int Alimentador
+        {
+            get => Transformador.Alimentador;
+            set
+            {
+                if (Transformador.Alimentador == value)
+                    return;
+                Transformador.Alimentador = value;
+                OnPropertyChanged();
+                NotificarParametros();
+            }
+        }
+
+        public int Fases
+        {
+            get => Transformador.Fases;
+            set => DefinirParametro(Transformador.PARAM_FASES, value <= 0 ? 3 : value);
+        }
+
+        public int Enrolamentos
+        {
+            get => Transformador.Enrolamentos;
+            set => DefinirParametro(Transformador.PARAM_ENROLAMENTOS, value <= 0 ? 2 : value);
+        }
+
+        public double TensaoPrimarioKV
+        {
+            get => Transformador.TensaoPrimarioKV;
+            set => DefinirParametro(Transformador.PARAM_TENSAO_PRIMARIO_KV, value > 0 ? value : 13.8);
+        }
+
+        public double TensaoSecundarioKV
+        {
+            get => Transformador.TensaoSecundarioKV;
+            set => DefinirParametro(Transformador.PARAM_TENSAO_SECUNDARIO_KV, value > 0 ? value : 0.38);
+        }
+
+        public double PotenciaAparente
+        {
+            get => Transformador.PotenciaAparente;
+            set => DefinirParametro(Transformador.PARAM_POTENCIA_APARENTE, value > 0 ? value : 500);
+        }
+
+        public double RPercentual
+        {
+            get => Transformador.RPercentual;
+            set => DefinirParametro(Transformador.PARAM_R_PERCENTUAL, value < 0 ? 0 : value);
+        }
+
+        public double XPercentual
+        {
+            get => Transformador.XPercentual;
+            set => DefinirParametro(Transformador.PARAM_X_PERCENTUAL, value < 0 ? 0 : value);
+        }
+
+        public string LigacaoPrimario
+        {
+            get => Transformador.LigacaoPrimario;
+            set => DefinirParametro(Transformador.PARAM_LIGACAO_PRIMARIO, value);
+        }
+
+        public string LigacaoSecundario
+        {
+            get => Transformador.LigacaoSecundario;
+            set => DefinirParametro(Transformador.PARAM_LIGACAO_SECUNDARIO, value);
+        }
+
+        protected override void AtualizarNode()
+        {
+            base.AtualizarNode();
+            AtualizarTerminais();
+        }
+
+        public override void Mover(Vector delta)
+        {
+            base.Mover(delta);
+            AtualizarTerminais();
+        }
+
+        private void AtualizarTerminais()
+        {
+            _terminalLayout.AtualizarTerminais(Transformador);
+        }
+
+        private void DefinirParametro<T>(string nome, T valor)
+        {
+            Transformador.Definir(nome, valor);
+            OnPropertyChanged();
+            NotificarParametros();
         }
     }
 }
