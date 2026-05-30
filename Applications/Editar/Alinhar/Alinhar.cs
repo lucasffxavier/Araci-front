@@ -136,7 +136,7 @@ namespace Araci.Applications.Editar.Alinhar
             if (elemento == null || elemento.IsPreview || elemento.BoundsAlinhamento.IsEmpty)
                 return null;
 
-            return new AlignReference(elemento, DetectarAncora(elemento.BoundsAlinhamento, position));
+            return new AlignReference(elemento, DetectarAncora(elemento, position));
         }
 
         private void AplicarAlinhamento(AlignReference reference, AlignReference target)
@@ -210,7 +210,32 @@ namespace Araci.Applications.Editar.Alinhar
             return reference.Anchor.Axis == AlignAxis.Vertical ? new Vector(offset, 0) : new Vector(0, offset);
         }
 
-        private static AlignAnchor DetectarAncora(Rect bounds, Point position)
+        private static AlignAnchor DetectarAncora(ElementoViewModel elemento, Point position)
+        {
+            Rect bounds = elemento.BoundsAlinhamento;
+
+            if (elemento is BarraViewModel)
+                return DetectarAncoraBarra(bounds, position);
+
+            return DetectarAncoraGeral(bounds, position);
+        }
+
+        private static AlignAnchor DetectarAncoraBarra(Rect bounds, Point position)
+        {
+            double topDistance = Math.Abs(bounds.Top - position.Y);
+            double centerDistance = Math.Abs((bounds.Top + bounds.Height / 2.0) - position.Y);
+            double bottomDistance = Math.Abs(bounds.Bottom - position.Y);
+
+            if (topDistance <= centerDistance && topDistance <= bottomDistance)
+                return AlignAnchor.Top;
+
+            if (bottomDistance <= centerDistance && bottomDistance <= topDistance)
+                return AlignAnchor.Bottom;
+
+            return AlignAnchor.CenterY;
+        }
+
+        private static AlignAnchor DetectarAncoraGeral(Rect bounds, Point position)
         {
             AlignAnchor[] anchors =
             {

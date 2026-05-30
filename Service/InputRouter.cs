@@ -3,6 +3,7 @@ using System.Linq;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
+using Araci.Applications.Editar.Alinhar;
 using Araci.Applications.Editar.Base;
 using Araci.Applications.Editar.Mover;
 using Araci.Applications.Editar.Selecionar;
@@ -188,6 +189,9 @@ namespace Araci.Services
                     return true;
                 case "MV":
                     _context.Tools.AtivarFerramenta(new MoverTool(_context));
+                    return true;
+                case "AL":
+                    _context.Tools.AtivarFerramenta(new AlinharTool(_context));
                     return true;
                 default:
                     return false;

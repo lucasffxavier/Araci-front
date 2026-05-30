@@ -461,10 +461,10 @@ namespace Araci.Applications.Editar.Alinhar
         {
             ElementoViewModel? elemento = vm ?? _context.SceneQueries.HitTest(position)?.Elemento;
 
-            if (elemento == null || elemento.IsPreview || elemento.Bounds.IsEmpty)
+            if (elemento == null || elemento.IsPreview || elemento.BoundsAlinhamento.IsEmpty)
                 return null;
 
-            return new AlignReference(elemento, DetectarAncora(elemento.Bounds, position));
+            return new AlignReference(elemento, DetectarAncora(elemento.BoundsAlinhamento, position));
         }
 
         private void AplicarAlinhamento(AlignReference reference, AlignReference target)
@@ -483,25 +483,28 @@ namespace Araci.Applications.Editar.Alinhar
 
         private void MostrarReferencia(AlignReference reference)
         {
-            double value = reference.Anchor.GetCoordinate(reference.Elemento.Bounds);
+            Rect bounds = reference.Elemento.BoundsAlinhamento;
+            double value = reference.Anchor.GetCoordinate(bounds);
 
             if (reference.Anchor.Axis == AlignAxis.Vertical)
-                _context.AlignmentGuides.MostrarReferenciaVertical(value, reference.Elemento.Bounds);
+                _context.AlignmentGuides.MostrarReferenciaVertical(value, bounds);
             else
-                _context.AlignmentGuides.MostrarReferenciaHorizontal(value, reference.Elemento.Bounds);
+                _context.AlignmentGuides.MostrarReferenciaHorizontal(value, bounds);
         }
 
         private void MostrarPreviewAlinhamento(AlignReference reference, AlignReference target)
         {
             Vector delta = CalcularDelta(reference, target);
-            Rect targetFinalBounds = Deslocar(target.Elemento.Bounds, delta);
-            double referenceValue = reference.Anchor.GetCoordinate(reference.Elemento.Bounds);
-            double targetValue = target.Anchor.GetCoordinate(target.Elemento.Bounds);
+            Rect referenceBounds = reference.Elemento.BoundsAlinhamento;
+            Rect targetBounds = target.Elemento.BoundsAlinhamento;
+            Rect targetFinalBounds = Deslocar(targetBounds, delta);
+            double referenceValue = reference.Anchor.GetCoordinate(referenceBounds);
+            double targetValue = target.Anchor.GetCoordinate(targetBounds);
 
             if (reference.Anchor.Axis == AlignAxis.Vertical)
-                _context.AlignmentGuides.MostrarDuasReferenciasVerticais(referenceValue, reference.Elemento.Bounds, targetValue, target.Elemento.Bounds, targetFinalBounds);
+                _context.AlignmentGuides.MostrarDuasReferenciasVerticais(referenceValue, referenceBounds, targetValue, targetBounds, targetFinalBounds);
             else
-                _context.AlignmentGuides.MostrarDuasReferenciasHorizontais(referenceValue, reference.Elemento.Bounds, targetValue, target.Elemento.Bounds, targetFinalBounds);
+                _context.AlignmentGuides.MostrarDuasReferenciasHorizontais(referenceValue, referenceBounds, targetValue, targetBounds, targetFinalBounds);
         }
 
         private void AtualizarHover(ElementoViewModel elemento)
@@ -527,8 +530,10 @@ namespace Araci.Applications.Editar.Alinhar
 
         private static Vector CalcularDelta(AlignReference reference, AlignReference target)
         {
-            double referenceValue = reference.Anchor.GetCoordinate(reference.Elemento.Bounds);
-            double targetValue = target.Anchor.GetCoordinate(target.Elemento.Bounds);
+            Rect referenceBounds = reference.Elemento.BoundsAlinhamento;
+            Rect targetBounds = target.Elemento.BoundsAlinhamento;
+            double referenceValue = reference.Anchor.GetCoordinate(referenceBounds);
+            double targetValue = target.Anchor.GetCoordinate(targetBounds);
             double offset = referenceValue - targetValue;
             return reference.Anchor.Axis == AlignAxis.Vertical ? new Vector(offset, 0) : new Vector(0, offset);
         }
@@ -738,10 +743,29 @@ namespace Araci.Controls
 
 
 ====================================================================================================
+ARQUIVO: C:\Araci-Engine-Front\Araci Engine\Core\Rendering\ElementGeometryDefaults.cs
+====================================================================================================
+
+namespace Araci.Core.Rendering
+{
+    public static class ElementGeometryDefaults
+    {
+        public const double EquipamentoLargura = 70;
+        public const double EquipamentoAltura = 70;
+        public const double TransformadorLargura = 80;
+        public const double TransformadorAltura = 140;
+        public const double BarraLargura = 10;
+    }
+}
+
+
+
+====================================================================================================
 ARQUIVO: C:\Araci-Engine-Front\Araci Engine\Core\SceneNodes\BarraNode.cs
 ====================================================================================================
 
-﻿using System.Windows;
+﻿using System;
+using System.Windows;
 using Araci.Core.Rendering;
 using Araci.Models;
 
@@ -759,16 +783,21 @@ namespace Araci.Core.SceneNodes
         }
 
         public override double Largura => ElementGeometryDefaults.BarraLargura;
-
         public override double Altura => _barra.Altura;
+
+        public override Rect BoundsAlinhamento
+        {
+            get
+            {
+                double inset = Math.Min(Altura / 4.0, Math.Max(0, ElementGeometryDefaults.BarraLargura / 2.0));
+                double alturaUtil = Math.Max(1, Altura - inset * 2);
+                return new Rect(Modelo.PosicaoX, Modelo.PosicaoY + inset, Largura, alturaUtil);
+            }
+        }
 
         public override void AtualizarGeometria()
         {
-            Bounds = new Rect(
-                Modelo.PosicaoX,
-                Modelo.PosicaoY,
-                Largura,
-                Altura);
+            Bounds = new Rect(Modelo.PosicaoX, Modelo.PosicaoY, Largura, Altura);
         }
     }
 }
@@ -791,8 +820,8 @@ namespace Araci.Core.SceneNodes
         }
 
         public Elemento Modelo { get; }
-
         public Rect Bounds { get; protected set; }
+        public virtual Rect BoundsAlinhamento => Bounds;
 
         public Point Centro => new(
             Bounds.X + Bounds.Width / 2,
@@ -817,11 +846,58 @@ namespace Araci.Core.SceneNodes
         {
             Modelo.PosicaoX += delta.X;
             Modelo.PosicaoY += delta.Y;
-
             AtualizarGeometria();
         }
 
         public abstract void AtualizarGeometria();
+    }
+}
+
+
+====================================================================================================
+ARQUIVO: C:\Araci-Engine-Front\Araci Engine\Core\SceneQueries\ISceneQueryService.cs
+====================================================================================================
+
+using System.Collections.Generic;
+using System.Windows;
+using Araci.ViewModels;
+
+namespace Araci.Core.SceneQueries
+{
+    public interface ISceneQueryService
+    {
+        void Invalidate();
+
+        SceneHitResult? HitTest(Point point);
+        SceneHitResult? HitTest(Point point, double tolerance);
+
+        IEnumerable<ElementoViewModel> Query(Rect area);
+
+        IEnumerable<ElementoViewModel> Nearby(Point point, double radius);
+    }
+}
+
+
+
+====================================================================================================
+ARQUIVO: C:\Araci-Engine-Front\Araci Engine\Core\SceneQueries\SceneHitResult.cs
+====================================================================================================
+
+﻿using System.Windows;
+using Araci.ViewModels;
+
+namespace Araci.Core.SceneQueries
+{
+    public sealed class SceneHitResult
+    {
+        public SceneHitResult(ElementoViewModel elemento, Point point)
+        {
+            Elemento = elemento;
+            Point = point;
+        }
+
+        public ElementoViewModel Elemento { get; }
+        public Point Point { get; }
     }
 }
 
@@ -1296,284 +1372,69 @@ namespace Araci.Models
 
 
 ====================================================================================================
-ARQUIVO: C:\Araci-Engine-Front\Araci Engine\Service\BarraResizeService.cs
+ARQUIVO: C:\Araci-Engine-Front\Araci Engine\Models\Terminal.cs
 ====================================================================================================
 
-﻿using System;
-using System.Linq;
-using System.Windows;
-using System.Windows.Input;
-using Araci.Core.Commands;
-using Araci.Core.Rendering;
-using Araci.Models;
-using Araci.ViewModels;
+﻿using System.Windows;
 
-namespace Araci.Services
+namespace Araci.Models
 {
-    public class BarraResizeService
+    public class Terminal
     {
-        private const double HandleTolerance = 12;
-        private readonly EditorContext _context;
-        private BarraViewModel? _vm;
-        private ResizeBarraHandle _handle;
-        private Point _startMouse;
-        private Point _startTopWorld;
-        private Point _startBottomWorld;
-        private double _startX;
-        private double _startY;
-        private double _startHeight;
+        public Elemento Dono { get; }
+        public string Id { get; }
+        public Point Posicao { get; set; }
+        public Point PosicaoLocal { get; private set; }
+        public string? Barra { get; set; }
+        public TerminalKind Kind { get; set; }
+        public TerminalDirection Direction { get; set; }
 
-        public BarraResizeService(EditorContext context)
+        public Terminal(
+            Elemento dono,
+            Point posicao,
+            string? id = null,
+            TerminalKind kind = TerminalKind.Electrical,
+            TerminalDirection direction = TerminalDirection.None)
         {
-            _context = context ?? throw new ArgumentNullException(nameof(context));
+            Dono = dono;
+            Id = string.IsNullOrWhiteSpace(id)
+                ? System.Guid.NewGuid().ToString("N")
+                : id;
+            Kind = kind;
+            Direction = direction;
+            Posicao = posicao;
+            PosicaoLocal = TerminalPlacement.ToLocal(dono, posicao);
         }
 
-        public bool IsResizing { get; private set; }
+        public TerminalEndpoint Endpoint =>
+            TerminalEndpoint.FromTerminal(this);
 
-        public Cursor? GetCursor(Point position)
+        public void DefinirPosicaoLocal(Point local)
         {
-            BarraViewModel? barraVm = IsResizing
-                ? _vm
-                : _context.Selection.Selecionados.Count == 1
-                    ? _context.Selection.Selecionados.FirstOrDefault() as BarraViewModel
-                    : null;
-
-            if (barraVm == null)
-                return null;
-
-            ResizeBarraHandle handle = IsResizing ? _handle : HitTestHandle(barraVm, position);
-            return handle == ResizeBarraHandle.None ? null : GetResizeCursor(barraVm.Barra.Rotacao);
+            PosicaoLocal = local;
+            Posicao = TerminalPlacement.ToWorld(Dono, local);
         }
 
-        public bool TryBegin(Point position)
+        public void DefinirPosicaoLocal(Point local, double width, double height)
         {
-            if (_context.Selection.Selecionados.Count != 1)
-                return false;
-            if (_context.Selection.Selecionados.FirstOrDefault() is not BarraViewModel barraVm)
-                return false;
-            ResizeBarraHandle handle = HitTestHandle(barraVm, position);
-            if (handle == ResizeBarraHandle.None)
-                return false;
-            _vm = barraVm;
-            _handle = handle;
-            _startMouse = position;
-            _startX = barraVm.Barra.PosicaoX;
-            _startY = barraVm.Barra.PosicaoY;
-            _startHeight = barraVm.Barra.Altura;
-            _startTopWorld = GetTopHandleWorld(barraVm.Barra);
-            _startBottomWorld = GetBottomHandleWorld(barraVm.Barra);
-            IsResizing = true;
-            return true;
+            PosicaoLocal = local;
+            Posicao = TerminalPlacement.ToWorld(Dono, local, width, height);
         }
 
-        public void Update(Point position)
+        public void DefinirPosicaoVisual(Point world)
         {
-            if (!IsResizing || _vm == null)
-                return;
-            Vector eixoLocal = GetLocalVerticalAxis(_vm.Barra.Rotacao);
-            Vector mouseDelta = position - _startMouse;
-            double delta = Dot(mouseDelta, eixoLocal);
-            double novaAltura = _handle == ResizeBarraHandle.Top ? _startHeight - delta : _startHeight + delta;
-            novaAltura = Barra.NormalizarAltura(novaAltura);
-            Point novoTopoEsquerdo = _handle == ResizeBarraHandle.Top
-                ? CalcularTopoEsquerdoMantendoBottom(_vm.Barra, novaAltura, _startBottomWorld)
-                : CalcularTopoEsquerdoMantendoTop(_vm.Barra, novaAltura, _startTopWorld);
-            _vm.Barra.PosicaoX = novoTopoEsquerdo.X;
-            _vm.Barra.PosicaoY = novoTopoEsquerdo.Y;
-            _context.GeometryUpdates.AplicarAlturaBarra(_vm.Barra, novaAltura);
-            _vm.NotificarPropriedades(nameof(BarraViewModel.Altura), nameof(BarraViewModel.X), nameof(BarraViewModel.Y), nameof(BarraViewModel.Bounds));
+            Posicao = world;
+            PosicaoLocal = TerminalPlacement.ToLocal(Dono, world);
         }
 
-        public void End()
+        public void DefinirPosicaoVisual(Point world, double width, double height)
         {
-            if (!IsResizing || _vm == null)
-            {
-                Cancel();
-                return;
-            }
-            double alturaDepois = _vm.Barra.Altura;
-            double xDepois = _vm.Barra.PosicaoX;
-            double yDepois = _vm.Barra.PosicaoY;
-            bool mudou = Math.Abs(_startHeight - alturaDepois) > 0.0001 || Math.Abs(_startX - xDepois) > 0.0001 || Math.Abs(_startY - yDepois) > 0.0001;
-            if (mudou)
-            {
-                _context.Commands.Execute(new ResizeBarraCommand(_vm.Barra, _startHeight, _startX, _startY, alturaDepois, xDepois, yDepois, _context.GeometryUpdates));
-            }
-            Limpar();
-        }
-
-        public void Cancel()
-        {
-            if (_vm != null)
-            {
-                _vm.Barra.PosicaoX = _startX;
-                _vm.Barra.PosicaoY = _startY;
-                _context.GeometryUpdates.AplicarAlturaBarra(_vm.Barra, _startHeight);
-            }
-            Limpar();
-        }
-
-        private void Limpar()
-        {
-            IsResizing = false;
-            _vm = null;
-            _handle = ResizeBarraHandle.None;
-        }
-
-        private static Cursor GetResizeCursor(double rotacao)
-        {
-            double angle = NormalizeAngle(rotacao);
-            if (angle is >= 45 and < 135 or >= 225 and < 315)
-                return Cursors.SizeWE;
-            return Cursors.SizeNS;
-        }
-
-        private static double NormalizeAngle(double value)
-        {
-            double angle = value % 360;
-            return angle < 0 ? angle + 360 : angle;
-        }
-
-        private static ResizeBarraHandle HitTestHandle(BarraViewModel vm, Point position)
-        {
-            Point top = GetTopHandleWorld(vm.Barra);
-            Point bottom = GetBottomHandleWorld(vm.Barra);
-            if (Distance(position, top) <= HandleTolerance)
-                return ResizeBarraHandle.Top;
-            if (Distance(position, bottom) <= HandleTolerance)
-                return ResizeBarraHandle.Bottom;
-            return ResizeBarraHandle.None;
-        }
-
-        private static Point GetTopHandleWorld(Barra barra)
-        {
-            return RotateAround(new Point(barra.PosicaoX + ElementGeometryDefaults.BarraLargura / 2, barra.PosicaoY), GetCenter(barra), barra.Rotacao);
-        }
-
-        private static Point GetBottomHandleWorld(Barra barra)
-        {
-            return RotateAround(new Point(barra.PosicaoX + ElementGeometryDefaults.BarraLargura / 2, barra.PosicaoY + barra.Altura), GetCenter(barra), barra.Rotacao);
-        }
-
-        private static Point GetCenter(Barra barra)
-        {
-            return new Point(barra.PosicaoX + ElementGeometryDefaults.BarraLargura / 2, barra.PosicaoY + barra.Altura / 2);
-        }
-
-        private static Point CalcularTopoEsquerdoMantendoTop(Barra barra, double novaAltura, Point topWorld)
-        {
-            Vector offsetCentroParaTop = RotateVector(new Vector(0, -novaAltura / 2), barra.Rotacao);
-            Point novoCentro = topWorld - offsetCentroParaTop;
-            return new Point(novoCentro.X - ElementGeometryDefaults.BarraLargura / 2, novoCentro.Y - novaAltura / 2);
-        }
-
-        private static Point CalcularTopoEsquerdoMantendoBottom(Barra barra, double novaAltura, Point bottomWorld)
-        {
-            Vector offsetCentroParaBottom = RotateVector(new Vector(0, novaAltura / 2), barra.Rotacao);
-            Point novoCentro = bottomWorld - offsetCentroParaBottom;
-            return new Point(novoCentro.X - ElementGeometryDefaults.BarraLargura / 2, novoCentro.Y - novaAltura / 2);
-        }
-
-        private static Vector GetLocalVerticalAxis(double rotacao)
-        {
-            return RotateVector(new Vector(0, 1), rotacao);
-        }
-
-        private static Vector RotateVector(Vector vector, double angle)
-        {
-            double radians = angle * Math.PI / 180.0;
-            double cos = Math.Cos(radians);
-            double sin = Math.Sin(radians);
-            return new Vector(vector.X * cos - vector.Y * sin, vector.X * sin + vector.Y * cos);
-        }
-
-        private static Point RotateAround(Point point, Point center, double angle)
-        {
-            Vector rotated = RotateVector(point - center, angle);
-            return center + rotated;
-        }
-
-        private static double Dot(Vector a, Vector b)
-        {
-            return a.X * b.X + a.Y * b.Y;
-        }
-
-        private static double Distance(Point a, Point b)
-        {
-            double dx = a.X - b.X;
-            double dy = a.Y - b.Y;
-            return Math.Sqrt(dx * dx + dy * dy);
+            Posicao = world;
+            PosicaoLocal = TerminalPlacement.ToLocal(Dono, world, width, height);
         }
     }
 }
 
-
-====================================================================================================
-ARQUIVO: C:\Araci-Engine-Front\Araci Engine\Service\ElementGeometryUpdateService.cs
-====================================================================================================
-
-using System;
-using Araci.Models;
-
-namespace Araci.Services
-{
-    public class ElementGeometryUpdateService
-    {
-        private readonly EditorContext _context;
-
-        public ElementGeometryUpdateService(EditorContext context)
-        {
-            _context = context ?? throw new ArgumentNullException(nameof(context));
-        }
-
-        public void AplicarAlturaBarra(Barra barra, double altura)
-        {
-            if (barra == null)
-                throw new ArgumentNullException(nameof(barra));
-
-            barra.Altura = altura;
-            AtualizarElementoECabos(barra);
-        }
-
-        public void AtualizarElementoECabos(Elemento elemento)
-        {
-            if (elemento == null)
-                throw new ArgumentNullException(nameof(elemento));
-
-            _context.TerminalLayout.AtualizarTerminais(elemento);
-
-            var cabos = _context.Connectivity.ReancorarCabosConectados(elemento);
-
-            _context.Viewport?.AtualizarViewModel(elemento);
-
-            foreach (Cabo cabo in cabos)
-            {
-                _context.TerminalLayout.AtualizarTerminais(cabo);
-                _context.Viewport?.AtualizarViewModel(cabo);
-            }
-
-            _context.SceneQueries.Invalidate();
-            _context.TerminalSnap.Limpar();
-            _context.CableVertexEdit.Refresh();
-        }
-    }
-}
-
-
-
-====================================================================================================
-ARQUIVO: C:\Araci-Engine-Front\Araci Engine\Service\ResizeBarraHandle.cs
-====================================================================================================
-
-﻿namespace Araci.Services
-{
-    public enum ResizeBarraHandle
-    {
-        None,
-        Top,
-        Bottom
-    }
-}
 
 
 ====================================================================================================
@@ -1761,5 +1622,307 @@ namespace Araci.ViewModels
     }
 }
 
+
+
+====================================================================================================
+ARQUIVO: C:\Araci-Engine-Front\Araci Engine\ViewModels\ElementoViewModel.cs
+====================================================================================================
+
+using System;
+using System.Collections;
+using System.Collections.ObjectModel;
+using System.Linq;
+using System.Windows;
+using System.Windows.Input;
+using System.Windows.Media;
+using Araci.Core.Rendering;
+using Araci.Core.SceneNodes;
+using Araci.Models;
+using Araci.Models.Tipos;
+using Araci.Services;
+using Araci.ViewModels.Base;
+using Araci.ViewModels.VisualStates;
+
+namespace Araci.ViewModels
+{
+    public abstract class ElementoViewModel : ViewModelBase
+    {
+        private readonly ElementoNode _node;
+        private readonly NameService _names;
+        private readonly TypePropertiesDialogService _typePropertiesDialogs;
+        private ICommand? _abrirPropriedadesTipoCommand;
+        private ObservableCollection<ParameterViewModel>? _parametros;
+        private bool _isPreview;
+
+        protected ElementoViewModel(Elemento modelo, ElementoNode node, TypeLibraryService types, NameService names, TypePropertiesDialogService typePropertiesDialogs)
+        {
+            Modelo = modelo ?? throw new ArgumentNullException(nameof(modelo));
+            _node = node ?? throw new ArgumentNullException(nameof(node));
+            Types = types ?? throw new ArgumentNullException(nameof(types));
+            _names = names ?? throw new ArgumentNullException(nameof(names));
+            _typePropertiesDialogs = typePropertiesDialogs ?? throw new ArgumentNullException(nameof(typePropertiesDialogs));
+            VisualState = new ElementoVisualState();
+            _node.AtualizarGeometria();
+        }
+
+        public Elemento Modelo { get; }
+        public ElementoNode Node => _node;
+        protected TypeLibraryService Types { get; }
+
+        protected void RenomearModelo(string novoNome)
+        {
+            _names.Renomear(Modelo, novoNome);
+        }
+
+        public TipoElemento Tipo
+        {
+            get => Modelo.Tipo!;
+            set
+            {
+                if (ReferenceEquals(Modelo.Tipo, value))
+                    return;
+
+                Modelo.Tipo = value;
+                OnPropertyChanged();
+                OnPropertyChanged(nameof(TipoViewModel));
+            }
+        }
+
+        public abstract IEnumerable TiposDisponiveis { get; }
+
+        public virtual TipoElementoViewModel? TipoViewModel => TipoElementoViewModelFactory.Criar(Tipo);
+
+        public ICommand AbrirPropriedadesTipoCommand => _abrirPropriedadesTipoCommand ??= new RelayCommand(AbrirPropriedadesTipo);
+
+        public ElementoVisualState VisualState { get; }
+
+        public bool IsSelecionado
+        {
+            get => VisualState.IsSelecionado;
+            set
+            {
+                if (VisualState.IsSelecionado == value)
+                    return;
+
+                VisualState.AtualizarSelecao(value);
+                OnPropertyChanged();
+                OnPropertyChanged(nameof(Stroke));
+                OnPropertyChanged(nameof(StrokeThickness));
+                OnPropertyChanged(nameof(RenderData));
+            }
+        }
+
+        public bool IsHover
+        {
+            get => VisualState.IsHover;
+            set
+            {
+                if (VisualState.IsHover == value)
+                    return;
+
+                VisualState.AtualizarHover(value);
+                OnPropertyChanged();
+                OnPropertyChanged(nameof(Stroke));
+                OnPropertyChanged(nameof(StrokeThickness));
+                OnPropertyChanged(nameof(RenderData));
+            }
+        }
+
+        public bool IsPreview
+        {
+            get => _isPreview;
+            set
+            {
+                if (_isPreview == value)
+                    return;
+
+                _isPreview = value;
+                OnPropertyChanged();
+                OnPropertyChanged(nameof(RenderData));
+            }
+        }
+
+        public Brush Stroke => VisualState.Stroke;
+        public double StrokeThickness => VisualState.StrokeThickness;
+
+        public virtual ElementoRenderData RenderData => new(Largura, Altura, PontoLocalInicial, PontoLocalFinal, Stroke, StrokeThickness);
+
+        public double Rotacao
+        {
+            get => Modelo.Rotacao;
+            set
+            {
+                if (Math.Abs(Modelo.Rotacao - value) < 0.0001)
+                    return;
+
+                Modelo.Rotacao = value;
+                AtualizarAposModeloAlterado();
+            }
+        }
+
+        public virtual double X
+        {
+            get => Node.X;
+            set
+            {
+                if (Math.Abs(Node.X - value) < 0.0001)
+                    return;
+
+                Node.X = value;
+                AtualizarNode();
+            }
+        }
+
+        public virtual double Y
+        {
+            get => Node.Y;
+            set
+            {
+                if (Math.Abs(Node.Y - value) < 0.0001)
+                    return;
+
+                Node.Y = value;
+                AtualizarNode();
+            }
+        }
+
+        public virtual double WorldX => Node.X;
+        public virtual double WorldY => Node.Y;
+        public virtual double Largura => Node.Largura;
+
+        public virtual double Altura
+        {
+            get => Node.Altura;
+            set { }
+        }
+
+        public virtual Rect Bounds => Node.Bounds;
+        public virtual Rect BoundsAlinhamento => ObterBoundsRotacionado(Node.BoundsAlinhamento);
+        public virtual Point Centro => Node.Centro;
+
+        public ObservableCollection<ParameterViewModel> Parametros =>
+            _parametros ??= new ObservableCollection<ParameterViewModel>(Modelo.Parametros.Values.Select(p => new ParameterViewModel(p)));
+
+        protected virtual Point PontoLocalInicial => new(0, 0);
+        protected virtual Point PontoLocalFinal => new(Largura, Altura);
+
+        protected void SelecionarPrimeiroTipoDisponivel()
+        {
+            TipoElemento? primeiroTipo = null;
+            bool tipoAtualExiste = false;
+
+            foreach (object? item in TiposDisponiveis)
+            {
+                if (item is not TipoElemento tipo)
+                    continue;
+
+                primeiroTipo ??= tipo;
+
+                if (ReferenceEquals(tipo, Modelo.Tipo))
+                {
+                    tipoAtualExiste = true;
+                    break;
+                }
+            }
+
+            if (tipoAtualExiste || primeiroTipo == null)
+                return;
+
+            Tipo = primeiroTipo;
+        }
+
+        public virtual void Mover(Vector delta)
+        {
+            Node.Mover(delta);
+            NotificarGeometria();
+        }
+
+        public virtual ElementoEstado CapturarEstado()
+        {
+            return new ElementoEstado(X, Y, rotacao: Modelo.Rotacao);
+        }
+
+        public virtual void AplicarEstado(ElementoEstado estado)
+        {
+            Node.X = estado.X;
+            Node.Y = estado.Y;
+            AtualizarNode();
+        }
+
+        public virtual void AtualizarAposModeloAlterado()
+        {
+            AtualizarNode();
+        }
+
+        public virtual void NotificarParametros()
+        {
+            foreach (var parametro in Parametros)
+                parametro.Atualizar();
+
+            OnPropertyChanged(nameof(Parametros));
+        }
+
+        public void NotificarPropriedades(params string[] nomes)
+        {
+            foreach (string nome in nomes)
+                OnPropertyChanged(nome);
+
+            NotificarParametros();
+        }
+
+        protected virtual void AtualizarNode()
+        {
+            Node.AtualizarGeometria();
+            NotificarGeometria();
+        }
+
+        protected virtual void NotificarGeometria()
+        {
+            OnPropertyChanged(nameof(X));
+            OnPropertyChanged(nameof(Y));
+            OnPropertyChanged(nameof(WorldX));
+            OnPropertyChanged(nameof(WorldY));
+            OnPropertyChanged(nameof(Largura));
+            OnPropertyChanged(nameof(Altura));
+            OnPropertyChanged(nameof(Bounds));
+            OnPropertyChanged(nameof(BoundsAlinhamento));
+            OnPropertyChanged(nameof(Centro));
+            OnPropertyChanged(nameof(Rotacao));
+            OnPropertyChanged(nameof(RenderData));
+        }
+
+        private Rect ObterBoundsRotacionado(Rect bounds)
+        {
+            if (Math.Abs(Rotacao) <= 0.000001)
+                return bounds;
+
+            Point center = Centro;
+            Point p1 = RotateAround(new Point(bounds.Left, bounds.Top), center, Rotacao);
+            Point p2 = RotateAround(new Point(bounds.Right, bounds.Top), center, Rotacao);
+            Point p3 = RotateAround(new Point(bounds.Right, bounds.Bottom), center, Rotacao);
+            Point p4 = RotateAround(new Point(bounds.Left, bounds.Bottom), center, Rotacao);
+            double minX = Math.Min(Math.Min(p1.X, p2.X), Math.Min(p3.X, p4.X));
+            double minY = Math.Min(Math.Min(p1.Y, p2.Y), Math.Min(p3.Y, p4.Y));
+            double maxX = Math.Max(Math.Max(p1.X, p2.X), Math.Max(p3.X, p4.X));
+            double maxY = Math.Max(Math.Max(p1.Y, p2.Y), Math.Max(p3.Y, p4.Y));
+            return new Rect(new Point(minX, minY), new Point(maxX, maxY));
+        }
+
+        private static Point RotateAround(Point point, Point center, double angle)
+        {
+            double radians = angle * Math.PI / 180.0;
+            double cos = Math.Cos(radians);
+            double sin = Math.Sin(radians);
+            double x = point.X - center.X;
+            double y = point.Y - center.Y;
+            return new Point(center.X + x * cos - y * sin, center.Y + x * sin + y * cos);
+        }
+
+        private void AbrirPropriedadesTipo()
+        {
+            _typePropertiesDialogs.Show(TipoViewModel);
+        }
+    }
+}
 
 
