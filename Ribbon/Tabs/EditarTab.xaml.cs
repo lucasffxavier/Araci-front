@@ -1,247 +1,179 @@
-﻿using System.Windows;
+﻿using System;
+using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Media;
-
 using Araci;
 using Araci.Applications.Editar.Base;
 using Araci.Applications.Editar.Deletar;
 using Araci.Applications.Editar.Mover;
 using Araci.Applications.Editar.Selecionar;
-
 using Araci.Services;
 
 namespace Araci.Ribbon.Tabs
 {
     public partial class EditarTab : UserControl
     {
-        // =========================
-        // CORES
-        // =========================
-
-        private readonly Brush _brushNormal =
-            Brushes.Transparent;
-
-        private readonly Brush _brushAtivo =
-            new SolidColorBrush(
-                Color.FromRgb(210, 230, 255));
-
-        // =========================
-        // ESTADO
-        // =========================
-
-        private bool _eventoFerramentaAssinado;
-
-        // =========================
-        // CONSTRUTOR
-        // =========================
+        private readonly Brush _brushNormal = Brushes.Transparent;
+        private readonly Brush _brushAtivo = new SolidColorBrush(Color.FromRgb(210, 230, 255));
+        private readonly Brush _bordaNormal = Brushes.Transparent;
+        private readonly Brush _bordaAtiva = new SolidColorBrush(Color.FromRgb(80, 140, 220));
+        private EditorContext? _contextAssinado;
 
         public EditarTab()
         {
             InitializeComponent();
-
             Loaded += OnLoaded;
-
             Unloaded += OnUnloaded;
+            DataContextChanged += OnDataContextChanged;
         }
 
-        // =========================
-        // CONTEXT
-        // =========================
+        private EditorContext? Context => DataContext as EditorContext;
 
-        private EditorContext? Context =>
-            DataContext as EditorContext;
-
-        // =========================
-        // LOADED
-        // =========================
-
-        private void OnLoaded(
-            object sender,
-            RoutedEventArgs e)
+        private void OnLoaded(object sender, RoutedEventArgs e)
         {
-            if (Context == null) return;
-
             AssinarEventoFerramenta();
-
-            AtualizarBotoes(
-                Context.Tools.FerramentaAtual);
+            AtualizarBotoes(Context?.Tools.FerramentaAtual);
         }
 
-        // =========================
-        // UNLOADED
-        // =========================
-
-        private void OnUnloaded(
-            object sender,
-            RoutedEventArgs e)
+        private void OnUnloaded(object sender, RoutedEventArgs e)
         {
             DesassinarEventoFerramenta();
         }
 
-        // =========================
-        // EVENTOS
-        // =========================
+        private void OnDataContextChanged(object sender, DependencyPropertyChangedEventArgs e)
+        {
+            AssinarEventoFerramenta();
+            AtualizarBotoes(Context?.Tools.FerramentaAtual);
+        }
 
         private void AssinarEventoFerramenta()
         {
-            if (_eventoFerramentaAssinado)
+            if (_contextAssinado == Context)
                 return;
 
-            if (Context == null) return;
+            DesassinarEventoFerramenta();
 
-            Context.Tools.FerramentaAlterada +=
-                OnFerramentaAlterada;
+            if (Context == null)
+                return;
 
-            _eventoFerramentaAssinado =
-                true;
+            Context.Tools.FerramentaAlterada += OnFerramentaAlterada;
+            _contextAssinado = Context;
         }
 
         private void DesassinarEventoFerramenta()
         {
-            if (!_eventoFerramentaAssinado)
+            if (_contextAssinado == null)
                 return;
 
-            if (Context == null) return;
-
-            Context.Tools.FerramentaAlterada -=
-                OnFerramentaAlterada;
-
-            _eventoFerramentaAssinado =
-                false;
+            _contextAssinado.Tools.FerramentaAlterada -= OnFerramentaAlterada;
+            _contextAssinado = null;
         }
 
-        // =========================
-        // EVENTO TOOL
-        // =========================
-
-        private void OnFerramentaAlterada(
-            ITool tool)
+        private void OnFerramentaAlterada(ITool tool)
         {
             AtualizarBotoes(tool);
         }
 
-        // =========================
-        // VISUAL
-        // =========================
-
-        private void AtualizarBotoes(
-            ITool tool)
+        private void AtualizarBotoes(ITool? tool)
         {
             ResetarBotoes();
 
-            if (!tool.MantemBotaoAtivado)
+            if (tool == null || !tool.MantemBotaoAtivado)
                 return;
 
-            switch (tool.Nome)
-            {
-                case "Selecionar":
+            AtivarSeCorresponder(SelecionarButton, tool);
+            AtivarSeCorresponder(MoverButton, tool);
+            AtivarSeCorresponder(DeletarButton, tool);
+        }
 
-                    SelecionarButton.Background =
-                        _brushAtivo;
+        private void AtivarSeCorresponder(Button button, ITool tool)
+        {
+            if (button.Tag is not string key || !FerramentaCorresponde(tool, key))
+                return;
 
-                    break;
-
-                case "Mover":
-
-                    MoverButton.Background =
-                        _brushAtivo;
-
-                    break;
-
-                case "Deletar":
-
-                    DeletarButton.Background =
-                        _brushAtivo;
-
-                    break;
-            }
+            button.Background = _brushAtivo;
+            button.BorderBrush = _bordaAtiva;
+            button.BorderThickness = new Thickness(1);
         }
 
         private void ResetarBotoes()
         {
-            SelecionarButton.Background =
-                _brushNormal;
-
-            MoverButton.Background =
-                _brushNormal;
-
-            DeletarButton.Background =
-                _brushNormal;
+            ResetarBotao(SelecionarButton);
+            ResetarBotao(MoverButton);
+            ResetarBotao(DeletarButton);
         }
 
-        // =========================
-        // BOTÕES
-        // =========================
-
-        private void SelecionarButton_Click(
-            object sender,
-            RoutedEventArgs e)
+        private void ResetarBotao(Button button)
         {
-            if (Context == null) return;
-            Context.Tools.AtivarFerramenta(
-                new SelecionarTool(Context));
+            button.Background = _brushNormal;
+            button.BorderBrush = _bordaNormal;
+            button.BorderThickness = new Thickness(1);
+        }
+
+        private bool FerramentaCorresponde(ITool tool, string key)
+        {
+            var nome = Normalizar(tool.Nome);
+            var chave = Normalizar(key);
+            return nome == chave || nome.Contains(chave, StringComparison.OrdinalIgnoreCase);
+        }
+
+        private static string Normalizar(string valor)
+        {
+            return valor.Replace(" ", "").Replace("_", "").Replace("-", "").Trim();
+        }
+
+        private void SelecionarButton_Click(object sender, RoutedEventArgs e)
+        {
+            if (Context == null)
+                return;
+
+            Context.Tools.AtivarFerramenta(new SelecionarTool(Context));
             FocarViewport();
         }
 
-        private void MoverButton_Click(
-            object sender,
-            RoutedEventArgs e)
+        private void MoverButton_Click(object sender, RoutedEventArgs e)
         {
-            if (Context == null) return;
-            Context.Tools.AtivarFerramenta(
-                new MoverTool(Context));
+            if (Context == null)
+                return;
+
+            Context.Tools.AtivarFerramenta(new MoverTool(Context));
             FocarViewport();
         }
 
-        private void CopiarButton_Click(
-            object sender,
-            RoutedEventArgs e)
+        private void CopiarButton_Click(object sender, RoutedEventArgs e)
         {
-            if (Context == null) return;
-            ClipboardService.CopiarSelecionados(
-                Context);
+            if (Context == null)
+                return;
+
+            ClipboardService.CopiarSelecionados(Context);
             FocarViewport();
         }
 
-        private void ColarButton_Click(
-            object sender,
-            RoutedEventArgs e)
+        private void ColarButton_Click(object sender, RoutedEventArgs e)
         {
-            if (Context == null) return;
-            ClipboardService.Colar(
-                Context);
+            if (Context == null)
+                return;
+
+            ClipboardService.Colar(Context);
             FocarViewport();
         }
 
-        private void DeletarButton_Click(
-            object sender,
-            RoutedEventArgs e)
+        private void DeletarButton_Click(object sender, RoutedEventArgs e)
         {
-            if (Context == null) return;
-            Context.Tools.AtivarFerramenta(
-                new DeletarTool(Context));
+            if (Context == null)
+                return;
+
+            Context.Tools.AtivarFerramenta(new DeletarTool(Context));
             FocarViewport();
         }
 
-        // =========================
-        // UNDO
-        // =========================
-
-        private void DesfazerButton_Click(
-            object sender,
-            RoutedEventArgs e)
+        private void DesfazerButton_Click(object sender, RoutedEventArgs e)
         {
             Context?.Commands.Undo();
             FocarViewport();
         }
 
-        // =========================
-        // REDO
-        // =========================
-
-        private void RefazerButton_Click(
-            object sender,
-            RoutedEventArgs e)
+        private void RefazerButton_Click(object sender, RoutedEventArgs e)
         {
             Context?.Commands.Redo();
             FocarViewport();
