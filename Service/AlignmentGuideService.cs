@@ -85,6 +85,44 @@ namespace Araci.Services
             return ajustado;
         }
 
+        public void MostrarReferenciaVertical(double x, Rect boundsReferencia)
+        {
+            Linhas.Clear();
+            AdicionarVertical(x, boundsReferencia, boundsReferencia);
+        }
+
+        public void MostrarReferenciaHorizontal(double y, Rect boundsReferencia)
+        {
+            Linhas.Clear();
+            AdicionarHorizontal(y, boundsReferencia, boundsReferencia);
+        }
+
+        public void MostrarAlinhamentoVertical(double x, Rect boundsReferencia, Rect boundsAlvo)
+        {
+            Linhas.Clear();
+            AdicionarVertical(x, boundsAlvo, boundsReferencia);
+        }
+
+        public void MostrarAlinhamentoHorizontal(double y, Rect boundsReferencia, Rect boundsAlvo)
+        {
+            Linhas.Clear();
+            AdicionarHorizontal(y, boundsAlvo, boundsReferencia);
+        }
+
+        public void MostrarDuasReferenciasVerticais(double referenceX, Rect referenceBounds, double targetX, Rect targetBounds, Rect targetFinalBounds)
+        {
+            Linhas.Clear();
+            AdicionarVertical(referenceX, referenceBounds, targetFinalBounds);
+            AdicionarVertical(targetX, targetBounds, targetBounds);
+        }
+
+        public void MostrarDuasReferenciasHorizontais(double referenceY, Rect referenceBounds, double targetY, Rect targetBounds, Rect targetFinalBounds)
+        {
+            Linhas.Clear();
+            AdicionarHorizontal(referenceY, referenceBounds, targetFinalBounds);
+            AdicionarHorizontal(targetY, targetBounds, targetBounds);
+        }
+
         public void Atualizar(IEnumerable<ElementoViewModel> selecionados)
         {
             Linhas.Clear();
@@ -261,28 +299,14 @@ namespace Araci.Services
         {
             double y1 = Math.Min(boundsSelecionados.Top, boundsReferencia.Top) - Margem;
             double y2 = Math.Max(boundsSelecionados.Bottom, boundsReferencia.Bottom) + Margem;
-
-            Linhas.Add(new AlignmentGuideLineViewModel
-            {
-                X1 = x,
-                Y1 = y1,
-                X2 = x,
-                Y2 = y2
-            });
+            Linhas.Add(new AlignmentGuideLineViewModel { X1 = x, Y1 = y1, X2 = x, Y2 = y2 });
         }
 
         private void AdicionarHorizontal(double y, Rect boundsSelecionados, Rect boundsReferencia)
         {
             double x1 = Math.Min(boundsSelecionados.Left, boundsReferencia.Left) - Margem;
             double x2 = Math.Max(boundsSelecionados.Right, boundsReferencia.Right) + Margem;
-
-            Linhas.Add(new AlignmentGuideLineViewModel
-            {
-                X1 = x1,
-                Y1 = y,
-                X2 = x2,
-                Y2 = y
-            });
+            Linhas.Add(new AlignmentGuideLineViewModel { X1 = x1, Y1 = y, X2 = x2, Y2 = y });
         }
 
         private static Rect CalcularBounds(IReadOnlyList<ElementoViewModel> items)

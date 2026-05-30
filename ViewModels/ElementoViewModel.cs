@@ -24,12 +24,7 @@ namespace Araci.ViewModels
         private ObservableCollection<ParameterViewModel>? _parametros;
         private bool _isPreview;
 
-        protected ElementoViewModel(
-            Elemento modelo,
-            ElementoNode node,
-            TypeLibraryService types,
-            NameService names,
-            TypePropertiesDialogService typePropertiesDialogs)
+        protected ElementoViewModel(Elemento modelo, ElementoNode node, TypeLibraryService types, NameService names, TypePropertiesDialogService typePropertiesDialogs)
         {
             Modelo = modelo ?? throw new ArgumentNullException(nameof(modelo));
             _node = node ?? throw new ArgumentNullException(nameof(node));
@@ -41,9 +36,7 @@ namespace Araci.ViewModels
         }
 
         public Elemento Modelo { get; }
-
         public ElementoNode Node => _node;
-
         protected TypeLibraryService Types { get; }
 
         protected void RenomearModelo(string novoNome)
@@ -67,11 +60,9 @@ namespace Araci.ViewModels
 
         public abstract IEnumerable TiposDisponiveis { get; }
 
-        public virtual TipoElementoViewModel? TipoViewModel =>
-            TipoElementoViewModelFactory.Criar(Tipo);
+        public virtual TipoElementoViewModel? TipoViewModel => TipoElementoViewModelFactory.Criar(Tipo);
 
-        public ICommand AbrirPropriedadesTipoCommand =>
-            _abrirPropriedadesTipoCommand ??= new RelayCommand(AbrirPropriedadesTipo);
+        public ICommand AbrirPropriedadesTipoCommand => _abrirPropriedadesTipoCommand ??= new RelayCommand(AbrirPropriedadesTipo);
 
         public ElementoVisualState VisualState { get; }
 
@@ -122,16 +113,9 @@ namespace Araci.ViewModels
         }
 
         public Brush Stroke => VisualState.Stroke;
-
         public double StrokeThickness => VisualState.StrokeThickness;
 
-        public virtual ElementoRenderData RenderData => new(
-            Largura,
-            Altura,
-            PontoLocalInicial,
-            PontoLocalFinal,
-            Stroke,
-            StrokeThickness);
+        public virtual ElementoRenderData RenderData => new(Largura, Altura, PontoLocalInicial, PontoLocalFinal, Stroke, StrokeThickness);
 
         public double Rotacao
         {
@@ -173,9 +157,7 @@ namespace Araci.ViewModels
         }
 
         public virtual double WorldX => Node.X;
-
         public virtual double WorldY => Node.Y;
-
         public virtual double Largura => Node.Largura;
 
         public virtual double Altura
@@ -185,16 +167,13 @@ namespace Araci.ViewModels
         }
 
         public virtual Rect Bounds => Node.Bounds;
-
+        public virtual Rect BoundsAlinhamento => ObterBoundsRotacionado(Node.BoundsAlinhamento);
         public virtual Point Centro => Node.Centro;
 
         public ObservableCollection<ParameterViewModel> Parametros =>
-            _parametros ??=
-            new ObservableCollection<ParameterViewModel>(
-                Modelo.Parametros.Values.Select(p => new ParameterViewModel(p)));
+            _parametros ??= new ObservableCollection<ParameterViewModel>(Modelo.Parametros.Values.Select(p => new ParameterViewModel(p)));
 
         protected virtual Point PontoLocalInicial => new(0, 0);
-
         protected virtual Point PontoLocalFinal => new(Largura, Altura);
 
         protected void SelecionarPrimeiroTipoDisponivel()
@@ -276,9 +255,37 @@ namespace Araci.ViewModels
             OnPropertyChanged(nameof(Largura));
             OnPropertyChanged(nameof(Altura));
             OnPropertyChanged(nameof(Bounds));
+            OnPropertyChanged(nameof(BoundsAlinhamento));
             OnPropertyChanged(nameof(Centro));
             OnPropertyChanged(nameof(Rotacao));
             OnPropertyChanged(nameof(RenderData));
+        }
+
+        private Rect ObterBoundsRotacionado(Rect bounds)
+        {
+            if (Math.Abs(Rotacao) <= 0.000001)
+                return bounds;
+
+            Point center = Centro;
+            Point p1 = RotateAround(new Point(bounds.Left, bounds.Top), center, Rotacao);
+            Point p2 = RotateAround(new Point(bounds.Right, bounds.Top), center, Rotacao);
+            Point p3 = RotateAround(new Point(bounds.Right, bounds.Bottom), center, Rotacao);
+            Point p4 = RotateAround(new Point(bounds.Left, bounds.Bottom), center, Rotacao);
+            double minX = Math.Min(Math.Min(p1.X, p2.X), Math.Min(p3.X, p4.X));
+            double minY = Math.Min(Math.Min(p1.Y, p2.Y), Math.Min(p3.Y, p4.Y));
+            double maxX = Math.Max(Math.Max(p1.X, p2.X), Math.Max(p3.X, p4.X));
+            double maxY = Math.Max(Math.Max(p1.Y, p2.Y), Math.Max(p3.Y, p4.Y));
+            return new Rect(new Point(minX, minY), new Point(maxX, maxY));
+        }
+
+        private static Point RotateAround(Point point, Point center, double angle)
+        {
+            double radians = angle * Math.PI / 180.0;
+            double cos = Math.Cos(radians);
+            double sin = Math.Sin(radians);
+            double x = point.X - center.X;
+            double y = point.Y - center.Y;
+            return new Point(center.X + x * cos - y * sin, center.Y + x * sin + y * cos);
         }
 
         private void AbrirPropriedadesTipo()

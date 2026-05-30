@@ -3,6 +3,7 @@ using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Media;
 using Araci;
+using Araci.Applications.Editar.Alinhar;
 using Araci.Applications.Editar.Base;
 using Araci.Applications.Editar.Deletar;
 using Araci.Applications.Editar.Mover;
@@ -83,6 +84,7 @@ namespace Araci.Ribbon.Tabs
 
             AtivarSeCorresponder(SelecionarButton, tool);
             AtivarSeCorresponder(MoverButton, tool);
+            AtivarSeCorresponder(AlinharButton, tool);
             AtivarSeCorresponder(DeletarButton, tool);
         }
 
@@ -100,6 +102,7 @@ namespace Araci.Ribbon.Tabs
         {
             ResetarBotao(SelecionarButton);
             ResetarBotao(MoverButton);
+            ResetarBotao(AlinharButton);
             ResetarBotao(DeletarButton);
         }
 
@@ -137,6 +140,15 @@ namespace Araci.Ribbon.Tabs
                 return;
 
             Context.Tools.AtivarFerramenta(new MoverTool(Context));
+            FocarViewport();
+        }
+
+        private void AlinharButton_Click(object sender, RoutedEventArgs e)
+        {
+            if (Context == null)
+                return;
+
+            Context.Tools.AtivarFerramenta(new AlinharTool(Context));
             FocarViewport();
         }
 

@@ -11,8 +11,8 @@ namespace Araci.Core.SceneNodes
         }
 
         public Elemento Modelo { get; }
-
         public Rect Bounds { get; protected set; }
+        public virtual Rect BoundsAlinhamento => Bounds;
 
         public Point Centro => new(
             Bounds.X + Bounds.Width / 2,
@@ -37,7 +37,6 @@ namespace Araci.Core.SceneNodes
         {
             Modelo.PosicaoX += delta.X;
             Modelo.PosicaoY += delta.Y;
-
             AtualizarGeometria();
         }
 
