@@ -213,9 +213,9 @@ namespace Araci.Services
         {
             Register(new ElementDefinition(KindCabo, "Cabo", "CABO", typeof(Cabo), typeof(CaboViewModel), typeof(TipoCabo), CriarCabo, (m, n, d, l) => new CaboViewModel((Cabo)m, Types, n, d), () => Types.TipoCaboPadrao, () => Types.TiposCabos, _ => Size.Empty, e => AtualizarTerminaisCabo((Cabo)e), "Cabo", "Inserir", "cabo.png", 10, true, "CB", true, new[]
             {
-                Prop<CaboViewModel>("Nome", "Nome", 10),
-                Prop<CaboViewModel>("BarraOrigem", "Barra origem", 20),
-                Prop<CaboViewModel>("BarraDestino", "Barra destino", 30),
+                Prop<CaboViewModel>("Nome", "Nome", 10, false),
+                Prop<CaboViewModel>("BarraOrigem", "Barra origem", 20, false),
+                Prop<CaboViewModel>("BarraDestino", "Barra destino", 30, false),
                 Prop<CaboViewModel>("Comprimento", "Comprimento (m)", 40),
                 Prop<CaboViewModel>("Ampacidade", "Ampacidade (A)", 50),
                 Prop<CaboViewModel>("TensaoLinha", "Tensão linha (kV)", 60, allowMixedTypeEdit: true),
@@ -230,7 +230,7 @@ namespace Araci.Services
 
             Register(new ElementDefinition(KindCarga, "Carga", "CARGA", typeof(Carga), typeof(CargaViewModel), typeof(TipoCarga), CriarCarga, (m, n, d, l) => new CargaViewModel((Carga)m, Types, n, d, l), () => Types.TipoCargaPadrao, () => Types.TiposCargas, _ => EquipamentoSize(), e => ((Carga)e).AtualizarTerminais(ElementGeometryDefaults.EquipamentoLargura, ElementGeometryDefaults.EquipamentoAltura), "Carga", "Inserir", "carga.png", 20, true, "CG", false, new[]
             {
-                Prop<CargaViewModel>("Nome", "Nome", 10),
+                Prop<CargaViewModel>("Nome", "Nome", 10, false),
                 Prop<CargaViewModel>("PotenciaAtiva", "Potência ativa (kW)", 20, allowMixedTypeEdit: true),
                 Prop<CargaViewModel>("PotenciaReativa", "Potência reativa (kVAr)", 30, allowMixedTypeEdit: true),
                 Prop<CargaViewModel>("Alimentador", "Alimentador", 40, allowMixedTypeEdit: true),
@@ -246,7 +246,7 @@ namespace Araci.Services
 
             Register(new ElementDefinition(KindGerador, "Gerador", "GERADOR", typeof(Gerador), typeof(GeradorViewModel), typeof(TipoGerador), CriarGerador, (m, n, d, l) => new GeradorViewModel((Gerador)m, Types, n, d, l), () => Types.TipoGeradorPadrao, () => Types.TiposGeradores, _ => EquipamentoSize(), e => ((Gerador)e).AtualizarTerminais(ElementGeometryDefaults.EquipamentoLargura, ElementGeometryDefaults.EquipamentoAltura), "Gerador", "Inserir", "gerador.png", 30, true, "GE", false, new[]
             {
-                Prop<GeradorViewModel>("Nome", "Nome", 10),
+                Prop<GeradorViewModel>("Nome", "Nome", 10, false),
                 Prop<GeradorViewModel>("PotenciaAparente", "Potência aparente (kVA)", 20),
                 Prop<GeradorViewModel>("PotenciaAtiva", "Potência ativa (kW)", 30, allowMixedTypeEdit: true),
                 Prop<GeradorViewModel>("PotenciaReativa", "Potência reativa (kVAr)", 40, allowMixedTypeEdit: true),
@@ -263,14 +263,13 @@ namespace Araci.Services
 
             Register(new ElementDefinition(KindSin, "SIN", "SIN", typeof(Sin), typeof(SinViewModel), typeof(TipoSin), CriarSin, (m, n, d, l) => new SinViewModel((Sin)m, Types, n, d, l), () => Types.TipoSinPadrao, () => Types.TiposSin, _ => EquipamentoSize(), e => ((Sin)e).AtualizarTerminais(ElementGeometryDefaults.EquipamentoLargura, ElementGeometryDefaults.EquipamentoAltura), "SIN", "Inserir", "sin.png", 40, true, "SI", false, new[]
             {
-                Prop<SinViewModel>("Nome", "Nome", 10),
+                Prop<SinViewModel>("Nome", "Nome", 10, false),
                 Prop<SinViewModel>("TensaoLinha", "Tensão linha (kV)", 20, allowMixedTypeEdit: true)
             }));
 
             Register(new ElementDefinition(KindTransformador, "Transformador", "TR", typeof(Transformador), typeof(TransformadorViewModel), typeof(TipoTransformador), CriarTransformador, (m, n, d, l) => new TransformadorViewModel((Transformador)m, Types, n, d, l), () => Types.TipoTransformadorPadrao, () => Types.TiposTransformadores, _ => TransformadorSize(), e => ((Transformador)e).AtualizarTerminais(ElementGeometryDefaults.TransformadorLargura, ElementGeometryDefaults.TransformadorAltura), "Trafo", "Inserir", "transformador.png", 50, true, "TR", false, new[]
             {
-                Prop<TransformadorViewModel>("Nome", "Nome", 10),
-                Prop<TransformadorViewModel>("Barra", "Barra", 20),
+                Prop<TransformadorViewModel>("Nome", "Nome", 10, false),
                 Prop<TransformadorViewModel>("Alimentador", "Alimentador", 30, allowMixedTypeEdit: true),
                 Prop<TransformadorViewModel>("Fases", "Fases", 40),
                 Prop<TransformadorViewModel>("Enrolamentos", "Enrolamentos", 50),
@@ -285,7 +284,7 @@ namespace Araci.Services
 
             Register(new ElementDefinition(KindBarra, "Barra", "BARRA", typeof(Barra), typeof(BarraViewModel), typeof(TipoBarra), CriarBarra, (m, n, d, l) => new BarraViewModel((Barra)m, Types, n, d, l), () => Types.TipoBarraPadrao, () => Types.TiposBarras, e => new Size(ElementGeometryDefaults.BarraLargura, ((Barra)e).Altura), e => ((Barra)e).AtualizarTerminais(ElementGeometryDefaults.BarraLargura), "Barra", "Inserir", "barra.png", 60, true, "BA", false, new[]
             {
-                Prop<BarraViewModel>("Nome", "Nome", 10),
+                Prop<BarraViewModel>("Nome", "Nome", 10, false),
                 Prop<BarraViewModel>("Tensao", "Tensão (kV)", 20),
                 Prop<BarraViewModel>("Altura", "Altura (m)", 30)
             }));
