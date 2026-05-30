@@ -17,7 +17,6 @@ namespace Araci.Services
         public const string KindSin = "Sin";
         public const string KindTransformador = "Transformador";
         public const string KindCabo = "Cabo";
-
         private readonly Dictionary<string, ElementDefinition> _porKind = new(StringComparer.OrdinalIgnoreCase);
         private readonly List<ElementDefinition> _definitions = new();
 
