@@ -215,55 +215,55 @@ namespace Araci.Services
                 Prop<CaboViewModel>("Nome", "Nome", 10, false),
                 Prop<CaboViewModel>("BarraOrigem", "Barra origem", 20, false),
                 Prop<CaboViewModel>("BarraDestino", "Barra destino", 30, false),
-                Prop<CaboViewModel>("Comprimento", "Comprimento (m)", 40),
-                Prop<CaboViewModel>("Ampacidade", "Ampacidade (A)", 50),
-                Prop<CaboViewModel>("TensaoLinha", "Tensão linha (kV)", 60, allowMixedTypeEdit: true),
-                Prop<CaboViewModel>("TensaoFaseA", "Tensão fase A (kV)", 70, allowMixedTypeEdit: true),
-                Prop<CaboViewModel>("TensaoFaseB", "Tensão fase B (kV)", 80, allowMixedTypeEdit: true),
-                Prop<CaboViewModel>("TensaoFaseC", "Tensão fase C (kV)", 90, allowMixedTypeEdit: true),
-                Prop<CaboViewModel>("CorrenteLinha", "Corrente linha (A)", 100, allowMixedTypeEdit: true),
-                Prop<CaboViewModel>("CorrenteFaseA", "Corrente fase A (A)", 110, allowMixedTypeEdit: true),
-                Prop<CaboViewModel>("CorrenteFaseB", "Corrente fase B (A)", 120, allowMixedTypeEdit: true),
-                Prop<CaboViewModel>("CorrenteFaseC", "Corrente fase C (A)", 130, allowMixedTypeEdit: true)
+                Prop<CaboViewModel>("Comprimento", "Comprimento", 40, unit: UnitKind.LengthMeter),
+                Prop<CaboViewModel>("Ampacidade", "Ampacidade", 50, unit: UnitKind.CurrentAmpere),
+                Prop<CaboViewModel>("TensaoLinha", "Tensão linha", 60, allowMixedTypeEdit: true, unit: UnitKind.VoltageKV),
+                Prop<CaboViewModel>("TensaoFaseA", "Tensão fase A", 70, allowMixedTypeEdit: true, unit: UnitKind.VoltageKV),
+                Prop<CaboViewModel>("TensaoFaseB", "Tensão fase B", 80, allowMixedTypeEdit: true, unit: UnitKind.VoltageKV),
+                Prop<CaboViewModel>("TensaoFaseC", "Tensão fase C", 90, allowMixedTypeEdit: true, unit: UnitKind.VoltageKV),
+                Prop<CaboViewModel>("CorrenteLinha", "Corrente linha", 100, allowMixedTypeEdit: true, unit: UnitKind.CurrentAmpere),
+                Prop<CaboViewModel>("CorrenteFaseA", "Corrente fase A", 110, allowMixedTypeEdit: true, unit: UnitKind.CurrentAmpere),
+                Prop<CaboViewModel>("CorrenteFaseB", "Corrente fase B", 120, allowMixedTypeEdit: true, unit: UnitKind.CurrentAmpere),
+                Prop<CaboViewModel>("CorrenteFaseC", "Corrente fase C", 130, allowMixedTypeEdit: true, unit: UnitKind.CurrentAmpere)
             }));
 
             Register(new ElementDefinition(KindCarga, "Carga", "CARGA", typeof(Carga), typeof(CargaViewModel), typeof(TipoCarga), CriarCarga, (m, n, d, l) => new CargaViewModel((Carga)m, Types, n, d, l), () => Types.TipoCargaPadrao, () => Types.TiposCargas, _ => EquipamentoSize(), e => ((Carga)e).AtualizarTerminais(ElementGeometryDefaults.EquipamentoLargura, ElementGeometryDefaults.EquipamentoAltura), "Carga", "Inserir", "carga.png", 20, true, "CG", false, new[]
             {
                 Prop<CargaViewModel>("Nome", "Nome", 10, false),
-                Prop<CargaViewModel>("PotenciaAtiva", "Potência ativa (kW)", 20, allowMixedTypeEdit: true),
-                Prop<CargaViewModel>("PotenciaReativa", "Potência reativa (kVAr)", 30, allowMixedTypeEdit: true),
+                Prop<CargaViewModel>("PotenciaAtiva", "Potência ativa", 20, allowMixedTypeEdit: true, unit: UnitKind.ActivePowerKW),
+                Prop<CargaViewModel>("PotenciaReativa", "Potência reativa", 30, allowMixedTypeEdit: true, unit: UnitKind.ReactivePowerKVAr),
                 Prop<CargaViewModel>("Alimentador", "Alimentador", 40, allowMixedTypeEdit: true),
-                Prop<CargaViewModel>("CorrenteLinha", "Corrente linha (A)", 50, allowMixedTypeEdit: true),
-                Prop<CargaViewModel>("CorrenteFaseA", "Corrente fase A (A)", 60, allowMixedTypeEdit: true),
-                Prop<CargaViewModel>("CorrenteFaseB", "Corrente fase B (A)", 70, allowMixedTypeEdit: true),
-                Prop<CargaViewModel>("CorrenteFaseC", "Corrente fase C (A)", 80, allowMixedTypeEdit: true),
-                Prop<CargaViewModel>("TensaoLinha", "Tensão linha (kV)", 90, allowMixedTypeEdit: true),
-                Prop<CargaViewModel>("TensaoFaseA", "Tensão fase A (kV)", 100, allowMixedTypeEdit: true),
-                Prop<CargaViewModel>("TensaoFaseB", "Tensão fase B (kV)", 110, allowMixedTypeEdit: true),
-                Prop<CargaViewModel>("TensaoFaseC", "Tensão fase C (kV)", 120, allowMixedTypeEdit: true)
+                Prop<CargaViewModel>("CorrenteLinha", "Corrente linha", 50, allowMixedTypeEdit: true, unit: UnitKind.CurrentAmpere),
+                Prop<CargaViewModel>("CorrenteFaseA", "Corrente fase A", 60, allowMixedTypeEdit: true, unit: UnitKind.CurrentAmpere),
+                Prop<CargaViewModel>("CorrenteFaseB", "Corrente fase B", 70, allowMixedTypeEdit: true, unit: UnitKind.CurrentAmpere),
+                Prop<CargaViewModel>("CorrenteFaseC", "Corrente fase C", 80, allowMixedTypeEdit: true, unit: UnitKind.CurrentAmpere),
+                Prop<CargaViewModel>("TensaoLinha", "Tensão linha", 90, allowMixedTypeEdit: true, unit: UnitKind.VoltageKV),
+                Prop<CargaViewModel>("TensaoFaseA", "Tensão fase A", 100, allowMixedTypeEdit: true, unit: UnitKind.VoltageKV),
+                Prop<CargaViewModel>("TensaoFaseB", "Tensão fase B", 110, allowMixedTypeEdit: true, unit: UnitKind.VoltageKV),
+                Prop<CargaViewModel>("TensaoFaseC", "Tensão fase C", 120, allowMixedTypeEdit: true, unit: UnitKind.VoltageKV)
             }));
 
             Register(new ElementDefinition(KindGerador, "Gerador", "GERADOR", typeof(Gerador), typeof(GeradorViewModel), typeof(TipoGerador), CriarGerador, (m, n, d, l) => new GeradorViewModel((Gerador)m, Types, n, d, l), () => Types.TipoGeradorPadrao, () => Types.TiposGeradores, _ => EquipamentoSize(), e => ((Gerador)e).AtualizarTerminais(ElementGeometryDefaults.EquipamentoLargura, ElementGeometryDefaults.EquipamentoAltura), "Gerador", "Inserir", "gerador.png", 30, true, "GE", false, new[]
             {
                 Prop<GeradorViewModel>("Nome", "Nome", 10, false),
-                Prop<GeradorViewModel>("PotenciaAparente", "Potência aparente (kVA)", 20),
-                Prop<GeradorViewModel>("PotenciaAtiva", "Potência ativa (kW)", 30, allowMixedTypeEdit: true),
-                Prop<GeradorViewModel>("PotenciaReativa", "Potência reativa (kVAr)", 40, allowMixedTypeEdit: true),
+                Prop<GeradorViewModel>("PotenciaAparente", "Potência aparente", 20, unit: UnitKind.ApparentPowerKVA),
+                Prop<GeradorViewModel>("PotenciaAtiva", "Potência ativa", 30, allowMixedTypeEdit: true, unit: UnitKind.ActivePowerKW),
+                Prop<GeradorViewModel>("PotenciaReativa", "Potência reativa", 40, allowMixedTypeEdit: true, unit: UnitKind.ReactivePowerKVAr),
                 Prop<GeradorViewModel>("Alimentador", "Alimentador", 45, allowMixedTypeEdit: true),
-                Prop<GeradorViewModel>("TensaoLinha", "Tensão linha (kV)", 50, allowMixedTypeEdit: true),
-                Prop<GeradorViewModel>("TensaoFaseA", "Tensão fase A (kV)", 60, allowMixedTypeEdit: true),
-                Prop<GeradorViewModel>("TensaoFaseB", "Tensão fase B (kV)", 70, allowMixedTypeEdit: true),
-                Prop<GeradorViewModel>("TensaoFaseC", "Tensão fase C (kV)", 80, allowMixedTypeEdit: true),
-                Prop<GeradorViewModel>("CorrenteLinha", "Corrente linha (A)", 90, allowMixedTypeEdit: true),
-                Prop<GeradorViewModel>("CorrenteFaseA", "Corrente fase A (A)", 100, allowMixedTypeEdit: true),
-                Prop<GeradorViewModel>("CorrenteFaseB", "Corrente fase B (A)", 110, allowMixedTypeEdit: true),
-                Prop<GeradorViewModel>("CorrenteFaseC", "Corrente fase C (A)", 120, allowMixedTypeEdit: true)
+                Prop<GeradorViewModel>("TensaoLinha", "Tensão linha", 50, allowMixedTypeEdit: true, unit: UnitKind.VoltageKV),
+                Prop<GeradorViewModel>("TensaoFaseA", "Tensão fase A", 60, allowMixedTypeEdit: true, unit: UnitKind.VoltageKV),
+                Prop<GeradorViewModel>("TensaoFaseB", "Tensão fase B", 70, allowMixedTypeEdit: true, unit: UnitKind.VoltageKV),
+                Prop<GeradorViewModel>("TensaoFaseC", "Tensão fase C", 80, allowMixedTypeEdit: true, unit: UnitKind.VoltageKV),
+                Prop<GeradorViewModel>("CorrenteLinha", "Corrente linha", 90, allowMixedTypeEdit: true, unit: UnitKind.CurrentAmpere),
+                Prop<GeradorViewModel>("CorrenteFaseA", "Corrente fase A", 100, allowMixedTypeEdit: true, unit: UnitKind.CurrentAmpere),
+                Prop<GeradorViewModel>("CorrenteFaseB", "Corrente fase B", 110, allowMixedTypeEdit: true, unit: UnitKind.CurrentAmpere),
+                Prop<GeradorViewModel>("CorrenteFaseC", "Corrente fase C", 120, allowMixedTypeEdit: true, unit: UnitKind.CurrentAmpere)
             }));
 
             Register(new ElementDefinition(KindSin, "SIN", "SIN", typeof(Sin), typeof(SinViewModel), typeof(TipoSin), CriarSin, (m, n, d, l) => new SinViewModel((Sin)m, Types, n, d, l), () => Types.TipoSinPadrao, () => Types.TiposSin, _ => EquipamentoSize(), e => ((Sin)e).AtualizarTerminais(ElementGeometryDefaults.EquipamentoLargura, ElementGeometryDefaults.EquipamentoAltura), "SIN", "Inserir", "sin.png", 40, true, "SI", false, new[]
             {
                 Prop<SinViewModel>("Nome", "Nome", 10, false),
-                Prop<SinViewModel>("TensaoLinha", "Tensão linha (kV)", 20, allowMixedTypeEdit: true)
+                Prop<SinViewModel>("TensaoLinha", "Tensão linha", 20, allowMixedTypeEdit: true, unit: UnitKind.VoltageKV)
             }));
 
             Register(new ElementDefinition(KindTransformador, "Transformador", "TR", typeof(Transformador), typeof(TransformadorViewModel), typeof(TipoTransformador), CriarTransformador, (m, n, d, l) => new TransformadorViewModel((Transformador)m, Types, n, d, l), () => Types.TipoTransformadorPadrao, () => Types.TiposTransformadores, _ => TransformadorSize(), e => ((Transformador)e).AtualizarTerminais(ElementGeometryDefaults.TransformadorLargura, ElementGeometryDefaults.TransformadorAltura), "Trafo", "Inserir", "transformador.png", 50, true, "TR", false, new[]
@@ -272,11 +272,11 @@ namespace Araci.Services
                 Prop<TransformadorViewModel>("Alimentador", "Alimentador", 30, allowMixedTypeEdit: true),
                 Prop<TransformadorViewModel>("Fases", "Fases", 40),
                 Prop<TransformadorViewModel>("Enrolamentos", "Enrolamentos", 50),
-                Prop<TransformadorViewModel>("TensaoPrimarioKV", "Tensão primário (kV)", 60),
-                Prop<TransformadorViewModel>("TensaoSecundarioKV", "Tensão secundário (kV)", 70),
-                Prop<TransformadorViewModel>("PotenciaAparente", "Potência aparente (kVA)", 80),
-                Prop<TransformadorViewModel>("RPercentual", "R (%)", 90),
-                Prop<TransformadorViewModel>("XPercentual", "X (%)", 100),
+                Prop<TransformadorViewModel>("TensaoPrimarioKV", "Tensão primário", 60, unit: UnitKind.VoltageKV),
+                Prop<TransformadorViewModel>("TensaoSecundarioKV", "Tensão secundário", 70, unit: UnitKind.VoltageKV),
+                Prop<TransformadorViewModel>("PotenciaAparente", "Potência aparente", 80, unit: UnitKind.ApparentPowerKVA),
+                Prop<TransformadorViewModel>("RPercentual", "R", 90, unit: UnitKind.Percent),
+                Prop<TransformadorViewModel>("XPercentual", "X", 100, unit: UnitKind.Percent),
                 Prop<TransformadorViewModel>("LigacaoPrimario", "Ligação primário", 110),
                 Prop<TransformadorViewModel>("LigacaoSecundario", "Ligação secundário", 120)
             }));
@@ -284,8 +284,8 @@ namespace Araci.Services
             Register(new ElementDefinition(KindBarra, "Barra", "BARRA", typeof(Barra), typeof(BarraViewModel), typeof(TipoBarra), CriarBarra, (m, n, d, l) => new BarraViewModel((Barra)m, Types, n, d, l), () => Types.TipoBarraPadrao, () => Types.TiposBarras, e => new Size(ElementGeometryDefaults.BarraLargura, ((Barra)e).Altura), e => ((Barra)e).AtualizarTerminais(ElementGeometryDefaults.BarraLargura), "Barra", "Inserir", "barra.png", 60, true, "BA", false, new[]
             {
                 Prop<BarraViewModel>("Nome", "Nome", 10, false),
-                Prop<BarraViewModel>("Tensao", "Tensão (kV)", 20),
-                Prop<BarraViewModel>("Altura", "Altura (m)", 30)
+                Prop<BarraViewModel>("Tensao", "Tensão", 20, unit: UnitKind.VoltageKV),
+                Prop<BarraViewModel>("Altura", "Altura", 30, unit: UnitKind.LengthMeter)
             }));
         }
 
@@ -349,9 +349,9 @@ namespace Araci.Services
                 cabo.DefinirDestino(cabo.Vertices[^1]);
         }
 
-        private static InstancePropertyDescriptor Prop<T>(string propertyName, string displayName, int order, bool isEditable = true, bool allowMixedTypeEdit = false) where T : ElementoViewModel
+        private static InstancePropertyDescriptor Prop<T>(string propertyName, string displayName, int order, bool isEditable = true, bool allowMixedTypeEdit = false, UnitKind unit = UnitKind.None) where T : ElementoViewModel
         {
-            return new InstancePropertyDescriptor(typeof(T), propertyName, displayName, order, isEditable, allowMixedTypeEdit);
+            return new InstancePropertyDescriptor(typeof(T), propertyName, displayName, order, isEditable, allowMixedTypeEdit, unit);
         }
     }
 }

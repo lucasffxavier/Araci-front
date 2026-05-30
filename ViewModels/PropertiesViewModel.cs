@@ -9,6 +9,7 @@ using System.Reflection;
 using System.Runtime.CompilerServices;
 using System.Windows.Input;
 using Araci.Models.Tipos;
+using Araci.Services;
 using AraciCommandManager = Araci.Core.Commands.CommandManager;
 using BulkPropertyChangeCommand = Araci.Core.Commands.BulkPropertyChangeCommand;
 
@@ -91,8 +92,7 @@ namespace Araci.ViewModels
             }
         }
 
-        public ICommand AbrirPropriedadesTipoCommand =>
-            _abrirPropriedadesTipoCommand ??= new SimpleCommand(AbrirPropriedadesTipo, () => PodeAbrirPropriedadesTipo);
+        public ICommand AbrirPropriedadesTipoCommand => _abrirPropriedadesTipoCommand ??= new SimpleCommand(AbrirPropriedadesTipo, () => PodeAbrirPropriedadesTipo);
 
         private void AbrirPropriedadesTipo()
         {
@@ -192,34 +192,41 @@ namespace Araci.ViewModels
 
         internal static string FormatarValor(object? valor)
         {
-            if (valor == null)
-                return string.Empty;
+            return UnitFormatter.Format(valor, UnitKind.None);
+        }
 
-            return valor switch
-            {
-                double d => d.ToString("N2", CultureInfo.CurrentCulture),
-                float f => f.ToString("N2", CultureInfo.CurrentCulture),
-                decimal m => m.ToString("N2", CultureInfo.CurrentCulture),
-                _ => valor.ToString() ?? string.Empty
-            };
+        internal static string FormatarValor(object? valor, InstancePropertyDescriptor descriptor)
+        {
+            return UnitFormatter.Format(valor, descriptor.Unit);
         }
 
         internal static bool TentarConverterValor(string valor, Type tipoDestino, out object? convertido)
         {
+            return TentarConverterValor(valor, tipoDestino, UnitKind.None, out convertido);
+        }
+
+        internal static bool TentarConverterValor(string valor, Type tipoDestino, InstancePropertyDescriptor descriptor, out object? convertido)
+        {
+            return TentarConverterValor(valor, tipoDestino, descriptor.Unit, out convertido);
+        }
+
+        internal static bool TentarConverterValor(string valor, Type tipoDestino, UnitKind unit, out object? convertido)
+        {
             convertido = null;
             Type tipo = Nullable.GetUnderlyingType(tipoDestino) ?? tipoDestino;
+            string valorSemUnidade = UnitFormatter.StripUnit(valor, unit);
 
             try
             {
                 if (tipo == typeof(string))
                 {
-                    convertido = valor;
+                    convertido = valorSemUnidade;
                     return true;
                 }
 
                 if (tipo == typeof(int))
                 {
-                    if (!int.TryParse(valor, NumberStyles.Integer, CultureInfo.CurrentCulture, out int i))
+                    if (!int.TryParse(valorSemUnidade, NumberStyles.Integer, CultureInfo.CurrentCulture, out int i))
                         return false;
 
                     convertido = i;
@@ -228,7 +235,7 @@ namespace Araci.ViewModels
 
                 if (tipo == typeof(double))
                 {
-                    if (!double.TryParse(valor, NumberStyles.Float | NumberStyles.AllowThousands, CultureInfo.CurrentCulture, out double d))
+                    if (!double.TryParse(valorSemUnidade, NumberStyles.Float | NumberStyles.AllowThousands, CultureInfo.CurrentCulture, out double d))
                         return false;
 
                     convertido = d;
@@ -237,7 +244,7 @@ namespace Araci.ViewModels
 
                 if (tipo == typeof(float))
                 {
-                    if (!float.TryParse(valor, NumberStyles.Float | NumberStyles.AllowThousands, CultureInfo.CurrentCulture, out float f))
+                    if (!float.TryParse(valorSemUnidade, NumberStyles.Float | NumberStyles.AllowThousands, CultureInfo.CurrentCulture, out float f))
                         return false;
 
                     convertido = f;
@@ -246,7 +253,7 @@ namespace Araci.ViewModels
 
                 if (tipo == typeof(decimal))
                 {
-                    if (!decimal.TryParse(valor, NumberStyles.Float | NumberStyles.AllowThousands, CultureInfo.CurrentCulture, out decimal m))
+                    if (!decimal.TryParse(valorSemUnidade, NumberStyles.Float | NumberStyles.AllowThousands, CultureInfo.CurrentCulture, out decimal m))
                         return false;
 
                     convertido = m;
@@ -255,7 +262,7 @@ namespace Araci.ViewModels
 
                 if (tipo == typeof(bool))
                 {
-                    if (!bool.TryParse(valor, out bool b))
+                    if (!bool.TryParse(valorSemUnidade, out bool b))
                         return false;
 
                     convertido = b;
@@ -264,11 +271,11 @@ namespace Araci.ViewModels
 
                 if (tipo.IsEnum)
                 {
-                    convertido = Enum.Parse(tipo, valor, true);
+                    convertido = Enum.Parse(tipo, valorSemUnidade, true);
                     return true;
                 }
 
-                convertido = Convert.ChangeType(valor, tipo, CultureInfo.CurrentCulture);
+                convertido = Convert.ChangeType(valorSemUnidade, tipo, CultureInfo.CurrentCulture);
                 return true;
             }
             catch
@@ -347,16 +354,21 @@ namespace Araci.ViewModels
             Nome = descriptor.DisplayName;
             DisplayName = descriptor.DisplayName;
             PropertyName = descriptor.PropertyName;
+            Unit = descriptor.Unit;
+            UnitSymbol = descriptor.UnitSymbol;
             IsEditable = isEditable;
             IsReadOnly = !isEditable;
             _varia = varia;
-            _valor = varia ? "<varia>" : PropertiesViewModel.FormatarValor(ObterValorAtual());
+            _valor = varia ? "<varia>" : PropertiesViewModel.FormatarValor(ObterValorAtual(), descriptor);
         }
 
         public string Nome { get; }
         public string DisplayName { get; }
         public string PropertyName { get; }
         public Type ValueType => _tipoValor;
+        public UnitKind Unit { get; }
+        public string UnitSymbol { get; }
+        public bool HasUnit => Unit != UnitKind.None;
         public bool IsEditable { get; }
         public bool IsReadOnly { get; }
         public bool IsMixed => _varia;
@@ -411,7 +423,7 @@ namespace Araci.ViewModels
             if (string.Equals(novoValor, "<varia>", StringComparison.OrdinalIgnoreCase))
                 return;
 
-            if (!PropertiesViewModel.TentarConverterValor(novoValor, _tipoValor, out object? convertido))
+            if (!PropertiesViewModel.TentarConverterValor(novoValor, _tipoValor, _descriptor, out object? convertido))
             {
                 TemErro = true;
                 MensagemErro = "Valor inválido";
@@ -433,7 +445,7 @@ namespace Araci.ViewModels
 
             if (items.Count == 0)
             {
-                _valor = PropertiesViewModel.FormatarValor(convertido);
+                _valor = PropertiesViewModel.FormatarValor(convertido, _descriptor);
                 _varia = false;
                 AtualizarEstadoValido();
                 return;
@@ -447,7 +459,7 @@ namespace Araci.ViewModels
                 _commands.Execute(command);
 
             _varia = false;
-            _valor = PropertiesViewModel.FormatarValor(convertido);
+            _valor = PropertiesViewModel.FormatarValor(convertido, _descriptor);
             AtualizarEstadoValido();
         }
 

@@ -1,10 +1,11 @@
 ﻿using System;
+using Araci.Services;
 
 namespace Araci.ViewModels
 {
     public sealed class InstancePropertyDescriptor
     {
-        public InstancePropertyDescriptor(Type ownerType, string propertyName, string displayName, int order, bool isEditable = true, bool allowMixedTypeEdit = false)
+        public InstancePropertyDescriptor(Type ownerType, string propertyName, string displayName, int order, bool isEditable = true, bool allowMixedTypeEdit = false, UnitKind unit = UnitKind.None)
         {
             OwnerType = ownerType ?? throw new ArgumentNullException(nameof(ownerType));
             PropertyName = propertyName ?? throw new ArgumentNullException(nameof(propertyName));
@@ -12,6 +13,7 @@ namespace Araci.ViewModels
             Order = order;
             IsEditable = isEditable;
             AllowMixedTypeEdit = allowMixedTypeEdit;
+            Unit = unit;
         }
 
         public Type OwnerType { get; }
@@ -20,5 +22,8 @@ namespace Araci.ViewModels
         public int Order { get; }
         public bool IsEditable { get; }
         public bool AllowMixedTypeEdit { get; }
+        public UnitKind Unit { get; }
+        public bool HasUnit => Unit != UnitKind.None;
+        public string UnitSymbol => UnitFormatter.GetSymbol(Unit);
     }
 }
