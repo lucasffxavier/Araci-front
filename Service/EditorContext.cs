@@ -6,6 +6,8 @@ using Araci.Core.SceneQueries;
 using Araci.Core.Scenes;
 using Araci.Core.Transactions;
 using Araci.Infrastructure.Persistence;
+using Araci.Applications.Simulation;
+using Araci.Infrastructure.Simulation;
 using Araci.ViewModels;
 
 namespace Araci.Services
@@ -29,7 +31,9 @@ namespace Araci.Services
             OperationalState = new OperationalGraphStateBuilder();
             Topology = new TopologyValidator(this);
             SimulationResults = new SimulationResultApplier(this);
-            Simulation = new SimulationPipeline(this);
+            var simulationGateway = new FastApiOpenDssGateway();
+            var circuitDtoBuilder = new CircuitDtoBuilder(this);
+            Simulation = new SimulationPipeline(circuitDtoBuilder, simulationGateway, SimulationResults);
             SimulationExport = new SimulationExportService();
             SimulationMessages = new SimulationMessageBuilder();
             TypePropertiesDialogs = new TypePropertiesDialogService();

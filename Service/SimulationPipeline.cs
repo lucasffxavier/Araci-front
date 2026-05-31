@@ -1,29 +1,40 @@
 using System;
 using System.Threading.Tasks;
 using Araci.Applications.Abstractions;
+using Araci.Applications.Simulation;
 using Araci.DTOs;
+using Araci.Infrastructure.Simulation;
 
 namespace Araci.Services
 {
     public class SimulationPipeline : ISimulationPipeline
     {
-        private readonly EditorContext _context;
+        private readonly CircuitDtoBuilder _circuitBuilder;
+        private readonly ISimulationGateway _gateway;
         private readonly ISimulationResultApplier _simulationResults;
 
         public SimulationPipeline(EditorContext context)
+            : this(
+                new CircuitDtoBuilder(context),
+                new FastApiOpenDssGateway(),
+                context?.SimulationResults ?? throw new ArgumentNullException(nameof(context)))
         {
-            _context = context ?? throw new ArgumentNullException(nameof(context));
-            _simulationResults = context.SimulationResults;
+        }
+
+        public SimulationPipeline(
+            CircuitDtoBuilder circuitBuilder,
+            ISimulationGateway gateway,
+            ISimulationResultApplier simulationResults)
+        {
+            _circuitBuilder = circuitBuilder ?? throw new ArgumentNullException(nameof(circuitBuilder));
+            _gateway = gateway ?? throw new ArgumentNullException(nameof(gateway));
+            _simulationResults = simulationResults ?? throw new ArgumentNullException(nameof(simulationResults));
         }
 
         public async Task<SimulationResultDto> ExecutarFluxoDeCorrenteAsync()
         {
-            ParameterReader reader = new(_context);
-            CircuitBuilder builder = new(reader);
-            CircuitDto dto = builder.Build();
-            SimulationApiClient client = new();
-
-            SimulationResultDto resultado = await client.SimularTipadoAsync(dto);
+            CircuitDto dto = _circuitBuilder.Build();
+            SimulationResultDto resultado = await _gateway.SimularAsync(dto);
             _simulationResults.Apply(resultado);
 
             return resultado;
