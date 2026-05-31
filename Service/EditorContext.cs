@@ -131,7 +131,7 @@ namespace Araci.Services
                 CriarAlinharTool,
                 () => new DeletarTool(SafeDelete),
                 () => new InserirCaboTool(this),
-                definition => new InserirElementoGenericoTool(this, definition));
+                CriarInserirElementoGenericoTool);
             Input = new InputRouter(
                 Tools,
                 Commands,
@@ -266,6 +266,21 @@ namespace Araci.Services
                 AlignmentGuides,
                 Commands,
                 SceneQueries);
+        }
+
+        private InserirElementoGenericoTool CriarInserirElementoGenericoTool(ElementDefinition definition)
+        {
+            return new InserirElementoGenericoTool(
+                definition,
+                ElementoFactory,
+                InserirElemento,
+                Snap,
+                Geometry,
+                TerminalLayout,
+                AlignmentGuides,
+                Scene,
+                SceneQueries,
+                () => Tools.VoltarParaSelecao());
         }
 
         private Point ObterDestinoColagem(IReadOnlyList<Elemento> copiados)

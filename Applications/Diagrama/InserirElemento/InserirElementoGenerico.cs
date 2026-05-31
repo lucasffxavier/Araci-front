@@ -2,6 +2,9 @@
 using System.Windows;
 using System.Windows.Input;
 using Araci.Applications.Editar.Base;
+using Araci.Applications.UseCases.Diagrama;
+using Araci.Core.SceneQueries;
+using Araci.Core.Scenes;
 using Araci.Models;
 using Araci.Services;
 using Araci.ViewModels;
@@ -10,15 +13,37 @@ namespace Araci.Applications.Diagrama.InserirElemento
 {
     public class InserirElementoGenericoTool : ITool
     {
-        private readonly EditorContext _context;
         private readonly ElementDefinition _definition;
+        private readonly ElementoFactory _factory;
+        private readonly InserirElementoUseCase _inserirElemento;
+        private readonly Action _voltarParaSelecao;
         private readonly InsertPreviewController<ElementoViewModel, Elemento> _preview;
 
-        public InserirElementoGenericoTool(EditorContext context, ElementDefinition definition)
+        public InserirElementoGenericoTool(
+            ElementDefinition definition,
+            ElementoFactory factory,
+            InserirElementoUseCase inserirElemento,
+            SnapService snap,
+            ElementGeometryService geometry,
+            TerminalLayoutService terminalLayout,
+            AlignmentGuideService alignmentGuides,
+            Scene scene,
+            ISceneQueryService sceneQueries,
+            Action voltarParaSelecao)
         {
-            _context = context ?? throw new ArgumentNullException(nameof(context));
             _definition = definition ?? throw new ArgumentNullException(nameof(definition));
-            _preview = new InsertPreviewController<ElementoViewModel, Elemento>(_context, CriarPreview, vm => vm.Modelo);
+            _factory = factory ?? throw new ArgumentNullException(nameof(factory));
+            _inserirElemento = inserirElemento ?? throw new ArgumentNullException(nameof(inserirElemento));
+            _voltarParaSelecao = voltarParaSelecao ?? throw new ArgumentNullException(nameof(voltarParaSelecao));
+            _preview = new InsertPreviewController<ElementoViewModel, Elemento>(
+                CriarPreview,
+                vm => vm.Modelo,
+                snap,
+                geometry,
+                terminalLayout,
+                alignmentGuides,
+                scene,
+                sceneQueries);
         }
 
         public string Nome => $"Inserir {_definition.NomeAmigavel}";
@@ -48,8 +73,8 @@ namespace Araci.Applications.Diagrama.InserirElemento
             double y = modeloPreview.PosicaoY;
             double rotacao = _preview.CurrentRotation;
             _preview.Clear();
-            _context.InserirElemento.Executar(_definition.Kind, x, y, rotacao);
-            _context.Tools.VoltarParaSelecao();
+            _inserirElemento.Executar(_definition.Kind, x, y, rotacao);
+            _voltarParaSelecao();
         }
 
         public void OnMouseMove(Point position, ToolInputState inputState)
@@ -69,7 +94,7 @@ namespace Araci.Applications.Diagrama.InserirElemento
             if (key == Key.Escape)
             {
                 _preview.Clear();
-                _context.Tools.VoltarParaSelecao();
+                _voltarParaSelecao();
                 return;
             }
 
@@ -79,7 +104,7 @@ namespace Araci.Applications.Diagrama.InserirElemento
 
         private ElementoViewModel CriarPreview()
         {
-            return _context.ElementoFactory.CriarViewModel(_definition.Kind);
+            return _factory.CriarViewModel(_definition.Kind);
         }
     }
 }

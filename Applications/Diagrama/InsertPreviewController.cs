@@ -1,5 +1,7 @@
 using System;
 using System.Windows;
+using Araci.Core.SceneQueries;
+using Araci.Core.Scenes;
 using Araci.Models;
 using Araci.Services;
 using Araci.ViewModels;
@@ -10,16 +12,34 @@ namespace Araci.Applications.Diagrama
         where TViewModel : ElementoViewModel
         where TModel : Elemento
     {
-        private readonly EditorContext _context;
         private readonly Func<TViewModel> _criarPreview;
         private readonly Func<TViewModel, TModel> _obterModelo;
+        private readonly SnapService _snap;
+        private readonly ElementGeometryService _geometry;
+        private readonly TerminalLayoutService _terminalLayout;
+        private readonly AlignmentGuideService _alignmentGuides;
+        private readonly Scene _scene;
+        private readonly ISceneQueryService _sceneQueries;
         private double _currentRotation;
 
-        public InsertPreviewController(EditorContext context, Func<TViewModel> criarPreview, Func<TViewModel, TModel> obterModelo)
+        public InsertPreviewController(
+            Func<TViewModel> criarPreview,
+            Func<TViewModel, TModel> obterModelo,
+            SnapService snap,
+            ElementGeometryService geometry,
+            TerminalLayoutService terminalLayout,
+            AlignmentGuideService alignmentGuides,
+            Scene scene,
+            ISceneQueryService sceneQueries)
         {
-            _context = context ?? throw new ArgumentNullException(nameof(context));
             _criarPreview = criarPreview ?? throw new ArgumentNullException(nameof(criarPreview));
             _obterModelo = obterModelo ?? throw new ArgumentNullException(nameof(obterModelo));
+            _snap = snap ?? throw new ArgumentNullException(nameof(snap));
+            _geometry = geometry ?? throw new ArgumentNullException(nameof(geometry));
+            _terminalLayout = terminalLayout ?? throw new ArgumentNullException(nameof(terminalLayout));
+            _alignmentGuides = alignmentGuides ?? throw new ArgumentNullException(nameof(alignmentGuides));
+            _scene = scene ?? throw new ArgumentNullException(nameof(scene));
+            _sceneQueries = sceneQueries ?? throw new ArgumentNullException(nameof(sceneQueries));
         }
 
         public TViewModel? Preview { get; private set; }
@@ -40,25 +60,25 @@ namespace Araci.Applications.Diagrama
         {
             TViewModel preview = ObterPreview();
             TModel modelo = _obterModelo(preview);
-            Point pontoSnap = _context.Snap.SnapFromElemento(elementoSobMouse, position, preview);
-            Point posicao = _context.Geometry.CalcularTopoEsquerdoPorCentro(modelo, pontoSnap);
+            Point pontoSnap = _snap.SnapFromElemento(elementoSobMouse, position, preview);
+            Point posicao = _geometry.CalcularTopoEsquerdoPorCentro(modelo, pontoSnap);
             modelo.PosicaoX = posicao.X;
             modelo.PosicaoY = posicao.Y;
             preview.Rotacao = _currentRotation;
-            _context.TerminalLayout.AtualizarTerminais(modelo);
+            _terminalLayout.AtualizarTerminais(modelo);
             preview.AtualizarAposModeloAlterado();
 
-            Vector ajuste = _context.AlignmentGuides.AplicarSnapPreview(preview);
+            Vector ajuste = _alignmentGuides.AplicarSnapPreview(preview);
 
             if (Math.Abs(ajuste.X) > 0.000001 || Math.Abs(ajuste.Y) > 0.000001)
             {
                 modelo.PosicaoX += ajuste.X;
                 modelo.PosicaoY += ajuste.Y;
-                _context.TerminalLayout.AtualizarTerminais(modelo);
+                _terminalLayout.AtualizarTerminais(modelo);
                 preview.AtualizarAposModeloAlterado();
             }
 
-            _context.SceneQueries.Invalidate();
+            _sceneQueries.Invalidate();
         }
 
         public bool RotateClockwise()
@@ -70,9 +90,9 @@ namespace Araci.Applications.Diagrama
 
             Preview.Rotacao = _currentRotation;
             TModel modelo = _obterModelo(Preview);
-            _context.TerminalLayout.AtualizarTerminais(modelo);
-            _context.AlignmentGuides.AplicarSnapPreview(Preview);
-            _context.SceneQueries.Invalidate();
+            _terminalLayout.AtualizarTerminais(modelo);
+            _alignmentGuides.AplicarSnapPreview(Preview);
+            _sceneQueries.Invalidate();
             return true;
         }
 
@@ -89,16 +109,16 @@ namespace Araci.Applications.Diagrama
             if (Preview == null)
             {
                 _currentRotation = 0;
-                _context.AlignmentGuides.Limpar();
+                _alignmentGuides.Limpar();
                 return;
             }
 
             Preview.IsPreview = false;
-            _context.Scene.Elementos.Remove(Preview);
+            _scene.Elementos.Remove(Preview);
             Preview = null;
             _currentRotation = 0;
-            _context.AlignmentGuides.Limpar();
-            _context.SceneQueries.Invalidate();
+            _alignmentGuides.Limpar();
+            _sceneQueries.Invalidate();
         }
 
         private TViewModel ObterPreview()
@@ -109,10 +129,10 @@ namespace Araci.Applications.Diagrama
             Preview = _criarPreview();
             Preview.Rotacao = _currentRotation;
             TModel modelo = _obterModelo(Preview);
-            _context.TerminalLayout.AtualizarTerminais(modelo);
+            _terminalLayout.AtualizarTerminais(modelo);
             Preview.IsPreview = true;
-            _context.Scene.Elementos.Add(Preview);
-            _context.SceneQueries.Invalidate();
+            _scene.Elementos.Add(Preview);
+            _sceneQueries.Invalidate();
             return Preview;
         }
     }
