@@ -1,16 +1,19 @@
 using System;
 using System.Threading.Tasks;
+using Araci.Applications.Abstractions;
 using Araci.DTOs;
 
 namespace Araci.Services
 {
-    public class SimulationPipeline
+    public class SimulationPipeline : ISimulationPipeline
     {
         private readonly EditorContext _context;
+        private readonly ISimulationResultApplier _simulationResults;
 
         public SimulationPipeline(EditorContext context)
         {
             _context = context ?? throw new ArgumentNullException(nameof(context));
+            _simulationResults = context.SimulationResults;
         }
 
         public async Task<SimulationResultDto> ExecutarFluxoDeCorrenteAsync()
@@ -21,7 +24,7 @@ namespace Araci.Services
             SimulationApiClient client = new();
 
             SimulationResultDto resultado = await client.SimularTipadoAsync(dto);
-            _context.SimulationResults.Apply(resultado);
+            _simulationResults.Apply(resultado);
 
             return resultado;
         }

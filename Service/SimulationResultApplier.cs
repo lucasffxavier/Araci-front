@@ -1,13 +1,14 @@
 using System;
 using System.Globalization;
 using System.Linq;
+using Araci.Applications.Abstractions;
 using Araci.DTOs;
 using Araci.Models;
 using Araci.ViewModels;
 
 namespace Araci.Services
 {
-    public class SimulationResultApplier
+    public class SimulationResultApplier : ISimulationResultApplier
     {
         private readonly EditorContext _context;
 

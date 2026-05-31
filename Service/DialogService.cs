@@ -1,8 +1,9 @@
+using Araci.Applications.Abstractions;
 using System.Windows;
 
 namespace Araci.Services
 {
-    public class DialogService
+    public class DialogService : IUserDialogService
     {
         public void ShowInfo(string title, string message)
         {

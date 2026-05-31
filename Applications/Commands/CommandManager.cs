@@ -1,8 +1,11 @@
 ﻿using System.Collections.Generic;
 
+using Araci.Applications.Abstractions;
+using Araci.Core.Transactions;
+
 namespace Araci.Core.Commands
 {
-    public class CommandManager
+    public class CommandManager : ICommandHistory
     {
         private readonly Stack<IUndoableCommand>
             _undoStack = new();
@@ -50,6 +53,11 @@ namespace Araci.Core.Commands
         {
             _undoStack.Clear();
             _redoStack.Clear();
+        }
+
+        public TransactionScope BeginTransaction()
+        {
+            return new TransactionScope(this);
         }
 
         public bool CanUndo =>

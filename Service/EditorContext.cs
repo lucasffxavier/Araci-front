@@ -1,14 +1,16 @@
+using Araci.Applications.Abstractions;
 using Araci.Core.Commands;
 using Araci.Core.Documents;
 using Araci.Core.Events;
 using Araci.Core.SceneQueries;
 using Araci.Core.Scenes;
 using Araci.Core.Transactions;
+using Araci.Infrastructure.Persistence;
 using Araci.ViewModels;
 
 namespace Araci.Services
 {
-    public class EditorContext
+    public class EditorContext : IEditorSession
     {
         public EditorContext()
             : this(new EventBus())
@@ -43,7 +45,15 @@ namespace Araci.Services
             Selection = new SelectionService(this);
             Selection.SelectionChanged += CableVertexEdit.Refresh;
             SafeDelete = new SafeDeleteService(this);
-            Projects = new ProjectPersistenceService(this);
+            var projectSerializer = new ProjectSerializer(Elements, TerminalLayout, Geometry);
+            var projectRepository = new FileSystemProjectRepository();
+            var projectFileDialogs = new ProjectFileDialogService();
+            Projects = new ProjectPersistenceService(
+                this,
+                projectSerializer,
+                projectRepository,
+                projectFileDialogs,
+                Dialogs);
             MoveHud = new MoveHudService(this);
             AlignmentGuides = new AlignmentGuideService(this);
             MoveConstraints = new MoveConstraintService(Settings);
@@ -57,7 +67,7 @@ namespace Araci.Services
 
         public IEventBus Events { get; }
         public AraciDocument Document { get; } = new AraciDocument();
-        public Scene Scene { get; } = new Scene();
+        public Scene Scene { get; }
         public ISceneQueryService SceneQueries { get; }
         public HoverService Hover { get; }
         public ToolService Tools { get; }
@@ -79,6 +89,7 @@ namespace Araci.Services
         public TerminalSnapState TerminalSnap { get; } = new TerminalSnapState();
         public CableVertexEditService CableVertexEdit { get; }
         public CommandManager Commands { get; } = new CommandManager();
+        ICommandHistory IEditorSession.Commands => Commands;
         public SafeDeleteService SafeDelete { get; }
         public ProjectPersistenceService Projects { get; }
         public SelectionService Selection { get; }
@@ -106,7 +117,7 @@ namespace Araci.Services
 
         public TransactionScope BeginTransaction()
         {
-            return new TransactionScope(Commands);
+            return Commands.BeginTransaction();
         }
     }
 }
