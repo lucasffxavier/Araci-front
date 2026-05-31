@@ -12,20 +12,21 @@ namespace Araci.Services
         private readonly ConnectivityService _connectivity;
         private readonly ElectricGraphBuilder _graphBuilder;
 
-        public TopologyValidator(EditorContext context)
-            : this(context?.Document ?? throw new ArgumentNullException(nameof(context)), context.ElectricGraph)
-        {
-        }
-
         public TopologyValidator(AraciDocument document)
-            : this(document, new ElectricGraphBuilder(document))
+            : this(
+                document,
+                new ConnectivityService(document),
+                new ElectricGraphBuilder(document))
         {
         }
 
-        private TopologyValidator(AraciDocument document, ElectricGraphBuilder graphBuilder)
+        public TopologyValidator(
+            AraciDocument document,
+            ConnectivityService connectivity,
+            ElectricGraphBuilder graphBuilder)
         {
             _document = document ?? throw new ArgumentNullException(nameof(document));
-            _connectivity = new ConnectivityService(_document);
+            _connectivity = connectivity ?? throw new ArgumentNullException(nameof(connectivity));
             _graphBuilder = graphBuilder ?? throw new ArgumentNullException(nameof(graphBuilder));
         }
 

@@ -26,7 +26,10 @@ namespace Araci.DTOs
             : this(
                 new CoreApi(context),
                 new ConnectivityService(context.Document),
-                new TopologyValidator(context),
+                new TopologyValidator(
+                    context.Document,
+                    new ConnectivityService(context.Document),
+                    context.ElectricGraph),
                 context.ElectricGraph)
         {
         }

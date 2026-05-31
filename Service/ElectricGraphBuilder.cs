@@ -16,14 +16,7 @@ namespace Araci.Services
         {
         }
 
-        public ElectricGraphBuilder(EditorContext context)
-            : this(
-                context?.Document ?? throw new ArgumentNullException(nameof(context)),
-                context.Elements)
-        {
-        }
-
-        private ElectricGraphBuilder(
+        public ElectricGraphBuilder(
             AraciDocument document,
             ElementRegistryService? registry)
         {

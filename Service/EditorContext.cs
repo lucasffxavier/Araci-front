@@ -31,20 +31,20 @@ namespace Araci.Services
             SceneQueries = new SceneQueryService(Scene);
             Hover = new HoverService(SceneQueries);
             Snap = new SnapService(SceneQueries, Settings);
+            TypePropertiesDialogs = new TypePropertiesDialogService();
+            Dialogs = new DialogService();
+            Elements = new ElementRegistryService(Types);
+            InstancePropertyCatalog.Configure(Elements);
             Connectivity = new ConnectivityService(Document);
-            ElectricGraph = new ElectricGraphBuilder(this);
+            ElectricGraph = new ElectricGraphBuilder(Document, Elements);
             OperationalState = new OperationalGraphStateBuilder();
-            Topology = new TopologyValidator(this);
+            Topology = new TopologyValidator(Document, Connectivity, ElectricGraph);
             SimulationResults = new SimulationResultApplier(Document, NotifySimulationResultViewModels);
             var simulationGateway = new FastApiOpenDssGateway();
             var circuitDtoBuilder = new CircuitDtoBuilder(Document);
             Simulation = new SimulationPipeline(circuitDtoBuilder, simulationGateway, SimulationResults);
             SimulationExport = new SimulationExportService();
             SimulationMessages = new SimulationMessageBuilder();
-            TypePropertiesDialogs = new TypePropertiesDialogService();
-            Dialogs = new DialogService();
-            Elements = new ElementRegistryService(Types);
-            InstancePropertyCatalog.Configure(Elements);
             Geometry = new ElementGeometryService(Elements);
             TerminalLayout = new TerminalLayoutService(Elements, Geometry);
             VisualUpdates = new VisualUpdateService(
@@ -71,7 +71,13 @@ namespace Araci.Services
                 VisualUpdates,
                 EditarVerticesCabo);
             Selection.SelectionChanged += CableVertexEdit.Refresh;
-            SafeDelete = new SafeDeleteService(this);
+            SafeDelete = new SafeDeleteService(
+                Selection,
+                CableVertexEdit,
+                ExcluirElemento,
+                Hover,
+                TerminalSnap,
+                SceneQueries);
             var projectSerializer = new ProjectSerializer(Elements, TerminalLayout, Geometry);
             var projectRepository = new FileSystemProjectRepository();
             var projectFileDialogs = new ProjectFileDialogService();
