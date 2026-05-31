@@ -12,7 +12,9 @@ namespace Araci.Services
     public class BarraResizeService
     {
         private const double HandleTolerance = 12;
-        private readonly EditorContext _context;
+        private readonly SelectionService _selection;
+        private readonly ElementGeometryUpdateService _geometryUpdates;
+        private readonly RedimensionarBarraUseCase _redimensionarBarra;
         private BarraViewModel? _vm;
         private ResizeBarraHandle _handle;
         private Point _startMouse;
@@ -22,9 +24,14 @@ namespace Araci.Services
         private double _startY;
         private double _startHeight;
 
-        public BarraResizeService(EditorContext context)
+        public BarraResizeService(
+            SelectionService selection,
+            ElementGeometryUpdateService geometryUpdates,
+            RedimensionarBarraUseCase redimensionarBarra)
         {
-            _context = context ?? throw new ArgumentNullException(nameof(context));
+            _selection = selection ?? throw new ArgumentNullException(nameof(selection));
+            _geometryUpdates = geometryUpdates ?? throw new ArgumentNullException(nameof(geometryUpdates));
+            _redimensionarBarra = redimensionarBarra ?? throw new ArgumentNullException(nameof(redimensionarBarra));
         }
 
         public bool IsResizing { get; private set; }
@@ -33,8 +40,8 @@ namespace Araci.Services
         {
             BarraViewModel? barraVm = IsResizing
                 ? _vm
-                : _context.Selection.Selecionados.Count == 1
-                    ? _context.Selection.Selecionados.FirstOrDefault() as BarraViewModel
+                : _selection.Selecionados.Count == 1
+                    ? _selection.Selecionados.FirstOrDefault() as BarraViewModel
                     : null;
 
             if (barraVm == null)
@@ -46,9 +53,9 @@ namespace Araci.Services
 
         public bool TryBegin(Point position)
         {
-            if (_context.Selection.Selecionados.Count != 1)
+            if (_selection.Selecionados.Count != 1)
                 return false;
-            if (_context.Selection.Selecionados.FirstOrDefault() is not BarraViewModel barraVm)
+            if (_selection.Selecionados.FirstOrDefault() is not BarraViewModel barraVm)
                 return false;
             ResizeBarraHandle handle = HitTestHandle(barraVm, position);
             if (handle == ResizeBarraHandle.None)
@@ -79,7 +86,7 @@ namespace Araci.Services
                 : CalcularTopoEsquerdoMantendoTop(_vm.Barra, novaAltura, _startTopWorld);
             _vm.Barra.PosicaoX = novoTopoEsquerdo.X;
             _vm.Barra.PosicaoY = novoTopoEsquerdo.Y;
-            _context.GeometryUpdates.AplicarAlturaBarra(_vm.Barra, novaAltura);
+            _geometryUpdates.AplicarAlturaBarra(_vm.Barra, novaAltura);
             _vm.NotificarPropriedades(nameof(BarraViewModel.Altura), nameof(BarraViewModel.X), nameof(BarraViewModel.Y), nameof(BarraViewModel.Bounds));
         }
 
@@ -101,7 +108,7 @@ namespace Araci.Services
                 alturaDepois,
                 xDepois,
                 yDepois);
-            _context.RedimensionarBarra.Executar(request);
+            _redimensionarBarra.Executar(request);
             Limpar();
         }
 
@@ -111,7 +118,7 @@ namespace Araci.Services
             {
                 _vm.Barra.PosicaoX = _startX;
                 _vm.Barra.PosicaoY = _startY;
-                _context.GeometryUpdates.AplicarAlturaBarra(_vm.Barra, _startHeight);
+                _geometryUpdates.AplicarAlturaBarra(_vm.Barra, _startHeight);
             }
             Limpar();
         }

@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Linq;
+using Araci.Applications.UseCases.Editar;
 using Araci.Core.Events;
 using Araci.ViewModels;
 
@@ -9,12 +10,19 @@ namespace Araci.Services
 {
     public class SelectionService
     {
-        private readonly EditorContext _context;
+        private readonly EditorState _editorState;
+        private readonly IEventBus _events;
+        private readonly EditarPropriedadesUseCase _editarPropriedades;
         private readonly ObservableCollection<ElementoViewModel> _selecionados = new();
 
-        public SelectionService(EditorContext context)
+        public SelectionService(
+            EditorState editorState,
+            IEventBus events,
+            EditarPropriedadesUseCase editarPropriedades)
         {
-            _context = context ?? throw new ArgumentNullException(nameof(context));
+            _editorState = editorState ?? throw new ArgumentNullException(nameof(editorState));
+            _events = events ?? throw new ArgumentNullException(nameof(events));
+            _editarPropriedades = editarPropriedades ?? throw new ArgumentNullException(nameof(editarPropriedades));
         }
 
         public IReadOnlyList<ElementoViewModel> Selecionados => _selecionados;
@@ -76,17 +84,17 @@ namespace Araci.Services
 
         private void AtualizarElementoSelecionado()
         {
-            _context.Editor.ElementoSelecionado = _selecionados.Count switch
+            _editorState.ElementoSelecionado = _selecionados.Count switch
             {
                 0 => null,
                 1 => _selecionados[0],
-                _ => new PropertiesViewModel(_selecionados, _context.EditarPropriedades)
+                _ => new PropertiesViewModel(_selecionados, _editarPropriedades)
             };
         }
 
         private void PublicarAlteracao()
         {
-            _context.Events.Publish(new SelecaoAlteradaEvent(_selecionados.ToList()));
+            _events.Publish(new SelecaoAlteradaEvent(_selecionados.ToList()));
             SelectionChanged?.Invoke();
         }
     }

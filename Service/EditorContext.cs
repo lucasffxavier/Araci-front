@@ -64,7 +64,7 @@ namespace Araci.Services
             ExcluirElemento = new ExcluirElementoUseCase(Document, Connectivity, Commands);
             EditarPropriedades = new EditarPropriedadesUseCase(Commands);
             CableVertexEdit = new CableVertexEditService(this);
-            Selection = new SelectionService(this);
+            Selection = new SelectionService(Editor, Events, EditarPropriedades);
             Selection.SelectionChanged += CableVertexEdit.Refresh;
             SafeDelete = new SafeDeleteService(this);
             var projectSerializer = new ProjectSerializer(Elements, TerminalLayout, Geometry);
@@ -85,9 +85,22 @@ namespace Araci.Services
             RotacionarElemento = new RotacionarElementoUseCase(Commands);
             RedimensionarBarra = new RedimensionarBarraUseCase(Commands, GeometryUpdates);
             EditarVerticesCabo = new EditarVerticesCaboUseCase(Commands);
-            Move = new MoveService(this);
-            BarraResize = new BarraResizeService(this);
-            Rotation = new RotationService(this);
+            Move = new MoveService(
+                Connectivity,
+                TerminalLayout,
+                () => Viewport,
+                SceneQueries,
+                MoverElemento);
+            BarraResize = new BarraResizeService(
+                Selection,
+                GeometryUpdates,
+                RedimensionarBarra);
+            Rotation = new RotationService(
+                Selection,
+                Connectivity,
+                () => Viewport,
+                VisualUpdates,
+                RotacionarElemento);
             Tools = new ToolService(this);
             Input = new InputRouter(this);
             Navigation = new ViewportNavigationService(this);

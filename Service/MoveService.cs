@@ -1,7 +1,9 @@
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Windows;
 using Araci.Applications.UseCases.Editar;
+using Araci.Core.SceneQueries;
 using Araci.Models;
 using Araci.ViewModels;
 
@@ -9,17 +11,29 @@ namespace Araci.Services
 {
     public class MoveService
     {
-        private readonly EditorContext _context;
+        private readonly ConnectivityService _connectivity;
+        private readonly TerminalLayoutService _terminalLayout;
+        private readonly Func<ViewportService?> _viewportProvider;
+        private readonly ISceneQueryService _sceneQueries;
+        private readonly MoverElementoUseCase _moverElemento;
 
         private readonly Dictionary<ElementoViewModel, ElementoEstado>
             _estadoInicial = new();
 
         private bool _movendo;
 
-        public MoveService(EditorContext context)
+        public MoveService(
+            ConnectivityService connectivity,
+            TerminalLayoutService terminalLayout,
+            Func<ViewportService?> viewportProvider,
+            ISceneQueryService sceneQueries,
+            MoverElementoUseCase moverElemento)
         {
-            _context = context ??
-                throw new ArgumentNullException(nameof(context));
+            _connectivity = connectivity ?? throw new ArgumentNullException(nameof(connectivity));
+            _terminalLayout = terminalLayout ?? throw new ArgumentNullException(nameof(terminalLayout));
+            _viewportProvider = viewportProvider ?? throw new ArgumentNullException(nameof(viewportProvider));
+            _sceneQueries = sceneQueries ?? throw new ArgumentNullException(nameof(sceneQueries));
+            _moverElemento = moverElemento ?? throw new ArgumentNullException(nameof(moverElemento));
         }
 
         public void BeginMove(IEnumerable<ElementoViewModel> elementos)
@@ -41,7 +55,7 @@ namespace Araci.Services
 
             vm.Mover(delta);
             ReancorarCabosConectados(vm.Modelo);
-            _context.SceneQueries.Invalidate();
+            _sceneQueries.Invalidate();
         }
 
         public void EndMove(IEnumerable<ElementoViewModel> elementos)
@@ -63,8 +77,8 @@ namespace Araci.Services
                 items.Add(new MoverElementoItem(vm.Modelo, antes, depois));
             }
 
-            _context.MoverElemento.Executar(items);
-            _context.SceneQueries.Invalidate();
+            _moverElemento.Executar(items);
+            _sceneQueries.Invalidate();
 
             _estadoInicial.Clear();
 
@@ -79,7 +93,7 @@ namespace Araci.Services
             foreach (var item in _estadoInicial)
                 item.Key.AplicarEstado(item.Value);
 
-            _context.SceneQueries.Invalidate();
+            _sceneQueries.Invalidate();
 
             _estadoInicial.Clear();
             _movendo = false;
@@ -99,9 +113,11 @@ namespace Araci.Services
             if (elemento is Cabo)
                 return;
 
-            foreach (Cabo cabo in _context.Connectivity.ObterCabosConectados(elemento))
+            ViewportService? viewport = _viewportProvider();
+
+            foreach (Cabo cabo in _connectivity.ObterCabosConectados(elemento))
             {
-                ElementoViewModel? caboVm = _context.Viewport?.ObterViewModel(cabo);
+                ElementoViewModel? caboVm = viewport?.ObterViewModel(cabo);
 
                 if (caboVm != null && !_estadoInicial.ContainsKey(caboVm))
                     _estadoInicial[caboVm] = caboVm.CapturarEstado();
@@ -113,10 +129,12 @@ namespace Araci.Services
             if (elemento is Cabo)
                 return;
 
-            _context.TerminalLayout.AtualizarTerminais(elemento);
+            _terminalLayout.AtualizarTerminais(elemento);
 
-            foreach (Cabo cabo in _context.Connectivity.ReancorarCabosConectados(elemento))
-                _context.Viewport?.AtualizarViewModel(cabo);
+            ViewportService? viewport = _viewportProvider();
+
+            foreach (Cabo cabo in _connectivity.ReancorarCabosConectados(elemento))
+                viewport?.AtualizarViewModel(cabo);
         }
     }
 }

@@ -9,16 +9,29 @@ namespace Araci.Services
 {
     public class RotationService
     {
-        private readonly EditorContext _context;
+        private readonly SelectionService _selection;
+        private readonly ConnectivityService _connectivity;
+        private readonly Func<ViewportService?> _viewportProvider;
+        private readonly VisualUpdateService _visualUpdates;
+        private readonly RotacionarElementoUseCase _rotacionarElemento;
 
-        public RotationService(EditorContext context)
+        public RotationService(
+            SelectionService selection,
+            ConnectivityService connectivity,
+            Func<ViewportService?> viewportProvider,
+            VisualUpdateService visualUpdates,
+            RotacionarElementoUseCase rotacionarElemento)
         {
-            _context = context ?? throw new ArgumentNullException(nameof(context));
+            _selection = selection ?? throw new ArgumentNullException(nameof(selection));
+            _connectivity = connectivity ?? throw new ArgumentNullException(nameof(connectivity));
+            _viewportProvider = viewportProvider ?? throw new ArgumentNullException(nameof(viewportProvider));
+            _visualUpdates = visualUpdates ?? throw new ArgumentNullException(nameof(visualUpdates));
+            _rotacionarElemento = rotacionarElemento ?? throw new ArgumentNullException(nameof(rotacionarElemento));
         }
 
         public bool RotateSelectionClockwise()
         {
-            var targets = _context.Selection.Selecionados
+            var targets = _selection.Selecionados
                 .Where(PodeRotacionar)
                 .Distinct()
                 .ToList();
@@ -33,14 +46,14 @@ namespace Araci.Services
                 RotacionarModelo(vm.Modelo);
 
             foreach (ElementoViewModel vm in targets)
-                _context.VisualUpdates.AtualizarElementoRotacionado(vm.Modelo);
+                _visualUpdates.AtualizarElementoRotacionado(vm.Modelo);
 
             var after = Capturar(affected);
             var items = affected
                 .Select(vm => new RotacionarElementoItem(vm.Modelo, before[vm], after[vm]))
                 .ToList();
 
-            return _context.RotacionarElemento.Executar(items, _context.VisualUpdates.AtualizarElementoRotacionado);
+            return _rotacionarElemento.Executar(items, _visualUpdates.AtualizarElementoRotacionado);
         }
 
         public static double RotateClockwise(double value)
@@ -73,14 +86,15 @@ namespace Araci.Services
         private List<ElementoViewModel> ColetarAfetados(IEnumerable<ElementoViewModel> targets)
         {
             var result = new List<ElementoViewModel>();
+            ViewportService? viewport = _viewportProvider();
 
             foreach (ElementoViewModel vm in targets)
             {
                 Adicionar(result, vm);
 
-                foreach (Cabo cabo in _context.Connectivity.ObterCabosConectados(vm.Modelo))
+                foreach (Cabo cabo in _connectivity.ObterCabosConectados(vm.Modelo))
                 {
-                    ElementoViewModel? caboVm = _context.Viewport?.ObterViewModel(cabo);
+                    ElementoViewModel? caboVm = viewport?.ObterViewModel(cabo);
 
                     if (caboVm != null)
                         Adicionar(result, caboVm);
