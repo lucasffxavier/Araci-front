@@ -51,6 +51,7 @@ namespace Araci.Services
             GeometryUpdates = new ElementGeometryUpdateService(this);
             ElementoFactory = new ElementoFactory(Elements, Names, TypePropertiesDialogs, TerminalLayout, GeometryUpdates);
             InserirElemento = new InserirElementoUseCase(ElementoFactory, TerminalLayout, Commands, Document, Names);
+            InserirCabo = new InserirCaboUseCase(ElementoFactory, Commands, Document, Names, cabo => Viewport?.ObterViewModel(cabo) as CaboViewModel);
             CopiarElementos = new CopiarElementosUseCase();
             ColarElementos = new ColarElementosUseCase(CopiarElementos, Document, Names, Commands, ObterDestinoColagem);
             CableVertexEdit = new CableVertexEditService(this);
@@ -127,6 +128,7 @@ namespace Araci.Services
         public TypeLibraryService Types { get; } = new TypeLibraryService();
         public ElementoFactory ElementoFactory { get; }
         public InserirElementoUseCase InserirElemento { get; }
+        public InserirCaboUseCase InserirCabo { get; }
         public CopiarElementosUseCase CopiarElementos { get; }
         public ColarElementosUseCase ColarElementos { get; }
 

@@ -13,14 +13,6 @@ namespace Araci.Core.Commands
         private bool _inicializado;
         private string? _nomeFinal;
 
-        public AddElementoCommand(Elemento elemento, EditorContext context)
-            : this(
-                elemento,
-                context?.Document ?? throw new ArgumentNullException(nameof(context)),
-                context.Names)
-        {
-        }
-
         public AddElementoCommand(
             Elemento elemento,
             AraciDocument document,

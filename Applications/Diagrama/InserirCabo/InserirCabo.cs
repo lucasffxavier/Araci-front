@@ -2,7 +2,6 @@ using System;
 using System.Windows;
 using System.Windows.Input;
 using Araci.Applications.Editar.Base;
-using Araci.Core.Commands;
 using Araci.Models;
 using Araci.Services;
 using Araci.ViewModels;
@@ -85,12 +84,9 @@ namespace Araci.Applications.Diagrama.InserirCabo
 
                 AtualizarTerminalCapturado(terminal);
                 LimparPreviewInicial();
-                _caboAtual = _context.ElementoFactory.CriarCaboVM();
-                _caboAtual.Iniciar(pontoSnap);
-                _context.Commands.Execute(new AddElementoCommand(_caboAtual.Modelo, _context));
-                UsarViewModelDaCena();
-                ConectarOrigem(terminal);
+                _caboAtual = _context.InserirCabo.Iniciar(pontoSnap, terminal);
                 _inserindo = true;
+                _terminalOrigem = terminal;
                 return;
             }
 
@@ -112,8 +108,7 @@ namespace Araci.Applications.Diagrama.InserirCabo
             }
 
             AtualizarTerminalCapturado(terminal);
-            _caboAtual.FinalizarNoPonto(pontoSnap);
-            ConectarDestino(terminal);
+            _context.InserirCabo.FinalizarDestino(_caboAtual, terminal, pontoSnap);
             Finalizar();
         }
 
@@ -282,20 +277,6 @@ namespace Araci.Applications.Diagrama.InserirCabo
             _context.TerminalSnap.Limpar();
         }
 
-        private void ConectarOrigem(Terminal? terminal)
-        {
-            if (_caboAtual == null || terminal == null)
-                return;
-
-            Elemento elemento = terminal.Dono;
-            _caboAtual.OrigemId = elemento.Id.ToString();
-            _caboAtual.OrigemTerminalId = terminal.Id;
-            _caboAtual.BarraOrigem = ObterRotuloTerminal(terminal);
-            _caboAtual.Cabo.DefinirOrigem(terminal.Posicao);
-            _terminalOrigem = terminal;
-            _caboAtual.NotificarParametros();
-        }
-
         private void AdicionarVerticeIntermediario(Point ponto)
         {
             if (_caboAtual == null)
@@ -356,33 +337,6 @@ namespace Araci.Applications.Diagrama.InserirCabo
                 return ConnectionValidationResult.Invalid("Origem do cabo não definida.");
 
             return _context.Connectivity.ValidarConexaoCabo(_caboAtual.Cabo, _terminalOrigem, terminal);
-        }
-
-        private void UsarViewModelDaCena()
-        {
-            if (_caboAtual == null)
-                return;
-
-            if (_context.Viewport?.ObterViewModel(_caboAtual.Modelo) is CaboViewModel caboNaCena)
-                _caboAtual = caboNaCena;
-        }
-
-        private void ConectarDestino(Terminal? terminal)
-        {
-            if (_caboAtual == null || terminal == null)
-                return;
-
-            Elemento elemento = terminal.Dono;
-            _caboAtual.DestinoId = elemento.Id.ToString();
-            _caboAtual.DestinoTerminalId = terminal.Id;
-            _caboAtual.BarraDestino = ObterRotuloTerminal(terminal);
-            _caboAtual.Cabo.DefinirDestino(terminal.Posicao);
-            _caboAtual.NotificarParametros();
-        }
-
-        private static string ObterRotuloTerminal(Terminal terminal)
-        {
-            return string.IsNullOrWhiteSpace(terminal.Barra) ? terminal.Dono.Nome : terminal.Barra;
         }
 
         private void Finalizar()
