@@ -1,15 +1,23 @@
 using System;
+using System.Collections.Generic;
 using Araci.Models;
 
 namespace Araci.Services
 {
     public class ElementGeometryUpdateService
     {
-        private readonly EditorContext _context;
+        private readonly TerminalLayoutService _terminalLayout;
+        private readonly ConnectivityService _connectivity;
+        private readonly VisualUpdateService _visualUpdates;
 
-        public ElementGeometryUpdateService(EditorContext context)
+        public ElementGeometryUpdateService(
+            TerminalLayoutService terminalLayout,
+            ConnectivityService connectivity,
+            VisualUpdateService visualUpdates)
         {
-            _context = context ?? throw new ArgumentNullException(nameof(context));
+            _terminalLayout = terminalLayout ?? throw new ArgumentNullException(nameof(terminalLayout));
+            _connectivity = connectivity ?? throw new ArgumentNullException(nameof(connectivity));
+            _visualUpdates = visualUpdates ?? throw new ArgumentNullException(nameof(visualUpdates));
         }
 
         public void AplicarAlturaBarra(Barra barra, double altura)
@@ -26,21 +34,14 @@ namespace Araci.Services
             if (elemento == null)
                 throw new ArgumentNullException(nameof(elemento));
 
-            _context.TerminalLayout.AtualizarTerminais(elemento);
+            _terminalLayout.AtualizarTerminais(elemento);
 
-            var cabos = _context.Connectivity.ReancorarCabosConectados(elemento);
-
-            _context.Viewport?.AtualizarViewModel(elemento);
+            IReadOnlyList<Cabo> cabos = _connectivity.ReancorarCabosConectados(elemento);
 
             foreach (Cabo cabo in cabos)
-            {
-                _context.TerminalLayout.AtualizarTerminais(cabo);
-                _context.Viewport?.AtualizarViewModel(cabo);
-            }
+                _terminalLayout.AtualizarTerminais(cabo);
 
-            _context.SceneQueries.Invalidate();
-            _context.TerminalSnap.Limpar();
-            _context.CableVertexEdit.Refresh();
+            _visualUpdates.AtualizarGeometriaElementoECabos(elemento, cabos);
         }
     }
 }

@@ -2,8 +2,8 @@ using System;
 using System.Collections.ObjectModel;
 using System.Linq;
 using System.Windows;
+using Araci.Applications.UseCases.Editar;
 using Araci.Applications.Editar.Base;
-using Araci.Core.Commands;
 using Araci.Models;
 using Araci.ViewModels;
 
@@ -222,12 +222,8 @@ namespace Araci.Services
                 return;
             }
 
-            _context.Commands.Execute(
-                new MoveElementoCommand(
-                    cabo.Modelo,
-                    antes,
-                    depois,
-                    AtualizarCabo));
+            var request = new EditarVerticesCaboRequest(cabo.Cabo, antes, depois);
+            _context.EditarVerticesCabo.Executar(request, AtualizarCabo);
 
             _context.SceneQueries.Invalidate();
             RebuildHandles();
@@ -235,8 +231,7 @@ namespace Araci.Services
 
         private void AtualizarCabo(Elemento elemento)
         {
-            _context.Viewport?.AtualizarViewModel(elemento);
-            _context.SceneQueries.Invalidate();
+            _context.VisualUpdates.AtualizarCaboEditado(elemento);
             RebuildHandles();
         }
 

@@ -16,14 +16,6 @@ namespace Araci.Applications.UseCases.Editar
         private readonly ConnectivityService _connectivity;
         private readonly ICommandHistory _commands;
 
-        public ExcluirElementoUseCase(EditorContext context)
-            : this(
-                context?.Document ?? throw new ArgumentNullException(nameof(context)),
-                context.Connectivity,
-                context.Commands)
-        {
-        }
-
         public ExcluirElementoUseCase(
             AraciDocument document,
             ConnectivityService connectivity,

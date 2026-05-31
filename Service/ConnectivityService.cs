@@ -10,11 +10,6 @@ namespace Araci.Services
     {
         private readonly AraciDocument _document;
 
-        public ConnectivityService(EditorContext context)
-            : this(context?.Document ?? throw new ArgumentNullException(nameof(context)))
-        {
-        }
-
         public ConnectivityService(AraciDocument document)
         {
             _document = document ?? throw new ArgumentNullException(nameof(document));

@@ -31,7 +31,7 @@ namespace Araci.Services
             SceneQueries = new SceneQueryService(Scene);
             Hover = new HoverService(SceneQueries);
             Snap = new SnapService(SceneQueries, Settings);
-            Connectivity = new ConnectivityService(this);
+            Connectivity = new ConnectivityService(Document);
             ElectricGraph = new ElectricGraphBuilder(this);
             OperationalState = new OperationalGraphStateBuilder();
             Topology = new TopologyValidator(this);
@@ -47,8 +47,9 @@ namespace Araci.Services
             InstancePropertyCatalog.Configure(Elements);
             Geometry = new ElementGeometryService(Elements);
             TerminalLayout = new TerminalLayoutService(Elements, Geometry);
+            VisualUpdates = new VisualUpdateService(this);
             Names = new NameService(Document, Elements);
-            GeometryUpdates = new ElementGeometryUpdateService(this);
+            GeometryUpdates = new ElementGeometryUpdateService(TerminalLayout, Connectivity, VisualUpdates);
             ElementoFactory = new ElementoFactory(Elements, Names, TypePropertiesDialogs, TerminalLayout, GeometryUpdates);
             InserirElemento = new InserirElementoUseCase(ElementoFactory, TerminalLayout, Commands, Document, Names);
             InserirCabo = new InserirCaboUseCase(ElementoFactory, Commands, Document, Names, cabo => Viewport?.ObterViewModel(cabo) as CaboViewModel);
@@ -72,9 +73,10 @@ namespace Araci.Services
             MoveHud = new MoveHudService(this);
             AlignmentGuides = new AlignmentGuideService(this);
             MoveConstraints = new MoveConstraintService(Settings);
-            MoverElemento = new MoverElementoUseCase(Commands, AtualizarElementoMovido);
+            MoverElemento = new MoverElementoUseCase(Commands, VisualUpdates.AtualizarElementoMovido);
             RotacionarElemento = new RotacionarElementoUseCase(Commands);
             RedimensionarBarra = new RedimensionarBarraUseCase(Commands, GeometryUpdates);
+            EditarVerticesCabo = new EditarVerticesCaboUseCase(Commands);
             Move = new MoveService(this);
             BarraResize = new BarraResizeService(this);
             Rotation = new RotationService(this);
@@ -110,6 +112,7 @@ namespace Araci.Services
         ICommandHistory IEditorSession.Commands => Commands;
         public SafeDeleteService SafeDelete { get; }
         public ProjectPersistenceService Projects { get; }
+        public VisualUpdateService VisualUpdates { get; }
         public SelectionService Selection { get; }
         public MoveService Move { get; }
         public BarraResizeService BarraResize { get; }
@@ -141,6 +144,7 @@ namespace Araci.Services
         public MoverElementoUseCase MoverElemento { get; }
         public RotacionarElementoUseCase RotacionarElemento { get; }
         public RedimensionarBarraUseCase RedimensionarBarra { get; }
+        public EditarVerticesCaboUseCase EditarVerticesCabo { get; }
 
         public TransactionScope BeginTransaction()
         {
@@ -179,12 +183,5 @@ namespace Araci.Services
                 centro.Y + ColarElementosUseCase.OffsetPadrao);
         }
 
-        private void AtualizarElementoMovido(Elemento elemento)
-        {
-            Viewport?.AtualizarViewModel(elemento);
-            TerminalLayout.AtualizarTerminais(elemento);
-            SceneQueries.Invalidate();
-            CableVertexEdit.Refresh();
-        }
     }
 }

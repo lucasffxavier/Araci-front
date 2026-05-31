@@ -4,7 +4,6 @@ using System.Linq;
 using System.Reflection;
 using Araci.Applications.Abstractions;
 using Araci.Core.Commands;
-using Araci.Services;
 using Araci.ViewModels;
 
 namespace Araci.Applications.UseCases.Editar
@@ -12,11 +11,6 @@ namespace Araci.Applications.UseCases.Editar
     public class EditarPropriedadesUseCase
     {
         private readonly ICommandHistory _commands;
-
-        public EditarPropriedadesUseCase(EditorContext context)
-            : this(context?.Commands ?? throw new ArgumentNullException(nameof(context)))
-        {
-        }
 
         public EditarPropriedadesUseCase(ICommandHistory commands)
         {

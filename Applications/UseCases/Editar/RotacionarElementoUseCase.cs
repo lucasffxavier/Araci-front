@@ -4,7 +4,6 @@ using System.Linq;
 using Araci.Applications.Abstractions;
 using Araci.Core.Commands;
 using Araci.Models;
-using Araci.Services;
 using Araci.ViewModels;
 
 namespace Araci.Applications.UseCases.Editar
@@ -13,11 +12,6 @@ namespace Araci.Applications.UseCases.Editar
     {
         private readonly ICommandHistory _commands;
         private readonly Action<Elemento>? _onStateApplied;
-
-        public RotacionarElementoUseCase(EditorContext context)
-            : this(context?.Commands ?? throw new ArgumentNullException(nameof(context)), null)
-        {
-        }
 
         public RotacionarElementoUseCase(
             ICommandHistory commands,

@@ -17,16 +17,6 @@ namespace Araci.Applications.UseCases.Diagrama
         private readonly NameService _names;
         private readonly Func<Cabo, CaboViewModel?> _obterViewModelDaCena;
 
-        public InserirCaboUseCase(EditorContext context)
-            : this(
-                context?.ElementoFactory ?? throw new ArgumentNullException(nameof(context)),
-                context.Commands,
-                context.Document,
-                context.Names,
-                cabo => context.Viewport?.ObterViewModel(cabo) as CaboViewModel)
-        {
-        }
-
         public InserirCaboUseCase(
             ElementoFactory factory,
             ICommandHistory commands,

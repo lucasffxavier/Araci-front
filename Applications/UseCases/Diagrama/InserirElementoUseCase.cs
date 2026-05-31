@@ -15,16 +15,6 @@ namespace Araci.Applications.UseCases.Diagrama
         private readonly AraciDocument _document;
         private readonly NameService _names;
 
-        public InserirElementoUseCase(EditorContext context)
-            : this(
-                context?.ElementoFactory ?? throw new ArgumentNullException(nameof(context)),
-                context.TerminalLayout,
-                context.Commands,
-                context.Document,
-                context.Names)
-        {
-        }
-
         public InserirElementoUseCase(
             ElementoFactory factory,
             TerminalLayoutService terminalLayout,

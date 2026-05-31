@@ -25,7 +25,7 @@ namespace Araci.DTOs
         public ParameterReader(EditorContext context)
             : this(
                 new CoreApi(context),
-                new ConnectivityService(context),
+                new ConnectivityService(context.Document),
                 new TopologyValidator(context),
                 context.ElectricGraph)
         {

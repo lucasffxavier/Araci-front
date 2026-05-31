@@ -11,13 +11,6 @@ namespace Araci.Applications.UseCases.Editar
         private readonly ICommandHistory _commands;
         private readonly ElementGeometryUpdateService _geometryUpdates;
 
-        public RedimensionarBarraUseCase(EditorContext context)
-            : this(
-                context?.Commands ?? throw new ArgumentNullException(nameof(context)),
-                context.GeometryUpdates)
-        {
-        }
-
         public RedimensionarBarraUseCase(
             ICommandHistory commands,
             ElementGeometryUpdateService geometryUpdates)

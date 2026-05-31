@@ -21,16 +21,6 @@ namespace Araci.Applications.UseCases.Editar
         private readonly ICommandHistory _commands;
         private readonly Func<IReadOnlyList<Elemento>, Point> _obterDestinoColagem;
 
-        public ColarElementosUseCase(EditorContext context)
-            : this(
-                context?.CopiarElementos ?? throw new ArgumentNullException(nameof(context)),
-                context.Document,
-                context.Names,
-                context.Commands,
-                elementos => ObterDestinoColagem(context, elementos))
-        {
-        }
-
         public ColarElementosUseCase(
             CopiarElementosUseCase clipboard,
             AraciDocument document,
@@ -68,18 +58,6 @@ namespace Araci.Applications.UseCases.Editar
 
             transaction.Commit();
             return colados;
-        }
-
-        private static Point ObterDestinoColagem(EditorContext context, IReadOnlyList<Elemento> copiados)
-        {
-            if (context.Input.PossuiUltimaPosicaoMouseMundo)
-                return context.Input.UltimaPosicaoMouseMundo;
-
-            if (context.Viewport != null)
-                return context.Viewport.ScreenToWorld(context.Viewport.CentroTela);
-
-            Point centro = CalcularCentro(copiados);
-            return new Point(centro.X + OffsetPadrao, centro.Y + OffsetPadrao);
         }
 
         public static Point CalcularCentro(IReadOnlyList<Elemento> elementos)

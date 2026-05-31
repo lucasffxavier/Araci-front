@@ -33,14 +33,14 @@ namespace Araci.Services
                 RotacionarModelo(vm.Modelo);
 
             foreach (ElementoViewModel vm in targets)
-                AtualizarElementoRotacionadoComCabos(vm.Modelo);
+                _context.VisualUpdates.AtualizarElementoRotacionado(vm.Modelo);
 
             var after = Capturar(affected);
             var items = affected
                 .Select(vm => new RotacionarElementoItem(vm.Modelo, before[vm], after[vm]))
                 .ToList();
 
-            return _context.RotacionarElemento.Executar(items, AtualizarAposComando);
+            return _context.RotacionarElemento.Executar(items, _context.VisualUpdates.AtualizarElementoRotacionado);
         }
 
         public static double RotateClockwise(double value)
@@ -100,46 +100,6 @@ namespace Araci.Services
             IEnumerable<ElementoViewModel> items)
         {
             return items.ToDictionary(vm => vm, vm => vm.CapturarEstado());
-        }
-
-        private void AtualizarElementoRotacionadoComCabos(Elemento elemento)
-        {
-            if (elemento is Cabo cabo)
-            {
-                AtualizarCabo(cabo);
-                AtualizarEstadoVisual();
-                return;
-            }
-
-            _context.TerminalLayout.AtualizarTerminais(elemento);
-
-            IReadOnlyList<Cabo> cabosReancorados =
-                _context.Connectivity.ReancorarCabosConectados(elemento);
-
-            _context.Viewport?.AtualizarViewModel(elemento);
-
-            foreach (Cabo caboReancorado in cabosReancorados)
-                AtualizarCabo(caboReancorado);
-
-            AtualizarEstadoVisual();
-        }
-
-        private void AtualizarAposComando(Elemento elemento)
-        {
-            AtualizarElementoRotacionadoComCabos(elemento);
-        }
-
-        private void AtualizarCabo(Cabo cabo)
-        {
-            _context.TerminalLayout.AtualizarTerminais(cabo);
-            _context.Viewport?.AtualizarViewModel(cabo);
-        }
-
-        private void AtualizarEstadoVisual()
-        {
-            _context.SceneQueries.Invalidate();
-            _context.TerminalSnap.Limpar();
-            _context.CableVertexEdit.Refresh();
         }
 
     }
