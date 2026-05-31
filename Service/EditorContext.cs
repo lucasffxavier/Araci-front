@@ -74,6 +74,7 @@ namespace Araci.Services
             MoveConstraints = new MoveConstraintService(Settings);
             MoverElemento = new MoverElementoUseCase(Commands, AtualizarElementoMovido);
             RotacionarElemento = new RotacionarElementoUseCase(Commands);
+            RedimensionarBarra = new RedimensionarBarraUseCase(Commands, GeometryUpdates);
             Move = new MoveService(this);
             BarraResize = new BarraResizeService(this);
             Rotation = new RotationService(this);
@@ -139,6 +140,7 @@ namespace Araci.Services
         public EditarPropriedadesUseCase EditarPropriedades { get; }
         public MoverElementoUseCase MoverElemento { get; }
         public RotacionarElementoUseCase RotacionarElemento { get; }
+        public RedimensionarBarraUseCase RedimensionarBarra { get; }
 
         public TransactionScope BeginTransaction()
         {

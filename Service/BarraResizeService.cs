@@ -2,7 +2,7 @@
 using System.Linq;
 using System.Windows;
 using System.Windows.Input;
-using Araci.Core.Commands;
+using Araci.Applications.UseCases.Editar;
 using Araci.Core.Rendering;
 using Araci.Models;
 using Araci.ViewModels;
@@ -93,11 +93,15 @@ namespace Araci.Services
             double alturaDepois = _vm.Barra.Altura;
             double xDepois = _vm.Barra.PosicaoX;
             double yDepois = _vm.Barra.PosicaoY;
-            bool mudou = Math.Abs(_startHeight - alturaDepois) > 0.0001 || Math.Abs(_startX - xDepois) > 0.0001 || Math.Abs(_startY - yDepois) > 0.0001;
-            if (mudou)
-            {
-                _context.Commands.Execute(new ResizeBarraCommand(_vm.Barra, _startHeight, _startX, _startY, alturaDepois, xDepois, yDepois, _context.GeometryUpdates));
-            }
+            var request = new RedimensionarBarraRequest(
+                _vm.Barra,
+                _startHeight,
+                _startX,
+                _startY,
+                alturaDepois,
+                xDepois,
+                yDepois);
+            _context.RedimensionarBarra.Executar(request);
             Limpar();
         }
 
