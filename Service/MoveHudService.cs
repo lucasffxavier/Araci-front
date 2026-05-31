@@ -1,4 +1,5 @@
 ﻿using System.ComponentModel;
+using System;
 using System.Windows;
 
 namespace Araci.Services
@@ -7,7 +8,7 @@ namespace Araci.Services
     {
         private const double MARGEM = 10;
 
-        private readonly EditorContext _context;
+        private readonly Func<ViewportService?> _viewportProvider;
 
         private bool _visivel;
         private double _x;
@@ -17,10 +18,10 @@ namespace Araci.Services
 
         public event PropertyChangedEventHandler? PropertyChanged;
 
-        public MoveHudService(EditorContext context)
+        public MoveHudService(Func<ViewportService?> viewportProvider)
         {
-            _context = context
-                ?? throw new System.ArgumentNullException(nameof(context));
+            _viewportProvider = viewportProvider
+                ?? throw new ArgumentNullException(nameof(viewportProvider));
         }
 
         public bool Visivel
@@ -94,11 +95,13 @@ namespace Araci.Services
 
         public void AtualizarPosicao(Rect bounds)
         {
+            ViewportService? viewport = _viewportProvider();
+
             double viewportX =
-                _context.Viewport?.Largura ?? 1000;
+                viewport?.Largura ?? 1000;
 
             double viewportY =
-                _context.Viewport?.Altura ?? 800;
+                viewport?.Altura ?? 800;
 
             Point worldPoint =
                 new(
@@ -106,7 +109,7 @@ namespace Araci.Services
                     bounds.Y - 20);
 
             Point screenPoint =
-                _context.Viewport?.WorldToScreen(worldPoint)
+                viewport?.WorldToScreen(worldPoint)
                 ?? worldPoint;
 
             double novoX =

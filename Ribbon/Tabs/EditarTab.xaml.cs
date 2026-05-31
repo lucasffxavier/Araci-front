@@ -3,11 +3,7 @@ using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Media;
 using Araci;
-using Araci.Applications.Editar.Alinhar;
 using Araci.Applications.Editar.Base;
-using Araci.Applications.Editar.Deletar;
-using Araci.Applications.Editar.Mover;
-using Araci.Applications.Editar.Selecionar;
 using Araci.Services;
 
 namespace Araci.Ribbon.Tabs
@@ -175,7 +171,7 @@ namespace Araci.Ribbon.Tabs
             if (Context == null)
                 return;
 
-            Context.Tools.AtivarFerramenta(new DeletarTool(Context));
+            Context.Tools.AtivarDeletar();
             FocarViewport();
         }
 

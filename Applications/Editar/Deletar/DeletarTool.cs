@@ -10,12 +10,12 @@ namespace Araci.Applications.Editar.Deletar
 {
     public class DeletarTool : ITool
     {
-        private readonly EditorContext _context;
+        private readonly SafeDeleteService _safeDelete;
 
-        public DeletarTool(EditorContext context)
+        public DeletarTool(SafeDeleteService safeDelete)
         {
-            _context = context
-                ?? throw new System.ArgumentNullException(nameof(context));
+            _safeDelete = safeDelete
+                ?? throw new System.ArgumentNullException(nameof(safeDelete));
         }
 
         public string Nome => "Deletar";
@@ -35,7 +35,7 @@ namespace Araci.Applications.Editar.Deletar
             Point position,
             ToolInputState inputState)
         {
-            _context.SafeDelete.DeleteSelection();
+            _safeDelete.DeleteSelection();
         }
 
         public void OnMouseMove(Point position, ToolInputState inputState) { }

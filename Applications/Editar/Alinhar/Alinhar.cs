@@ -1,8 +1,10 @@
 ﻿using System;
 using System.Windows;
 using System.Windows.Input;
+using Araci.Applications.Abstractions;
 using Araci.Applications.Editar.Base;
 using Araci.Core.Commands;
+using Araci.Core.SceneQueries;
 using Araci.Services;
 using Araci.ViewModels;
 
@@ -10,14 +12,24 @@ namespace Araci.Applications.Editar.Alinhar
 {
     public class AlinharTool : ITool
     {
-        private readonly EditorContext _context;
+        private readonly HoverService _hoverService;
+        private readonly AlignmentGuideService _alignmentGuides;
+        private readonly ICommandHistory _commands;
+        private readonly ISceneQueryService _sceneQueries;
         private AlignReference? _reference;
         private AlignReference? _preview;
         private ElementoViewModel? _hover;
 
-        public AlinharTool(EditorContext context)
+        public AlinharTool(
+            HoverService hoverService,
+            AlignmentGuideService alignmentGuides,
+            ICommandHistory commands,
+            ISceneQueryService sceneQueries)
         {
-            _context = context ?? throw new ArgumentNullException(nameof(context));
+            _hoverService = hoverService ?? throw new ArgumentNullException(nameof(hoverService));
+            _alignmentGuides = alignmentGuides ?? throw new ArgumentNullException(nameof(alignmentGuides));
+            _commands = commands ?? throw new ArgumentNullException(nameof(commands));
+            _sceneQueries = sceneQueries ?? throw new ArgumentNullException(nameof(sceneQueries));
         }
 
         public string Nome => "Alinhar";
@@ -26,8 +38,8 @@ namespace Araci.Applications.Editar.Alinhar
 
         public void Ativar()
         {
-            _context.Hover.Clear();
-            _context.AlignmentGuides.Limpar();
+            _hoverService.Clear();
+            _alignmentGuides.Limpar();
         }
 
         public void Desativar()
@@ -43,7 +55,7 @@ namespace Araci.Applications.Editar.Alinhar
             LimparHover();
             _reference = null;
             _preview = null;
-            _context.AlignmentGuides.Limpar();
+            _alignmentGuides.Limpar();
         }
 
         public void OnMouseDown(ElementoViewModel? vm, Point position, ToolInputState inputState)
@@ -81,7 +93,7 @@ namespace Araci.Applications.Editar.Alinhar
                 if (_reference != null)
                     MostrarReferencia(_reference);
                 else
-                    _context.AlignmentGuides.Limpar();
+                    _alignmentGuides.Limpar();
 
                 return;
             }
@@ -131,7 +143,7 @@ namespace Araci.Applications.Editar.Alinhar
 
         private AlignReference? CriarReferenciaDoMouse(ElementoViewModel? vm, Point position)
         {
-            ElementoViewModel? elemento = vm ?? _context.SceneQueries.HitTest(position)?.Elemento;
+            ElementoViewModel? elemento = vm ?? _sceneQueries.HitTest(position)?.Elemento;
 
             if (elemento == null || elemento.IsPreview || elemento.BoundsAlinhamento.IsEmpty)
                 return null;
@@ -149,8 +161,8 @@ namespace Araci.Applications.Editar.Alinhar
             ElementoEstado antes = target.Elemento.CapturarEstado();
             target.Elemento.Mover(delta);
             ElementoEstado depois = target.Elemento.CapturarEstado();
-            _context.Commands.Execute(new AlignElementCommand(target.Elemento, antes, depois));
-            _context.SceneQueries.Invalidate();
+            _commands.Execute(new AlignElementCommand(target.Elemento, antes, depois));
+            _sceneQueries.Invalidate();
         }
 
         private void MostrarReferencia(AlignReference reference)
@@ -159,9 +171,9 @@ namespace Araci.Applications.Editar.Alinhar
             double value = reference.Anchor.GetCoordinate(bounds);
 
             if (reference.Anchor.Axis == AlignAxis.Vertical)
-                _context.AlignmentGuides.MostrarReferenciaVertical(value, bounds);
+                _alignmentGuides.MostrarReferenciaVertical(value, bounds);
             else
-                _context.AlignmentGuides.MostrarReferenciaHorizontal(value, bounds);
+                _alignmentGuides.MostrarReferenciaHorizontal(value, bounds);
         }
 
         private void MostrarPreviewAlinhamento(AlignReference reference, AlignReference target)
@@ -174,9 +186,9 @@ namespace Araci.Applications.Editar.Alinhar
             double targetValue = target.Anchor.GetCoordinate(targetBounds);
 
             if (reference.Anchor.Axis == AlignAxis.Vertical)
-                _context.AlignmentGuides.MostrarDuasReferenciasVerticais(referenceValue, referenceBounds, targetValue, targetBounds, targetFinalBounds);
+                _alignmentGuides.MostrarDuasReferenciasVerticais(referenceValue, referenceBounds, targetValue, targetBounds, targetFinalBounds);
             else
-                _context.AlignmentGuides.MostrarDuasReferenciasHorizontais(referenceValue, referenceBounds, targetValue, targetBounds, targetFinalBounds);
+                _alignmentGuides.MostrarDuasReferenciasHorizontais(referenceValue, referenceBounds, targetValue, targetBounds, targetFinalBounds);
         }
 
         private void AtualizarHover(ElementoViewModel elemento)

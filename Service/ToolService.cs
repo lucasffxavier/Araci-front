@@ -10,6 +10,7 @@ namespace Araci.Services
         private readonly Func<ITool> _criarSelecionarTool;
         private readonly Func<ITool> _criarMoverTool;
         private readonly Func<ITool> _criarAlinharTool;
+        private readonly Func<ITool> _criarDeletarTool;
         private readonly Func<ITool> _criarInserirCaboTool;
         private readonly Func<ElementDefinition, ITool> _criarInserirElementoTool;
         private ITool _ferramentaAtual;
@@ -19,6 +20,7 @@ namespace Araci.Services
             Func<ITool> criarSelecionarTool,
             Func<ITool> criarMoverTool,
             Func<ITool> criarAlinharTool,
+            Func<ITool> criarDeletarTool,
             Func<ITool> criarInserirCaboTool,
             Func<ElementDefinition, ITool> criarInserirElementoTool)
         {
@@ -26,6 +28,7 @@ namespace Araci.Services
             _criarSelecionarTool = criarSelecionarTool ?? throw new ArgumentNullException(nameof(criarSelecionarTool));
             _criarMoverTool = criarMoverTool ?? throw new ArgumentNullException(nameof(criarMoverTool));
             _criarAlinharTool = criarAlinharTool ?? throw new ArgumentNullException(nameof(criarAlinharTool));
+            _criarDeletarTool = criarDeletarTool ?? throw new ArgumentNullException(nameof(criarDeletarTool));
             _criarInserirCaboTool = criarInserirCaboTool ?? throw new ArgumentNullException(nameof(criarInserirCaboTool));
             _criarInserirElementoTool = criarInserirElementoTool ?? throw new ArgumentNullException(nameof(criarInserirElementoTool));
             _ferramentaAtual = _criarSelecionarTool();
@@ -68,6 +71,11 @@ namespace Araci.Services
         public void AtivarAlinhar()
         {
             FerramentaAtual = _criarAlinharTool();
+        }
+
+        public void AtivarDeletar()
+        {
+            FerramentaAtual = _criarDeletarTool();
         }
 
         public bool AtivarInsercaoElemento(string kind)

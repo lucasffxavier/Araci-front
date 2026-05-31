@@ -11,6 +11,7 @@ using Araci.Infrastructure.Persistence;
 using Araci.Applications.Diagrama.InserirCabo;
 using Araci.Applications.Diagrama.InserirElemento;
 using Araci.Applications.Editar.Alinhar;
+using Araci.Applications.Editar.Deletar;
 using Araci.Applications.Editar.Mover;
 using Araci.Applications.Editar.Selecionar;
 using Araci.Applications.Simulation;
@@ -101,8 +102,8 @@ namespace Araci.Services
                 projectFileDialogs,
                 Dialogs,
                 LimparEstadoTransitorioProjeto);
-            MoveHud = new MoveHudService(this);
-            AlignmentGuides = new AlignmentGuideService(this);
+            MoveHud = new MoveHudService(() => Viewport);
+            AlignmentGuides = new AlignmentGuideService(() => Scene.Elementos);
             MoveConstraints = new MoveConstraintService(Settings);
             MoverElemento = new MoverElementoUseCase(Commands, VisualUpdates.AtualizarElementoMovido);
             RotacionarElemento = new RotacionarElementoUseCase(Commands);
@@ -127,7 +128,8 @@ namespace Araci.Services
                 Elements,
                 CriarSelecionarTool,
                 CriarMoverTool,
-                () => new AlinharTool(this),
+                CriarAlinharTool,
+                () => new DeletarTool(SafeDelete),
                 () => new InserirCaboTool(this),
                 definition => new InserirElementoGenericoTool(this, definition));
             Input = new InputRouter(
@@ -255,6 +257,15 @@ namespace Araci.Services
                 AlignmentGuides,
                 MoveConstraints,
                 Rotation);
+        }
+
+        private AlinharTool CriarAlinharTool()
+        {
+            return new AlinharTool(
+                Hover,
+                AlignmentGuides,
+                Commands,
+                SceneQueries);
         }
 
         private Point ObterDestinoColagem(IReadOnlyList<Elemento> copiados)

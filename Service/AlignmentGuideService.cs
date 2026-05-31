@@ -11,11 +11,11 @@ namespace Araci.Services
     {
         private const double Tolerancia = 4;
         private const double Margem = 80;
-        private readonly EditorContext _context;
+        private readonly Func<IEnumerable<ElementoViewModel>> _elementosProvider;
 
-        public AlignmentGuideService(EditorContext context)
+        public AlignmentGuideService(Func<IEnumerable<ElementoViewModel>> elementosProvider)
         {
-            _context = context ?? throw new ArgumentNullException(nameof(context));
+            _elementosProvider = elementosProvider ?? throw new ArgumentNullException(nameof(elementosProvider));
         }
 
         public ObservableCollection<AlignmentGuideLineViewModel> Linhas { get; } = new();
@@ -46,7 +46,7 @@ namespace Araci.Services
             if (preview == null || preview.Bounds.IsEmpty)
                 return default;
 
-            var referencias = _context.Scene.Elementos
+            var referencias = _elementosProvider()
                 .Where(e => !ReferenceEquals(e, preview) && !e.IsPreview && !e.Bounds.IsEmpty)
                 .ToList();
 
@@ -171,14 +171,14 @@ namespace Araci.Services
 
         private IReadOnlyList<ElementoViewModel> ObterReferencias(IReadOnlyList<ElementoViewModel> ignorar)
         {
-            return _context.Scene.Elementos
+            return _elementosProvider()
                 .Where(e => !e.IsPreview && !ignorar.Contains(e) && !e.Bounds.IsEmpty)
                 .ToList();
         }
 
         private IReadOnlyList<ElementoViewModel> ObterReferenciasParaPonto(ElementoViewModel? ignorar)
         {
-            return _context.Scene.Elementos
+            return _elementosProvider()
                 .Where(e => !e.IsPreview && !ReferenceEquals(e, ignorar) && !e.Bounds.IsEmpty)
                 .ToList();
         }
