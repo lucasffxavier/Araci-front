@@ -4,6 +4,8 @@ using Araci.Applications.Abstractions;
 using Araci.Applications.Simulation;
 using Araci.DTOs;
 using Araci.Infrastructure.Simulation;
+using Araci.Models;
+using Araci.ViewModels;
 
 namespace Araci.Services
 {
@@ -15,9 +17,11 @@ namespace Araci.Services
 
         public SimulationPipeline(EditorContext context)
             : this(
-                new CircuitDtoBuilder(context),
+                new CircuitDtoBuilder(context?.Document ?? throw new ArgumentNullException(nameof(context))),
                 new FastApiOpenDssGateway(),
-                context?.SimulationResults ?? throw new ArgumentNullException(nameof(context)))
+                new SimulationResultApplier(
+                    context.Document,
+                    () => NotificarViewModels(context)))
         {
         }
 
@@ -38,6 +42,24 @@ namespace Araci.Services
             _simulationResults.Apply(resultado);
 
             return resultado;
+        }
+
+        private static void NotificarViewModels(EditorContext context)
+        {
+            if (context.Viewport == null)
+                return;
+
+            foreach (ElementoViewModel vm in context.Viewport.Elementos)
+            {
+                if (vm.Modelo is Cabo or Carga)
+                {
+                    vm.NotificarPropriedades(
+                        "CorrenteLinha",
+                        "CorrenteFaseA",
+                        "CorrenteFaseB",
+                        "CorrenteFaseC");
+                }
+            }
         }
     }
 }

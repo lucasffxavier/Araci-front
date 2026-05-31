@@ -23,5 +23,10 @@ namespace Araci.Infrastructure.Simulation
         {
             return _client.SimularTipadoAsync(circuit);
         }
+
+        public Task<string> SimularTextoAsync(CircuitDto circuit)
+        {
+            return _client.SimularAsync(circuit);
+        }
     }
 }

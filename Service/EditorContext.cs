@@ -8,6 +8,7 @@ using Araci.Core.Transactions;
 using Araci.Infrastructure.Persistence;
 using Araci.Applications.Simulation;
 using Araci.Infrastructure.Simulation;
+using Araci.Models;
 using Araci.ViewModels;
 
 namespace Araci.Services
@@ -30,9 +31,9 @@ namespace Araci.Services
             ElectricGraph = new ElectricGraphBuilder(this);
             OperationalState = new OperationalGraphStateBuilder();
             Topology = new TopologyValidator(this);
-            SimulationResults = new SimulationResultApplier(this);
+            SimulationResults = new SimulationResultApplier(Document, NotifySimulationResultViewModels);
             var simulationGateway = new FastApiOpenDssGateway();
-            var circuitDtoBuilder = new CircuitDtoBuilder(this);
+            var circuitDtoBuilder = new CircuitDtoBuilder(Document);
             Simulation = new SimulationPipeline(circuitDtoBuilder, simulationGateway, SimulationResults);
             SimulationExport = new SimulationExportService();
             SimulationMessages = new SimulationMessageBuilder();
@@ -122,6 +123,24 @@ namespace Araci.Services
         public TransactionScope BeginTransaction()
         {
             return Commands.BeginTransaction();
+        }
+
+        private void NotifySimulationResultViewModels()
+        {
+            if (Viewport == null)
+                return;
+
+            foreach (ElementoViewModel vm in Viewport.Elementos)
+            {
+                if (vm.Modelo is Cabo or Carga)
+                {
+                    vm.NotificarPropriedades(
+                        "CorrenteLinha",
+                        "CorrenteFaseA",
+                        "CorrenteFaseB",
+                        "CorrenteFaseC");
+                }
+            }
         }
     }
 }

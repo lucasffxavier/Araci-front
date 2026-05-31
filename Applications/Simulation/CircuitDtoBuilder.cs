@@ -1,21 +1,21 @@
 using System;
+using Araci.Core.Documents;
 using Araci.DTOs;
-using Araci.Services;
 
 namespace Araci.Applications.Simulation
 {
     public class CircuitDtoBuilder
     {
-        private readonly EditorContext _context;
+        private readonly AraciDocument _document;
 
-        public CircuitDtoBuilder(EditorContext context)
+        public CircuitDtoBuilder(AraciDocument document)
         {
-            _context = context ?? throw new ArgumentNullException(nameof(context));
+            _document = document ?? throw new ArgumentNullException(nameof(document));
         }
 
         public CircuitDto Build()
         {
-            ParameterReader reader = new(_context);
+            ParameterReader reader = new(_document);
             CircuitBuilder builder = new(reader);
             return builder.Build();
         }

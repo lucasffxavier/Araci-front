@@ -2,6 +2,7 @@ using System;
 using System.Globalization;
 using System.Linq;
 using Araci.Applications.Abstractions;
+using Araci.Core.Documents;
 using Araci.DTOs;
 using Araci.Models;
 using Araci.ViewModels;
@@ -10,11 +11,22 @@ namespace Araci.Services
 {
     public class SimulationResultApplier : ISimulationResultApplier
     {
-        private readonly EditorContext _context;
+        private readonly AraciDocument _document;
+        private readonly Action? _notifyViewModels;
 
         public SimulationResultApplier(EditorContext context)
+            : this(
+                context?.Document ?? throw new ArgumentNullException(nameof(context)),
+                () => NotificarViewModels(context))
         {
-            _context = context ?? throw new ArgumentNullException(nameof(context));
+        }
+
+        public SimulationResultApplier(
+            AraciDocument document,
+            Action? notifyViewModels = null)
+        {
+            _document = document ?? throw new ArgumentNullException(nameof(document));
+            _notifyViewModels = notifyViewModels;
         }
 
         public void Apply(SimulationResultDto resultado)
@@ -24,7 +36,7 @@ namespace Araci.Services
 
             foreach (LineResultDto lineResult in resultado.Lines)
             {
-                Cabo? cabo = _context.Document.Elementos
+                Cabo? cabo = _document.Elementos
                     .OfType<Cabo>()
                     .FirstOrDefault(c => string.Equals(c.Id.ToString(), lineResult.Id, StringComparison.OrdinalIgnoreCase));
 
@@ -34,7 +46,7 @@ namespace Araci.Services
 
             foreach (LoadResultDto loadResult in resultado.Loads)
             {
-                Carga? carga = _context.Document.Elementos
+                Carga? carga = _document.Elementos
                     .OfType<Carga>()
                     .FirstOrDefault(c => string.Equals(c.Id.ToString(), loadResult.Id, StringComparison.OrdinalIgnoreCase));
 
@@ -42,15 +54,15 @@ namespace Araci.Services
                     AplicarCorrentes(carga, loadResult);
             }
 
-            NotificarViewModels();
+            _notifyViewModels?.Invoke();
         }
 
-        private void NotificarViewModels()
+        private static void NotificarViewModels(EditorContext context)
         {
-            if (_context.Viewport == null)
+            if (context.Viewport == null)
                 return;
 
-            foreach (ElementoViewModel vm in _context.Viewport.Elementos)
+            foreach (ElementoViewModel vm in context.Viewport.Elementos)
             {
                 if (vm.Modelo is Cabo or Carga)
                 {
