@@ -1,7 +1,7 @@
 using System.Collections.Generic;
 using System.Linq;
 using System.Windows;
-using Araci.Core.Commands;
+using Araci.Applications.UseCases.Editar;
 using Araci.Models;
 using Araci.ViewModels;
 
@@ -49,11 +49,10 @@ namespace Araci.Services
             if (!_movendo)
                 return;
 
-            using var transaction =
-                _context.BeginTransaction();
-
             foreach (var vm in elementos.Distinct())
                 CapturarCabosConectados(vm.Modelo);
+
+            var items = new List<MoverElementoItem>();
 
             foreach (var item in _estadoInicial)
             {
@@ -61,27 +60,10 @@ namespace Araci.Services
                 var antes = item.Value;
 
                 var depois = vm.CapturarEstado();
-
-                bool mudou =
-                    antes.X != depois.X ||
-                    antes.Y != depois.Y ||
-                    antes.X2 != depois.X2 ||
-                    antes.Y2 != depois.Y2 ||
-                    antes.Rotacao != depois.Rotacao ||
-                    !antes.Vertices.SequenceEqual(depois.Vertices);
-
-                if (!mudou)
-                    continue;
-
-                transaction.Add(
-                    new MoveElementoCommand(
-                        vm.Modelo,
-                        antes,
-                        depois,
-                        AtualizarElementoMovido));
+                items.Add(new MoverElementoItem(vm.Modelo, antes, depois));
             }
 
-            transaction.Commit();
+            _context.MoverElemento.Executar(items);
             _context.SceneQueries.Invalidate();
 
             _estadoInicial.Clear();
@@ -101,14 +83,6 @@ namespace Araci.Services
 
             _estadoInicial.Clear();
             _movendo = false;
-        }
-
-        private void AtualizarElementoMovido(Elemento elemento)
-        {
-            _context.Viewport?.AtualizarViewModel(elemento);
-            _context.TerminalLayout.AtualizarTerminais(elemento);
-            _context.SceneQueries.Invalidate();
-            _context.CableVertexEdit.Refresh();
         }
 
         private void CapturarEstadoInicial(ElementoViewModel vm)

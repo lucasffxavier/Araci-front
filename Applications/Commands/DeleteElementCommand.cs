@@ -1,33 +1,33 @@
 using System;
+using Araci.Core.Documents;
 using Araci.Models;
-using Araci.Services;
 
 namespace Araci.Core.Commands
 {
     public class DeleteElementCommand : IUndoableCommand
     {
         private readonly Elemento _elemento;
-        private readonly EditorContext _context;
+        private readonly AraciDocument _document;
 
         public DeleteElementCommand(
             Elemento elemento,
-            EditorContext context)
+            AraciDocument document)
         {
             _elemento = elemento
                 ?? throw new ArgumentNullException(nameof(elemento));
 
-            _context = context
-                ?? throw new ArgumentNullException(nameof(context));
+            _document = document
+                ?? throw new ArgumentNullException(nameof(document));
         }
 
         public void Execute()
         {
-            _context.Document.RemoverElemento(_elemento);
+            _document.RemoverElemento(_elemento);
         }
 
         public void Undo()
         {
-            _context.Document.AdicionarElemento(_elemento);
+            _document.AdicionarElemento(_elemento);
         }
 
         public void Redo()

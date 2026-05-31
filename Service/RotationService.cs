@@ -1,7 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using Araci.Core.Commands;
+using Araci.Applications.UseCases.Editar;
 using Araci.Models;
 using Araci.ViewModels;
 
@@ -37,15 +37,10 @@ namespace Araci.Services
 
             var after = Capturar(affected);
             var items = affected
-                .Where(vm => Mudou(before[vm], after[vm]))
-                .Select(vm => new RotateElementoCommand.Item(vm.Modelo, before[vm], after[vm]))
+                .Select(vm => new RotacionarElementoItem(vm.Modelo, before[vm], after[vm]))
                 .ToList();
 
-            if (items.Count == 0)
-                return false;
-
-            _context.Commands.Execute(new RotateElementoCommand(items, AtualizarAposComando));
-            return true;
+            return _context.RotacionarElemento.Executar(items, AtualizarAposComando);
         }
 
         public static double RotateClockwise(double value)
@@ -147,14 +142,5 @@ namespace Araci.Services
             _context.CableVertexEdit.Refresh();
         }
 
-        private static bool Mudou(ElementoEstado antes, ElementoEstado depois)
-        {
-            return antes.X != depois.X ||
-                antes.Y != depois.Y ||
-                antes.X2 != depois.X2 ||
-                antes.Y2 != depois.Y2 ||
-                antes.Rotacao != depois.Rotacao ||
-                !antes.Vertices.SequenceEqual(depois.Vertices);
-        }
     }
 }

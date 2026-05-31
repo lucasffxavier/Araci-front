@@ -54,6 +54,8 @@ namespace Araci.Services
             InserirCabo = new InserirCaboUseCase(ElementoFactory, Commands, Document, Names, cabo => Viewport?.ObterViewModel(cabo) as CaboViewModel);
             CopiarElementos = new CopiarElementosUseCase();
             ColarElementos = new ColarElementosUseCase(CopiarElementos, Document, Names, Commands, ObterDestinoColagem);
+            ExcluirElemento = new ExcluirElementoUseCase(Document, Connectivity, Commands);
+            EditarPropriedades = new EditarPropriedadesUseCase(Commands);
             CableVertexEdit = new CableVertexEditService(this);
             Selection = new SelectionService(this);
             Selection.SelectionChanged += CableVertexEdit.Refresh;
@@ -70,6 +72,8 @@ namespace Araci.Services
             MoveHud = new MoveHudService(this);
             AlignmentGuides = new AlignmentGuideService(this);
             MoveConstraints = new MoveConstraintService(Settings);
+            MoverElemento = new MoverElementoUseCase(Commands, AtualizarElementoMovido);
+            RotacionarElemento = new RotacionarElementoUseCase(Commands);
             Move = new MoveService(this);
             BarraResize = new BarraResizeService(this);
             Rotation = new RotationService(this);
@@ -131,6 +135,10 @@ namespace Araci.Services
         public InserirCaboUseCase InserirCabo { get; }
         public CopiarElementosUseCase CopiarElementos { get; }
         public ColarElementosUseCase ColarElementos { get; }
+        public ExcluirElementoUseCase ExcluirElemento { get; }
+        public EditarPropriedadesUseCase EditarPropriedades { get; }
+        public MoverElementoUseCase MoverElemento { get; }
+        public RotacionarElementoUseCase RotacionarElemento { get; }
 
         public TransactionScope BeginTransaction()
         {
@@ -167,6 +175,14 @@ namespace Araci.Services
             return new Point(
                 centro.X + ColarElementosUseCase.OffsetPadrao,
                 centro.Y + ColarElementosUseCase.OffsetPadrao);
+        }
+
+        private void AtualizarElementoMovido(Elemento elemento)
+        {
+            Viewport?.AtualizarViewModel(elemento);
+            TerminalLayout.AtualizarTerminais(elemento);
+            SceneQueries.Invalidate();
+            CableVertexEdit.Refresh();
         }
     }
 }

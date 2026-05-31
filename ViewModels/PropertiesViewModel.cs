@@ -8,17 +8,16 @@ using System.Linq;
 using System.Reflection;
 using System.Runtime.CompilerServices;
 using System.Windows.Input;
+using Araci.Applications.UseCases.Editar;
 using Araci.Models.Tipos;
 using Araci.Services;
-using AraciCommandManager = Araci.Core.Commands.CommandManager;
-using BulkPropertyChangeCommand = Araci.Core.Commands.BulkPropertyChangeCommand;
 
 namespace Araci.ViewModels
 {
     public class PropertiesViewModel : INotifyPropertyChanged
     {
         private readonly IReadOnlyList<ElementoViewModel> _selecionados;
-        private readonly AraciCommandManager? _commands;
+        private readonly EditarPropriedadesUseCase? _editarPropriedades;
         private object? _elementoSelecionado;
         private ICommand? _abrirPropriedadesTipoCommand;
 
@@ -27,13 +26,13 @@ namespace Araci.ViewModels
             _selecionados = Array.Empty<ElementoViewModel>();
         }
 
-        public PropertiesViewModel(IEnumerable<ElementoViewModel> selecionados, AraciCommandManager? commands = null)
+        public PropertiesViewModel(IEnumerable<ElementoViewModel> selecionados, EditarPropriedadesUseCase? editarPropriedades = null)
         {
             _selecionados = selecionados?.Where(e => e != null).ToList() ?? new List<ElementoViewModel>();
-            _commands = commands;
+            _editarPropriedades = editarPropriedades;
             QuantidadeSelecionada = _selecionados.Count;
             Titulo = CriarTitulo(_selecionados);
-            Propriedades = new ObservableCollection<PropertyDescriptorViewModel>(CriarDescritores(_selecionados, _commands));
+            Propriedades = new ObservableCollection<PropertyDescriptorViewModel>(CriarDescritores(_selecionados, _editarPropriedades));
         }
 
         public object? ElementoSelecionado
@@ -72,20 +71,11 @@ namespace Araci.ViewModels
                 if (!MesmoTipo || value == null)
                     return;
 
-                var items = _selecionados
-                    .Where(e => !ReferenceEquals(e.Tipo, value))
-                    .Select(e => new BulkPropertyChangeCommand.Item(e, nameof(ElementoViewModel.Tipo), e.Tipo, value))
-                    .ToList();
-
-                if (items.Count == 0)
+                if (_editarPropriedades == null)
                     return;
 
-                var command = new BulkPropertyChangeCommand(items);
-
-                if (_commands == null)
-                    command.Execute();
-                else
-                    _commands.Execute(command);
+                if (!_editarPropriedades.Executar(_selecionados, nameof(ElementoViewModel.Tipo), value))
+                    return;
 
                 OnPropertyChanged();
                 OnPropertyChanged(nameof(PodeAbrirPropriedadesTipo));
@@ -115,7 +105,7 @@ namespace Araci.ViewModels
             return $"{itens.Count} elementos selecionados";
         }
 
-        private static IEnumerable<PropertyDescriptorViewModel> CriarDescritores(IReadOnlyList<ElementoViewModel> itens, AraciCommandManager? commands)
+        private static IEnumerable<PropertyDescriptorViewModel> CriarDescritores(IReadOnlyList<ElementoViewModel> itens, EditarPropriedadesUseCase? editarPropriedades)
         {
             if (itens.Count == 0)
                 yield break;
@@ -137,7 +127,7 @@ namespace Araci.ViewModels
                 object? primeiro = valores[0];
                 bool varia = valores.Skip(1).Any(v => !ValoresIguais(primeiro, v));
 
-                yield return new PropertyDescriptorViewModel(itens, descriptor, tipoValor, varia, editavel, commands);
+                yield return new PropertyDescriptorViewModel(itens, descriptor, tipoValor, varia, editavel, editarPropriedades);
             }
         }
 
@@ -339,18 +329,18 @@ namespace Araci.ViewModels
         private readonly IReadOnlyList<ElementoViewModel> _elementos;
         private readonly InstancePropertyDescriptor _descriptor;
         private readonly Type _tipoValor;
-        private readonly AraciCommandManager? _commands;
+        private readonly EditarPropriedadesUseCase? _editarPropriedades;
         private string _valor;
         private bool _varia;
         private bool _temErro;
         private string _mensagemErro = string.Empty;
 
-        public PropertyDescriptorViewModel(IReadOnlyList<ElementoViewModel> elementos, InstancePropertyDescriptor descriptor, Type tipoValor, bool varia, bool isEditable, AraciCommandManager? commands = null)
+        public PropertyDescriptorViewModel(IReadOnlyList<ElementoViewModel> elementos, InstancePropertyDescriptor descriptor, Type tipoValor, bool varia, bool isEditable, EditarPropriedadesUseCase? editarPropriedades = null)
         {
             _elementos = elementos;
             _descriptor = descriptor;
             _tipoValor = tipoValor;
-            _commands = commands;
+            _editarPropriedades = editarPropriedades;
             Nome = descriptor.DisplayName;
             DisplayName = descriptor.DisplayName;
             PropertyName = descriptor.PropertyName;
@@ -433,30 +423,15 @@ namespace Araci.ViewModels
                 return;
             }
 
-            var items = _elementos
-                .Select(e => new
-                {
-                    Elemento = e,
-                    Antes = PropertiesViewModel.ObterValor(e, _descriptor.PropertyName)
-                })
-                .Where(x => !PropertiesViewModel.ValoresIguais(x.Antes, convertido))
-                .Select(x => new BulkPropertyChangeCommand.Item(x.Elemento, _descriptor.PropertyName, x.Antes, convertido))
-                .ToList();
+            bool alterou = _editarPropriedades?.Executar(_elementos, _descriptor.PropertyName, convertido) == true;
 
-            if (items.Count == 0)
+            if (!alterou)
             {
                 _valor = PropertiesViewModel.FormatarValor(convertido, _descriptor);
                 _varia = false;
                 AtualizarEstadoValido();
                 return;
             }
-
-            var command = new BulkPropertyChangeCommand(items);
-
-            if (_commands == null)
-                command.Execute();
-            else
-                _commands.Execute(command);
 
             _varia = false;
             _valor = PropertiesViewModel.FormatarValor(convertido, _descriptor);

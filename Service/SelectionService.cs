@@ -80,7 +80,7 @@ namespace Araci.Services
             {
                 0 => null,
                 1 => _selecionados[0],
-                _ => new PropertiesViewModel(_selecionados, _context.Commands)
+                _ => new PropertiesViewModel(_selecionados, _context.EditarPropriedades)
             };
         }
 
