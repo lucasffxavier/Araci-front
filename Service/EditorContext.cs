@@ -47,7 +47,13 @@ namespace Araci.Services
             InstancePropertyCatalog.Configure(Elements);
             Geometry = new ElementGeometryService(Elements);
             TerminalLayout = new TerminalLayoutService(Elements, Geometry);
-            VisualUpdates = new VisualUpdateService(this);
+            VisualUpdates = new VisualUpdateService(
+                () => Viewport,
+                TerminalLayout,
+                Connectivity,
+                SceneQueries,
+                TerminalSnap,
+                RefreshCableVertexEdit);
             Names = new NameService(Document, Elements);
             GeometryUpdates = new ElementGeometryUpdateService(TerminalLayout, Connectivity, VisualUpdates);
             ElementoFactory = new ElementoFactory(Elements, Names, TypePropertiesDialogs, TerminalLayout, GeometryUpdates);
@@ -65,11 +71,13 @@ namespace Araci.Services
             var projectRepository = new FileSystemProjectRepository();
             var projectFileDialogs = new ProjectFileDialogService();
             Projects = new ProjectPersistenceService(
-                this,
+                Document,
+                Commands,
                 projectSerializer,
                 projectRepository,
                 projectFileDialogs,
-                Dialogs);
+                Dialogs,
+                LimparEstadoTransitorioProjeto);
             MoveHud = new MoveHudService(this);
             AlignmentGuides = new AlignmentGuideService(this);
             MoveConstraints = new MoveConstraintService(Settings);
@@ -181,6 +189,24 @@ namespace Araci.Services
             return new Point(
                 centro.X + ColarElementosUseCase.OffsetPadrao,
                 centro.Y + ColarElementosUseCase.OffsetPadrao);
+        }
+
+        private void RefreshCableVertexEdit()
+        {
+            CableVertexEdit?.Refresh();
+        }
+
+        private void LimparEstadoTransitorioProjeto()
+        {
+            Selection.Limpar();
+            Hover.Clear();
+            CableVertexEdit.Clear();
+            TerminalSnap.Limpar();
+            SelectionBox.Visivel = false;
+            MoveHud.Visivel = false;
+            MoveHud.Reset();
+            SceneQueries.Invalidate();
+            Tools.VoltarParaSelecao();
         }
 
     }

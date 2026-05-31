@@ -2,6 +2,7 @@ using System;
 using System.IO;
 using System.Text.Json;
 using Araci.Applications.Abstractions;
+using Araci.Core.Documents;
 using Araci.Infrastructure.Persistence;
 using Araci.Models;
 
@@ -9,43 +10,39 @@ namespace Araci.Services
 {
     public class ProjectPersistenceService : IProjectPersistenceService
     {
-        private readonly EditorContext _context;
+        private readonly AraciDocument _document;
+        private readonly ICommandHistory _commands;
         private readonly ProjectSerializer _serializer;
         private readonly IProjectRepository _repository;
         private readonly IProjectFileDialogService _fileDialogs;
         private readonly IUserDialogService _dialogs;
+        private readonly Action _limparEstadoTransitorio;
         private ProjectMetadataDto _metadata = ProjectMetadataDto.CreateNew(ProjectSerializer.UntitledProjectName);
         private string? _currentPath;
 
-        public ProjectPersistenceService(EditorContext context)
-            : this(
-                context,
-                new ProjectSerializer(context.Elements, context.TerminalLayout, context.Geometry),
-                new FileSystemProjectRepository(),
-                new ProjectFileDialogService(),
-                context.Dialogs)
-        {
-        }
-
         public ProjectPersistenceService(
-            EditorContext context,
+            AraciDocument document,
+            ICommandHistory commands,
             ProjectSerializer serializer,
             IProjectRepository repository,
             IProjectFileDialogService fileDialogs,
-            IUserDialogService dialogs)
+            IUserDialogService dialogs,
+            Action limparEstadoTransitorio)
         {
-            _context = context ?? throw new ArgumentNullException(nameof(context));
+            _document = document ?? throw new ArgumentNullException(nameof(document));
+            _commands = commands ?? throw new ArgumentNullException(nameof(commands));
             _serializer = serializer ?? throw new ArgumentNullException(nameof(serializer));
             _repository = repository ?? throw new ArgumentNullException(nameof(repository));
             _fileDialogs = fileDialogs ?? throw new ArgumentNullException(nameof(fileDialogs));
             _dialogs = dialogs ?? throw new ArgumentNullException(nameof(dialogs));
+            _limparEstadoTransitorio = limparEstadoTransitorio ?? throw new ArgumentNullException(nameof(limparEstadoTransitorio));
         }
 
         public void Novo()
         {
-            _context.Document.Limpar();
-            LimparEstadoTransitorio();
-            _context.Commands.Clear();
+            _document.Limpar();
+            _limparEstadoTransitorio();
+            _commands.Clear();
             _currentPath = null;
             _metadata = ProjectMetadataDto.CreateNew(ProjectSerializer.UntitledProjectName);
         }
@@ -72,7 +69,7 @@ namespace Araci.Services
             {
                 DateTimeOffset savedAt = DateTimeOffset.UtcNow;
                 ProjectMetadataDto metadata = _serializer.PrepareMetadataForSave(_metadata, path, savedAt);
-                ProjectFileDto dto = _serializer.CreateFileDto(_context.Document, metadata);
+                ProjectFileDto dto = _serializer.CreateFileDto(_document, metadata);
                 string json = _serializer.Serialize(dto);
 
                 _repository.WriteAllText(path, json);
@@ -106,16 +103,16 @@ namespace Araci.Services
 
                 var elementos = _serializer.CreateElements(dto);
 
-                _context.Document.Limpar();
+                _document.Limpar();
 
                 foreach (Elemento elemento in elementos)
-                    _context.Document.AdicionarElemento(elemento);
+                    _document.AdicionarElemento(elemento);
 
                 _metadata = _serializer.CreateMetadataFromFile(dto, path);
                 _currentPath = path;
 
-                LimparEstadoTransitorio();
-                _context.Commands.Clear();
+                _limparEstadoTransitorio();
+                _commands.Clear();
             }
             catch (JsonException ex)
             {
@@ -132,19 +129,6 @@ namespace Araci.Services
             _dialogs.ShowError(
                 "Abrir projeto",
                 $"Nao foi possivel abrir o projeto. O projeto atual foi mantido.{Environment.NewLine}{ex.Message}");
-        }
-
-        private void LimparEstadoTransitorio()
-        {
-            _context.Selection.Limpar();
-            _context.Hover.Clear();
-            _context.CableVertexEdit.Clear();
-            _context.TerminalSnap.Limpar();
-            _context.SelectionBox.Visivel = false;
-            _context.MoveHud.Visivel = false;
-            _context.MoveHud.Reset();
-            _context.SceneQueries.Invalidate();
-            _context.Tools.VoltarParaSelecao();
         }
     }
 }
