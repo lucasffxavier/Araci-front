@@ -2,6 +2,7 @@
 using System.Windows.Input;
 using Araci.Applications.Editar.Base;
 using Araci.Applications.Editar.Selecionar;
+using Araci.Core.SceneQueries;
 using Araci.Services;
 using Araci.ViewModels;
 
@@ -11,12 +12,29 @@ namespace Araci.Applications.Editar.Mover
     {
         private readonly SelecionarTool _selecionarTool;
 
-        public MoverTool(EditorContext context)
+        public MoverTool(
+            ISceneQueryService queries,
+            SelectionService selection,
+            SelectionBoxViewModel selectionBox,
+            CableVertexEditService cableVertexEdit,
+            BarraResizeService barraResize,
+            MoveService move,
+            MoveHudService moveHud,
+            AlignmentGuideService alignmentGuides,
+            MoveConstraintService moveConstraints,
+            RotationService rotation)
         {
-            ArgumentNullException.ThrowIfNull(context);
-
             _selecionarTool = new SelecionarTool(
-                context,
+                queries,
+                selection,
+                selectionBox,
+                cableVertexEdit,
+                barraResize,
+                move,
+                moveHud,
+                alignmentGuides,
+                moveConstraints,
+                rotation,
                 modoSoMover: true,
                 mostrarHud: true);
         }

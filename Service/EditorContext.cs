@@ -83,6 +83,13 @@ namespace Araci.Services
                 Hover,
                 TerminalSnap,
                 SceneQueries);
+            Clipboard = new ClipboardService(
+                CopiarElementos,
+                ColarElementos,
+                Selection,
+                () => Viewport,
+                SceneQueries,
+                CableVertexEdit);
             var projectSerializer = new ProjectSerializer(Elements, TerminalLayout, Geometry);
             var projectRepository = new FileSystemProjectRepository();
             var projectFileDialogs = new ProjectFileDialogService();
@@ -118,8 +125,8 @@ namespace Araci.Services
                 RotacionarElemento);
             Tools = new ToolService(
                 Elements,
-                () => new SelecionarTool(this),
-                () => new MoverTool(this),
+                CriarSelecionarTool,
+                CriarMoverTool,
                 () => new AlinharTool(this),
                 () => new InserirCaboTool(this),
                 definition => new InserirElementoGenericoTool(this, definition));
@@ -130,8 +137,8 @@ namespace Araci.Services
                 Selection,
                 Elements,
                 Hover,
-                () => ClipboardService.CopiarSelecionados(this),
-                () => ClipboardService.Colar(this));
+                Clipboard.CopiarSelecionados,
+                Clipboard.Colar);
             Navigation = new ViewportNavigationService(() => Viewport);
         }
 
@@ -161,6 +168,7 @@ namespace Araci.Services
         public CommandManager Commands { get; } = new CommandManager();
         ICommandHistory IEditorSession.Commands => Commands;
         public SafeDeleteService SafeDelete { get; }
+        public ClipboardService Clipboard { get; }
         public ProjectPersistenceService Projects { get; }
         public VisualUpdateService VisualUpdates { get; }
         public SelectionService Selection { get; }
@@ -217,6 +225,36 @@ namespace Araci.Services
                         "CorrenteFaseC");
                 }
             }
+        }
+
+        private SelecionarTool CriarSelecionarTool()
+        {
+            return new SelecionarTool(
+                SceneQueries,
+                Selection,
+                SelectionBox,
+                CableVertexEdit,
+                BarraResize,
+                Move,
+                MoveHud,
+                AlignmentGuides,
+                MoveConstraints,
+                Rotation);
+        }
+
+        private MoverTool CriarMoverTool()
+        {
+            return new MoverTool(
+                SceneQueries,
+                Selection,
+                SelectionBox,
+                CableVertexEdit,
+                BarraResize,
+                Move,
+                MoveHud,
+                AlignmentGuides,
+                MoveConstraints,
+                Rotation);
         }
 
         private Point ObterDestinoColagem(IReadOnlyList<Elemento> copiados)

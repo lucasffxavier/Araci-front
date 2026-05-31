@@ -1,38 +1,61 @@
 using System;
 using System.Collections.Generic;
+using Araci.Applications.UseCases.Editar;
+using Araci.Core.SceneQueries;
 using Araci.Models;
 using Araci.ViewModels;
 
 namespace Araci.Services
 {
-    public static class ClipboardService
+    public class ClipboardService
     {
-        public static void CopiarSelecionados(EditorContext context)
+        private readonly CopiarElementosUseCase _copiarElementos;
+        private readonly ColarElementosUseCase _colarElementos;
+        private readonly SelectionService _selection;
+        private readonly Func<ViewportService?> _viewportProvider;
+        private readonly ISceneQueryService _sceneQueries;
+        private readonly CableVertexEditService _cableVertexEdit;
+
+        public ClipboardService(
+            CopiarElementosUseCase copiarElementos,
+            ColarElementosUseCase colarElementos,
+            SelectionService selection,
+            Func<ViewportService?> viewportProvider,
+            ISceneQueryService sceneQueries,
+            CableVertexEditService cableVertexEdit)
         {
-            ArgumentNullException.ThrowIfNull(context);
-            context.CopiarElementos.Executar(context.Selection.Selecionados);
+            _copiarElementos = copiarElementos ?? throw new ArgumentNullException(nameof(copiarElementos));
+            _colarElementos = colarElementos ?? throw new ArgumentNullException(nameof(colarElementos));
+            _selection = selection ?? throw new ArgumentNullException(nameof(selection));
+            _viewportProvider = viewportProvider ?? throw new ArgumentNullException(nameof(viewportProvider));
+            _sceneQueries = sceneQueries ?? throw new ArgumentNullException(nameof(sceneQueries));
+            _cableVertexEdit = cableVertexEdit ?? throw new ArgumentNullException(nameof(cableVertexEdit));
         }
 
-        public static void Colar(EditorContext context)
+        public void CopiarSelecionados()
         {
-            ArgumentNullException.ThrowIfNull(context);
+            _copiarElementos.Executar(_selection.Selecionados);
+        }
 
-            IReadOnlyList<Elemento> colados = context.ColarElementos.Executar();
+        public void Colar()
+        {
+            IReadOnlyList<Elemento> colados = _colarElementos.Executar();
 
             if (colados.Count == 0)
                 return;
 
-            context.Selection.Limpar();
+            _selection.Limpar();
+            ViewportService? viewport = _viewportProvider();
 
             foreach (Elemento elemento in colados)
             {
-                ElementoViewModel? vm = context.Viewport?.ObterViewModel(elemento);
+                ElementoViewModel? vm = viewport?.ObterViewModel(elemento);
                 if (vm != null)
-                    context.Selection.Selecionar(vm, true);
+                    _selection.Selecionar(vm, true);
             }
 
-            context.SceneQueries.Invalidate();
-            context.CableVertexEdit.Refresh();
+            _sceneQueries.Invalidate();
+            _cableVertexEdit.Refresh();
         }
     }
 }

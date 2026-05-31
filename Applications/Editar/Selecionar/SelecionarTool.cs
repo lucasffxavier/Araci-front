@@ -16,26 +16,40 @@ namespace Araci.Applications.Editar.Selecionar
         private readonly DragMoveController _dragMove;
         private readonly CableVertexEditService _cableVertexEdit;
         private readonly BarraResizeService _barraResize;
-        private readonly EditorContext _context;
+        private readonly AlignmentGuideService _alignmentGuides;
+        private readonly RotationService _rotation;
         private readonly bool _modoSoMover;
 
-        public SelecionarTool(EditorContext context, bool modoSoMover = false, bool mostrarHud = false)
+        public SelecionarTool(
+            ISceneQueryService queries,
+            SelectionService selection,
+            SelectionBoxViewModel selectionBox,
+            CableVertexEditService cableVertexEdit,
+            BarraResizeService barraResize,
+            MoveService move,
+            MoveHudService moveHud,
+            AlignmentGuideService alignmentGuides,
+            MoveConstraintService moveConstraints,
+            RotationService rotation,
+            bool modoSoMover = false,
+            bool mostrarHud = false)
         {
-            if (context == null)
-                throw new ArgumentNullException(nameof(context));
-
-            _context = context;
-            _queries = context.SceneQueries;
-            _selection = new SelectionController(context.Selection);
-            _selectionBox = new SelectionBoxController(context.SelectionBox, _queries, context.Selection);
-            _cableVertexEdit = context.CableVertexEdit;
-            _barraResize = context.BarraResize;
+            _queries = queries ?? throw new ArgumentNullException(nameof(queries));
+            _selection = new SelectionController(selection ?? throw new ArgumentNullException(nameof(selection)));
+            _selectionBox = new SelectionBoxController(
+                selectionBox ?? throw new ArgumentNullException(nameof(selectionBox)),
+                _queries,
+                selection);
+            _cableVertexEdit = cableVertexEdit ?? throw new ArgumentNullException(nameof(cableVertexEdit));
+            _barraResize = barraResize ?? throw new ArgumentNullException(nameof(barraResize));
+            _alignmentGuides = alignmentGuides ?? throw new ArgumentNullException(nameof(alignmentGuides));
+            _rotation = rotation ?? throw new ArgumentNullException(nameof(rotation));
             _dragMove = new DragMoveController(
-                context.Selection,
-                context.Move,
-                context.MoveHud,
-                context.AlignmentGuides,
-                context.MoveConstraints,
+                selection,
+                move ?? throw new ArgumentNullException(nameof(move)),
+                moveHud ?? throw new ArgumentNullException(nameof(moveHud)),
+                _alignmentGuides,
+                moveConstraints ?? throw new ArgumentNullException(nameof(moveConstraints)),
                 mostrarHud);
             _modoSoMover = modoSoMover;
         }
@@ -68,7 +82,7 @@ namespace Araci.Applications.Editar.Selecionar
             _selectionBox.Cancel();
             _cableVertexEdit.Cancel();
             _cableVertexEdit.Refresh();
-            _context.AlignmentGuides.Limpar();
+            _alignmentGuides.Limpar();
         }
 
         public void OnMouseDown(ElementoViewModel? vm, Point position, ToolInputState inputState)
@@ -164,7 +178,7 @@ namespace Araci.Applications.Editar.Selecionar
         {
             if (!_modoSoMover && key == Key.Space)
             {
-                _context.Rotation.RotateSelectionClockwise();
+                _rotation.RotateSelectionClockwise();
                 return;
             }
 

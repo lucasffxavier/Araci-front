@@ -130,7 +130,7 @@ namespace Araci.Ribbon.Tabs
             if (Context == null)
                 return;
 
-            Context.Tools.AtivarFerramenta(new SelecionarTool(Context));
+            Context.Tools.VoltarParaSelecao();
             FocarViewport();
         }
 
@@ -139,7 +139,7 @@ namespace Araci.Ribbon.Tabs
             if (Context == null)
                 return;
 
-            Context.Tools.AtivarFerramenta(new MoverTool(Context));
+            Context.Tools.AtivarMover();
             FocarViewport();
         }
 
@@ -148,7 +148,7 @@ namespace Araci.Ribbon.Tabs
             if (Context == null)
                 return;
 
-            Context.Tools.AtivarFerramenta(new AlinharTool(Context));
+            Context.Tools.AtivarAlinhar();
             FocarViewport();
         }
 
@@ -157,7 +157,7 @@ namespace Araci.Ribbon.Tabs
             if (Context == null)
                 return;
 
-            ClipboardService.CopiarSelecionados(Context);
+            Context.Clipboard.CopiarSelecionados();
             FocarViewport();
         }
 
@@ -166,7 +166,7 @@ namespace Araci.Ribbon.Tabs
             if (Context == null)
                 return;
 
-            ClipboardService.Colar(Context);
+            Context.Clipboard.Colar();
             FocarViewport();
         }
 
