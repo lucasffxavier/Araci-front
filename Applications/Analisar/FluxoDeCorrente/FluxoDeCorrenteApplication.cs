@@ -1,5 +1,6 @@
 using System;
 using System.Threading.Tasks;
+using Araci.Applications.Abstractions;
 using Araci.DTOs;
 using Araci.Services;
 
@@ -7,11 +8,21 @@ namespace Araci.Applications.Analisar.FluxoDeCorrente
 {
     public class FluxoDeCorrenteApplication
     {
-        private readonly EditorContext _context;
+        private readonly ISimulationPipeline _simulation;
+        private readonly SimulationExportService _simulationExport;
+        private readonly SimulationMessageBuilder _simulationMessages;
+        private readonly IUserDialogService _dialogs;
 
-        public FluxoDeCorrenteApplication(EditorContext context)
+        public FluxoDeCorrenteApplication(
+            ISimulationPipeline simulation,
+            SimulationExportService simulationExport,
+            SimulationMessageBuilder simulationMessages,
+            IUserDialogService dialogs)
         {
-            _context = context ?? throw new ArgumentNullException(nameof(context));
+            _simulation = simulation ?? throw new ArgumentNullException(nameof(simulation));
+            _simulationExport = simulationExport ?? throw new ArgumentNullException(nameof(simulationExport));
+            _simulationMessages = simulationMessages ?? throw new ArgumentNullException(nameof(simulationMessages));
+            _dialogs = dialogs ?? throw new ArgumentNullException(nameof(dialogs));
         }
 
         public SimulationResultDto Resultado { get; private set; } = new();
@@ -37,7 +48,7 @@ namespace Araci.Applications.Analisar.FluxoDeCorrente
 
             try
             {
-                Resultado = await _context.Simulation.ExecutarFluxoDeCorrenteAsync();
+                Resultado = await _simulation.ExecutarFluxoDeCorrenteAsync();
 
                 if (options != null)
                     dssPath = SalvarArquivos(options, Resultado);
@@ -46,7 +57,7 @@ namespace Araci.Applications.Analisar.FluxoDeCorrente
             }
             catch (Exception ex)
             {
-                _context.Dialogs.ShowWarning("Fluxo de corrente", ex.Message);
+                _dialogs.ShowWarning("Fluxo de corrente", ex.Message);
             }
         }
 
@@ -54,16 +65,16 @@ namespace Araci.Applications.Analisar.FluxoDeCorrente
         {
             try
             {
-                SimulationExportPaths paths = _context.SimulationExport.GetPaths(options);
+                SimulationExportPaths paths = _simulationExport.GetPaths(options);
 
-                if (_context.SimulationExport.Exists(paths) && !ConfirmarSubstituicao())
+                if (_simulationExport.Exists(paths) && !ConfirmarSubstituicao())
                     return null;
 
-                return _context.SimulationExport.Save(options, resultado);
+                return _simulationExport.Save(options, resultado);
             }
             catch (Exception ex)
             {
-                _context.Dialogs.ShowWarning(
+                _dialogs.ShowWarning(
                     "Fluxo de corrente",
                     $"A simula\u00E7\u00E3o foi aplicada, mas n\u00E3o foi poss\u00EDvel salvar os arquivos.\n\n{ex.Message}");
 
@@ -73,16 +84,16 @@ namespace Araci.Applications.Analisar.FluxoDeCorrente
 
         private bool ConfirmarSubstituicao()
         {
-            return _context.Dialogs.Confirm(
+            return _dialogs.Confirm(
                 "Fluxo de corrente",
                 "Um ou mais arquivos de sa\u00EDda j\u00E1 existem. Deseja substituir?");
         }
 
         private void MostrarResultado(SimulationResultDto resultado, string? dssPath)
         {
-            SimulationMessage message = _context.SimulationMessages.Build(resultado, dssPath);
+            SimulationMessage message = _simulationMessages.Build(resultado, dssPath);
 
-            _context.Dialogs.Show(message);
+            _dialogs.Show(message);
         }
     }
 }

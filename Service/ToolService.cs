@@ -1,6 +1,4 @@
 using System;
-using Araci.Applications.Diagrama.InserirCabo;
-using Araci.Applications.Diagrama.InserirElemento;
 using Araci.Applications.Editar.Base;
 using Araci.Applications.Editar.Selecionar;
 
@@ -8,13 +6,29 @@ namespace Araci.Services
 {
     public class ToolService
     {
-        private readonly EditorContext _context;
+        private readonly ElementRegistryService _elements;
+        private readonly Func<ITool> _criarSelecionarTool;
+        private readonly Func<ITool> _criarMoverTool;
+        private readonly Func<ITool> _criarAlinharTool;
+        private readonly Func<ITool> _criarInserirCaboTool;
+        private readonly Func<ElementDefinition, ITool> _criarInserirElementoTool;
         private ITool _ferramentaAtual;
 
-        public ToolService(EditorContext context)
+        public ToolService(
+            ElementRegistryService elements,
+            Func<ITool> criarSelecionarTool,
+            Func<ITool> criarMoverTool,
+            Func<ITool> criarAlinharTool,
+            Func<ITool> criarInserirCaboTool,
+            Func<ElementDefinition, ITool> criarInserirElementoTool)
         {
-            _context = context ?? throw new ArgumentNullException(nameof(context));
-            _ferramentaAtual = new SelecionarTool(_context);
+            _elements = elements ?? throw new ArgumentNullException(nameof(elements));
+            _criarSelecionarTool = criarSelecionarTool ?? throw new ArgumentNullException(nameof(criarSelecionarTool));
+            _criarMoverTool = criarMoverTool ?? throw new ArgumentNullException(nameof(criarMoverTool));
+            _criarAlinharTool = criarAlinharTool ?? throw new ArgumentNullException(nameof(criarAlinharTool));
+            _criarInserirCaboTool = criarInserirCaboTool ?? throw new ArgumentNullException(nameof(criarInserirCaboTool));
+            _criarInserirElementoTool = criarInserirElementoTool ?? throw new ArgumentNullException(nameof(criarInserirElementoTool));
+            _ferramentaAtual = _criarSelecionarTool();
             _ferramentaAtual.Ativar();
         }
 
@@ -46,20 +60,30 @@ namespace Araci.Services
             FerramentaAtual = ferramenta;
         }
 
+        public void AtivarMover()
+        {
+            FerramentaAtual = _criarMoverTool();
+        }
+
+        public void AtivarAlinhar()
+        {
+            FerramentaAtual = _criarAlinharTool();
+        }
+
         public bool AtivarInsercaoElemento(string kind)
         {
-            ElementDefinition? definition = _context.Elements.FindByKind(kind);
+            ElementDefinition? definition = _elements.FindByKind(kind);
 
             if (definition == null)
                 return false;
 
             if (definition.Kind == ElementRegistryService.KindCabo || definition.UsaFerramentaEspecial)
             {
-                FerramentaAtual = new InserirCaboTool(_context);
+                FerramentaAtual = _criarInserirCaboTool();
                 return true;
             }
 
-            FerramentaAtual = new InserirElementoGenericoTool(_context, definition);
+            FerramentaAtual = _criarInserirElementoTool(definition);
             return true;
         }
 
@@ -73,7 +97,7 @@ namespace Araci.Services
                 return;
             }
 
-            FerramentaAtual = new SelecionarTool(_context);
+            FerramentaAtual = _criarSelecionarTool();
         }
     }
 }

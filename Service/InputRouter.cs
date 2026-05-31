@@ -3,9 +3,8 @@ using System.Linq;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
-using Araci.Applications.Editar.Alinhar;
+using Araci.Applications.Abstractions;
 using Araci.Applications.Editar.Base;
-using Araci.Applications.Editar.Mover;
 using Araci.Applications.Editar.Selecionar;
 using Araci.ViewModels;
 
@@ -13,14 +12,36 @@ namespace Araci.Services
 {
     public class InputRouter
     {
-        private readonly EditorContext _context;
+        private readonly ToolService _tools;
+        private readonly ICommandHistory _commands;
+        private readonly SafeDeleteService _safeDelete;
+        private readonly SelectionService _selection;
+        private readonly ElementRegistryService _elements;
+        private readonly HoverService _hover;
+        private readonly Action _copiarSelecionados;
+        private readonly Action _colar;
         private string _shortcutBuffer = string.Empty;
         private DateTime _lastShortcutKeyTime = DateTime.MinValue;
         private static readonly TimeSpan ShortcutTimeout = TimeSpan.FromSeconds(1);
 
-        public InputRouter(EditorContext context)
+        public InputRouter(
+            ToolService tools,
+            ICommandHistory commands,
+            SafeDeleteService safeDelete,
+            SelectionService selection,
+            ElementRegistryService elements,
+            HoverService hover,
+            Action copiarSelecionados,
+            Action colar)
         {
-            _context = context ?? throw new ArgumentNullException(nameof(context));
+            _tools = tools ?? throw new ArgumentNullException(nameof(tools));
+            _commands = commands ?? throw new ArgumentNullException(nameof(commands));
+            _safeDelete = safeDelete ?? throw new ArgumentNullException(nameof(safeDelete));
+            _selection = selection ?? throw new ArgumentNullException(nameof(selection));
+            _elements = elements ?? throw new ArgumentNullException(nameof(elements));
+            _hover = hover ?? throw new ArgumentNullException(nameof(hover));
+            _copiarSelecionados = copiarSelecionados ?? throw new ArgumentNullException(nameof(copiarSelecionados));
+            _colar = colar ?? throw new ArgumentNullException(nameof(colar));
         }
 
         public Point UltimaPosicaoMouseMundo { get; private set; }
@@ -28,8 +49,8 @@ namespace Araci.Services
 
         public ITool ToolAtual
         {
-            get => _context.Tools.FerramentaAtual;
-            set => _context.Tools.AtivarFerramenta(value);
+            get => _tools.FerramentaAtual;
+            set => _tools.AtivarFerramenta(value);
         }
 
         public void MouseDown(ElementoViewModel? vm, Point position)
@@ -54,9 +75,9 @@ namespace Araci.Services
             AtualizarUltimaPosicao(position);
 
             if (ToolAtual.IsBusy)
-                _context.Hover.Clear();
+                _hover.Clear();
             else
-                _context.Hover.Update(position);
+                _hover.Update(position);
 
             ToolAtual.OnMouseMove(position, inputState);
         }
@@ -79,35 +100,35 @@ namespace Araci.Services
             if (control && key == Key.Z)
             {
                 LimparAtalho();
-                _context.Commands.Undo();
+                _commands.Undo();
                 return true;
             }
 
             if (control && key == Key.Y)
             {
                 LimparAtalho();
-                _context.Commands.Redo();
+                _commands.Redo();
                 return true;
             }
 
             if (control && key == Key.C)
             {
                 LimparAtalho();
-                ClipboardService.CopiarSelecionados(_context);
+                _copiarSelecionados();
                 return true;
             }
 
             if (control && key == Key.V)
             {
                 LimparAtalho();
-                ClipboardService.Colar(_context);
+                _colar();
                 return true;
             }
 
             if (key == Key.Delete)
             {
                 LimparAtalho();
-                _context.SafeDelete.DeleteActiveHandleOrSelection();
+                _safeDelete.DeleteActiveHandleOrSelection();
                 return true;
             }
 
@@ -121,7 +142,7 @@ namespace Araci.Services
             {
                 LimparAtalho();
 
-                if (ToolAtual.IsBusy || ToolAtual.HandlesKey(key) || _context.Selection.Selecionados.Any(RotationService.PodeRotacionar))
+                if (ToolAtual.IsBusy || ToolAtual.HandlesKey(key) || _selection.Selecionados.Any(RotationService.PodeRotacionar))
                 {
                     ToolAtual.OnKeyDown(key);
                     return true;
@@ -177,21 +198,21 @@ namespace Araci.Services
 
         private bool ExecutarAtalho(string shortcut)
         {
-            ElementDefinition? definition = _context.Elements.FindByShortcut(shortcut);
+            ElementDefinition? definition = _elements.FindByShortcut(shortcut);
 
             if (definition != null)
-                return _context.Tools.AtivarInsercaoElemento(definition.Kind);
+                return _tools.AtivarInsercaoElemento(definition.Kind);
 
             switch (shortcut)
             {
                 case "SE":
-                    _context.Tools.VoltarParaSelecao();
+                    _tools.VoltarParaSelecao();
                     return true;
                 case "MV":
-                    _context.Tools.AtivarFerramenta(new MoverTool(_context));
+                    _tools.AtivarMover();
                     return true;
                 case "AL":
-                    _context.Tools.AtivarFerramenta(new AlinharTool(_context));
+                    _tools.AtivarAlinhar();
                     return true;
                 default:
                     return false;
@@ -219,12 +240,12 @@ namespace Araci.Services
                 if (ToolAtual.IsBusy)
                     ToolAtual.Cancelar();
                 else
-                    _context.Selection.Limpar();
+                    _selection.Limpar();
 
                 return true;
             }
 
-            _context.Tools.VoltarParaSelecao();
+            _tools.VoltarParaSelecao();
             return true;
         }
 

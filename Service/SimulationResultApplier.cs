@@ -5,7 +5,6 @@ using Araci.Applications.Abstractions;
 using Araci.Core.Documents;
 using Araci.DTOs;
 using Araci.Models;
-using Araci.ViewModels;
 
 namespace Araci.Services
 {
@@ -13,13 +12,6 @@ namespace Araci.Services
     {
         private readonly AraciDocument _document;
         private readonly Action? _notifyViewModels;
-
-        public SimulationResultApplier(EditorContext context)
-            : this(
-                context?.Document ?? throw new ArgumentNullException(nameof(context)),
-                () => NotificarViewModels(context))
-        {
-        }
 
         public SimulationResultApplier(
             AraciDocument document,
@@ -55,24 +47,6 @@ namespace Araci.Services
             }
 
             _notifyViewModels?.Invoke();
-        }
-
-        private static void NotificarViewModels(EditorContext context)
-        {
-            if (context.Viewport == null)
-                return;
-
-            foreach (ElementoViewModel vm in context.Viewport.Elementos)
-            {
-                if (vm.Modelo is Cabo or Carga)
-                {
-                    vm.NotificarPropriedades(
-                        "CorrenteLinha",
-                        "CorrenteFaseA",
-                        "CorrenteFaseB",
-                        "CorrenteFaseC");
-                }
-            }
         }
 
         private static void AplicarCorrentes(Cabo cabo, LineResultDto resultado)

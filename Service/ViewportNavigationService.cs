@@ -5,16 +5,16 @@ namespace Araci.Services
 {
     public class ViewportNavigationService
     {
-        private readonly EditorContext _context;
+        private readonly Func<ViewportService?> _viewportProvider;
         private bool _isPanning;
         private bool _isSpacePressed;
         private bool _isSpaceLeftPanning;
         private bool _suppressNextLeftButtonUp;
         private Point _lastPanPoint;
 
-        public ViewportNavigationService(EditorContext context)
+        public ViewportNavigationService(Func<ViewportService?> viewportProvider)
         {
-            _context = context;
+            _viewportProvider = viewportProvider ?? throw new ArgumentNullException(nameof(viewportProvider));
         }
 
         public bool IsPanning => _isPanning;
@@ -25,7 +25,7 @@ namespace Araci.Services
 
         public bool TryBeginMiddlePan(MouseButtonEventArgs e, IInputElement relativeTo)
         {
-            if (_context.Viewport == null || e.ChangedButton != MouseButton.Middle || e.ClickCount >= 2)
+            if (_viewportProvider() == null || e.ChangedButton != MouseButton.Middle || e.ClickCount >= 2)
                 return false;
 
             BeginPan(e.GetPosition(relativeTo), spaceLeftPan: false);
@@ -34,7 +34,7 @@ namespace Araci.Services
 
         public bool TryBeginSpaceLeftPan(MouseButtonEventArgs e, IInputElement relativeTo)
         {
-            if (_context.Viewport == null || !_isSpacePressed || e.ChangedButton != MouseButton.Left)
+            if (_viewportProvider() == null || !_isSpacePressed || e.ChangedButton != MouseButton.Left)
                 return false;
 
             BeginPan(e.GetPosition(relativeTo), spaceLeftPan: true);
@@ -43,13 +43,15 @@ namespace Araci.Services
 
         public bool TryUpdatePan(MouseEventArgs e, IInputElement relativeTo)
         {
-            if (_context.Viewport == null || !_isPanning)
+            ViewportService? viewport = _viewportProvider();
+
+            if (viewport == null || !_isPanning)
                 return false;
 
             Point current = e.GetPosition(relativeTo);
             Vector delta = current - _lastPanPoint;
 
-            _context.Viewport.Pan(delta);
+            viewport.Pan(delta);
 
             _lastPanPoint = current;
             return true;
@@ -102,22 +104,26 @@ namespace Araci.Services
 
         public bool TryHandleMouseWheel(MouseWheelEventArgs e, IInputElement relativeTo)
         {
-            if (_context.Viewport == null)
+            ViewportService? viewport = _viewportProvider();
+
+            if (viewport == null)
                 return false;
 
             Point cursor = e.GetPosition(relativeTo);
 
             if (e.Delta > 0)
-                _context.Viewport.ZoomInAt(cursor);
+                viewport.ZoomInAt(cursor);
             else if (e.Delta < 0)
-                _context.Viewport.ZoomOutAt(cursor);
+                viewport.ZoomOutAt(cursor);
 
             return true;
         }
 
         public bool TryHandleViewportShortcut(KeyEventArgs e)
         {
-            if (_context.Viewport == null)
+            ViewportService? viewport = _viewportProvider();
+
+            if (viewport == null)
                 return false;
 
             if (!Keyboard.Modifiers.HasFlag(ModifierKeys.Control))
@@ -127,22 +133,22 @@ namespace Araci.Services
             {
                 case Key.OemPlus:
                 case Key.Add:
-                    _context.Viewport.ZoomInAtCenter();
+                    viewport.ZoomInAtCenter();
                     return true;
 
                 case Key.OemMinus:
                 case Key.Subtract:
-                    _context.Viewport.ZoomOutAtCenter();
+                    viewport.ZoomOutAtCenter();
                     return true;
 
                 case Key.D0:
                 case Key.NumPad0:
-                    _context.Viewport.ResetCamera();
+                    viewport.ResetCamera();
                     return true;
 
                 case Key.D1:
                 case Key.NumPad1:
-                    _context.Viewport.Zoom100AtCenter();
+                    viewport.Zoom100AtCenter();
                     return true;
 
                 default:
@@ -152,11 +158,13 @@ namespace Araci.Services
 
         public bool TryHandleMiddleDoubleClick(MouseButtonEventArgs e)
         {
-            if (_context.Viewport == null || e.ChangedButton != MouseButton.Middle || e.ClickCount < 2)
+            ViewportService? viewport = _viewportProvider();
+
+            if (viewport == null || e.ChangedButton != MouseButton.Middle || e.ClickCount < 2)
                 return false;
 
             CancelPan();
-            _context.Viewport.ZoomExtents();
+            viewport.ZoomExtents();
             return true;
         }
 

@@ -30,7 +30,11 @@ namespace Araci.Ribbon.Tabs
             if (result != true)
                 return;
 
-            FluxoDeCorrenteApplication app = new(Context);
+            FluxoDeCorrenteApplication app = new(
+                Context.Simulation,
+                Context.SimulationExport,
+                Context.SimulationMessages,
+                Context.Dialogs);
 
             await app.ExecutarAsync(window.Options);
         }

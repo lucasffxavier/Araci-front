@@ -8,6 +8,11 @@ using Araci.Core.SceneQueries;
 using Araci.Core.Scenes;
 using Araci.Core.Transactions;
 using Araci.Infrastructure.Persistence;
+using Araci.Applications.Diagrama.InserirCabo;
+using Araci.Applications.Diagrama.InserirElemento;
+using Araci.Applications.Editar.Alinhar;
+using Araci.Applications.Editar.Mover;
+using Araci.Applications.Editar.Selecionar;
 using Araci.Applications.Simulation;
 using Araci.Applications.UseCases.Editar;
 using Araci.Applications.UseCases.Diagrama;
@@ -111,9 +116,23 @@ namespace Araci.Services
                 () => Viewport,
                 VisualUpdates,
                 RotacionarElemento);
-            Tools = new ToolService(this);
-            Input = new InputRouter(this);
-            Navigation = new ViewportNavigationService(this);
+            Tools = new ToolService(
+                Elements,
+                () => new SelecionarTool(this),
+                () => new MoverTool(this),
+                () => new AlinharTool(this),
+                () => new InserirCaboTool(this),
+                definition => new InserirElementoGenericoTool(this, definition));
+            Input = new InputRouter(
+                Tools,
+                Commands,
+                SafeDelete,
+                Selection,
+                Elements,
+                Hover,
+                () => ClipboardService.CopiarSelecionados(this),
+                () => ClipboardService.Colar(this));
+            Navigation = new ViewportNavigationService(() => Viewport);
         }
 
         public IEventBus Events { get; }
