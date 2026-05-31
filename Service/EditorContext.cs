@@ -1,3 +1,5 @@
+using System.Collections.Generic;
+using System.Windows;
 using Araci.Applications.Abstractions;
 using Araci.Core.Commands;
 using Araci.Core.Documents;
@@ -7,6 +9,8 @@ using Araci.Core.Scenes;
 using Araci.Core.Transactions;
 using Araci.Infrastructure.Persistence;
 using Araci.Applications.Simulation;
+using Araci.Applications.UseCases.Editar;
+using Araci.Applications.UseCases.Diagrama;
 using Araci.Infrastructure.Simulation;
 using Araci.Models;
 using Araci.ViewModels;
@@ -46,6 +50,9 @@ namespace Araci.Services
             Names = new NameService(Document, Elements);
             GeometryUpdates = new ElementGeometryUpdateService(this);
             ElementoFactory = new ElementoFactory(Elements, Names, TypePropertiesDialogs, TerminalLayout, GeometryUpdates);
+            InserirElemento = new InserirElementoUseCase(ElementoFactory, TerminalLayout, Commands, Document, Names);
+            CopiarElementos = new CopiarElementosUseCase();
+            ColarElementos = new ColarElementosUseCase(CopiarElementos, Document, Names, Commands, ObterDestinoColagem);
             CableVertexEdit = new CableVertexEditService(this);
             Selection = new SelectionService(this);
             Selection.SelectionChanged += CableVertexEdit.Refresh;
@@ -119,6 +126,9 @@ namespace Araci.Services
         public ElementRegistryService Elements { get; }
         public TypeLibraryService Types { get; } = new TypeLibraryService();
         public ElementoFactory ElementoFactory { get; }
+        public InserirElementoUseCase InserirElemento { get; }
+        public CopiarElementosUseCase CopiarElementos { get; }
+        public ColarElementosUseCase ColarElementos { get; }
 
         public TransactionScope BeginTransaction()
         {
@@ -141,6 +151,20 @@ namespace Araci.Services
                         "CorrenteFaseC");
                 }
             }
+        }
+
+        private Point ObterDestinoColagem(IReadOnlyList<Elemento> copiados)
+        {
+            if (Input.PossuiUltimaPosicaoMouseMundo)
+                return Input.UltimaPosicaoMouseMundo;
+
+            if (Viewport != null)
+                return Viewport.ScreenToWorld(Viewport.CentroTela);
+
+            Point centro = ColarElementosUseCase.CalcularCentro(copiados);
+            return new Point(
+                centro.X + ColarElementosUseCase.OffsetPadrao,
+                centro.Y + ColarElementosUseCase.OffsetPadrao);
         }
     }
 }

@@ -2,7 +2,6 @@
 using System.Windows;
 using System.Windows.Input;
 using Araci.Applications.Editar.Base;
-using Araci.Core.Commands;
 using Araci.Models;
 using Araci.Services;
 using Araci.ViewModels;
@@ -45,13 +44,11 @@ namespace Araci.Applications.Diagrama.InserirElemento
 
             _preview.Update(position, vm);
             Elemento modeloPreview = _preview.ObterModeloPreview();
-            Elemento modelo = _context.ElementoFactory.CriarModelo(_definition.Kind);
-            modelo.PosicaoX = modeloPreview.PosicaoX;
-            modelo.PosicaoY = modeloPreview.PosicaoY;
-            modelo.Rotacao = _preview.CurrentRotation;
-            _context.TerminalLayout.AtualizarTerminais(modelo);
+            double x = modeloPreview.PosicaoX;
+            double y = modeloPreview.PosicaoY;
+            double rotacao = _preview.CurrentRotation;
             _preview.Clear();
-            _context.Commands.Execute(new AddElementoCommand(modelo, _context));
+            _context.InserirElemento.Executar(_definition.Kind, x, y, rotacao);
             _context.Tools.VoltarParaSelecao();
         }
 
