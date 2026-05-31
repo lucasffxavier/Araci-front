@@ -4,6 +4,7 @@ using System.Linq;
 using System.Windows;
 using Araci.Applications.UseCases.Editar;
 using Araci.Applications.Editar.Base;
+using Araci.Core.SceneQueries;
 using Araci.Models;
 using Araci.ViewModels;
 
@@ -13,7 +14,10 @@ namespace Araci.Services
     {
         private const double HandleTolerance = 8.0;
 
-        private readonly EditorContext _context;
+        private readonly SelectionService _selection;
+        private readonly ISceneQueryService _sceneQueries;
+        private readonly VisualUpdateService _visualUpdates;
+        private readonly EditarVerticesCaboUseCase _editarVerticesCabo;
 
         private CaboViewModel? _caboAtivo;
         private int _indiceAtivo = -1;
@@ -23,9 +27,16 @@ namespace Araci.Services
         private Point _pontoInicialArrasto;
         private OrthogonalAxis? _eixoOrtogonal;
 
-        public CableVertexEditService(EditorContext context)
+        public CableVertexEditService(
+            SelectionService selection,
+            ISceneQueryService sceneQueries,
+            VisualUpdateService visualUpdates,
+            EditarVerticesCaboUseCase editarVerticesCabo)
         {
-            _context = context ?? throw new ArgumentNullException(nameof(context));
+            _selection = selection ?? throw new ArgumentNullException(nameof(selection));
+            _sceneQueries = sceneQueries ?? throw new ArgumentNullException(nameof(sceneQueries));
+            _visualUpdates = visualUpdates ?? throw new ArgumentNullException(nameof(visualUpdates));
+            _editarVerticesCabo = editarVerticesCabo ?? throw new ArgumentNullException(nameof(editarVerticesCabo));
         }
 
         public ObservableCollection<CableVertexHandleViewModel> Handles { get; } = new();
@@ -102,7 +113,7 @@ namespace Araci.Services
 
             _caboAtivo.Cabo.Vertices[_indiceAtivo] = pontoEfetivo;
             _caboAtivo.AtualizarAposModeloAlterado();
-            _context.SceneQueries.Invalidate();
+            _sceneQueries.Invalidate();
 
             RebuildHandles();
         }
@@ -130,7 +141,7 @@ namespace Araci.Services
                 _caboAtivo.AplicarEstado(_estadoInicial);
 
             LimparEdicao();
-            _context.SceneQueries.Invalidate();
+            _sceneQueries.Invalidate();
             RebuildHandles();
         }
 
@@ -155,7 +166,7 @@ namespace Araci.Services
         {
             Handles.Clear();
 
-            foreach (var cabo in _context.Selection.Selecionados.OfType<CaboViewModel>())
+            foreach (var cabo in _selection.Selecionados.OfType<CaboViewModel>())
             {
                 if (cabo.IsPreview || cabo.Cabo.Vertices.Count < 3)
                     continue;
@@ -174,7 +185,7 @@ namespace Araci.Services
             double tolerance2 = HandleTolerance * HandleTolerance;
             SegmentHit? melhor = null;
 
-            foreach (var cabo in _context.Selection.Selecionados.OfType<CaboViewModel>())
+            foreach (var cabo in _selection.Selecionados.OfType<CaboViewModel>())
             {
                 var vertices = cabo.Cabo.Vertices;
 
@@ -223,15 +234,15 @@ namespace Araci.Services
             }
 
             var request = new EditarVerticesCaboRequest(cabo.Cabo, antes, depois);
-            _context.EditarVerticesCabo.Executar(request, AtualizarCabo);
+            _editarVerticesCabo.Executar(request, AtualizarCabo);
 
-            _context.SceneQueries.Invalidate();
+            _sceneQueries.Invalidate();
             RebuildHandles();
         }
 
         private void AtualizarCabo(Elemento elemento)
         {
-            _context.VisualUpdates.AtualizarCaboEditado(elemento);
+            _visualUpdates.AtualizarCaboEditado(elemento);
             RebuildHandles();
         }
 

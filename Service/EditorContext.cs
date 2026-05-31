@@ -63,8 +63,13 @@ namespace Araci.Services
             ColarElementos = new ColarElementosUseCase(CopiarElementos, Document, Names, Commands, ObterDestinoColagem);
             ExcluirElemento = new ExcluirElementoUseCase(Document, Connectivity, Commands);
             EditarPropriedades = new EditarPropriedadesUseCase(Commands);
-            CableVertexEdit = new CableVertexEditService(this);
             Selection = new SelectionService(Editor, Events, EditarPropriedades);
+            EditarVerticesCabo = new EditarVerticesCaboUseCase(Commands);
+            CableVertexEdit = new CableVertexEditService(
+                Selection,
+                SceneQueries,
+                VisualUpdates,
+                EditarVerticesCabo);
             Selection.SelectionChanged += CableVertexEdit.Refresh;
             SafeDelete = new SafeDeleteService(this);
             var projectSerializer = new ProjectSerializer(Elements, TerminalLayout, Geometry);
@@ -84,7 +89,6 @@ namespace Araci.Services
             MoverElemento = new MoverElementoUseCase(Commands, VisualUpdates.AtualizarElementoMovido);
             RotacionarElemento = new RotacionarElementoUseCase(Commands);
             RedimensionarBarra = new RedimensionarBarraUseCase(Commands, GeometryUpdates);
-            EditarVerticesCabo = new EditarVerticesCaboUseCase(Commands);
             Move = new MoveService(
                 Connectivity,
                 TerminalLayout,
