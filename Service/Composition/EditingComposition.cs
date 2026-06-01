@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using Araci.Applications.Abstractions;
 using Araci.Applications.Editor;
 using Araci.Applications.Editar.Selecionar;
 using Araci.Applications.UseCases.Editar;
@@ -113,10 +114,10 @@ namespace Araci.Services.Composition
         public static InputRouter CreateInput(
             ToolService tools,
             CommandManager commands,
-            SafeDeleteService safeDelete,
-            SelectionService selection,
+            ISafeDeleteService safeDelete,
+            ISelectionService selection,
             ElementRegistryService elements,
-            HoverService hover,
+            IHoverService hover,
             Action copySelected,
             Action paste)
         {

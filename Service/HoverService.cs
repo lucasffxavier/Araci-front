@@ -1,11 +1,12 @@
 using System;
 using System.Windows;
+using Araci.Applications.Abstractions;
 using Araci.Core.SceneQueries;
 using Araci.ViewModels;
 
 namespace Araci.Services
 {
-    public class HoverService
+    public class HoverService : IHoverService
     {
         private readonly ISceneQueryService _queries;
         private ElementoViewModel? _atual;

@@ -2,6 +2,7 @@ using System;
 using System.Collections.ObjectModel;
 using System.Linq;
 using System.Windows;
+using Araci.Applications.Abstractions;
 using Araci.Applications.Editar.Base;
 using Araci.Applications.UseCases.Editar;
 using Araci.Core.SceneQueries;
@@ -13,7 +14,7 @@ namespace Araci.Applications.Editar.Selecionar
 {
     public class CableVertexEditService
     {
-        private readonly SelectionService _selection;
+        private readonly ISelectionService _selection;
         private readonly ISceneQueryService _sceneQueries;
         private readonly VisualUpdateService _visualUpdates;
         private readonly EditarVerticesCaboUseCase _editarVerticesCabo;
@@ -24,7 +25,7 @@ namespace Araci.Applications.Editar.Selecionar
         private int _handleAtivoIndice = -1;
 
         public CableVertexEditService(
-            SelectionService selection,
+            ISelectionService selection,
             ISceneQueryService sceneQueries,
             VisualUpdateService visualUpdates,
             EditarVerticesCaboUseCase editarVerticesCabo)

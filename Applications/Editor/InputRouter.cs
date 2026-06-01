@@ -15,10 +15,10 @@ namespace Araci.Applications.Editor
     {
         private readonly ToolService _tools;
         private readonly ICommandHistory _commands;
-        private readonly SafeDeleteService _safeDelete;
-        private readonly SelectionService _selection;
+        private readonly ISafeDeleteService _safeDelete;
+        private readonly ISelectionService _selection;
         private readonly ElementRegistryService _elements;
-        private readonly HoverService _hover;
+        private readonly IHoverService _hover;
         private readonly Action _copiarSelecionados;
         private readonly Action _colar;
         private string _shortcutBuffer = string.Empty;
@@ -28,10 +28,10 @@ namespace Araci.Applications.Editor
         public InputRouter(
             ToolService tools,
             ICommandHistory commands,
-            SafeDeleteService safeDelete,
-            SelectionService selection,
+            ISafeDeleteService safeDelete,
+            ISelectionService selection,
             ElementRegistryService elements,
-            HoverService hover,
+            IHoverService hover,
             Action copiarSelecionados,
             Action colar)
         {

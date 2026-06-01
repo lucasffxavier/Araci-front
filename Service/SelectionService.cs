@@ -2,13 +2,14 @@
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Linq;
+using Araci.Applications.Abstractions;
 using Araci.Applications.UseCases.Editar;
 using Araci.Core.Events;
 using Araci.ViewModels;
 
 namespace Araci.Services
 {
-    public class SelectionService
+    public class SelectionService : ISelectionService
     {
         private readonly EditorState _editorState;
         private readonly IEventBus _events;

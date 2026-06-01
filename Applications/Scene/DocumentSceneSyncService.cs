@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Collections.Specialized;
+using Araci.Applications.Abstractions;
 using Araci.Core.Documents;
 using Araci.Core.SceneQueries;
 using Araci.Applications.Editar.Selecionar;
@@ -17,11 +18,11 @@ namespace Araci.Applications.Scene
         private readonly AraciDocument _document;
         private readonly CoreScene _scene;
         private readonly ElementoFactory _elementoFactory;
-        private readonly SelectionService _selection;
+        private readonly ISelectionService _selection;
         private readonly CableVertexEditService _cableVertexEdit;
         private readonly TerminalSnapState _terminalSnap;
         private readonly AlignmentGuideService _alignmentGuides;
-        private readonly HoverService _hover;
+        private readonly IHoverService _hover;
         private readonly ISceneQueryService _sceneQueries;
         private readonly Dictionary<Elemento, ElementoViewModel> _viewModelsPorModelo = new();
 
@@ -29,11 +30,11 @@ namespace Araci.Applications.Scene
             AraciDocument document,
             CoreScene scene,
             ElementoFactory elementoFactory,
-            SelectionService selection,
+            ISelectionService selection,
             CableVertexEditService cableVertexEdit,
             TerminalSnapState terminalSnap,
             AlignmentGuideService alignmentGuides,
-            HoverService hover,
+            IHoverService hover,
             ISceneQueryService sceneQueries)
         {
             _document = document ?? throw new ArgumentNullException(nameof(document));

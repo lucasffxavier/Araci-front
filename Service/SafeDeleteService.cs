@@ -1,5 +1,6 @@
 using System;
 using System.Linq;
+using Araci.Applications.Abstractions;
 using Araci.Applications.Editar.Selecionar;
 using Araci.Applications.UseCases.Editar;
 using Araci.Core.SceneQueries;
@@ -7,7 +8,7 @@ using Araci.ViewModels;
 
 namespace Araci.Services
 {
-    public class SafeDeleteService
+    public class SafeDeleteService : ISafeDeleteService
     {
         private readonly SelectionService _selection;
         private readonly CableVertexEditService _cableVertexEdit;

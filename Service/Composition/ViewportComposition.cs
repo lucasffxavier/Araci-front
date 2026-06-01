@@ -1,4 +1,5 @@
 using System;
+using Araci.Applications.Abstractions;
 using Araci.Applications.Editar.Selecionar;
 using Araci.Applications.Factories;
 using Araci.Applications.Scene;
@@ -20,8 +21,8 @@ namespace Araci.Services.Composition
             MoveHudService moveHud,
             AlignmentGuideService alignmentGuides,
             ElementoFactory elementoFactory,
-            SelectionService selection,
-            HoverService hover,
+            ISelectionService selection,
+            IHoverService hover,
             ISceneQueryService sceneQueries)
         {
             var documentSceneSync = new DocumentSceneSyncService(
