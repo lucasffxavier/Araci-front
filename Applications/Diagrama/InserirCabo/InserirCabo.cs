@@ -1,31 +1,29 @@
 using System;
 using System.Windows;
 using System.Windows.Input;
+using Araci.Applications.Abstractions;
 using Araci.Applications.Editar.Base;
+using Araci.Applications.UseCases.Diagrama;
+using Araci.Core.SceneQueries;
+using Araci.Core.Scenes;
 using Araci.Models;
 using Araci.Services;
 using Araci.ViewModels;
 
 namespace Araci.Applications.Diagrama.InserirCabo
 {
-    public class InserirCaboApplication
-    {
-        private readonly EditorContext _context;
-
-        public InserirCaboApplication(EditorContext context)
-        {
-            _context = context ?? throw new ArgumentNullException(nameof(context));
-        }
-
-        public void Executar()
-        {
-            _context.Input.ToolAtual = new InserirCaboTool(_context);
-        }
-    }
-
     public class InserirCaboTool : ITool
     {
-        private readonly EditorContext _context;
+        private readonly ICommandHistory _commands;
+        private readonly ElementoFactory _factory;
+        private readonly InserirCaboUseCase _inserirCabo;
+        private readonly SnapService _snap;
+        private readonly ConnectivityService _connectivity;
+        private readonly AlignmentGuideService _alignmentGuides;
+        private readonly Scene _scene;
+        private readonly ISceneQueryService _sceneQueries;
+        private readonly TerminalSnapState _terminalSnap;
+        private readonly Action _voltarParaSelecao;
         private CaboViewModel? _caboAtual;
         private CaboViewModel? _previewInicial;
         private Terminal? _terminalPreviewInicial;
@@ -33,9 +31,28 @@ namespace Araci.Applications.Diagrama.InserirCabo
         private Terminal? _terminalOrigem;
         private bool _inserindo;
 
-        public InserirCaboTool(EditorContext context)
+        public InserirCaboTool(
+            ICommandHistory commands,
+            ElementoFactory factory,
+            InserirCaboUseCase inserirCabo,
+            SnapService snap,
+            ConnectivityService connectivity,
+            AlignmentGuideService alignmentGuides,
+            Scene scene,
+            ISceneQueryService sceneQueries,
+            TerminalSnapState terminalSnap,
+            Action voltarParaSelecao)
         {
-            _context = context;
+            _commands = commands ?? throw new ArgumentNullException(nameof(commands));
+            _factory = factory ?? throw new ArgumentNullException(nameof(factory));
+            _inserirCabo = inserirCabo ?? throw new ArgumentNullException(nameof(inserirCabo));
+            _snap = snap ?? throw new ArgumentNullException(nameof(snap));
+            _connectivity = connectivity ?? throw new ArgumentNullException(nameof(connectivity));
+            _alignmentGuides = alignmentGuides ?? throw new ArgumentNullException(nameof(alignmentGuides));
+            _scene = scene ?? throw new ArgumentNullException(nameof(scene));
+            _sceneQueries = sceneQueries ?? throw new ArgumentNullException(nameof(sceneQueries));
+            _terminalSnap = terminalSnap ?? throw new ArgumentNullException(nameof(terminalSnap));
+            _voltarParaSelecao = voltarParaSelecao ?? throw new ArgumentNullException(nameof(voltarParaSelecao));
         }
 
         public string Nome => "Inserir Cabo";
@@ -54,7 +71,7 @@ namespace Araci.Applications.Diagrama.InserirCabo
         public void Cancelar()
         {
             if (_caboAtual != null)
-                _context.Commands.Undo();
+                _commands.Undo();
 
             LimparTerminalCapturado();
             LimparPreviewInicial();
@@ -67,7 +84,7 @@ namespace Araci.Applications.Diagrama.InserirCabo
                 vm = null;
 
             Terminal? terminal = ObterTerminalParaClique(vm, position);
-            Point pontoSnap = terminal?.Posicao ?? _context.Snap.SnapFromElemento(vm, position, _caboAtual);
+            Point pontoSnap = terminal?.Posicao ?? _snap.SnapFromElemento(vm, position, _caboAtual);
 
             if (!_inserindo)
             {
@@ -84,7 +101,7 @@ namespace Araci.Applications.Diagrama.InserirCabo
 
                 AtualizarTerminalCapturado(terminal);
                 LimparPreviewInicial();
-                _caboAtual = _context.InserirCabo.Iniciar(pontoSnap, terminal);
+                _caboAtual = _inserirCabo.Iniciar(pontoSnap, terminal);
                 _inserindo = true;
                 _terminalOrigem = terminal;
                 return;
@@ -108,7 +125,7 @@ namespace Araci.Applications.Diagrama.InserirCabo
             }
 
             AtualizarTerminalCapturado(terminal);
-            _context.InserirCabo.FinalizarDestino(_caboAtual, terminal, pontoSnap);
+            _inserirCabo.FinalizarDestino(_caboAtual, terminal, pontoSnap);
             Finalizar();
         }
 
@@ -116,7 +133,7 @@ namespace Araci.Applications.Diagrama.InserirCabo
         {
             if (!_inserindo)
             {
-                _context.AlignmentGuides.Limpar();
+                _alignmentGuides.Limpar();
                 AtualizarPreviewInicial(position);
                 return;
             }
@@ -141,11 +158,11 @@ namespace Araci.Applications.Diagrama.InserirCabo
                     MostrarTerminalInvalido(terminal, validacao.Message ?? "Conexão inválida");
             }
 
-            Point pontoSnap = terminal?.Posicao ?? _context.Snap.Snap(position, _caboAtual);
+            Point pontoSnap = terminal?.Posicao ?? _snap.Snap(position, _caboAtual);
             Point pontoPreview = terminal == null ? AplicarAlinhamentoCabo(pontoSnap, inputState) : pontoSnap;
 
             if (terminal != null)
-                _context.AlignmentGuides.Limpar();
+                _alignmentGuides.Limpar();
 
             _caboAtual.AtualizarPreview(pontoPreview);
         }
@@ -170,12 +187,12 @@ namespace Araci.Applications.Diagrama.InserirCabo
 
         private Terminal? ObterTerminalConexao(ElementoViewModel? vm, Point position)
         {
-            Terminal? terminal = _context.Snap.ObterTerminalMaisProximo(vm, position);
+            Terminal? terminal = _snap.ObterTerminalMaisProximo(vm, position);
 
             if (terminal != null && EhElementoConectavel(terminal.Dono))
                 return terminal;
 
-            terminal = _context.Snap.ObterTerminalMaisProximo(position, _caboAtual ?? _previewInicial, t => EhElementoConectavel(t.Dono));
+            terminal = _snap.ObterTerminalMaisProximo(position, _caboAtual ?? _previewInicial, t => EhElementoConectavel(t.Dono));
             return terminal;
         }
 
@@ -197,7 +214,7 @@ namespace Araci.Applications.Diagrama.InserirCabo
 
             double dx = terminal.Posicao.X - position.X;
             double dy = terminal.Posicao.Y - position.Y;
-            double tolerancia = _context.Snap.TerminalTolerance;
+            double tolerancia = _snap.TerminalTolerance;
             return dx * dx + dy * dy <= tolerancia * tolerancia;
         }
 
@@ -229,7 +246,7 @@ namespace Araci.Applications.Diagrama.InserirCabo
             preview.Cabo.DefinirOrigem(terminal.Posicao);
             preview.Cabo.PreviewPonto = position;
             preview.AtualizarAposModeloAlterado();
-            _context.SceneQueries.Invalidate();
+            _sceneQueries.Invalidate();
         }
 
         private CaboViewModel ObterPreviewInicial()
@@ -237,10 +254,10 @@ namespace Araci.Applications.Diagrama.InserirCabo
             if (_previewInicial != null)
                 return _previewInicial;
 
-            _previewInicial = _context.ElementoFactory.CriarCaboVM();
+            _previewInicial = _factory.CriarCaboVM();
             _previewInicial.IsPreview = true;
-            _context.Scene.Elementos.Add(_previewInicial);
-            _context.SceneQueries.Invalidate();
+            _scene.Elementos.Add(_previewInicial);
+            _sceneQueries.Invalidate();
             return _previewInicial;
         }
 
@@ -250,10 +267,10 @@ namespace Araci.Applications.Diagrama.InserirCabo
                 return;
 
             _previewInicial.IsPreview = false;
-            _context.Scene.Elementos.Remove(_previewInicial);
+            _scene.Elementos.Remove(_previewInicial);
             _previewInicial = null;
             _terminalPreviewInicial = null;
-            _context.SceneQueries.Invalidate();
+            _sceneQueries.Invalidate();
         }
 
         private void AtualizarTerminalCapturado(Terminal? terminal)
@@ -264,17 +281,17 @@ namespace Araci.Applications.Diagrama.InserirCabo
                 return;
             }
 
-            _context.TerminalSnap.Mostrar(terminal);
+            _terminalSnap.Mostrar(terminal);
         }
 
         private void MostrarTerminalInvalido(Terminal terminal, string mensagem)
         {
-            _context.TerminalSnap.MostrarInvalido(terminal, terminal.Posicao, mensagem);
+            _terminalSnap.MostrarInvalido(terminal, terminal.Posicao, mensagem);
         }
 
         private void LimparTerminalCapturado()
         {
-            _context.TerminalSnap.Limpar();
+            _terminalSnap.Limpar();
         }
 
         private void AdicionarVerticeIntermediario(Point ponto)
@@ -283,7 +300,7 @@ namespace Araci.Applications.Diagrama.InserirCabo
                 return;
 
             _caboAtual.AdicionarVerticeIntermediario(ponto);
-            _context.SceneQueries.Invalidate();
+            _sceneQueries.Invalidate();
         }
 
         private Point AplicarAlinhamentoCabo(Point ponto, ToolInputState inputState)
@@ -296,11 +313,11 @@ namespace Araci.Applications.Diagrama.InserirCabo
             if (inputState.IsShiftPressed)
             {
                 Point ortogonal = AplicarOrtogonalizacao(ponto, origem);
-                _context.AlignmentGuides.AplicarSnapPontoCabo(ortogonal, origem, _caboAtual);
+                _alignmentGuides.AplicarSnapPontoCabo(ortogonal, origem, _caboAtual);
                 return ortogonal;
             }
 
-            return _context.AlignmentGuides.AplicarSnapPontoCabo(ponto, origem, _caboAtual);
+            return _alignmentGuides.AplicarSnapPontoCabo(ponto, origem, _caboAtual);
         }
 
         private static Point AplicarOrtogonalizacao(Point ponto, Point origem)
@@ -320,7 +337,7 @@ namespace Araci.Applications.Diagrama.InserirCabo
             if (!OrigemValida(terminal))
                 return ConnectionValidationResult.Invalid("Conexão inválida");
 
-            return _context.Connectivity.ValidarTerminalDisponivel(null, terminal);
+            return _connectivity.ValidarTerminalDisponivel(null, terminal);
         }
 
         private bool OrigemValida(Terminal terminal)
@@ -336,7 +353,7 @@ namespace Araci.Applications.Diagrama.InserirCabo
             if (_terminalOrigem == null)
                 return ConnectionValidationResult.Invalid("Origem do cabo não definida.");
 
-            return _context.Connectivity.ValidarConexaoCabo(_caboAtual.Cabo, _terminalOrigem, terminal);
+            return _connectivity.ValidarConexaoCabo(_caboAtual.Cabo, _terminalOrigem, terminal);
         }
 
         private void Finalizar()
@@ -344,7 +361,7 @@ namespace Araci.Applications.Diagrama.InserirCabo
             LimparTerminalCapturado();
             LimparPreviewInicial();
             LimparEstado();
-            _context.Tools.VoltarParaSelecao();
+            _voltarParaSelecao();
         }
 
         private void LimparEstado()
@@ -354,7 +371,7 @@ namespace Araci.Applications.Diagrama.InserirCabo
             _terminalPreviewFinal = null;
             _terminalOrigem = null;
             LimparTerminalCapturado();
-            _context.AlignmentGuides.Limpar();
+            _alignmentGuides.Limpar();
             _inserindo = false;
         }
     }

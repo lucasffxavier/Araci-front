@@ -130,7 +130,7 @@ namespace Araci.Services
                 CriarMoverTool,
                 CriarAlinharTool,
                 () => new DeletarTool(SafeDelete),
-                () => new InserirCaboTool(this),
+                CriarInserirCaboTool,
                 CriarInserirElementoGenericoTool);
             Input = new InputRouter(
                 Tools,
@@ -153,6 +153,22 @@ namespace Araci.Services
         public InputRouter Input { get; }
         public ViewportNavigationService Navigation { get; }
         public ViewportService? Viewport { get; private set; }
+
+        public ViewportViewModel CriarViewportViewModel()
+        {
+            return new ViewportViewModel(
+                Document,
+                Scene,
+                SelectionBox,
+                TerminalSnap,
+                CableVertexEdit,
+                MoveHud,
+                AlignmentGuides,
+                Selection,
+                Hover,
+                SceneQueries,
+                ElementoFactory);
+        }
 
         public void InicializarViewport(ViewportViewModel viewportViewModel)
         {
@@ -266,6 +282,21 @@ namespace Araci.Services
                 AlignmentGuides,
                 Commands,
                 SceneQueries);
+        }
+
+        private InserirCaboTool CriarInserirCaboTool()
+        {
+            return new InserirCaboTool(
+                Commands,
+                ElementoFactory,
+                InserirCabo,
+                Snap,
+                Connectivity,
+                AlignmentGuides,
+                Scene,
+                SceneQueries,
+                TerminalSnap,
+                () => Tools.VoltarParaSelecao());
         }
 
         private InserirElementoGenericoTool CriarInserirElementoGenericoTool(ElementDefinition definition)

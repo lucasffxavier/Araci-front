@@ -6,6 +6,7 @@ using System.ComponentModel;
 using System.Runtime.CompilerServices;
 using System.Windows;
 using Araci.Core.Documents;
+using Araci.Core.SceneQueries;
 using Araci.Core.Scenes;
 using Araci.Models;
 using Araci.Services;
@@ -14,20 +15,39 @@ namespace Araci.ViewModels
 {
     public class ViewportViewModel : INotifyPropertyChanged
     {
-        private readonly EditorContext _context;
         private readonly Dictionary<Elemento, ElementoViewModel> _viewModelsPorModelo = new();
+        private readonly SelectionService _selection;
+        private readonly HoverService _hover;
+        private readonly AlignmentGuideService _alignmentGuidesService;
+        private readonly ISceneQueryService _sceneQueries;
+        private readonly ElementoFactory _elementoFactory;
         private double _inverseZoom = 1;
 
-        public ViewportViewModel(EditorContext context)
+        public ViewportViewModel(
+            AraciDocument document,
+            Scene scene,
+            SelectionBoxViewModel selectionBox,
+            TerminalSnapState terminalSnap,
+            CableVertexEditService cableVertexEdit,
+            MoveHudService moveHud,
+            AlignmentGuideService alignmentGuides,
+            SelectionService selection,
+            HoverService hover,
+            ISceneQueryService sceneQueries,
+            ElementoFactory elementoFactory)
         {
-            _context = context ?? throw new ArgumentNullException(nameof(context));
-            Document = context.Document;
-            Scene = context.Scene;
-            SelectionBox = context.SelectionBox;
-            TerminalSnap = context.TerminalSnap;
-            CableVertexEdit = context.CableVertexEdit;
-            MoveHud = context.MoveHud;
-            AlignmentGuides = context.AlignmentGuides.Linhas;
+            Document = document ?? throw new ArgumentNullException(nameof(document));
+            Scene = scene ?? throw new ArgumentNullException(nameof(scene));
+            SelectionBox = selectionBox ?? throw new ArgumentNullException(nameof(selectionBox));
+            TerminalSnap = terminalSnap ?? throw new ArgumentNullException(nameof(terminalSnap));
+            CableVertexEdit = cableVertexEdit ?? throw new ArgumentNullException(nameof(cableVertexEdit));
+            MoveHud = moveHud ?? throw new ArgumentNullException(nameof(moveHud));
+            _alignmentGuidesService = alignmentGuides ?? throw new ArgumentNullException(nameof(alignmentGuides));
+            AlignmentGuides = alignmentGuides.Linhas;
+            _selection = selection ?? throw new ArgumentNullException(nameof(selection));
+            _hover = hover ?? throw new ArgumentNullException(nameof(hover));
+            _sceneQueries = sceneQueries ?? throw new ArgumentNullException(nameof(sceneQueries));
+            _elementoFactory = elementoFactory ?? throw new ArgumentNullException(nameof(elementoFactory));
             Document.Elementos.CollectionChanged += OnDocumentElementosChanged;
             SincronizarComDocumento();
         }
@@ -140,24 +160,24 @@ namespace Araci.ViewModels
             if (!_viewModelsPorModelo.TryGetValue(modelo, out var vm))
                 return;
 
-            _context.Selection.Deselecionar(vm);
-            _context.CableVertexEdit.Clear();
-            _context.Hover.Clear();
+            _selection.Deselecionar(vm);
+            CableVertexEdit.Clear();
+            _hover.Clear();
             Elementos.Remove(vm);
             _viewModelsPorModelo.Remove(modelo);
-            _context.SceneQueries.Invalidate();
+            _sceneQueries.Invalidate();
         }
 
         private void LimparViewModels()
         {
-            _context.Selection.Limpar();
-            _context.CableVertexEdit.Clear();
-            _context.Hover.Clear();
-            _context.TerminalSnap.Limpar();
-            _context.AlignmentGuides.Limpar();
+            _selection.Limpar();
+            CableVertexEdit.Clear();
+            _hover.Clear();
+            TerminalSnap.Limpar();
+            _alignmentGuidesService.Limpar();
             Elementos.Clear();
             _viewModelsPorModelo.Clear();
-            _context.SceneQueries.Invalidate();
+            _sceneQueries.Invalidate();
         }
 
         private ElementoViewModel? ObterOuCriarViewModel(Elemento modelo)
@@ -165,7 +185,7 @@ namespace Araci.ViewModels
             if (_viewModelsPorModelo.TryGetValue(modelo, out var existente))
                 return existente;
 
-            var vm = _context.ElementoFactory.CriarViewModel(modelo);
+            var vm = _elementoFactory.CriarViewModel(modelo);
 
             if (vm != null)
                 _viewModelsPorModelo[modelo] = vm;

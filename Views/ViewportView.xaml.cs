@@ -24,7 +24,7 @@ namespace Araci.Views
         public void Inicializar(EditorContext context)
         {
             _context = context ?? throw new ArgumentNullException(nameof(context));
-            _viewportViewModel = new ViewportViewModel(_context);
+            _viewportViewModel = _context.CriarViewportViewModel();
             DataContext = _viewportViewModel;
             _context.InicializarViewport(_viewportViewModel);
             ConfigurarCamera();
