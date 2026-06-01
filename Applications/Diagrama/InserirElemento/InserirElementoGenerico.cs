@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Windows;
 using System.Windows.Input;
+using Araci.Applications.Abstractions;
 using Araci.Applications.Editar.Base;
 using Araci.Applications.Factories;
 using Araci.Applications.UseCases.Diagrama;

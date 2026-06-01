@@ -1,5 +1,6 @@
 using Araci.Core.Documents;
 using Araci.Core.SceneQueries;
+using Araci.Applications.Factories;
 using Araci.Applications.Simulation;
 using Araci.ViewModels;
 using CoreScene = Araci.Core.Scenes.Scene;
@@ -19,7 +20,9 @@ namespace Araci.Services.Composition
             var snap = new SnapService(sceneQueries, settings);
             var typePropertiesDialogs = new TypePropertiesDialogService();
             var dialogs = new DialogService();
-            var elements = new ElementRegistryService(types);
+            var instanceProperties = new ElementInstancePropertyProvider();
+            var definitions = new ElementDefinitionsProvider(types, instanceProperties);
+            var elements = new ElementRegistryService(definitions.CreateDefaults());
 
             InstancePropertyCatalog.Configure(elements);
 

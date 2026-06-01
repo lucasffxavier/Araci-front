@@ -7,6 +7,7 @@ using System.Threading;
 using System.Windows;
 using System.Windows.Input;
 using Araci.API;
+using Araci.Applications.Abstractions;
 using Araci.Applications.Diagrama;
 using Araci.Applications.Editar.Base;
 using Araci.Core.Commands;
@@ -98,6 +99,9 @@ namespace Araci.TechnicalChecks
                 ("InputRouter envia Space para insercao sem preview", InputRouterEnviaSpaceParaInsercaoSemPreview),
                 ("Botoes da Ribbon nao capturam foco", BotoesDaRibbonNaoCapturamFoco),
                 ("Viewport continua focavel", ViewportContinuaFocavel),
+                ("Catalogo preserva Ribbon ordem e atalhos", CatalogoPreservaRibbonOrdemEAtalhos),
+                ("Catalogo preserva propriedades nao editaveis", CatalogoPreservaPropriedadesNaoEditaveis),
+                ("Catalogo preserva edicao mista", CatalogoPreservaEdicaoMista),
                 ("DocumentSceneSync cria ViewModel ao adicionar elemento", DocumentSceneSyncCriaViewModelAoAdicionarElemento),
                 ("DocumentSceneSync remove ViewModel ao remover elemento", DocumentSceneSyncRemoveViewModelAoRemoverElemento),
                 ("DocumentSceneSync limpa Scene ao limpar Document", DocumentSceneSyncLimpaSceneAoLimparDocument),
@@ -1617,6 +1621,66 @@ namespace Araci.TechnicalChecks
             AssertContains(xaml, "Focusable=\"True\"", "ViewportView.Focusable");
         }
 
+        private static void CatalogoPreservaRibbonOrdemEAtalhos()
+        {
+            EditorContext context = new();
+            var definitions = context.Elements.RibbonDefinitions.ToList();
+            var expected = new[]
+            {
+                (ElementKinds.Cabo, "CB"),
+                (ElementKinds.Carga, "CG"),
+                (ElementKinds.Gerador, "GE"),
+                (ElementKinds.Sin, "SI"),
+                (ElementKinds.Transformador, "TR"),
+                (ElementKinds.Barra, "BA")
+            };
+
+            AssertEqual(expected.Length, definitions.Count, "Quantidade de definicoes da Ribbon");
+
+            for (int i = 0; i < expected.Length; i++)
+            {
+                AssertEqual(expected[i].Item1, definitions[i].Kind, $"Ribbon[{i}].Kind");
+                AssertEqual(expected[i].Item2, definitions[i].Atalho, $"Ribbon[{i}].Atalho");
+            }
+        }
+
+        private static void CatalogoPreservaPropriedadesNaoEditaveis()
+        {
+            EditorContext context = new();
+            Type[] viewModelTypes =
+            {
+                typeof(CaboViewModel),
+                typeof(CargaViewModel),
+                typeof(GeradorViewModel),
+                typeof(SinViewModel),
+                typeof(TransformadorViewModel),
+                typeof(BarraViewModel)
+            };
+
+            foreach (Type viewModelType in viewModelTypes)
+            {
+                InstancePropertyDescriptor nome = GetInstanceProperty(context, viewModelType, "Nome");
+                Assert(!nome.IsEditable, $"{viewModelType.Name}.Nome deve ser nao editavel.");
+            }
+
+            Assert(!GetInstanceProperty(context, typeof(CaboViewModel), "BarraOrigem").IsEditable, "Cabo.BarraOrigem deve ser nao editavel.");
+            Assert(!GetInstanceProperty(context, typeof(CaboViewModel), "BarraDestino").IsEditable, "Cabo.BarraDestino deve ser nao editavel.");
+        }
+
+        private static void CatalogoPreservaEdicaoMista()
+        {
+            EditorContext context = CreateContextWithViewport();
+            Carga load = CreateLoad("CARGA-MIXED", 120, 40);
+            Gerador generator = CreateGenerator("GERADOR-MIXED", 500, 0.95);
+
+            context.Document.AdicionarElemento(load);
+            context.Document.AdicionarElemento(generator);
+
+            var vms = new[] { GetVm(context, load), GetVm(context, generator) };
+            Assert(context.Elements.CanEditAcrossMixedTypes(vms, "TensaoLinha"), "TensaoLinha deve permitir edicao mista.");
+            Assert(!context.Elements.CanEditAcrossMixedTypes(vms, "Nome"), "Nome nao deve permitir edicao mista.");
+        }
+
         private static void DocumentSceneSyncCriaViewModelAoAdicionarElemento()
         {
             EditorContext context = CreateContextWithViewport();
@@ -2865,6 +2929,18 @@ namespace Araci.TechnicalChecks
                 throw new InvalidOperationException($"ViewModel de '{elemento.Nome}' nao encontrado.");
 
             return vm;
+        }
+
+        private static InstancePropertyDescriptor GetInstanceProperty(EditorContext context, Type viewModelType, string propertyName)
+        {
+            InstancePropertyDescriptor? descriptor = context.Elements
+                .GetInstanceProperties(viewModelType)
+                .FirstOrDefault(p => p.PropertyName == propertyName);
+
+            if (descriptor == null)
+                throw new InvalidOperationException($"Propriedade '{propertyName}' nao encontrada em {viewModelType.Name}.");
+
+            return descriptor;
         }
 
         private static AraciDocument CreateBranchDocument()

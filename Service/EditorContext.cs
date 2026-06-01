@@ -66,7 +66,15 @@ namespace Araci.Services
                 RefreshCableVertexEdit);
             Names = new NameService(Document, Elements);
             GeometryUpdates = new ElementGeometryUpdateService(TerminalLayout, Connectivity, VisualUpdates);
-            ElementoFactory = new ElementoFactory(Elements, Names, TypePropertiesDialogs, TerminalLayout, GeometryUpdates);
+            var elementoModelFactory = new ElementoModelFactory(Elements);
+            var elementoViewModelFactory = new ElementoViewModelFactory(
+                Elements,
+                elementoModelFactory,
+                Names,
+                TypePropertiesDialogs,
+                TerminalLayout,
+                GeometryUpdates);
+            ElementoFactory = new ElementoFactory(elementoModelFactory, elementoViewModelFactory);
             InserirElemento = new InserirElementoUseCase(ElementoFactory, TerminalLayout, Commands, Document, Names);
             InserirCabo = new InserirCaboUseCase(ElementoFactory, Commands, Document, Names, cabo => Viewport?.ObterViewModel(cabo) as CaboViewModel);
             CopiarElementos = new CopiarElementosUseCase();
@@ -99,6 +107,7 @@ namespace Araci.Services
                 Document,
                 Commands,
                 Elements,
+                elementoModelFactory,
                 TerminalLayout,
                 Geometry,
                 Dialogs,

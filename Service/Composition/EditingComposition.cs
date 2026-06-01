@@ -116,7 +116,7 @@ namespace Araci.Services.Composition
             CommandManager commands,
             ISafeDeleteService safeDelete,
             ISelectionService selection,
-            ElementRegistryService elements,
+            IElementCatalog elements,
             IHoverService hover,
             Action copySelected,
             Action paste)

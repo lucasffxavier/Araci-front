@@ -17,7 +17,7 @@ namespace Araci.Applications.Editor
         private readonly ICommandHistory _commands;
         private readonly ISafeDeleteService _safeDelete;
         private readonly ISelectionService _selection;
-        private readonly ElementRegistryService _elements;
+        private readonly IElementCatalog _elements;
         private readonly IHoverService _hover;
         private readonly Action _copiarSelecionados;
         private readonly Action _colar;
@@ -30,7 +30,7 @@ namespace Araci.Applications.Editor
             ICommandHistory commands,
             ISafeDeleteService safeDelete,
             ISelectionService selection,
-            ElementRegistryService elements,
+            IElementCatalog elements,
             IHoverService hover,
             Action copiarSelecionados,
             Action colar)

@@ -5,6 +5,7 @@ using System.Linq;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using System.Windows;
+using Araci.Applications.Abstractions;
 using Araci.Core.Documents;
 using Araci.Models;
 using Araci.Models.Tipos;
@@ -19,6 +20,7 @@ namespace Araci.Infrastructure.Persistence
         public const string UntitledProjectName = "Sem titulo";
 
         private readonly ElementRegistryService _elements;
+        private readonly IElementModelFactory _modelFactory;
         private readonly TerminalLayoutService _terminalLayout;
         private readonly ElementGeometryService _geometry;
         private readonly JsonSerializerOptions _jsonOptions = new()
@@ -29,10 +31,12 @@ namespace Araci.Infrastructure.Persistence
 
         public ProjectSerializer(
             ElementRegistryService elements,
+            IElementModelFactory modelFactory,
             TerminalLayoutService terminalLayout,
             ElementGeometryService geometry)
         {
             _elements = elements ?? throw new ArgumentNullException(nameof(elements));
+            _modelFactory = modelFactory ?? throw new ArgumentNullException(nameof(modelFactory));
             _terminalLayout = terminalLayout ?? throw new ArgumentNullException(nameof(terminalLayout));
             _geometry = geometry ?? throw new ArgumentNullException(nameof(geometry));
         }
@@ -164,7 +168,7 @@ namespace Araci.Infrastructure.Persistence
 
         private Elemento? CriarElemento(ElementDto dto)
         {
-            Elemento? elemento = _elements.CreateModel(dto.Kind);
+            Elemento? elemento = _modelFactory.CreateModel(dto.Kind);
 
             if (elemento == null)
                 return null;

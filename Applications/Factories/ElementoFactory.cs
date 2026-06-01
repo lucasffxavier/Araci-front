@@ -1,54 +1,41 @@
 using System;
+using Araci.Applications.Abstractions;
 using Araci.Models;
-using Araci.Services;
 using Araci.ViewModels;
 
 namespace Araci.Applications.Factories
 {
     public class ElementoFactory
     {
-        private readonly ElementRegistryService _registry;
-        private readonly NameService _names;
-        private readonly TypePropertiesDialogService _typePropertiesDialogs;
-        private readonly TerminalLayoutService _terminalLayout;
-        private readonly ElementGeometryUpdateService _geometryUpdates;
+        private readonly IElementModelFactory _modelFactory;
+        private readonly IElementViewModelFactory _viewModelFactory;
 
         public ElementoFactory(
-            ElementRegistryService registry,
-            NameService names,
-            TypePropertiesDialogService typePropertiesDialogs,
-            TerminalLayoutService terminalLayout,
-            ElementGeometryUpdateService geometryUpdates)
+            IElementModelFactory modelFactory,
+            IElementViewModelFactory viewModelFactory)
         {
-            _registry = registry ?? throw new ArgumentNullException(nameof(registry));
-            _names = names ?? throw new ArgumentNullException(nameof(names));
-            _typePropertiesDialogs = typePropertiesDialogs ?? throw new ArgumentNullException(nameof(typePropertiesDialogs));
-            _terminalLayout = terminalLayout ?? throw new ArgumentNullException(nameof(terminalLayout));
-            _geometryUpdates = geometryUpdates ?? throw new ArgumentNullException(nameof(geometryUpdates));
+            _modelFactory = modelFactory ?? throw new ArgumentNullException(nameof(modelFactory));
+            _viewModelFactory = viewModelFactory ?? throw new ArgumentNullException(nameof(viewModelFactory));
         }
 
         public Elemento CriarModelo(string kind)
         {
-            return _registry.CreateModel(kind);
+            return _modelFactory.CreateModel(kind);
         }
 
         public TModel CriarModelo<TModel>(string kind) where TModel : Elemento
         {
-            return _registry.CreateModel<TModel>(kind);
+            return _modelFactory.CreateModel<TModel>(kind);
         }
 
         public ElementoViewModel? CriarViewModel(Elemento modelo)
         {
-            ElementoViewModel? vm = _registry.CreateViewModel(modelo, _names, _typePropertiesDialogs, _terminalLayout);
-            ConfigurarViewModel(vm);
-            return vm;
+            return _viewModelFactory.CreateViewModel(modelo);
         }
 
         public TViewModel CriarViewModel<TViewModel>(string kind) where TViewModel : ElementoViewModel
         {
-            TViewModel vm = _registry.CreateViewModel<TViewModel>(kind, _names, _typePropertiesDialogs, _terminalLayout);
-            ConfigurarViewModel(vm);
-            return vm;
+            return _viewModelFactory.CreateViewModel<TViewModel>(kind);
         }
 
         public ElementoViewModel CriarViewModel(string kind)
@@ -59,68 +46,62 @@ namespace Araci.Applications.Factories
 
         public Cabo CriarCabo()
         {
-            return CriarModelo<Cabo>(ElementRegistryService.KindCabo);
+            return CriarModelo<Cabo>(ElementKinds.Cabo);
         }
 
         public CaboViewModel CriarCaboVM()
         {
-            return CriarViewModel<CaboViewModel>(ElementRegistryService.KindCabo);
+            return CriarViewModel<CaboViewModel>(ElementKinds.Cabo);
         }
 
         public Carga CriarCarga()
         {
-            return CriarModelo<Carga>(ElementRegistryService.KindCarga);
+            return CriarModelo<Carga>(ElementKinds.Carga);
         }
 
         public CargaViewModel CriarCargaVM()
         {
-            return CriarViewModel<CargaViewModel>(ElementRegistryService.KindCarga);
+            return CriarViewModel<CargaViewModel>(ElementKinds.Carga);
         }
 
         public Gerador CriarGerador()
         {
-            return CriarModelo<Gerador>(ElementRegistryService.KindGerador);
+            return CriarModelo<Gerador>(ElementKinds.Gerador);
         }
 
         public GeradorViewModel CriarGeradorVM()
         {
-            return CriarViewModel<GeradorViewModel>(ElementRegistryService.KindGerador);
+            return CriarViewModel<GeradorViewModel>(ElementKinds.Gerador);
         }
 
         public Sin CriarSin()
         {
-            return CriarModelo<Sin>(ElementRegistryService.KindSin);
+            return CriarModelo<Sin>(ElementKinds.Sin);
         }
 
         public SinViewModel CriarSinVM()
         {
-            return CriarViewModel<SinViewModel>(ElementRegistryService.KindSin);
+            return CriarViewModel<SinViewModel>(ElementKinds.Sin);
         }
 
         public Transformador CriarTransformador()
         {
-            return CriarModelo<Transformador>(ElementRegistryService.KindTransformador);
+            return CriarModelo<Transformador>(ElementKinds.Transformador);
         }
 
         public TransformadorViewModel CriarTransformadorVM()
         {
-            return CriarViewModel<TransformadorViewModel>(ElementRegistryService.KindTransformador);
+            return CriarViewModel<TransformadorViewModel>(ElementKinds.Transformador);
         }
 
         public Barra CriarBarra()
         {
-            return CriarModelo<Barra>(ElementRegistryService.KindBarra);
+            return CriarModelo<Barra>(ElementKinds.Barra);
         }
 
         public BarraViewModel CriarBarraVM()
         {
-            return CriarViewModel<BarraViewModel>(ElementRegistryService.KindBarra);
-        }
-
-        private void ConfigurarViewModel(ElementoViewModel? vm)
-        {
-            if (vm is BarraViewModel barra)
-                barra.GeometryUpdates = _geometryUpdates;
+            return CriarViewModel<BarraViewModel>(ElementKinds.Barra);
         }
     }
 }

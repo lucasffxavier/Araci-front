@@ -1,13 +1,13 @@
 using System;
+using Araci.Applications.Abstractions;
 using Araci.Applications.Editar.Base;
 using Araci.Applications.Editar.Selecionar;
-using Araci.Services;
 
 namespace Araci.Applications.Editor
 {
     public class ToolService
     {
-        private readonly ElementRegistryService _elements;
+        private readonly IElementCatalog _elements;
         private readonly Func<ITool> _criarSelecionarTool;
         private readonly Func<ITool> _criarMoverTool;
         private readonly Func<ITool> _criarAlinharTool;
@@ -17,7 +17,7 @@ namespace Araci.Applications.Editor
         private ITool _ferramentaAtual;
 
         public ToolService(
-            ElementRegistryService elements,
+            IElementCatalog elements,
             Func<ITool> criarSelecionarTool,
             Func<ITool> criarMoverTool,
             Func<ITool> criarAlinharTool,
@@ -86,7 +86,7 @@ namespace Araci.Applications.Editor
             if (definition == null)
                 return false;
 
-            if (definition.Kind == ElementRegistryService.KindCabo || definition.UsaFerramentaEspecial)
+            if (definition.Kind == ElementKinds.Cabo || definition.UsaFerramentaEspecial)
             {
                 FerramentaAtual = _criarInserirCaboTool();
                 return true;

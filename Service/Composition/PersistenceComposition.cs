@@ -1,4 +1,5 @@
 using System;
+using Araci.Applications.Abstractions;
 using Araci.Applications.Projects;
 using Araci.Core.Commands;
 using Araci.Core.Documents;
@@ -12,12 +13,13 @@ namespace Araci.Services.Composition
             AraciDocument document,
             CommandManager commands,
             ElementRegistryService elements,
+            IElementModelFactory modelFactory,
             TerminalLayoutService terminalLayout,
             ElementGeometryService geometry,
             DialogService dialogs,
             Action clearTransientState)
         {
-            var serializer = new ProjectSerializer(elements, terminalLayout, geometry);
+            var serializer = new ProjectSerializer(elements, modelFactory, terminalLayout, geometry);
             var repository = new FileSystemProjectRepository();
             var fileDialogs = new ProjectFileDialogService();
 
