@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using Araci.Models;
 
 namespace Araci.Services
@@ -57,6 +58,12 @@ namespace Araci.Services
                     AtualizarTerminaisCabo(cabo);
                     break;
             }
+        }
+
+        public void AtualizarTerminais(Barra barra, IReadOnlySet<string>? terminaisProtegidos)
+        {
+            ArgumentNullException.ThrowIfNull(barra);
+            barra.AtualizarTerminais(_geometry.ObterTamanho(barra).Width, terminaisProtegidos);
         }
 
         private static void AtualizarTerminaisCabo(Cabo cabo)

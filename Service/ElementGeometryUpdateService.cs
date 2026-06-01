@@ -34,7 +34,10 @@ namespace Araci.Services
             if (elemento == null)
                 throw new ArgumentNullException(nameof(elemento));
 
-            _terminalLayout.AtualizarTerminais(elemento);
+            if (elemento is Barra barra)
+                _terminalLayout.AtualizarTerminais(barra, _connectivity.ObterTerminalIdsOcupados(barra));
+            else
+                _terminalLayout.AtualizarTerminais(elemento);
 
             IReadOnlyList<Cabo> cabos = _connectivity.ReancorarCabosConectados(elemento);
 

@@ -133,6 +133,29 @@ namespace Araci.Services
                 .ToList();
         }
 
+        public IReadOnlySet<string> ObterTerminalIdsOcupados(Elemento elemento)
+        {
+            var ids = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            string id = elemento.Id.ToString();
+
+            foreach (Cabo cabo in ObterCabosConectados(elemento))
+            {
+                if (string.Equals(cabo.OrigemId, id, StringComparison.OrdinalIgnoreCase) &&
+                    !string.IsNullOrWhiteSpace(cabo.OrigemTerminalId))
+                {
+                    ids.Add(cabo.OrigemTerminalId);
+                }
+
+                if (string.Equals(cabo.DestinoId, id, StringComparison.OrdinalIgnoreCase) &&
+                    !string.IsNullOrWhiteSpace(cabo.DestinoTerminalId))
+                {
+                    ids.Add(cabo.DestinoTerminalId);
+                }
+            }
+
+            return ids;
+        }
+
         public IReadOnlyList<Cabo> ObterCabosConectados(TerminalEndpoint endpoint)
         {
             if (!endpoint.IsComplete)
