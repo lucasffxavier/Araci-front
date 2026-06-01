@@ -8,6 +8,7 @@ using System.Windows;
 using System.Windows.Input;
 using Araci.API;
 using Araci.Applications.Diagrama;
+using Araci.Applications.Editar.Base;
 using Araci.Core.Commands;
 using Araci.Core.Documents;
 using Araci.Core.Rendering;
@@ -102,6 +103,16 @@ namespace Araci.TechnicalChecks
                 ("Cabo preserva TerminalId apos rotacao", CaboPreservaTerminalIdAposRotacao),
                 ("Cabo reancora visualmente apos rotacao", CaboReancoraVisualmenteAposRotacao),
                 ("Undo Redo da rotacao restaura elemento e cabos", UndoRedoRotacaoRestauraElementoECabos),
+                ("CableVertexEdit cria handles intermediarios", CableVertexEditCriaHandlesIntermediarios),
+                ("CableVertexEdit insere vertice no segmento", CableVertexEditInsereVerticeNoSegmento),
+                ("CableVertexEdit remove handle intermediario", CableVertexEditRemoveHandleIntermediario),
+                ("CableVertexEdit remove handle ativo", CableVertexEditRemoveHandleAtivo),
+                ("CableVertexEdit arrasta vertice intermediario", CableVertexEditArrastaVerticeIntermediario),
+                ("CableVertexEdit Shift restringe arraste ortogonal", CableVertexEditShiftRestringeArrasteOrtogonal),
+                ("CableVertexEdit Cancel restaura estado inicial", CableVertexEditCancelRestauraEstadoInicial),
+                ("CableVertexEdit nao insere longe de segmento", CableVertexEditNaoInsereLongeDeSegmento),
+                ("CableVertexEdit nao remove longe de handle", CableVertexEditNaoRemoveLongeDeHandle),
+                ("CableVertexEdit Clear limpa handles", CableVertexEditClearLimpaHandles),
                 ("Rotacao reancora Carga com cabo conectado", RotacaoReancoraCargaComCaboConectado),
                 ("Rotacao reancora Gerador com cabo conectado", RotacaoReancoraGeradorComCaboConectado),
                 ("Rotacao reancora SIN em todos terminais", RotacaoReancoraSinEmTodosTerminais),
@@ -1772,6 +1783,196 @@ namespace Araci.TechnicalChecks
             AssertEqual(afterVertex.Y, circuit.Cable.Vertices[0].Y, "Cabo Y apos redo");
         }
 
+        private static void CableVertexEditCriaHandlesIntermediarios()
+        {
+            CableVertexEditCircuit circuit = CreateCableVertexEditCircuit(new Point(190, 120), new Point(230, 150));
+
+            SelectCable(circuit.Context, circuit.Cable);
+            circuit.Context.CableVertexEdit.Refresh();
+
+            AssertEqual(2, circuit.Context.CableVertexEdit.Handles.Count, "Quantidade de handles");
+            AssertHandle(circuit.Context.CableVertexEdit.Handles[0], circuit.CableVm, 1, circuit.Cable.Vertices[1], "Handle 1");
+            AssertHandle(circuit.Context.CableVertexEdit.Handles[1], circuit.CableVm, 2, circuit.Cable.Vertices[2], "Handle 2");
+        }
+
+        private static void CableVertexEditInsereVerticeNoSegmento()
+        {
+            CableVertexEditCircuit circuit = CreateCableVertexEditCircuit();
+            Point novoVertice = MidPoint(circuit.Cable.Vertices[0], circuit.Cable.Vertices[1]);
+
+            SelectCable(circuit.Context, circuit.Cable);
+            circuit.Context.CableVertexEdit.Refresh();
+            bool inserted = circuit.Context.CableVertexEdit.TryInsertVertex(novoVertice);
+
+            Assert(inserted, "TryInsertVertex deve retornar true.");
+            AssertEqual(3, circuit.Cable.Vertices.Count, "Vertices.Count apos insert");
+            AssertPointEqual(novoVertice, circuit.Cable.Vertices[1], "Vertice inserido");
+            AssertEqual(1, circuit.Context.CableVertexEdit.Handles.Count, "Handles.Count apos insert");
+            Assert(circuit.Context.CableVertexEdit.Handles[0].IsActive, "Handle inserido deve ficar ativo.");
+
+            circuit.Context.Commands.Undo();
+            AssertEqual(2, circuit.Cable.Vertices.Count, "Vertices.Count apos undo");
+            AssertEqual(0, circuit.Context.CableVertexEdit.Handles.Count, "Handles.Count apos undo");
+
+            circuit.Context.Commands.Redo();
+            AssertEqual(3, circuit.Cable.Vertices.Count, "Vertices.Count apos redo");
+            AssertPointEqual(novoVertice, circuit.Cable.Vertices[1], "Vertice reinserido");
+        }
+
+        private static void CableVertexEditRemoveHandleIntermediario()
+        {
+            Point intermediario = new(190, 120);
+            CableVertexEditCircuit circuit = CreateCableVertexEditCircuit(intermediario);
+
+            SelectCable(circuit.Context, circuit.Cable);
+            circuit.Context.CableVertexEdit.Refresh();
+            bool removed = circuit.Context.CableVertexEdit.TryRemoveHandle(intermediario);
+
+            Assert(removed, "TryRemoveHandle deve retornar true.");
+            AssertEqual(2, circuit.Cable.Vertices.Count, "Vertices.Count apos remove");
+            AssertPointEqual(circuit.Cable.Origem!.Posicao, circuit.Cable.Vertices[0], "Origem preservada");
+            AssertPointEqual(circuit.Cable.Destino!.Posicao, circuit.Cable.Vertices[^1], "Destino preservado");
+            AssertEqual(0, circuit.Context.CableVertexEdit.Handles.Count, "Handles.Count apos remove");
+
+            circuit.Context.Commands.Undo();
+            AssertEqual(3, circuit.Cable.Vertices.Count, "Vertices.Count apos undo");
+            AssertPointEqual(intermediario, circuit.Cable.Vertices[1], "Intermediario restaurado");
+
+            circuit.Context.Commands.Redo();
+            AssertEqual(2, circuit.Cable.Vertices.Count, "Vertices.Count apos redo");
+        }
+
+        private static void CableVertexEditRemoveHandleAtivo()
+        {
+            Point intermediario = new(190, 120);
+            CableVertexEditCircuit circuit = CreateCableVertexEditCircuit(intermediario);
+
+            SelectCable(circuit.Context, circuit.Cable);
+            circuit.Context.CableVertexEdit.Refresh();
+            Assert(circuit.Context.CableVertexEdit.TryBegin(intermediario), "TryBegin deve ativar handle.");
+            circuit.Context.CableVertexEdit.End();
+
+            bool removed = circuit.Context.CableVertexEdit.TryRemoveActive();
+
+            Assert(removed, "TryRemoveActive deve retornar true.");
+            AssertEqual(2, circuit.Cable.Vertices.Count, "Vertices.Count apos remove active");
+
+            circuit.Context.Commands.Undo();
+            AssertEqual(3, circuit.Cable.Vertices.Count, "Vertices.Count apos undo");
+            circuit.Context.Commands.Redo();
+            AssertEqual(2, circuit.Cable.Vertices.Count, "Vertices.Count apos redo");
+        }
+
+        private static void CableVertexEditArrastaVerticeIntermediario()
+        {
+            Point intermediario = new(190, 120);
+            Point novo = new(210, 145);
+            CableVertexEditCircuit circuit = CreateCableVertexEditCircuit(intermediario);
+            Point origem = circuit.Cable.Vertices[0];
+            Point destino = circuit.Cable.Vertices[^1];
+
+            SelectCable(circuit.Context, circuit.Cable);
+            circuit.Context.CableVertexEdit.Refresh();
+            Assert(circuit.Context.CableVertexEdit.TryBegin(intermediario), "TryBegin deve iniciar arraste.");
+            circuit.Context.CableVertexEdit.Update(novo, CreateInputState(novo));
+            circuit.Context.CableVertexEdit.End();
+
+            AssertPointEqual(origem, circuit.Cable.Vertices[0], "Origem apos arraste");
+            AssertPointEqual(destino, circuit.Cable.Vertices[^1], "Destino apos arraste");
+            AssertPointEqual(novo, circuit.Cable.Vertices[1], "Intermediario apos arraste");
+            AssertHandle(circuit.Context.CableVertexEdit.Handles[0], circuit.CableVm, 1, novo, "Handle apos arraste");
+
+            circuit.Context.Commands.Undo();
+            AssertPointEqual(intermediario, circuit.Cable.Vertices[1], "Intermediario apos undo");
+            circuit.Context.Commands.Redo();
+            AssertPointEqual(novo, circuit.Cable.Vertices[1], "Intermediario apos redo");
+        }
+
+        private static void CableVertexEditShiftRestringeArrasteOrtogonal()
+        {
+            Point intermediario = new(190, 120);
+            Point tentativa = new(230, 135);
+            Point esperado = new(tentativa.X, intermediario.Y);
+            CableVertexEditCircuit circuit = CreateCableVertexEditCircuit(intermediario);
+
+            SelectCable(circuit.Context, circuit.Cable);
+            circuit.Context.CableVertexEdit.Refresh();
+            Assert(circuit.Context.CableVertexEdit.TryBegin(intermediario), "TryBegin deve iniciar arraste com Shift.");
+            circuit.Context.CableVertexEdit.Update(tentativa, CreateInputState(tentativa, ModifierKeys.Shift));
+            circuit.Context.CableVertexEdit.End();
+
+            AssertPointEqual(esperado, circuit.Cable.Vertices[1], "Intermediario com restricao ortogonal");
+
+            circuit.Context.Commands.Undo();
+            AssertPointEqual(intermediario, circuit.Cable.Vertices[1], "Intermediario Shift apos undo");
+            circuit.Context.Commands.Redo();
+            AssertPointEqual(esperado, circuit.Cable.Vertices[1], "Intermediario Shift apos redo");
+        }
+
+        private static void CableVertexEditCancelRestauraEstadoInicial()
+        {
+            Point intermediario = new(190, 120);
+            Point tentativa = new(210, 145);
+            CableVertexEditCircuit circuit = CreateCableVertexEditCircuit(intermediario);
+
+            SelectCable(circuit.Context, circuit.Cable);
+            circuit.Context.CableVertexEdit.Refresh();
+            Assert(circuit.Context.CableVertexEdit.TryBegin(intermediario), "TryBegin deve iniciar arraste para cancel.");
+            circuit.Context.CableVertexEdit.Update(tentativa, CreateInputState(tentativa));
+            circuit.Context.CableVertexEdit.Cancel();
+
+            AssertPointEqual(intermediario, circuit.Cable.Vertices[1], "Intermediario apos cancel");
+            Assert(!circuit.Context.CableVertexEdit.IsEditing, "IsEditing deve ficar false apos cancel.");
+            AssertEqual(1, circuit.Context.CableVertexEdit.Handles.Count, "Handles.Count apos cancel");
+
+            circuit.Context.Commands.Undo();
+            AssertPointEqual(intermediario, circuit.Cable.Vertices[1], "Cancel nao deve criar comando");
+        }
+
+        private static void CableVertexEditNaoInsereLongeDeSegmento()
+        {
+            CableVertexEditCircuit circuit = CreateCableVertexEditCircuit();
+            int count = circuit.Cable.Vertices.Count;
+
+            SelectCable(circuit.Context, circuit.Cable);
+            circuit.Context.CableVertexEdit.Refresh();
+            int handles = circuit.Context.CableVertexEdit.Handles.Count;
+            bool inserted = circuit.Context.CableVertexEdit.TryInsertVertex(new Point(-1000, -1000));
+
+            Assert(!inserted, "TryInsertVertex longe deve retornar false.");
+            AssertEqual(count, circuit.Cable.Vertices.Count, "Vertices.Count sem insert");
+            AssertEqual(handles, circuit.Context.CableVertexEdit.Handles.Count, "Handles.Count sem insert");
+        }
+
+        private static void CableVertexEditNaoRemoveLongeDeHandle()
+        {
+            Point intermediario = new(190, 120);
+            CableVertexEditCircuit circuit = CreateCableVertexEditCircuit(intermediario);
+            var vertices = circuit.Cable.Vertices.ToList();
+
+            SelectCable(circuit.Context, circuit.Cable);
+            circuit.Context.CableVertexEdit.Refresh();
+            bool removed = circuit.Context.CableVertexEdit.TryRemoveHandle(new Point(-1000, -1000));
+
+            Assert(!removed, "TryRemoveHandle longe deve retornar false.");
+            AssertVertices(circuit.Cable, vertices, "Vertices sem remove");
+        }
+
+        private static void CableVertexEditClearLimpaHandles()
+        {
+            CableVertexEditCircuit circuit = CreateCableVertexEditCircuit(new Point(190, 120));
+
+            SelectCable(circuit.Context, circuit.Cable);
+            circuit.Context.CableVertexEdit.Refresh();
+            AssertEqual(1, circuit.Context.CableVertexEdit.Handles.Count, "Handles antes do Clear");
+
+            circuit.Context.CableVertexEdit.Clear();
+
+            AssertEqual(0, circuit.Context.CableVertexEdit.Handles.Count, "Handles apos Clear");
+            Assert(!circuit.Context.CableVertexEdit.IsEditing, "IsEditing apos Clear");
+            Assert(!circuit.Context.CableVertexEdit.TryRemoveActive(), "TryRemoveActive apos Clear deve retornar false.");
+        }
+
         private static void RotacaoReancoraCargaComCaboConectado()
         {
             RotatedCircuit circuit = CreateRotatedCircuit();
@@ -2465,6 +2666,24 @@ namespace Araci.TechnicalChecks
             return new RotatedCircuit(context, generator, load, cable);
         }
 
+        private static CableVertexEditCircuit CreateCableVertexEditCircuit(params Point[] intermediarios)
+        {
+            EditorContext context = CreateContextWithViewport();
+            Gerador generator = CreateGenerator("GER-CABO-VERTEX", 1000, 0.95);
+            Carga load = CreateLoad("CARGA-CABO-VERTEX", 300, 100);
+            Cabo cable = CreateCable(generator, 0, load, 0, "L-CABO-VERTEX", 1.0);
+
+            for (int i = 0; i < intermediarios.Length; i++)
+                cable.Vertices.Insert(i + 1, intermediarios[i]);
+
+            cable.AtualizarTerminaisPelasPontas();
+            context.Document.AdicionarElemento(generator);
+            context.Document.AdicionarElemento(load);
+            context.Document.AdicionarElemento(cable);
+
+            return new CableVertexEditCircuit(context, generator, load, cable, GetCableVm(context, cable));
+        }
+
         private static BarRotationCircuit CreateBarRotationCircuit()
         {
             EditorContext context = CreateContextWithViewport();
@@ -2550,6 +2769,24 @@ namespace Araci.TechnicalChecks
                 throw new InvalidOperationException($"ViewModel da Barra '{bar.Nome}' nao encontrado.");
 
             return vm;
+        }
+
+        private static CaboViewModel GetCableVm(EditorContext context, Cabo cable)
+        {
+            if (GetVm(context, cable) is not CaboViewModel vm)
+                throw new InvalidOperationException($"ViewModel do Cabo '{cable.Nome}' nao encontrado.");
+
+            return vm;
+        }
+
+        private static void SelectCable(EditorContext context, Cabo cable)
+        {
+            context.Selection.Selecionar(GetCableVm(context, cable));
+        }
+
+        private static ToolInputState CreateInputState(Point world, ModifierKeys modifiers = ModifierKeys.None)
+        {
+            return new ToolInputState(modifiers, MouseButton.Left, 0, world, world);
         }
 
         private static ElementoViewModel GetVm(EditorContext context, Elemento elemento)
@@ -2790,6 +3027,38 @@ namespace Araci.TechnicalChecks
             AssertEqual(terminal.Id, terminalId, $"{name}.TerminalId");
             AssertEqual(terminal.Posicao.X, vertex.X, $"{name}.Vertice.X");
             AssertEqual(terminal.Posicao.Y, vertex.Y, $"{name}.Vertice.Y");
+        }
+
+        private static void AssertHandle(
+            CableVertexHandleViewModel handle,
+            CaboViewModel cabo,
+            int indice,
+            Point expected,
+            string name)
+        {
+            Assert(ReferenceEquals(cabo, handle.Cabo), $"{name}.Cabo");
+            AssertEqual(indice, handle.Indice, $"{name}.Indice");
+            AssertEqual(expected.X, handle.X, $"{name}.X");
+            AssertEqual(expected.Y, handle.Y, $"{name}.Y");
+        }
+
+        private static void AssertPointEqual(Point expected, Point actual, string name)
+        {
+            AssertEqual(expected.X, actual.X, $"{name}.X");
+            AssertEqual(expected.Y, actual.Y, $"{name}.Y");
+        }
+
+        private static void AssertVertices(Cabo cabo, IReadOnlyList<Point> expected, string name)
+        {
+            AssertEqual(expected.Count, cabo.Vertices.Count, $"{name}.Count");
+
+            for (int i = 0; i < expected.Count; i++)
+                AssertPointEqual(expected[i], cabo.Vertices[i], $"{name}[{i}]");
+        }
+
+        private static Point MidPoint(Point a, Point b)
+        {
+            return new Point((a.X + b.X) / 2, (a.Y + b.Y) / 2);
         }
 
         private static void AssertNoDuplicateTerminalIds(Barra barra, string name)
@@ -3228,6 +3497,13 @@ namespace Araci.TechnicalChecks
             Gerador Generator,
             Carga Load,
             Cabo Cable);
+
+        private sealed record CableVertexEditCircuit(
+            EditorContext Context,
+            Gerador Generator,
+            Carga Load,
+            Cabo Cable,
+            CaboViewModel CableVm);
 
         private sealed record BarRotationCircuit(
             EditorContext Context,

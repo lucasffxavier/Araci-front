@@ -2,8 +2,9 @@ using System;
 using System.Collections.ObjectModel;
 using System.Linq;
 using System.Windows;
-using Araci.Applications.UseCases.Editar;
 using Araci.Applications.Editar.Base;
+using Araci.Applications.UseCases.Editar;
+using Araci.Applications.Editar.Selecionar;
 using Araci.Core.SceneQueries;
 using Araci.Models;
 using Araci.ViewModels;
@@ -12,20 +13,15 @@ namespace Araci.Services
 {
     public class CableVertexEditService
     {
-        private const double HandleTolerance = 8.0;
-
         private readonly SelectionService _selection;
         private readonly ISceneQueryService _sceneQueries;
         private readonly VisualUpdateService _visualUpdates;
         private readonly EditarVerticesCaboUseCase _editarVerticesCabo;
+        private readonly CableVertexInteractionController _interaction = new();
 
-        private CaboViewModel? _caboAtivo;
-        private int _indiceAtivo = -1;
         private ElementoEstado? _estadoInicial;
         private CaboViewModel? _handleAtivoCabo;
         private int _handleAtivoIndice = -1;
-        private Point _pontoInicialArrasto;
-        private OrthogonalAxis? _eixoOrtogonal;
 
         public CableVertexEditService(
             SelectionService selection,
@@ -41,7 +37,7 @@ namespace Araci.Services
 
         public ObservableCollection<CableVertexHandleViewModel> Handles { get; } = new();
 
-        public bool IsEditing => _caboAtivo != null;
+        public bool IsEditing => _interaction.IsDragging;
 
         public void Refresh()
         {
@@ -53,16 +49,13 @@ namespace Araci.Services
 
         public bool TryBegin(Point position)
         {
-            var handle = HitTest(position);
+            var handle = _interaction.HitTest(Handles, position);
 
             if (handle == null)
                 return false;
 
-            _caboAtivo = handle.Cabo;
-            _indiceAtivo = handle.Indice;
-            _estadoInicial = _caboAtivo.CapturarEstado();
-            _pontoInicialArrasto = new Point(handle.X, handle.Y);
-            _eixoOrtogonal = null;
+            _interaction.BeginDrag(handle);
+            _estadoInicial = handle.Cabo.CapturarEstado();
             DefinirHandleAtivo(handle.Cabo, handle.Indice);
 
             return true;
@@ -70,7 +63,7 @@ namespace Araci.Services
 
         public bool TryInsertVertex(Point position)
         {
-            var hit = HitTestSegment(position);
+            var hit = _interaction.HitTestSegment(_selection.Selecionados.OfType<CaboViewModel>(), position);
 
             if (hit == null)
                 return false;
@@ -88,7 +81,7 @@ namespace Araci.Services
 
         public bool TryRemoveHandle(Point position)
         {
-            var handle = HitTest(position);
+            var handle = _interaction.HitTest(Handles, position);
 
             if (handle == null)
                 return false;
@@ -106,13 +99,16 @@ namespace Araci.Services
 
         public void Update(Point position, ToolInputState inputState)
         {
-            if (_caboAtivo == null || !IndiceIntermediarioValido(_caboAtivo, _indiceAtivo))
+            CaboViewModel? caboAtivo = _interaction.CaboAtivo;
+            int indiceAtivo = _interaction.IndiceAtivo;
+
+            if (caboAtivo == null || !CableVertexInteractionController.IndiceIntermediarioValido(caboAtivo, indiceAtivo))
                 return;
 
-            Point pontoEfetivo = AplicarRestricaoOrtogonal(position, inputState);
+            Point pontoEfetivo = _interaction.AplicarRestricaoOrtogonal(position, inputState);
 
-            _caboAtivo.Cabo.Vertices[_indiceAtivo] = pontoEfetivo;
-            _caboAtivo.AtualizarAposModeloAlterado();
+            caboAtivo.Cabo.Vertices[indiceAtivo] = pontoEfetivo;
+            caboAtivo.AtualizarAposModeloAlterado();
             _sceneQueries.Invalidate();
 
             RebuildHandles();
@@ -120,10 +116,10 @@ namespace Araci.Services
 
         public void End()
         {
-            if (_caboAtivo == null)
+            if (_interaction.CaboAtivo == null)
                 return;
 
-            var cabo = _caboAtivo;
+            var cabo = _interaction.CaboAtivo;
             var antes = _estadoInicial;
             var depois = cabo.CapturarEstado();
 
@@ -137,8 +133,8 @@ namespace Araci.Services
 
         public void Cancel()
         {
-            if (_caboAtivo != null && _estadoInicial != null)
-                _caboAtivo.AplicarEstado(_estadoInicial);
+            if (_interaction.CaboAtivo != null && _estadoInicial != null)
+                _interaction.CaboAtivo.AplicarEstado(_estadoInicial);
 
             LimparEdicao();
             _sceneQueries.Invalidate();
@@ -150,16 +146,6 @@ namespace Araci.Services
             LimparEdicao();
             LimparHandleAtivo();
             Handles.Clear();
-        }
-
-        private CableVertexHandleViewModel? HitTest(Point position)
-        {
-            double tolerance2 = HandleTolerance * HandleTolerance;
-
-            return Handles
-                .Where(h => DistanciaQuadrada(new Point(h.X, h.Y), position) <= tolerance2)
-                .OrderBy(h => DistanciaQuadrada(new Point(h.X, h.Y), position))
-                .FirstOrDefault();
         }
 
         private void RebuildHandles()
@@ -180,37 +166,9 @@ namespace Araci.Services
             }
         }
 
-        private SegmentHit? HitTestSegment(Point position)
-        {
-            double tolerance2 = HandleTolerance * HandleTolerance;
-            SegmentHit? melhor = null;
-
-            foreach (var cabo in _selection.Selecionados.OfType<CaboViewModel>())
-            {
-                var vertices = cabo.Cabo.Vertices;
-
-                if (cabo.IsPreview || vertices.Count < 2)
-                    continue;
-
-                for (int i = 0; i < vertices.Count - 1; i++)
-                {
-                    Point projection = ProjetarNoSegmento(position, vertices[i], vertices[i + 1]);
-                    double distance2 = DistanciaQuadrada(position, projection);
-
-                    if (distance2 > tolerance2)
-                        continue;
-
-                    if (melhor == null || distance2 < melhor.DistanceSquared)
-                        melhor = new SegmentHit(cabo, i + 1, projection, distance2);
-                }
-            }
-
-            return melhor;
-        }
-
         private bool RemoveHandle(CaboViewModel cabo, int indice)
         {
-            if (!IndiceIntermediarioValido(cabo, indice))
+            if (!CableVertexInteractionController.IndiceIntermediarioValido(cabo, indice))
                 return false;
 
             var antes = cabo.CapturarEstado();
@@ -248,10 +206,8 @@ namespace Araci.Services
 
         private void LimparEdicao()
         {
-            _caboAtivo = null;
-            _indiceAtivo = -1;
+            _interaction.ClearDrag();
             _estadoInicial = null;
-            _eixoOrtogonal = null;
         }
 
         private void DefinirHandleAtivo(CaboViewModel cabo, int indice)
@@ -282,70 +238,9 @@ namespace Araci.Services
             DefinirHandleAtivo(cabo, novoIndice);
         }
 
-        private static bool IndiceIntermediarioValido(CaboViewModel cabo, int indice)
-        {
-            return indice > 0 && indice < cabo.Cabo.Vertices.Count - 1;
-        }
-
         private static bool VerticesIguais(ElementoEstado a, ElementoEstado b)
         {
             return a.Vertices.SequenceEqual(b.Vertices);
-        }
-
-        private static Point ProjetarNoSegmento(Point p, Point a, Point b)
-        {
-            double dx = b.X - a.X;
-            double dy = b.Y - a.Y;
-            double lengthSquared = dx * dx + dy * dy;
-
-            if (lengthSquared <= double.Epsilon)
-                return a;
-
-            double t = ((p.X - a.X) * dx + (p.Y - a.Y) * dy) / lengthSquared;
-            t = Math.Max(0, Math.Min(1, t));
-
-            return new Point(
-                a.X + t * dx,
-                a.Y + t * dy);
-        }
-
-        private static double DistanciaQuadrada(Point a, Point b)
-        {
-            double dx = a.X - b.X;
-            double dy = a.Y - b.Y;
-
-            return dx * dx + dy * dy;
-        }
-
-        private Point AplicarRestricaoOrtogonal(Point position, ToolInputState inputState)
-        {
-            if (!inputState.IsShiftPressed)
-            {
-                _eixoOrtogonal = null;
-                return position;
-            }
-
-            Vector total = position - _pontoInicialArrasto;
-
-            if (!_eixoOrtogonal.HasValue)
-            {
-                if (Math.Abs(total.X) < 0.0001 && Math.Abs(total.Y) < 0.0001)
-                    return _pontoInicialArrasto;
-
-                _eixoOrtogonal = Math.Abs(total.X) >= Math.Abs(total.Y)
-                    ? OrthogonalAxis.Horizontal
-                    : OrthogonalAxis.Vertical;
-            }
-
-            return _eixoOrtogonal == OrthogonalAxis.Horizontal
-                ? new Point(position.X, _pontoInicialArrasto.Y)
-                : new Point(_pontoInicialArrasto.X, position.Y);
-        }
-
-        private enum OrthogonalAxis
-        {
-            Horizontal,
-            Vertical
         }
     }
 
@@ -367,19 +262,4 @@ namespace Araci.Services
         public bool IsActive { get; }
     }
 
-    internal sealed class SegmentHit
-    {
-        public SegmentHit(CaboViewModel cabo, int insertIndex, Point point, double distanceSquared)
-        {
-            Cabo = cabo;
-            InsertIndex = insertIndex;
-            Point = point;
-            DistanceSquared = distanceSquared;
-        }
-
-        public CaboViewModel Cabo { get; }
-        public int InsertIndex { get; }
-        public Point Point { get; }
-        public double DistanceSquared { get; }
-    }
 }
