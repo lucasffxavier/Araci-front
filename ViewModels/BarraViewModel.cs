@@ -85,7 +85,9 @@ namespace Araci.ViewModels
         protected override void AtualizarNode()
         {
             base.AtualizarNode();
-            AtualizarTerminais();
+
+            if (GeometryUpdates == null)
+                AtualizarTerminais();
         }
 
         public override void Mover(Vector delta)

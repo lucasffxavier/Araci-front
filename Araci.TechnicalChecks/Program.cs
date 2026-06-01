@@ -8,7 +8,7 @@ using System.Windows;
 using System.Windows.Input;
 using Araci.API;
 using Araci.Applications.Diagrama;
-using Araci.Applications.Diagrama.InserirCarga;
+using Araci.Core.Commands;
 using Araci.Core.Documents;
 using Araci.Core.Rendering;
 using Araci.DTOs;
@@ -113,8 +113,14 @@ namespace Araci.TechnicalChecks
                 ("DTO nao muda por causa da rotacao", DtoNaoMudaPorCausaDaRotacao),
                 ("RotationService aceita Barra", RotationServiceAceitaBarra),
                 ("Barra nova possui altura padrao", BarraNovaPossuiAlturaPadrao),
+                ("Barra padrao mantem 24 terminais com pitch fixo", BarraPadraoMantemVinteQuatroTerminaisComPitchFixo),
                 ("Alterar altura da Barra muda Bounds", AlterarAlturaDaBarraMudaBounds),
-                ("Alterar altura da Barra redistribui terminais", AlterarAlturaDaBarraRedistribuiTerminais),
+                ("Crescer Barra aumenta conectores preservando IDs", CrescerBarraAumentaConectoresPreservandoIds),
+                ("Reduzir Barra remove terminais livres excedentes", ReduzirBarraRemoveTerminaisLivresExcedentes),
+                ("Reduzir Barra preserva terminal ocupado", ReduzirBarraPreservaTerminalOcupado),
+                ("Resize da Barra reancora cabo conectado", ResizeDaBarraReancoraCaboConectado),
+                ("Undo Redo de resize da Barra preserva cabo", UndoRedoResizeBarraPreservaCabo),
+                ("Connectivity retorna terminais ocupados da Barra", ConnectivityRetornaTerminaisOcupadosDaBarra),
                 ("Cabo conectado a Barra reancora apos alterar altura", CaboConectadoABarraReancoraAposAlterarAltura),
                 ("Barra com altura alterada persiste apos reload", BarraComAlturaAlteradaPersisteAposReload),
                 ("ElectricGraph continua valido apos altura da Barra", ElectricGraphContinuaValidoAposAlturaDaBarra),
@@ -789,13 +795,13 @@ namespace Araci.TechnicalChecks
 
             sin.TensaoLinha = "138";
 
-            trSe.Definir(TipoTransformador.PARAM_TENSAO_PRIMARIO_KV, 138.0);
-            trSe.Definir(TipoTransformador.PARAM_TENSAO_SECUNDARIO_KV, 34.5);
-            trSe.Definir(TipoTransformador.PARAM_POTENCIA_MVA, 65.0);
+            trSe.TensaoPrimarioKV = 138.0;
+            trSe.TensaoSecundarioKV = 34.5;
+            trSe.PotenciaAparente = 65000.0;
 
-            trAerogerador.Definir(TipoTransformador.PARAM_TENSAO_PRIMARIO_KV, 34.5);
-            trAerogerador.Definir(TipoTransformador.PARAM_TENSAO_SECUNDARIO_KV, 0.69);
-            trAerogerador.Definir(TipoTransformador.PARAM_POTENCIA_KVA, 5000.0);
+            trAerogerador.TensaoPrimarioKV = 34.5;
+            trAerogerador.TensaoSecundarioKV = 0.69;
+            trAerogerador.PotenciaAparente = 5000.0;
 
             generator.TensaoLinha = "0.69";
             load.TensaoLinha = "0.69";
@@ -1127,13 +1133,13 @@ namespace Araci.TechnicalChecks
             Gerador generator = CreateGenerator("GERADOR-RELOAD-DTO-TR", 900, 0.95);
             Carga load = CreateLoad("CARGA-RELOAD-DTO-TR", 300, 100);
 
-            transformador.Definir(TipoTransformador.PARAM_TENSAO_PRIMARIO_KV, 34.5);
-            transformador.Definir(TipoTransformador.PARAM_TENSAO_SECUNDARIO_KV, 0.69);
-            transformador.Definir(TipoTransformador.PARAM_POTENCIA_KVA, 1500.0);
-            transformador.Definir(TipoTransformador.PARAM_R_PERCENTUAL, 0.75);
-            transformador.Definir(TipoTransformador.PARAM_X_PERCENTUAL, 6.5);
-            transformador.Definir(TipoTransformador.PARAM_LIGACAO_PRIMARIO, "Delta");
-            transformador.Definir(TipoTransformador.PARAM_LIGACAO_SECUNDARIO, "Wye");
+            transformador.TensaoPrimarioKV = 34.5;
+            transformador.TensaoSecundarioKV = 0.69;
+            transformador.PotenciaAparente = 1500.0;
+            transformador.RPercentual = 0.75;
+            transformador.XPercentual = 6.5;
+            transformador.LigacaoPrimario = "Delta";
+            transformador.LigacaoSecundario = "Wye";
 
             document.AdicionarElemento(sin);
             document.AdicionarElemento(transformador);
@@ -1171,13 +1177,13 @@ namespace Araci.TechnicalChecks
 
             sin.TensaoLinha = "138";
 
-            transformador.Definir(TipoTransformador.PARAM_TENSAO_PRIMARIO_KV, 138.0);
-            transformador.Definir(TipoTransformador.PARAM_TENSAO_SECUNDARIO_KV, 34.5);
-            transformador.Definir(TipoTransformador.PARAM_POTENCIA_MVA, 65.0);
-            transformador.Definir(TipoTransformador.PARAM_R_PERCENTUAL, 1.0);
-            transformador.Definir(TipoTransformador.PARAM_X_PERCENTUAL, 8.0);
-            transformador.Definir(TipoTransformador.PARAM_LIGACAO_PRIMARIO, "Wye");
-            transformador.Definir(TipoTransformador.PARAM_LIGACAO_SECUNDARIO, "Wye");
+            transformador.TensaoPrimarioKV = 138.0;
+            transformador.TensaoSecundarioKV = 34.5;
+            transformador.PotenciaAparente = 65000.0;
+            transformador.RPercentual = 1.0;
+            transformador.XPercentual = 8.0;
+            transformador.LigacaoPrimario = "Wye";
+            transformador.LigacaoSecundario = "Wye";
 
             load.TensaoLinha = "34.5";
 
@@ -1479,7 +1485,7 @@ namespace Araci.TechnicalChecks
         private static void PreviewPreservaRotacaoEmModeloReal()
         {
             EditorContext context = CreateContextWithViewport();
-            var controller = new InsertPreviewController<CargaViewModel, Carga>(
+            var controller = CriarPreviewController<CargaViewModel, Carga>(
                 context,
                 context.ElementoFactory.CriarCargaVM,
                 vm => (Carga)vm.Modelo);
@@ -1574,7 +1580,9 @@ namespace Araci.TechnicalChecks
             RunSta(() =>
             {
                 EditorContext context = CreateContextWithViewport();
-                context.Input.ToolAtual = new InserirCargaTool(context);
+                Assert(
+                    context.Tools.AtivarInsercaoElemento(ElementRegistryService.KindCarga),
+                    "Ferramenta de insercao de Carga deve ser ativada pelo ToolService.");
 
                 Assert(context.Input.KeyDown(Key.Space), "InputRouter deve consumir Space na ferramenta de insercao sem preview.");
             });
@@ -1602,7 +1610,7 @@ namespace Araci.TechnicalChecks
             where TModel : Elemento
         {
             EditorContext context = CreateContextWithViewport();
-            var controller = new InsertPreviewController<TViewModel, TModel>(
+            var controller = CriarPreviewController<TViewModel, TModel>(
                 context,
                 () => criarPreview(context),
                 obterModelo);
@@ -1624,7 +1632,7 @@ namespace Araci.TechnicalChecks
             where TModel : Elemento
         {
             EditorContext context = CreateContextWithViewport();
-            var controller = new InsertPreviewController<TViewModel, TModel>(
+            var controller = CriarPreviewController<TViewModel, TModel>(
                 context,
                 () => criarPreview(context),
                 obterModelo);
@@ -1646,7 +1654,7 @@ namespace Araci.TechnicalChecks
             where TModel : Elemento
         {
             EditorContext context = CreateContextWithViewport();
-            var controller = new InsertPreviewController<TViewModel, TModel>(
+            var controller = CriarPreviewController<TViewModel, TModel>(
                 context,
                 () => criarPreview(context),
                 obterModelo);
@@ -1671,7 +1679,7 @@ namespace Araci.TechnicalChecks
             where TModel : Elemento
         {
             EditorContext context = CreateContextWithViewport();
-            var controller = new InsertPreviewController<TViewModel, TModel>(
+            var controller = CriarPreviewController<TViewModel, TModel>(
                 context,
                 () => criarPreview(context),
                 obterModelo);
@@ -1975,26 +1983,127 @@ namespace Araci.TechnicalChecks
             Assert(before != vm.Bounds.Height, "Bounds deve mudar apos alterar altura.");
         }
 
-        private static void AlterarAlturaDaBarraRedistribuiTerminais()
+        private static void BarraPadraoMantemVinteQuatroTerminaisComPitchFixo()
         {
-            Barra bar = CreateBar("BARRA-ALT-TERMINAIS");
-            var before = bar.Terminais
-                .Select(t => (t.Id, t.Posicao, t.PosicaoLocal))
-                .ToList();
+            Barra bar = CreateBar("BARRA-PITCH-PADRAO");
+
+            AssertEqual(24, bar.Terminais.Count, "Quantidade de terminais padrao");
+            AssertNoDuplicateTerminalIds(bar, "Barra padrao");
+            AssertEqual("BARRA-01", bar.Terminais[0].Id, "Primeiro terminal");
+            AssertEqual("BARRA-24", bar.Terminais[^1].Id, "Ultimo terminal");
+            AssertEqual(0, bar.Terminais[0].PosicaoLocal.Y, "Primeiro terminal local Y");
+            AssertEqual(Barra.ALTURA_PADRAO, bar.Terminais[^1].PosicaoLocal.Y, "Ultimo terminal local Y");
+            AssertTerminaisDaBarraSeguemPitchFixo(bar, "Barra padrao");
+        }
+
+        private static void CrescerBarraAumentaConectoresPreservandoIds()
+        {
+            Barra bar = CreateBar("BARRA-PITCH-CRESCE");
+            var idsIniciais = bar.Terminais.Select(t => t.Id).ToList();
 
             bar.Altura = 240;
             bar.AtualizarTerminais();
 
-            AssertEqual(24, bar.Terminais.Count, "Quantidade de terminais");
+            Assert(bar.Terminais.Count > idsIniciais.Count, "Quantidade deve aumentar.");
+            AssertNoDuplicateTerminalIds(bar, "Barra aumentada");
 
-            for (int i = 0; i < before.Count; i++)
-                AssertEqual(before[i].Id, bar.Terminais[i].Id, $"Terminal {i}.Id");
+            for (int i = 0; i < idsIniciais.Count; i++)
+                AssertEqual(idsIniciais[i], bar.Terminais[i].Id, $"Terminal existente {i}.Id");
 
-            AssertEqual(0, bar.Terminais[0].PosicaoLocal.Y, "Primeiro terminal local Y");
-            AssertEqual(240, bar.Terminais[^1].PosicaoLocal.Y, "Ultimo terminal local Y");
-            Assert(
-                before.Any(item => bar.Terminais.Single(t => t.Id == item.Id).Posicao != item.Posicao),
-                "Ao menos um terminal deve mudar de posicao apos alterar altura.");
+            AssertEqual("BARRA-25", bar.Terminais[24].Id, "Primeiro terminal novo");
+            AssertTerminaisDaBarraSeguemPitchFixo(bar, "Barra aumentada");
+        }
+
+        private static void ReduzirBarraRemoveTerminaisLivresExcedentes()
+        {
+            Barra bar = CreateBar("BARRA-PITCH-REDUZ");
+            bar.Altura = 240;
+            bar.AtualizarTerminais();
+            int quantidadeAumentada = bar.Terminais.Count;
+
+            bar.Altura = Barra.ALTURA_MINIMA;
+            bar.AtualizarTerminais();
+
+            Assert(bar.Terminais.Count < quantidadeAumentada, "Quantidade deve reduzir.");
+            AssertNoDuplicateTerminalIds(bar, "Barra reduzida");
+            AssertTerminaisDaBarraSeguemPitchFixo(bar, "Barra reduzida");
+
+            foreach (Terminal terminal in bar.Terminais)
+                Assert(terminal.PosicaoLocal.Y <= bar.Altura + 0.000001, $"{terminal.Id}: Y deve ficar dentro da altura.");
+        }
+
+        private static void ReduzirBarraPreservaTerminalOcupado()
+        {
+            BarResizeCircuit circuit = CreateBarResizeCircuit();
+            Terminal terminalAlto = GetTerminal(circuit.Bar, "BARRA-30");
+            Cabo cable = CreateCable(circuit.Bar, terminalAlto, circuit.OtherBar, circuit.OtherBar.Terminais[0], "L-BARRA-ALTA", 1.0);
+            circuit.Document.AdicionarElemento(cable);
+
+            circuit.Context.GeometryUpdates.AplicarAlturaBarra(circuit.Bar, Barra.ALTURA_MINIMA);
+
+            Terminal preservado = AssertTerminalExists(circuit.Bar, terminalAlto.Id);
+            AssertNoDuplicateTerminalIds(circuit.Bar, "Barra reduzida com cabo");
+            Assert(preservado.PosicaoLocal.Y <= circuit.Bar.Altura + 0.000001, "Terminal ocupado deve ficar em posicao local valida.");
+            AssertEqual(terminalAlto.Id, cable.OrigemTerminalId, "OrigemTerminalId preservado");
+            AssertEqual(preservado.Posicao.X, cable.Vertices[0].X, "Cabo origem X reancorado");
+            AssertEqual(preservado.Posicao.Y, cable.Vertices[0].Y, "Cabo origem Y reancorado");
+        }
+
+        private static void ResizeDaBarraReancoraCaboConectado()
+        {
+            BarResizeCircuit circuit = CreateBarResizeCircuit();
+            Terminal terminal = GetTerminal(circuit.Bar, "BARRA-24");
+            Cabo cable = CreateCable(circuit.Bar, terminal, circuit.OtherBar, circuit.OtherBar.Terminais[0], "L-BARRA-REANCORA", 1.0);
+            circuit.Document.AdicionarElemento(cable);
+            string endpoint = cable.OrigemTerminalId;
+
+            circuit.Context.GeometryUpdates.AplicarAlturaBarra(circuit.Bar, 240);
+
+            Terminal atual = AssertTerminalExists(circuit.Bar, endpoint);
+            AssertEqual(endpoint, cable.OrigemTerminalId, "Endpoint preservado");
+            AssertEqual(atual.Posicao.X, cable.Vertices[0].X, "Cabo origem X reancorado");
+            AssertEqual(atual.Posicao.Y, cable.Vertices[0].Y, "Cabo origem Y reancorado");
+        }
+
+        private static void UndoRedoResizeBarraPreservaCabo()
+        {
+            BarResizeCircuit circuit = CreateBarResizeCircuit();
+            Terminal terminal = GetTerminal(circuit.Bar, "BARRA-30");
+            Cabo cable = CreateCable(circuit.Bar, terminal, circuit.OtherBar, circuit.OtherBar.Terminais[0], "L-BARRA-UNDO", 1.0);
+            circuit.Document.AdicionarElemento(cable);
+            string terminalId = terminal.Id;
+            var command = new ResizeBarraCommand(
+                circuit.Bar,
+                240,
+                circuit.Bar.PosicaoX,
+                circuit.Bar.PosicaoY,
+                Barra.ALTURA_MINIMA,
+                circuit.Bar.PosicaoX,
+                circuit.Bar.PosicaoY,
+                circuit.Context.GeometryUpdates);
+
+            command.Execute();
+            AssertResizePreservaCabo(circuit.Bar, cable, terminalId, Barra.ALTURA_MINIMA, "Execute");
+
+            command.Undo();
+            AssertResizePreservaCabo(circuit.Bar, cable, terminalId, 240, "Undo");
+
+            command.Redo();
+            AssertResizePreservaCabo(circuit.Bar, cable, terminalId, Barra.ALTURA_MINIMA, "Redo");
+        }
+
+        private static void ConnectivityRetornaTerminaisOcupadosDaBarra()
+        {
+            BarResizeCircuit circuit = CreateBarResizeCircuit();
+            Terminal ocupado = GetTerminal(circuit.Bar, "BARRA-30");
+            Terminal livre = GetTerminal(circuit.Bar, "BARRA-29");
+            Cabo cable = CreateCable(circuit.Bar, ocupado, circuit.OtherBar, circuit.OtherBar.Terminais[0], "L-BARRA-OCUPADOS", 1.0);
+            circuit.Document.AdicionarElemento(cable);
+
+            IReadOnlySet<string> ocupados = circuit.Context.Connectivity.ObterTerminalIdsOcupados(circuit.Bar);
+
+            Assert(ocupados.Contains(ocupado.Id), "Terminal ocupado deve aparecer no conjunto.");
+            Assert(!ocupados.Contains(livre.Id), "Terminal livre nao deve aparecer no conjunto.");
         }
 
         private static void CaboConectadoABarraReancoraAposAlterarAltura()
@@ -2010,7 +2119,8 @@ namespace Araci.TechnicalChecks
 
             SetBarHeight(circuit.Context, circuit.Bar, 240);
 
-            Assert(before != circuit.Outgoing.Vertices[0], "Ponta conectada a Barra deve mover.");
+            AssertEqual(GetTerminal(circuit.Bar, 1).Posicao.X, circuit.Outgoing.Vertices[0].X, "Ponta conectada X");
+            AssertEqual(GetTerminal(circuit.Bar, 1).Posicao.Y, circuit.Outgoing.Vertices[0].Y, "Ponta conectada Y");
             AssertCableEndpointAtTerminal(circuit.Outgoing, true, circuit.Bar, 1, "Barra saida apos altura");
             AssertEqual(middle.X, circuit.Outgoing.Vertices[1].X, "Intermediario X preservado");
             AssertEqual(middle.Y, circuit.Outgoing.Vertices[1].Y, "Intermediario Y preservado");
@@ -2029,7 +2139,8 @@ namespace Araci.TechnicalChecks
             Barra loadedBar = FindById<Barra>(loaded, circuit.Bar.Id);
 
             AssertEqual(260, loadedBar.Altura, "Altura apos reload");
-            AssertEqual(260, loadedBar.Terminais[^1].PosicaoLocal.Y, "Ultimo terminal apos reload");
+            Assert(loadedBar.Terminais[^1].PosicaoLocal.Y <= loadedBar.Altura + 0.000001, "Ultimo terminal apos reload deve ficar dentro da altura.");
+            AssertTerminaisDaBarraSeguemPitchFixo(loadedBar, "Barra apos reload");
             AssertCableEndpointAtTerminal(
                 FindById<Cabo>(loaded, circuit.Outgoing.Id),
                 true,
@@ -2110,7 +2221,8 @@ namespace Araci.TechnicalChecks
             bar.AtualizarTerminais();
 
             AssertEqual(Barra.ALTURA_MINIMA, bar.Altura, "Altura minima");
-            AssertEqual(Barra.ALTURA_MINIMA, bar.Terminais[^1].PosicaoLocal.Y, "Ultimo terminal com altura minima");
+            Assert(bar.Terminais[^1].PosicaoLocal.Y <= bar.Altura + 0.000001, "Ultimo terminal com altura minima deve ficar dentro da altura.");
+            AssertTerminaisDaBarraSeguemPitchFixo(bar, "Barra com altura minima");
         }
 
         private static void BarraSelecionadaRotacionaZeroParaNoventa()
@@ -2139,7 +2251,7 @@ namespace Araci.TechnicalChecks
         private static void PreviewDeBarraPreservaRotacao()
         {
             EditorContext context = CreateContextWithViewport();
-            var controller = new InsertPreviewController<BarraViewModel, Barra>(
+            var controller = CriarPreviewController<BarraViewModel, Barra>(
                 context,
                 context.ElementoFactory.CriarBarraVM,
                 vm => vm.Barra);
@@ -2371,13 +2483,43 @@ namespace Araci.TechnicalChecks
             return new BarRotationCircuit(context, generator, bar, load, incoming, outgoing);
         }
 
+        private static BarResizeCircuit CreateBarResizeCircuit()
+        {
+            EditorContext context = CreateContextWithViewport();
+            Barra bar = CreateBar("BARRA-RESIZE-A");
+            Barra otherBar = CreateBar("BARRA-RESIZE-B");
+            otherBar.PosicaoX = 300;
+            context.Document.AdicionarElemento(bar);
+            context.Document.AdicionarElemento(otherBar);
+            context.GeometryUpdates.AplicarAlturaBarra(bar, 240);
+            return new BarResizeCircuit(context, context.Document, bar, otherBar);
+        }
+
         private static EditorContext CreateContextWithViewport()
         {
             var context = new EditorContext();
-            var viewport = new ViewportViewModel(context);
+            var viewport = context.CriarViewportViewModel();
 
             context.InicializarViewport(viewport);
             return context;
+        }
+
+        private static InsertPreviewController<TViewModel, TModel> CriarPreviewController<TViewModel, TModel>(
+            EditorContext context,
+            Func<TViewModel> criarPreview,
+            Func<TViewModel, TModel> obterModelo)
+            where TViewModel : ElementoViewModel
+            where TModel : Elemento
+        {
+            return new InsertPreviewController<TViewModel, TModel>(
+                criarPreview,
+                obterModelo,
+                context.Snap,
+                context.Geometry,
+                context.TerminalLayout,
+                context.AlignmentGuides,
+                context.Scene,
+                context.SceneQueries);
         }
 
         private static void RotateSelected(EditorContext context, Elemento elemento)
@@ -2510,7 +2652,6 @@ namespace Araci.TechnicalChecks
                 Barra = name,
                 Tipo = new TipoSin
                 {
-                    TensaoKV = 13.8,
                     Fases = 3,
                     PotenciaCurtoMVA = 500,
                     RelacaoXR = 10
@@ -2536,15 +2677,16 @@ namespace Araci.TechnicalChecks
                 Tipo = new TipoTransformador
                 {
                     Fases = 3,
-                    Enrolamentos = 2,
-                    TensaoPrimarioKV = 13.8,
-                    TensaoSecundarioKV = 0.38,
-                    PotenciaKVA = 500
+                    Enrolamentos = 2
                 },
                 PosicaoX = 80,
                 PosicaoY = 80,
                 TensaoLinha = "13.8"
             };
+
+            transformador.TensaoPrimarioKV = 13.8;
+            transformador.TensaoSecundarioKV = 0.38;
+            transformador.PotenciaAparente = 500;
 
             transformador.AtualizarTerminais(
                 ElementGeometryDefaults.TransformadorLargura,
@@ -2590,12 +2732,44 @@ namespace Araci.TechnicalChecks
             return cable;
         }
 
+        private static Cabo CreateCable(
+            Elemento from,
+            Terminal fromTerminal,
+            Elemento to,
+            Terminal toTerminal,
+            string name,
+            double length)
+        {
+            var cable = new Cabo
+            {
+                Nome = name,
+                OrigemId = from.Id.ToString(),
+                OrigemTerminalId = fromTerminal.Id,
+                DestinoId = to.Id.ToString(),
+                DestinoTerminalId = toTerminal.Id,
+                Comprimento = length
+            };
+
+            cable.DefinirOrigem(fromTerminal.Posicao);
+            cable.DefinirDestino(toTerminal.Posicao);
+            cable.Vertices.Add(fromTerminal.Posicao);
+            cable.Vertices.Add(toTerminal.Posicao);
+
+            return cable;
+        }
+
         private static Terminal GetTerminal(Elemento elemento, int index)
         {
             if (elemento is not ITerminalOwner owner)
                 throw new InvalidOperationException($"Elemento '{elemento.Nome}' nao possui terminais.");
 
             return owner.Terminais[index];
+        }
+
+        private static Terminal GetTerminal(Barra barra, string terminalId)
+        {
+            return barra.Terminais.First(t =>
+                string.Equals(t.Id, terminalId, StringComparison.OrdinalIgnoreCase));
         }
 
         private static void AssertCableEndpointAtTerminal(
@@ -2616,6 +2790,52 @@ namespace Araci.TechnicalChecks
             AssertEqual(terminal.Id, terminalId, $"{name}.TerminalId");
             AssertEqual(terminal.Posicao.X, vertex.X, $"{name}.Vertice.X");
             AssertEqual(terminal.Posicao.Y, vertex.Y, $"{name}.Vertice.Y");
+        }
+
+        private static void AssertNoDuplicateTerminalIds(Barra barra, string name)
+        {
+            int idsUnicos = barra.Terminais
+                .Select(t => t.Id)
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .Count();
+
+            AssertEqual(barra.Terminais.Count, idsUnicos, $"{name}.TerminalIds unicos");
+        }
+
+        private static Terminal AssertTerminalExists(Barra barra, string terminalId)
+        {
+            Terminal? terminal = barra.Terminais.FirstOrDefault(t =>
+                string.Equals(t.Id, terminalId, StringComparison.OrdinalIgnoreCase));
+
+            Assert(terminal != null, $"Terminal '{terminalId}' deve existir na barra '{barra.Nome}'.");
+            return terminal!;
+        }
+
+        private static void AssertTerminaisDaBarraSeguemPitchFixo(Barra barra, string name)
+        {
+            double pitch = Barra.ALTURA_PADRAO / 23;
+
+            foreach (Terminal terminal in barra.Terminais)
+            {
+                int slot = int.Parse(terminal.Id["BARRA-".Length..]) - 1;
+                double expected = Math.Min(slot * pitch, barra.Altura);
+                AssertEqual(expected, terminal.PosicaoLocal.Y, $"{name}.{terminal.Id}.Y");
+            }
+        }
+
+        private static void AssertResizePreservaCabo(
+            Barra barra,
+            Cabo cable,
+            string terminalId,
+            double alturaEsperada,
+            string name)
+        {
+            AssertEqual(alturaEsperada, barra.Altura, $"{name}.Altura");
+            Terminal terminal = AssertTerminalExists(barra, terminalId);
+            AssertNoDuplicateTerminalIds(barra, $"{name}.Barra");
+            AssertEqual(terminalId, cable.OrigemTerminalId, $"{name}.OrigemTerminalId");
+            AssertEqual(terminal.Posicao.X, cable.Vertices[0].X, $"{name}.Cabo.X");
+            AssertEqual(terminal.Posicao.Y, cable.Vertices[0].Y, $"{name}.Cabo.Y");
         }
 
         private static void AssertTerminalsUseCentralPivot(
@@ -2896,6 +3116,9 @@ namespace Araci.TechnicalChecks
             {
                 string button = buttons[i];
 
+                if (button.Contains("Style=\"{StaticResource RibbonToolButton}\"", StringComparison.OrdinalIgnoreCase))
+                    continue;
+
                 AssertContains(button, "Focusable=\"False\"", $"{name}.Button[{i}].Focusable");
                 AssertContains(button, "IsTabStop=\"False\"", $"{name}.Button[{i}].IsTabStop");
             }
@@ -3013,6 +3236,12 @@ namespace Araci.TechnicalChecks
             Carga Load,
             Cabo Incoming,
             Cabo Outgoing);
+
+        private sealed record BarResizeCircuit(
+            EditorContext Context,
+            AraciDocument Document,
+            Barra Bar,
+            Barra OtherBar);
 
         private sealed class FakeAnnotationElement : Elemento
         {
