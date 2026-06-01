@@ -1,10 +1,9 @@
 using System;
 using System.Threading.Tasks;
 using Araci.Applications.Abstractions;
-using Araci.Applications.Simulation;
 using Araci.DTOs;
 
-namespace Araci.Services
+namespace Araci.Applications.Simulation
 {
     public class SimulationPipeline : ISimulationPipeline
     {

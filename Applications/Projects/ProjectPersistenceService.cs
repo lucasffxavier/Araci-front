@@ -5,8 +5,9 @@ using Araci.Applications.Abstractions;
 using Araci.Core.Documents;
 using Araci.Infrastructure.Persistence;
 using Araci.Models;
+using Araci.Services;
 
-namespace Araci.Services
+namespace Araci.Applications.Projects
 {
     public class ProjectPersistenceService : IProjectPersistenceService
     {

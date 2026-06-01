@@ -3,12 +3,13 @@ using System.Windows;
 using System.Windows.Input;
 using Araci.Applications.Abstractions;
 using Araci.Applications.Editar.Base;
+using Araci.Applications.Factories;
 using Araci.Applications.UseCases.Diagrama;
 using Araci.Core.SceneQueries;
-using Araci.Core.Scenes;
 using Araci.Models;
 using Araci.Services;
 using Araci.ViewModels;
+using CoreScene = Araci.Core.Scenes.Scene;
 
 namespace Araci.Applications.Diagrama.InserirCabo
 {
@@ -20,7 +21,7 @@ namespace Araci.Applications.Diagrama.InserirCabo
         private readonly SnapService _snap;
         private readonly ConnectivityService _connectivity;
         private readonly AlignmentGuideService _alignmentGuides;
-        private readonly Scene _scene;
+        private readonly CoreScene _scene;
         private readonly ISceneQueryService _sceneQueries;
         private readonly TerminalSnapState _terminalSnap;
         private readonly Action _voltarParaSelecao;
@@ -38,7 +39,7 @@ namespace Araci.Applications.Diagrama.InserirCabo
             SnapService snap,
             ConnectivityService connectivity,
             AlignmentGuideService alignmentGuides,
-            Scene scene,
+            CoreScene scene,
             ISceneQueryService sceneQueries,
             TerminalSnapState terminalSnap,
             Action voltarParaSelecao)

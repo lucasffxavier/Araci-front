@@ -98,6 +98,10 @@ namespace Araci.TechnicalChecks
                 ("InputRouter envia Space para insercao sem preview", InputRouterEnviaSpaceParaInsercaoSemPreview),
                 ("Botoes da Ribbon nao capturam foco", BotoesDaRibbonNaoCapturamFoco),
                 ("Viewport continua focavel", ViewportContinuaFocavel),
+                ("DocumentSceneSync cria ViewModel ao adicionar elemento", DocumentSceneSyncCriaViewModelAoAdicionarElemento),
+                ("DocumentSceneSync remove ViewModel ao remover elemento", DocumentSceneSyncRemoveViewModelAoRemoverElemento),
+                ("DocumentSceneSync limpa Scene ao limpar Document", DocumentSceneSyncLimpaSceneAoLimparDocument),
+                ("DocumentSceneSync preserva CaboViewModel", DocumentSceneSyncPreservaCaboViewModel),
                 ("Elemento rotacionado persiste apos reload", ElementoRotacionadoPersisteAposReload),
                 ("Terminais mudam posicao e preservam IDs", TerminaisMudamPosicaoEPreservamIds),
                 ("Cabo preserva TerminalId apos rotacao", CaboPreservaTerminalIdAposRotacao),
@@ -1611,6 +1615,70 @@ namespace Araci.TechnicalChecks
             string xaml = File.ReadAllText(FindProjectFile("Views/ViewportView.xaml"));
 
             AssertContains(xaml, "Focusable=\"True\"", "ViewportView.Focusable");
+        }
+
+        private static void DocumentSceneSyncCriaViewModelAoAdicionarElemento()
+        {
+            EditorContext context = CreateContextWithViewport();
+            Carga load = CreateLoad("CARGA-SYNC-ADD", 120, 40);
+
+            context.Document.AdicionarElemento(load);
+
+            ElementoViewModel? vm = context.Viewport?.ObterViewModel(load);
+            Assert(vm is CargaViewModel, "ObterViewModel deve retornar CargaViewModel.");
+            Assert(context.Scene.Elementos.Contains(vm!), "Scene deve conter a ViewModel criada.");
+        }
+
+        private static void DocumentSceneSyncRemoveViewModelAoRemoverElemento()
+        {
+            EditorContext context = CreateContextWithViewport();
+            Carga load = CreateLoad("CARGA-SYNC-REMOVE", 120, 40);
+            context.Document.AdicionarElemento(load);
+            ElementoViewModel vm = GetVm(context, load);
+
+            context.Document.RemoverElemento(load);
+
+            Assert(!context.Scene.Elementos.Contains(vm), "Scene nao deve conter a ViewModel removida.");
+            Assert(context.Viewport?.ObterViewModel(load) == null, "ObterViewModel deve retornar null apos remocao.");
+        }
+
+        private static void DocumentSceneSyncLimpaSceneAoLimparDocument()
+        {
+            EditorContext context = CreateContextWithViewport();
+            Gerador generator = CreateGenerator("GERADOR-SYNC-CLEAR", 500, 0.95);
+            Carga load = CreateLoad("CARGA-SYNC-CLEAR", 120, 40);
+            Cabo cable = CreateCable(generator, load, "CABO-SYNC-CLEAR", 1);
+            cable.Vertices.Insert(1, MidPoint(cable.Vertices[0], cable.Vertices[1]));
+
+            context.Document.AdicionarElemento(generator);
+            context.Document.AdicionarElemento(load);
+            context.Document.AdicionarElemento(cable);
+            SelectCable(context, cable);
+            context.AlignmentGuides.MostrarReferenciaVertical(10, new Rect(0, 0, 20, 20));
+
+            Assert(context.CableVertexEdit.Handles.Count > 0, "Pre-condicao: handles de cabo devem existir.");
+            Assert(context.AlignmentGuides.Linhas.Count > 0, "Pre-condicao: guias devem existir.");
+
+            context.Document.Limpar();
+
+            AssertEqual(0, context.Scene.Elementos.Count, "Scene.Elementos.Count");
+            AssertEqual(0, context.Selection.Selecionados.Count, "Selection.Selecionados.Count");
+            AssertEqual(0, context.CableVertexEdit.Handles.Count, "CableVertexEdit.Handles.Count");
+            AssertEqual(0, context.AlignmentGuides.Linhas.Count, "AlignmentGuides.Linhas.Count");
+        }
+
+        private static void DocumentSceneSyncPreservaCaboViewModel()
+        {
+            EditorContext context = CreateContextWithViewport();
+            Gerador generator = CreateGenerator("GERADOR-SYNC-CABO", 500, 0.95);
+            Carga load = CreateLoad("CARGA-SYNC-CABO", 120, 40);
+            Cabo cable = CreateCable(generator, load, "CABO-SYNC-CABO", 1);
+
+            context.Document.AdicionarElemento(generator);
+            context.Document.AdicionarElemento(load);
+            context.Document.AdicionarElemento(cable);
+
+            Assert(context.Viewport?.ObterViewModel(cable) is CaboViewModel, "ObterViewModel deve preservar CaboViewModel.");
         }
 
         private static void AssertPreviewArmazenaRotacaoAntesDeExistir<TViewModel, TModel>(

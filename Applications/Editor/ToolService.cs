@@ -1,8 +1,9 @@
 using System;
 using Araci.Applications.Editar.Base;
 using Araci.Applications.Editar.Selecionar;
+using Araci.Services;
 
-namespace Araci.Services
+namespace Araci.Applications.Editor
 {
     public class ToolService
     {

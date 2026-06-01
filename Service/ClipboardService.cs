@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using Araci.Applications.Editar.Selecionar;
 using Araci.Applications.UseCases.Editar;
 using Araci.Core.SceneQueries;
 using Araci.Models;

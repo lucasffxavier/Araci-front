@@ -1,8 +1,9 @@
 using System;
 using Araci.Models;
+using Araci.Services;
 using Araci.ViewModels;
 
-namespace Araci.Services
+namespace Araci.Applications.Factories
 {
     public class ElementoFactory
     {

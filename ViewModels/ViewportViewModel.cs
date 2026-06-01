@@ -1,12 +1,11 @@
 using System;
-using System.Collections.Generic;
 using System.Collections.ObjectModel;
-using System.Collections.Specialized;
 using System.ComponentModel;
 using System.Runtime.CompilerServices;
 using System.Windows;
+using Araci.Applications.Editar.Selecionar;
+using Araci.Applications.Scene;
 using Araci.Core.Documents;
-using Araci.Core.SceneQueries;
 using Araci.Core.Scenes;
 using Araci.Models;
 using Araci.Services;
@@ -15,12 +14,7 @@ namespace Araci.ViewModels
 {
     public class ViewportViewModel : INotifyPropertyChanged
     {
-        private readonly Dictionary<Elemento, ElementoViewModel> _viewModelsPorModelo = new();
-        private readonly SelectionService _selection;
-        private readonly HoverService _hover;
-        private readonly AlignmentGuideService _alignmentGuidesService;
-        private readonly ISceneQueryService _sceneQueries;
-        private readonly ElementoFactory _elementoFactory;
+        private readonly DocumentSceneSyncService _documentSceneSync;
         private double _inverseZoom = 1;
 
         public ViewportViewModel(
@@ -31,10 +25,7 @@ namespace Araci.ViewModels
             CableVertexEditService cableVertexEdit,
             MoveHudService moveHud,
             AlignmentGuideService alignmentGuides,
-            SelectionService selection,
-            HoverService hover,
-            ISceneQueryService sceneQueries,
-            ElementoFactory elementoFactory)
+            DocumentSceneSyncService documentSceneSync)
         {
             Document = document ?? throw new ArgumentNullException(nameof(document));
             Scene = scene ?? throw new ArgumentNullException(nameof(scene));
@@ -42,14 +33,9 @@ namespace Araci.ViewModels
             TerminalSnap = terminalSnap ?? throw new ArgumentNullException(nameof(terminalSnap));
             CableVertexEdit = cableVertexEdit ?? throw new ArgumentNullException(nameof(cableVertexEdit));
             MoveHud = moveHud ?? throw new ArgumentNullException(nameof(moveHud));
-            _alignmentGuidesService = alignmentGuides ?? throw new ArgumentNullException(nameof(alignmentGuides));
+            ArgumentNullException.ThrowIfNull(alignmentGuides);
             AlignmentGuides = alignmentGuides.Linhas;
-            _selection = selection ?? throw new ArgumentNullException(nameof(selection));
-            _hover = hover ?? throw new ArgumentNullException(nameof(hover));
-            _sceneQueries = sceneQueries ?? throw new ArgumentNullException(nameof(sceneQueries));
-            _elementoFactory = elementoFactory ?? throw new ArgumentNullException(nameof(elementoFactory));
-            Document.Elementos.CollectionChanged += OnDocumentElementosChanged;
-            SincronizarComDocumento();
+            _documentSceneSync = documentSceneSync ?? throw new ArgumentNullException(nameof(documentSceneSync));
         }
 
         public AraciDocument Document { get; }
@@ -93,104 +79,17 @@ namespace Araci.ViewModels
 
         public void RegistrarViewModel(ElementoViewModel vm)
         {
-            if (!Document.Elementos.Contains(vm.Modelo) || !Elementos.Contains(vm))
-                return;
-
-            _viewModelsPorModelo[vm.Modelo] = vm;
+            _documentSceneSync.RegistrarViewModel(vm);
         }
 
         public ElementoViewModel? ObterViewModel(Elemento modelo)
         {
-            if (!_viewModelsPorModelo.TryGetValue(modelo, out var vm))
-                return null;
-
-            if (Document.Elementos.Contains(modelo) && Elementos.Contains(vm))
-                return vm;
-
-            _viewModelsPorModelo.Remove(modelo);
-            return null;
+            return _documentSceneSync.ObterViewModel(modelo);
         }
 
         public void AtualizarViewModel(Elemento modelo)
         {
-            ObterViewModel(modelo)?.AtualizarAposModeloAlterado();
-        }
-
-        private void OnDocumentElementosChanged(object? sender, NotifyCollectionChangedEventArgs e)
-        {
-            if (e.Action == NotifyCollectionChangedAction.Reset)
-            {
-                LimparViewModels();
-                return;
-            }
-
-            if (e.OldItems != null)
-            {
-                foreach (Elemento modelo in e.OldItems)
-                    RemoverViewModel(modelo);
-            }
-
-            if (e.NewItems != null)
-            {
-                foreach (Elemento modelo in e.NewItems)
-                    AdicionarViewModel(modelo);
-            }
-        }
-
-        private void SincronizarComDocumento()
-        {
-            LimparViewModels();
-
-            foreach (Elemento modelo in Document.Elementos)
-                AdicionarViewModel(modelo);
-        }
-
-        private void AdicionarViewModel(Elemento modelo)
-        {
-            var vm = ObterOuCriarViewModel(modelo);
-
-            if (vm == null || Elementos.Contains(vm))
-                return;
-
-            Elementos.Add(vm);
-        }
-
-        private void RemoverViewModel(Elemento modelo)
-        {
-            if (!_viewModelsPorModelo.TryGetValue(modelo, out var vm))
-                return;
-
-            _selection.Deselecionar(vm);
-            CableVertexEdit.Clear();
-            _hover.Clear();
-            Elementos.Remove(vm);
-            _viewModelsPorModelo.Remove(modelo);
-            _sceneQueries.Invalidate();
-        }
-
-        private void LimparViewModels()
-        {
-            _selection.Limpar();
-            CableVertexEdit.Clear();
-            _hover.Clear();
-            TerminalSnap.Limpar();
-            _alignmentGuidesService.Limpar();
-            Elementos.Clear();
-            _viewModelsPorModelo.Clear();
-            _sceneQueries.Invalidate();
-        }
-
-        private ElementoViewModel? ObterOuCriarViewModel(Elemento modelo)
-        {
-            if (_viewModelsPorModelo.TryGetValue(modelo, out var existente))
-                return existente;
-
-            var vm = _elementoFactory.CriarViewModel(modelo);
-
-            if (vm != null)
-                _viewModelsPorModelo[modelo] = vm;
-
-            return vm;
+            _documentSceneSync.AtualizarViewModel(modelo);
         }
 
         public event PropertyChangedEventHandler? PropertyChanged;

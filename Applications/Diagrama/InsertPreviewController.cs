@@ -1,10 +1,10 @@
 using System;
 using System.Windows;
 using Araci.Core.SceneQueries;
-using Araci.Core.Scenes;
 using Araci.Models;
 using Araci.Services;
 using Araci.ViewModels;
+using CoreScene = Araci.Core.Scenes.Scene;
 
 namespace Araci.Applications.Diagrama
 {
@@ -18,7 +18,7 @@ namespace Araci.Applications.Diagrama
         private readonly ElementGeometryService _geometry;
         private readonly TerminalLayoutService _terminalLayout;
         private readonly AlignmentGuideService _alignmentGuides;
-        private readonly Scene _scene;
+        private readonly CoreScene _scene;
         private readonly ISceneQueryService _sceneQueries;
         private double _currentRotation;
 
@@ -29,7 +29,7 @@ namespace Araci.Applications.Diagrama
             ElementGeometryService geometry,
             TerminalLayoutService terminalLayout,
             AlignmentGuideService alignmentGuides,
-            Scene scene,
+            CoreScene scene,
             ISceneQueryService sceneQueries)
         {
             _criarPreview = criarPreview ?? throw new ArgumentNullException(nameof(criarPreview));

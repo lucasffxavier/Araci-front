@@ -6,9 +6,10 @@ using System.Windows.Input;
 using Araci.Applications.Abstractions;
 using Araci.Applications.Editar.Base;
 using Araci.Applications.Editar.Selecionar;
+using Araci.Services;
 using Araci.ViewModels;
 
-namespace Araci.Services
+namespace Araci.Applications.Editor
 {
     public class InputRouter
     {

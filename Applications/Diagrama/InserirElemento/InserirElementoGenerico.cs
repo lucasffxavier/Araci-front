@@ -2,12 +2,13 @@
 using System.Windows;
 using System.Windows.Input;
 using Araci.Applications.Editar.Base;
+using Araci.Applications.Factories;
 using Araci.Applications.UseCases.Diagrama;
 using Araci.Core.SceneQueries;
-using Araci.Core.Scenes;
 using Araci.Models;
 using Araci.Services;
 using Araci.ViewModels;
+using CoreScene = Araci.Core.Scenes.Scene;
 
 namespace Araci.Applications.Diagrama.InserirElemento
 {
@@ -27,7 +28,7 @@ namespace Araci.Applications.Diagrama.InserirElemento
             ElementGeometryService geometry,
             TerminalLayoutService terminalLayout,
             AlignmentGuideService alignmentGuides,
-            Scene scene,
+            CoreScene scene,
             ISceneQueryService sceneQueries,
             Action voltarParaSelecao)
         {

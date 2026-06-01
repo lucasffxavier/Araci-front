@@ -1,5 +1,6 @@
 using System;
 using System.Linq;
+using Araci.Applications.Editar.Selecionar;
 using Araci.Applications.UseCases.Editar;
 using Araci.Core.SceneQueries;
 using Araci.ViewModels;

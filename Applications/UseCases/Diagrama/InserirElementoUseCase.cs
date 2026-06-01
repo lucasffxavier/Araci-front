@@ -1,5 +1,6 @@
 using System;
 using Araci.Applications.Abstractions;
+using Araci.Applications.Factories;
 using Araci.Core.Commands;
 using Araci.Core.Documents;
 using Araci.Models;

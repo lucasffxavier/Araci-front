@@ -1,0 +1,54 @@
+using System;
+using Araci.Applications.Editar.Selecionar;
+using Araci.Applications.Factories;
+using Araci.Applications.Scene;
+using Araci.Core.Documents;
+using Araci.Core.SceneQueries;
+using Araci.ViewModels;
+using CoreScene = Araci.Core.Scenes.Scene;
+
+namespace Araci.Services.Composition
+{
+    internal static class ViewportComposition
+    {
+        public static ViewportViewModel CreateViewModel(
+            AraciDocument document,
+            CoreScene scene,
+            SelectionBoxViewModel selectionBox,
+            TerminalSnapState terminalSnap,
+            CableVertexEditService cableVertexEdit,
+            MoveHudService moveHud,
+            AlignmentGuideService alignmentGuides,
+            ElementoFactory elementoFactory,
+            SelectionService selection,
+            HoverService hover,
+            ISceneQueryService sceneQueries)
+        {
+            var documentSceneSync = new DocumentSceneSyncService(
+                document,
+                scene,
+                elementoFactory,
+                selection,
+                cableVertexEdit,
+                terminalSnap,
+                alignmentGuides,
+                hover,
+                sceneQueries);
+
+            return new ViewportViewModel(
+                document,
+                scene,
+                selectionBox,
+                terminalSnap,
+                cableVertexEdit,
+                moveHud,
+                alignmentGuides,
+                documentSceneSync);
+        }
+
+        public static ViewportNavigationService CreateNavigation(Func<ViewportService?> viewportProvider)
+        {
+            return new ViewportNavigationService(viewportProvider);
+        }
+    }
+}

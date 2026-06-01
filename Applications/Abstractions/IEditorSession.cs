@@ -1,6 +1,6 @@
 using Araci.Core.Documents;
 using Araci.Core.SceneQueries;
-using Araci.Core.Scenes;
+using CoreScene = Araci.Core.Scenes.Scene;
 
 namespace Araci.Applications.Abstractions
 {
@@ -8,7 +8,7 @@ namespace Araci.Applications.Abstractions
     {
         AraciDocument Document { get; }
 
-        Scene Scene { get; }
+        CoreScene Scene { get; }
 
         ISceneQueryService SceneQueries { get; }
 

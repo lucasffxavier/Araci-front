@@ -1,25 +1,27 @@
 using System.Collections.Generic;
 using System.Windows;
 using Araci.Applications.Abstractions;
+using Araci.Applications.Editor;
+using Araci.Applications.Factories;
 using Araci.Core.Commands;
 using Araci.Core.Documents;
 using Araci.Core.Events;
 using Araci.Core.SceneQueries;
-using Araci.Core.Scenes;
 using Araci.Core.Transactions;
-using Araci.Infrastructure.Persistence;
 using Araci.Applications.Diagrama.InserirCabo;
 using Araci.Applications.Diagrama.InserirElemento;
 using Araci.Applications.Editar.Alinhar;
 using Araci.Applications.Editar.Deletar;
 using Araci.Applications.Editar.Mover;
 using Araci.Applications.Editar.Selecionar;
+using Araci.Applications.Projects;
 using Araci.Applications.Simulation;
 using Araci.Applications.UseCases.Editar;
 using Araci.Applications.UseCases.Diagrama;
-using Araci.Infrastructure.Simulation;
 using Araci.Models;
+using Araci.Services.Composition;
 using Araci.ViewModels;
+using CoreScene = Araci.Core.Scenes.Scene;
 
 namespace Araci.Services
 {
@@ -33,27 +35,29 @@ namespace Araci.Services
         public EditorContext(IEventBus eventBus)
         {
             Events = eventBus;
-            Scene = new Scene();
-            SceneQueries = new SceneQueryService(Scene);
-            Hover = new HoverService(SceneQueries);
-            Snap = new SnapService(SceneQueries, Settings);
-            TypePropertiesDialogs = new TypePropertiesDialogService();
-            Dialogs = new DialogService();
-            Elements = new ElementRegistryService(Types);
-            InstancePropertyCatalog.Configure(Elements);
-            Connectivity = new ConnectivityService(Document);
-            ElectricGraph = new ElectricGraphBuilder(Document, Elements);
-            OperationalState = new OperationalGraphStateBuilder();
-            Topology = new TopologyValidator(Document, Connectivity, ElectricGraph);
-            SimulationResults = new SimulationResultApplier(Document, NotifySimulationResultViewModels);
-            var simulationGateway = new FastApiOpenDssGateway();
-            var circuitDtoBuilder = new CircuitDtoBuilder(Document);
-            Simulation = new SimulationPipeline(circuitDtoBuilder, simulationGateway, SimulationResults);
-            SimulationExport = new SimulationExportService();
-            SimulationMessages = new SimulationMessageBuilder();
-            Geometry = new ElementGeometryService(Elements);
-            TerminalLayout = new TerminalLayoutService(Elements, Geometry);
-            VisualUpdates = new VisualUpdateService(
+
+            var core = EditorCoreComposition.Create(Document, Settings, Types);
+            Scene = core.Scene;
+            SceneQueries = core.SceneQueries;
+            Hover = core.Hover;
+            Snap = core.Snap;
+            TypePropertiesDialogs = core.TypePropertiesDialogs;
+            Dialogs = core.Dialogs;
+            Elements = core.Elements;
+            Connectivity = core.Connectivity;
+            ElectricGraph = core.ElectricGraph;
+            OperationalState = core.OperationalState;
+            Topology = core.Topology;
+            Geometry = core.Geometry;
+            TerminalLayout = core.TerminalLayout;
+
+            var simulation = SimulationComposition.Create(Document, NotifySimulationResultViewModels);
+            SimulationResults = simulation.Results;
+            Simulation = simulation.Pipeline;
+            SimulationExport = simulation.Export;
+            SimulationMessages = simulation.Messages;
+
+            VisualUpdates = EditingComposition.CreateVisualUpdates(
                 () => Viewport,
                 TerminalLayout,
                 Connectivity,
@@ -69,61 +73,58 @@ namespace Araci.Services
             ColarElementos = new ColarElementosUseCase(CopiarElementos, Document, Names, Commands, ObterDestinoColagem);
             ExcluirElemento = new ExcluirElementoUseCase(Document, Connectivity, Commands);
             EditarPropriedades = new EditarPropriedadesUseCase(Commands);
-            Selection = new SelectionService(Editor, Events, EditarPropriedades);
+            Selection = EditingComposition.CreateSelection(Editor, Events, EditarPropriedades);
             EditarVerticesCabo = new EditarVerticesCaboUseCase(Commands);
-            CableVertexEdit = new CableVertexEditService(
+            CableVertexEdit = EditingComposition.CreateCableVertexEdit(
                 Selection,
                 SceneQueries,
                 VisualUpdates,
                 EditarVerticesCabo);
             Selection.SelectionChanged += CableVertexEdit.Refresh;
-            SafeDelete = new SafeDeleteService(
+            SafeDelete = EditingComposition.CreateSafeDelete(
                 Selection,
                 CableVertexEdit,
                 ExcluirElemento,
                 Hover,
                 TerminalSnap,
                 SceneQueries);
-            Clipboard = new ClipboardService(
+            Clipboard = EditingComposition.CreateClipboard(
                 CopiarElementos,
                 ColarElementos,
                 Selection,
                 () => Viewport,
                 SceneQueries,
                 CableVertexEdit);
-            var projectSerializer = new ProjectSerializer(Elements, TerminalLayout, Geometry);
-            var projectRepository = new FileSystemProjectRepository();
-            var projectFileDialogs = new ProjectFileDialogService();
-            Projects = new ProjectPersistenceService(
+            Projects = PersistenceComposition.CreateProjects(
                 Document,
                 Commands,
-                projectSerializer,
-                projectRepository,
-                projectFileDialogs,
+                Elements,
+                TerminalLayout,
+                Geometry,
                 Dialogs,
                 LimparEstadoTransitorioProjeto);
-            MoveHud = new MoveHudService(() => Viewport);
-            AlignmentGuides = new AlignmentGuideService(() => Scene.Elementos);
-            MoveConstraints = new MoveConstraintService(Settings);
-            MoverElemento = new MoverElementoUseCase(Commands, VisualUpdates.AtualizarElementoMovido);
-            RotacionarElemento = new RotacionarElementoUseCase(Commands);
-            RedimensionarBarra = new RedimensionarBarraUseCase(Commands, GeometryUpdates);
-            Move = new MoveService(
+
+            var moveServices = EditingComposition.CreateMoveServices(
+                () => Viewport,
+                () => Scene.Elementos,
+                Settings,
                 Connectivity,
                 TerminalLayout,
-                () => Viewport,
                 SceneQueries,
-                MoverElemento);
-            BarraResize = new BarraResizeService(
+                VisualUpdates,
                 Selection,
                 GeometryUpdates,
-                RedimensionarBarra);
-            Rotation = new RotationService(
-                Selection,
-                Connectivity,
-                () => Viewport,
-                VisualUpdates,
-                RotacionarElemento);
+                Commands);
+            MoveHud = moveServices.MoveHud;
+            AlignmentGuides = moveServices.AlignmentGuides;
+            MoveConstraints = moveServices.MoveConstraints;
+            MoverElemento = moveServices.MoverElemento;
+            RotacionarElemento = moveServices.RotacionarElemento;
+            RedimensionarBarra = moveServices.RedimensionarBarra;
+            Move = moveServices.Move;
+            BarraResize = moveServices.BarraResize;
+            Rotation = moveServices.Rotation;
+
             Tools = new ToolService(
                 Elements,
                 CriarSelecionarTool,
@@ -132,7 +133,7 @@ namespace Araci.Services
                 () => new DeletarTool(SafeDelete),
                 CriarInserirCaboTool,
                 CriarInserirElementoGenericoTool);
-            Input = new InputRouter(
+            Input = EditingComposition.CreateInput(
                 Tools,
                 Commands,
                 SafeDelete,
@@ -141,12 +142,12 @@ namespace Araci.Services
                 Hover,
                 Clipboard.CopiarSelecionados,
                 Clipboard.Colar);
-            Navigation = new ViewportNavigationService(() => Viewport);
+            Navigation = ViewportComposition.CreateNavigation(() => Viewport);
         }
 
         public IEventBus Events { get; }
         public AraciDocument Document { get; } = new AraciDocument();
-        public Scene Scene { get; }
+        public CoreScene Scene { get; }
         public ISceneQueryService SceneQueries { get; }
         public HoverService Hover { get; }
         public ToolService Tools { get; }
@@ -156,7 +157,7 @@ namespace Araci.Services
 
         public ViewportViewModel CriarViewportViewModel()
         {
-            return new ViewportViewModel(
+            return ViewportComposition.CreateViewModel(
                 Document,
                 Scene,
                 SelectionBox,
@@ -164,10 +165,10 @@ namespace Araci.Services
                 CableVertexEdit,
                 MoveHud,
                 AlignmentGuides,
+                ElementoFactory,
                 Selection,
                 Hover,
-                SceneQueries,
-                ElementoFactory);
+                SceneQueries);
         }
 
         public void InicializarViewport(ViewportViewModel viewportViewModel)
