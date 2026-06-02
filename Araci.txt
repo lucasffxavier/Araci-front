@@ -237,6 +237,8 @@ Araci Engine
 │   ├── TransformadorPropertiesView.xaml.cs
 │   ├── TypePropertiesWindow.xaml
 │   ├── TypePropertiesWindow.xaml.cs
+│   ├── UnitsWindow.xaml
+│   ├── UnitsWindow.xaml.cs
 │   └── UnitValueConverter.cs
 ├── Resources
 │   ├── Icons
@@ -388,6 +390,7 @@ Araci Engine
 │   ├── TipoSinViewModel.cs
 │   ├── TipoTransformadorViewModel.cs
 │   ├── TransformadorViewModel.cs
+│   ├── UnitsSettingsViewModel.cs
 │   └── ViewportViewModel.cs
 ├── Views
 │   ├── ViewportView.xaml
@@ -414,6 +417,148 @@ Araci Engine
 
 
 ====================================================================================================
+ARQUIVO: C:\Araci-Engine-Front\Araci Engine\Applications\Projects\ProjectPersistenceService.cs
+====================================================================================================
+
+using System;
+using System.IO;
+using System.Text.Json;
+using Araci.Applications.Abstractions;
+using Araci.Core.Documents;
+using Araci.Infrastructure.Persistence;
+using Araci.Models;
+using Araci.Services;
+
+namespace Araci.Applications.Projects
+{
+    public class ProjectPersistenceService : IProjectPersistenceService
+    {
+        private readonly AraciDocument _document;
+        private readonly ICommandHistory _commands;
+        private readonly ProjectSerializer _serializer;
+        private readonly IProjectRepository _repository;
+        private readonly IProjectFileDialogService _fileDialogs;
+        private readonly IUserDialogService _dialogs;
+        private readonly Action _limparEstadoTransitorio;
+        private ProjectMetadataDto _metadata = ProjectMetadataDto.CreateNew(ProjectSerializer.UntitledProjectName);
+        private string? _currentPath;
+
+        public ProjectPersistenceService(
+            AraciDocument document,
+            ICommandHistory commands,
+            ProjectSerializer serializer,
+            IProjectRepository repository,
+            IProjectFileDialogService fileDialogs,
+            IUserDialogService dialogs,
+            Action limparEstadoTransitorio)
+        {
+            _document = document ?? throw new ArgumentNullException(nameof(document));
+            _commands = commands ?? throw new ArgumentNullException(nameof(commands));
+            _serializer = serializer ?? throw new ArgumentNullException(nameof(serializer));
+            _repository = repository ?? throw new ArgumentNullException(nameof(repository));
+            _fileDialogs = fileDialogs ?? throw new ArgumentNullException(nameof(fileDialogs));
+            _dialogs = dialogs ?? throw new ArgumentNullException(nameof(dialogs));
+            _limparEstadoTransitorio = limparEstadoTransitorio ?? throw new ArgumentNullException(nameof(limparEstadoTransitorio));
+        }
+
+        public void Novo()
+        {
+            _document.Limpar();
+            _limparEstadoTransitorio();
+            _commands.Clear();
+            _currentPath = null;
+            _metadata = ProjectMetadataDto.CreateNew(ProjectSerializer.UntitledProjectName);
+        }
+
+        public void SalvarComDialogo()
+        {
+            string? path = _fileDialogs.ShowSaveDialog();
+
+            if (path != null)
+                Salvar(path);
+        }
+
+        public void AbrirComDialogo()
+        {
+            string? path = _fileDialogs.ShowOpenDialog();
+
+            if (path != null)
+                Abrir(path);
+        }
+
+        public void Salvar(string path)
+        {
+            try
+            {
+                DateTimeOffset savedAt = DateTimeOffset.UtcNow;
+                ProjectMetadataDto metadata = _serializer.PrepareMetadataForSave(_metadata, path, savedAt);
+                ProjectFileDto dto = _serializer.CreateFileDto(_document, metadata);
+                string json = _serializer.Serialize(dto);
+
+                _repository.WriteAllText(path, json);
+
+                _currentPath = path;
+                _metadata = metadata;
+            }
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or JsonException or NotSupportedException or ArgumentException)
+            {
+                _dialogs.ShowError(
+                    "Salvar projeto",
+                    $"Nao foi possivel salvar o projeto.{Environment.NewLine}{ex.Message}");
+            }
+        }
+
+        public void Abrir(string path)
+        {
+            try
+            {
+                string json = _repository.ReadAllText(path);
+                ProjectFileDto dto = _serializer.Deserialize(json);
+                int version = _serializer.GetVersion(dto);
+
+                if (version > ProjectSerializer.CurrentVersion)
+                {
+                    _dialogs.ShowWarning(
+                        "Abrir projeto",
+                        $"Este projeto foi salvo em uma versao futura ({version}). " +
+                        "O Araci tentara abrir de forma conservadora.");
+                }
+
+                var elementos = _serializer.CreateElements(dto);
+
+                _document.Limpar();
+
+                foreach (Elemento elemento in elementos)
+                    _document.AdicionarElemento(elemento);
+
+                _metadata = _serializer.CreateMetadataFromFile(dto, path);
+                _currentPath = path;
+
+                _limparEstadoTransitorio();
+                _commands.Clear();
+            }
+            catch (JsonException ex)
+            {
+                MostrarErroAbrir(ex);
+            }
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or InvalidOperationException or NotSupportedException or ArgumentException)
+            {
+                MostrarErroAbrir(ex);
+            }
+        }
+
+        private void MostrarErroAbrir(Exception ex)
+        {
+            _dialogs.ShowError(
+                "Abrir projeto",
+                $"Nao foi possivel abrir o projeto. O projeto atual foi mantido.{Environment.NewLine}{ex.Message}");
+        }
+    }
+}
+
+
+
+====================================================================================================
 ARQUIVO: C:\Araci-Engine-Front\Araci Engine\Araci.TechnicalChecks\Program.cs
 ====================================================================================================
 
@@ -435,6 +580,7 @@ using Araci.Core.Rendering;
 using Araci.DTOs;
 using Araci.Models;
 using Araci.Models.Tipos;
+using Araci.Properties;
 using Araci.Services;
 using Araci.ViewModels;
 using Araci.Services.Topology;
@@ -531,6 +677,11 @@ namespace Araci.TechnicalChecks
                 ("PropertiesViewModel exibe tensao em V", PropertiesViewModelExibeTensaoEmVolt),
                 ("PropertiesViewModel edita tensao em V e salva kV", PropertiesViewModelEditaTensaoEmVoltESalvaKv),
                 ("PropertiesViewModel edita comprimento em km e salva m", PropertiesViewModelEditaComprimentoEmKmESalvaMetro),
+                ("UnitsSettingsViewModel copia defaults", UnitsSettingsViewModelCopiaDefaults),
+                ("UnitsSettingsViewModel ApplyTo altera settings", UnitsSettingsViewModelApplyToAlteraSettings),
+                ("UnitsSettingsViewModel aplica tensao V", UnitsSettingsViewModelAplicaTensaoVolt),
+                ("UnitValueConverter usa settings em runtime", UnitValueConverterUsaSettingsEmRuntime),
+                ("UnitValueConverter converte edicao para unidade base", UnitValueConverterConverteEdicaoParaUnidadeBase),
                 ("DocumentSceneSync cria ViewModel ao adicionar elemento", DocumentSceneSyncCriaViewModelAoAdicionarElemento),
                 ("DocumentSceneSync remove ViewModel ao remover elemento", DocumentSceneSyncRemoveViewModelAoRemoverElemento),
                 ("DocumentSceneSync limpa Scene ao limpar Document", DocumentSceneSyncLimpaSceneAoLimparDocument),
@@ -2184,6 +2335,82 @@ namespace Araci.TechnicalChecks
             propriedade.Valor = "2 km";
 
             AssertEqual(2000.0, barra.Altura, "Altura apos edicao em km");
+        }
+
+        private static void UnitsSettingsViewModelCopiaDefaults()
+        {
+            var settings = new UnitDisplaySettings();
+            var viewModel = new UnitsSettingsViewModel(settings);
+
+            AssertEqual(UnitKind.LengthMeter, viewModel.Length, "Length default");
+            AssertEqual(UnitKind.VoltageKV, viewModel.Voltage, "Voltage default");
+            AssertEqual(UnitKind.CurrentAmpere, viewModel.Current, "Current default");
+            AssertEqual(UnitKind.ActivePowerKW, viewModel.ActivePower, "ActivePower default");
+            AssertEqual(UnitKind.ReactivePowerKVAr, viewModel.ReactivePower, "ReactivePower default");
+            AssertEqual(UnitKind.ApparentPowerKVA, viewModel.ApparentPower, "ApparentPower default");
+            AssertEqual(UnitKind.Percent, viewModel.Percent, "Percent default");
+        }
+
+        private static void UnitsSettingsViewModelApplyToAlteraSettings()
+        {
+            var settings = new UnitDisplaySettings();
+            var viewModel = new UnitsSettingsViewModel(settings)
+            {
+                Length = UnitKind.LengthKilometer,
+                ActivePower = UnitKind.ActivePowerMW,
+                ReactivePower = UnitKind.ReactivePowerMVAr,
+                ApparentPower = UnitKind.ApparentPowerMVA
+            };
+
+            viewModel.ApplyTo(settings);
+
+            AssertEqual(UnitKind.LengthKilometer, settings.Length, "Length aplicado");
+            AssertEqual(UnitKind.ActivePowerMW, settings.ActivePower, "ActivePower aplicado");
+            AssertEqual(UnitKind.ReactivePowerMVAr, settings.ReactivePower, "ReactivePower aplicado");
+            AssertEqual(UnitKind.ApparentPowerMVA, settings.ApparentPower, "ApparentPower aplicado");
+        }
+
+        private static void UnitsSettingsViewModelAplicaTensaoVolt()
+        {
+            var settings = new UnitDisplaySettings();
+            var viewModel = new UnitsSettingsViewModel(settings)
+            {
+                Voltage = UnitKind.VoltageVolt
+            };
+
+            viewModel.ApplyTo(settings);
+
+            AssertEqual(UnitKind.VoltageVolt, settings.Voltage, "Voltage aplicado em V");
+        }
+
+        private static void UnitValueConverterUsaSettingsEmRuntime()
+        {
+            UnitValueConverter.CurrentUnits = new UnitDisplaySettings
+            {
+                Voltage = UnitKind.VoltageVolt
+            };
+
+            var converter = new UnitValueConverter();
+            string text = converter.Convert(13.8, typeof(string), "VoltageKV", System.Globalization.CultureInfo.CurrentCulture)?.ToString() ?? string.Empty;
+
+            Assert(text.Contains("13.800") || text.Contains("13,800"), "Converter deve exibir tensao em V.");
+            Assert(text.EndsWith(" V", StringComparison.Ordinal), "Converter deve usar simbolo V.");
+            UnitValueConverter.CurrentUnits = new UnitDisplaySettings();
+        }
+
+        private static void UnitValueConverterConverteEdicaoParaUnidadeBase()
+        {
+            UnitValueConverter.CurrentUnits = new UnitDisplaySettings
+            {
+                Voltage = UnitKind.VoltageVolt
+            };
+
+            var converter = new UnitValueConverter();
+            object? value = converter.ConvertBack("13800 V", typeof(double), "VoltageKV", System.Globalization.CultureInfo.CurrentCulture);
+
+            Assert(value is double, "ConvertBack deve retornar double.");
+            AssertEqual(13.8, (double)value!, "ConvertBack deve salvar kV.");
+            UnitValueConverter.CurrentUnits = new UnitDisplaySettings();
         }
 
         private static void DocumentSceneSyncCriaViewModelAoAdicionarElemento()
@@ -4193,48 +4420,382 @@ namespace Araci.TechnicalChecks
 
 
 ====================================================================================================
-ARQUIVO: C:\Araci-Engine-Front\Araci Engine\MainWindow.xaml
+ARQUIVO: C:\Araci-Engine-Front\Araci Engine\Core\Documents\AraciDocument.cs
 ====================================================================================================
 
-﻿<Window x:Class="Araci.MainWindow"
-        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
-        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-        xmlns:views="clr-namespace:Araci.Views"
-        xmlns:ribbon="clr-namespace:Araci.Ribbon"
-        xmlns:properties="clr-namespace:Araci.Properties"
-        xmlns:tabs="clr-namespace:Araci.Ribbon.Tabs"
-        Title="ARACI ENGINE"
-        Width="1400"
-        Height="900"
-        WindowStartupLocation="CenterScreen"
-        Background="#D0D0D0">
-    <Grid>
-        <DockPanel>
-            <ribbon:RibbonView x:Name="Ribbon"
-                               DockPanel.Dock="Top"
-                               Height="130"/>
-            <Grid>
-                <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="*"/>
-                    <ColumnDefinition x:Name="PropertiesColumn" Width="320"/>
-                </Grid.ColumnDefinitions>
-                <views:ViewportView x:Name="Viewport"
-                                    Grid.Column="0"
-                                    Margin="10"/>
-                <properties:PropertiesHostView x:Name="PropertiesHost"
-                                               Grid.Column="1"
-                                               CloseRequested="OnPropertiesCloseRequested"/>
-            </Grid>
-        </DockPanel>
-        <Popup x:Name="ArquivoPopup"
-               Placement="Bottom"
-               AllowsTransparency="True"
-               StaysOpen="False"
-               PopupAnimation="Fade">
-            <tabs:ArquivoMenuView x:Name="ArquivoMenu"/>
-        </Popup>
-    </Grid>
-</Window>
+using System.Collections.ObjectModel;
+using Araci.Models;
+
+namespace Araci.Core.Documents
+{
+    public class AraciDocument
+    {
+        public AraciDocument()
+        {
+            Elementos = new ObservableCollection<Elemento>();
+        }
+
+        public ObservableCollection<Elemento> Elementos { get; }
+
+        public void AdicionarElemento(Elemento elemento)
+        {
+            if (Elementos.Contains(elemento))
+                return;
+
+            Elementos.Add(elemento);
+        }
+
+        public void RemoverElemento(Elemento elemento)
+        {
+            if (!Elementos.Contains(elemento))
+                return;
+
+            Elementos.Remove(elemento);
+        }
+
+        public void Limpar()
+        {
+            Elementos.Clear();
+        }
+    }
+}
+
+
+
+====================================================================================================
+ARQUIVO: C:\Araci-Engine-Front\Araci Engine\Infrastructure\Persistence\ProjectSerializer.cs
+====================================================================================================
+
+using System;
+using System.Collections.Generic;
+using System.IO;
+using System.Linq;
+using System.Text.Json;
+using System.Text.Json.Serialization;
+using System.Windows;
+using Araci.Applications.Abstractions;
+using Araci.Core.Documents;
+using Araci.Models;
+using Araci.Models.Tipos;
+using Araci.Services;
+using Araci.Services.Geometry;
+using Araci.Services.Catalog;
+
+namespace Araci.Infrastructure.Persistence
+{
+    public sealed class ProjectSerializer
+    {
+        public const int CurrentVersion = 1;
+        public const string AppName = "Araci Engine";
+        public const string UntitledProjectName = "Sem titulo";
+
+        private readonly ElementRegistryService _elements;
+        private readonly IElementModelFactory _modelFactory;
+        private readonly TerminalLayoutService _terminalLayout;
+        private readonly ElementGeometryService _geometry;
+        private readonly JsonSerializerOptions _jsonOptions = new()
+        {
+            WriteIndented = true,
+            DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull
+        };
+
+        public ProjectSerializer(
+            ElementRegistryService elements,
+            IElementModelFactory modelFactory,
+            TerminalLayoutService terminalLayout,
+            ElementGeometryService geometry)
+        {
+            _elements = elements ?? throw new ArgumentNullException(nameof(elements));
+            _modelFactory = modelFactory ?? throw new ArgumentNullException(nameof(modelFactory));
+            _terminalLayout = terminalLayout ?? throw new ArgumentNullException(nameof(terminalLayout));
+            _geometry = geometry ?? throw new ArgumentNullException(nameof(geometry));
+        }
+
+        public ProjectFileDto CreateFileDto(
+            AraciDocument document,
+            ProjectMetadataDto metadata)
+        {
+            ArgumentNullException.ThrowIfNull(document);
+            ArgumentNullException.ThrowIfNull(metadata);
+
+            return new ProjectFileDto
+            {
+                Version = CurrentVersion,
+                AppName = metadata.AppName,
+                ProjectName = metadata.ProjectName,
+                CreatedAt = metadata.CreatedAt,
+                SavedAt = metadata.SavedAt,
+                Generator = metadata.Generator,
+                Notes = metadata.Notes,
+                Elements = document.Elementos
+                    .Select(CriarElementoDto)
+                    .ToList()
+            };
+        }
+
+        public IReadOnlyList<Elemento> CreateElements(ProjectFileDto dto)
+        {
+            ArgumentNullException.ThrowIfNull(dto);
+
+            return dto.Elements
+                .Select(CriarElemento)
+                .Where(e => e != null)
+                .Cast<Elemento>()
+                .ToList();
+        }
+
+        public string Serialize(ProjectFileDto dto)
+        {
+            return JsonSerializer.Serialize(dto, _jsonOptions);
+        }
+
+        public ProjectFileDto Deserialize(string json)
+        {
+            return JsonSerializer.Deserialize<ProjectFileDto>(json, _jsonOptions)
+                ?? new ProjectFileDto();
+        }
+
+        public ProjectMetadataDto PrepareMetadataForSave(
+            ProjectMetadataDto currentMetadata,
+            string path,
+            DateTimeOffset savedAt)
+        {
+            ArgumentNullException.ThrowIfNull(currentMetadata);
+
+            string projectName = NomeProjetoParaSalvar(currentMetadata, path);
+
+            return new ProjectMetadataDto
+            {
+                AppName = AppName,
+                ProjectName = projectName,
+                CreatedAt = currentMetadata.CreatedAt ?? savedAt,
+                SavedAt = savedAt,
+                Generator = AppName,
+                Notes = currentMetadata.Notes
+            };
+        }
+
+        public ProjectMetadataDto CreateMetadataFromFile(ProjectFileDto dto, string path)
+        {
+            DateTimeOffset now = DateTimeOffset.UtcNow;
+            string projectName = string.IsNullOrWhiteSpace(dto.ProjectName)
+                ? Path.GetFileNameWithoutExtension(path)
+                : dto.ProjectName;
+
+            return new ProjectMetadataDto
+            {
+                AppName = string.IsNullOrWhiteSpace(dto.AppName) ? AppName : dto.AppName,
+                ProjectName = string.IsNullOrWhiteSpace(projectName) ? UntitledProjectName : projectName,
+                CreatedAt = dto.CreatedAt ?? dto.SavedAt ?? now,
+                SavedAt = dto.SavedAt ?? now,
+                Generator = string.IsNullOrWhiteSpace(dto.Generator) ? AppName : dto.Generator,
+                Notes = dto.Notes
+            };
+        }
+
+        public int GetVersion(ProjectFileDto dto)
+        {
+            return dto.Version <= 0 ? 1 : dto.Version;
+        }
+
+        private static string NomeProjetoParaSalvar(
+            ProjectMetadataDto metadata,
+            string path)
+        {
+            if (!string.IsNullOrWhiteSpace(metadata.ProjectName) &&
+                !string.Equals(metadata.ProjectName, UntitledProjectName, StringComparison.OrdinalIgnoreCase))
+            {
+                return metadata.ProjectName;
+            }
+
+            string name = Path.GetFileNameWithoutExtension(path);
+            return string.IsNullOrWhiteSpace(name) ? UntitledProjectName : name;
+        }
+
+        private ElementDto CriarElementoDto(Elemento elemento)
+        {
+            return new ElementDto
+            {
+                Kind = ObterKind(elemento),
+                DomainRole = elemento.DomainRole.ToString(),
+                Id = elemento.Id,
+                X = elemento.PosicaoX,
+                Y = elemento.PosicaoY,
+                Rotation = elemento.Rotacao,
+                Scale = elemento.Escala,
+                Type = CriarTypeRef(elemento.Tipo),
+                Parameters = elemento.Parametros.Values
+                    .Select(CriarParameterDto)
+                    .ToList(),
+                Terminals = (elemento as ITerminalOwner)?.Terminais
+                    .Select(CriarTerminalDto)
+                    .ToList() ?? new List<TerminalDto>(),
+                Vertices = elemento is Cabo cabo
+                    ? cabo.Vertices.Select(CriarPointDto).ToList()
+                    : new List<PointDto>()
+            };
+        }
+
+        private Elemento? CriarElemento(ElementDto dto)
+        {
+            Elemento? elemento = _modelFactory.CreateModel(dto.Kind);
+
+            if (elemento == null)
+                return null;
+
+            elemento.Id = dto.Id == Guid.Empty ? Guid.NewGuid() : dto.Id;
+            elemento.PosicaoX = dto.X;
+            elemento.PosicaoY = dto.Y;
+            elemento.Rotacao = dto.Rotation;
+            elemento.Escala = dto.Scale == 0 ? 1 : dto.Scale;
+            elemento.Tipo = ResolverTipo(dto.Kind, dto.Type);
+
+            AplicarParametros(elemento, dto.Parameters);
+            NormalizarParametros(elemento);
+            AplicarVertices(elemento, dto.Vertices);
+            _terminalLayout.AtualizarTerminais(elemento);
+            RestaurarTerminais(elemento, dto.Terminals);
+
+            return elemento;
+        }
+
+        private void AplicarParametros(Elemento elemento, IEnumerable<ParameterDto> parametros)
+        {
+            foreach (ParameterDto dto in parametros)
+            {
+                if (!elemento.PossuiParametro(dto.Name))
+                    continue;
+
+                Parameter parameter = elemento.Parametros[dto.Name];
+                parameter.ValorObjeto = ConverterValor(dto, parameter.Tipo);
+            }
+        }
+
+        private static void NormalizarParametros(Elemento elemento)
+        {
+            if (elemento is Barra barra)
+                barra.Altura = barra.Altura;
+        }
+
+        private static object? ConverterValor(ParameterDto dto, Type destino)
+        {
+            if (dto.Value.ValueKind is JsonValueKind.Null or JsonValueKind.Undefined)
+                return null;
+
+            if (destino == typeof(string))
+                return dto.Value.GetString() ?? string.Empty;
+
+            if (destino == typeof(int))
+                return dto.Value.GetInt32();
+
+            if (destino == typeof(double))
+                return dto.Value.GetDouble();
+
+            if (destino == typeof(bool))
+                return dto.Value.GetBoolean();
+
+            if (destino == typeof(Guid))
+                return dto.Value.GetGuid();
+
+            return dto.Value.ToString();
+        }
+
+        private void AplicarVertices(Elemento elemento, IEnumerable<PointDto> vertices)
+        {
+            if (elemento is not Cabo cabo)
+                return;
+
+            cabo.Vertices.Clear();
+
+            foreach (PointDto p in vertices)
+                cabo.Vertices.Add(new Point(p.X, p.Y));
+
+            cabo.PreviewPonto = null;
+
+            if (cabo.Vertices.Count > 0)
+                cabo.DefinirOrigem(cabo.Vertices[0]);
+
+            if (cabo.Vertices.Count > 1)
+                cabo.DefinirDestino(cabo.Vertices[^1]);
+        }
+
+        private void RestaurarTerminais(Elemento elemento, IEnumerable<TerminalDto> terminais)
+        {
+            if (elemento is not ITerminalOwner owner)
+                return;
+
+            Size tamanho = _geometry.ObterTamanho(elemento);
+
+            foreach (TerminalDto dto in terminais)
+            {
+                Terminal? terminal = owner.Terminais.FirstOrDefault(t =>
+                    string.Equals(t.Id, dto.Id, StringComparison.OrdinalIgnoreCase));
+
+                if (terminal == null)
+                    continue;
+
+                if (elemento is Cabo || tamanho.IsEmpty)
+                    terminal.DefinirPosicaoVisual(new Point(dto.X, dto.Y));
+                else
+                    terminal.DefinirPosicaoVisual(new Point(dto.X, dto.Y), tamanho.Width, tamanho.Height);
+
+                terminal.Barra = dto.Barra;
+            }
+        }
+
+        private TipoElemento? ResolverTipo(string kind, TypeRefDto? dto)
+        {
+            return _elements.ResolveType(
+                kind,
+                dto?.NomeTipo,
+                dto?.Familia,
+                dto?.Categoria);
+        }
+
+        private string ObterKind(Elemento elemento)
+        {
+            return _elements.GetKind(elemento);
+        }
+
+        private static TypeRefDto? CriarTypeRef(TipoElemento? tipo)
+        {
+            return tipo == null
+                ? null
+                : new TypeRefDto
+                {
+                    NomeTipo = tipo.NomeTipo,
+                    Familia = tipo.Familia,
+                    Categoria = tipo.Categoria
+                };
+        }
+
+        private static ParameterDto CriarParameterDto(Parameter parameter)
+        {
+            return new ParameterDto
+            {
+                Name = parameter.Nome,
+                Type = parameter.Tipo.FullName ?? parameter.Tipo.Name,
+                Value = JsonSerializer.SerializeToElement(parameter.ValorObjeto, parameter.Tipo)
+            };
+        }
+
+        private static TerminalDto CriarTerminalDto(Terminal terminal)
+        {
+            return new TerminalDto
+            {
+                Id = terminal.Id,
+                X = terminal.Posicao.X,
+                Y = terminal.Posicao.Y,
+                Barra = terminal.Barra
+            };
+        }
+
+        private static PointDto CriarPointDto(Point point)
+        {
+            return new PointDto { X = point.X, Y = point.Y };
+        }
+    }
+}
 
 
 
@@ -4242,7 +4803,9 @@ ARQUIVO: C:\Araci-Engine-Front\Araci Engine\MainWindow.xaml
 ARQUIVO: C:\Araci-Engine-Front\Araci Engine\MainWindow.xaml.cs
 ====================================================================================================
 
-﻿using Araci.Services;
+using Araci.Services;
+using Araci.Properties;
+using Araci.ViewModels;
 using System.Windows;
 using System.Windows.Controls.Primitives;
 
@@ -4257,6 +4820,7 @@ namespace Araci
         {
             InitializeComponent();
             _context = new EditorContext();
+            UnitValueConverter.CurrentUnits = _context.Settings.Units;
             Viewport.Inicializar(_context);
             InicializarRibbon();
         }
@@ -4292,6 +4856,23 @@ namespace Araci
             PropertiesHost.Visibility = Visibility.Visible;
         }
 
+        public void MostrarConfiguracaoUnidades()
+        {
+            var viewModel = new UnitsSettingsViewModel(_context.Settings.Units);
+            var window = new UnitsWindow(viewModel)
+            {
+                Owner = this
+            };
+
+            if (window.ShowDialog() == true)
+            {
+                viewModel.ApplyTo(_context.Settings.Units);
+                _context.RefreshProperties();
+            }
+
+            FocarViewport();
+        }
+
         private void OnPropertiesCloseRequested(object sender, RoutedEventArgs e)
         {
             PropertiesColumn.Width = new GridLength(0);
@@ -4302,396 +4883,138 @@ namespace Araci
 }
 
 
+
 ====================================================================================================
-ARQUIVO: C:\Araci-Engine-Front\Araci Engine\Properties\TypePropertiesWindow.xaml
+ARQUIVO: C:\Araci-Engine-Front\Araci Engine\Properties\UnitsWindow.xaml
 ====================================================================================================
 
-<Window x:Class="Araci.Properties.TypePropertiesWindow"
+<Window x:Class="Araci.Properties.UnitsWindow"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-        Title="Propriedades de Tipo"
-        Width="460"
-        Height="500"
+        Title="Unidades"
+        Width="520"
+        MinHeight="430"
+        SizeToContent="Height"
+        ResizeMode="NoResize"
         Background="#252526"
         WindowStartupLocation="CenterOwner">
+    <Window.Resources>
+        <Style x:Key="UnitLabelStyle" TargetType="TextBlock">
+            <Setter Property="Foreground" Value="#CCCCCC"/>
+            <Setter Property="VerticalAlignment" Value="Center"/>
+            <Setter Property="Margin" Value="0,0,12,10"/>
+        </Style>
+        <Style x:Key="UnitComboBoxStyle" TargetType="ComboBox">
+            <Setter Property="Margin" Value="0,0,0,10"/>
+            <Setter Property="Height" Value="26"/>
+        </Style>
+    </Window.Resources>
+    <Border Margin="10"
+            Padding="16"
+            BorderBrush="#F4F4F4"
+            BorderThickness="1"
+            Background="#252526">
+        <DockPanel LastChildFill="True">
+            <StackPanel DockPanel.Dock="Bottom"
+                        Orientation="Horizontal"
+                        HorizontalAlignment="Right"
+                        Margin="0,18,0,0">
+                <Button Content="OK"
+                        Width="90"
+                        Height="30"
+                        Margin="0,0,8,0"
+                        IsDefault="True"
+                        Click="OkButton_Click"/>
+                <Button Content="Cancelar"
+                        Width="90"
+                        Height="30"
+                        IsCancel="True"
+                        Click="CancelButton_Click"/>
+            </StackPanel>
 
-    <Border Padding="12">
+            <StackPanel>
+                <TextBlock Text="Unidades"
+                           Foreground="White"
+                           FontSize="18"
+                           FontWeight="SemiBold"
+                           TextAlignment="Center"
+                           Margin="0,0,0,18"/>
+                <TextBlock Text="Unidades do projeto"
+                           Foreground="#F4F4F4"
+                           FontSize="13"
+                           FontWeight="SemiBold"
+                           Margin="0,0,0,10"/>
 
-        <ScrollViewer VerticalScrollBarVisibility="Auto">
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="190"/>
+                        <ColumnDefinition Width="*"/>
+                    </Grid.ColumnDefinitions>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="Auto"/>
+                    </Grid.RowDefinitions>
 
-            <ContentControl Content="{Binding}"/>
+                    <TextBlock Grid.Row="0" Text="Comprimento" Style="{StaticResource UnitLabelStyle}"/>
+                    <ComboBox Grid.Row="0" Grid.Column="1" Style="{StaticResource UnitComboBoxStyle}" ItemsSource="{Binding LengthOptions}" SelectedValue="{Binding Length}" SelectedValuePath="Unit" DisplayMemberPath="Text"/>
 
-        </ScrollViewer>
+                    <TextBlock Grid.Row="1" Text="Tensão" Style="{StaticResource UnitLabelStyle}"/>
+                    <ComboBox Grid.Row="1" Grid.Column="1" Style="{StaticResource UnitComboBoxStyle}" ItemsSource="{Binding VoltageOptions}" SelectedValue="{Binding Voltage}" SelectedValuePath="Unit" DisplayMemberPath="Text"/>
 
+                    <TextBlock Grid.Row="2" Text="Corrente" Style="{StaticResource UnitLabelStyle}"/>
+                    <ComboBox Grid.Row="2" Grid.Column="1" Style="{StaticResource UnitComboBoxStyle}" ItemsSource="{Binding CurrentOptions}" SelectedValue="{Binding Current}" SelectedValuePath="Unit" DisplayMemberPath="Text"/>
+
+                    <TextBlock Grid.Row="3" Text="Potência ativa" Style="{StaticResource UnitLabelStyle}"/>
+                    <ComboBox Grid.Row="3" Grid.Column="1" Style="{StaticResource UnitComboBoxStyle}" ItemsSource="{Binding ActivePowerOptions}" SelectedValue="{Binding ActivePower}" SelectedValuePath="Unit" DisplayMemberPath="Text"/>
+
+                    <TextBlock Grid.Row="4" Text="Potência reativa" Style="{StaticResource UnitLabelStyle}"/>
+                    <ComboBox Grid.Row="4" Grid.Column="1" Style="{StaticResource UnitComboBoxStyle}" ItemsSource="{Binding ReactivePowerOptions}" SelectedValue="{Binding ReactivePower}" SelectedValuePath="Unit" DisplayMemberPath="Text"/>
+
+                    <TextBlock Grid.Row="5" Text="Potência aparente" Style="{StaticResource UnitLabelStyle}"/>
+                    <ComboBox Grid.Row="5" Grid.Column="1" Style="{StaticResource UnitComboBoxStyle}" ItemsSource="{Binding ApparentPowerOptions}" SelectedValue="{Binding ApparentPower}" SelectedValuePath="Unit" DisplayMemberPath="Text"/>
+
+                    <TextBlock Grid.Row="6" Text="Percentual" Style="{StaticResource UnitLabelStyle}"/>
+                    <ComboBox Grid.Row="6" Grid.Column="1" Style="{StaticResource UnitComboBoxStyle}" ItemsSource="{Binding PercentOptions}" SelectedValue="{Binding Percent}" SelectedValuePath="Unit" DisplayMemberPath="Text"/>
+                </Grid>
+            </StackPanel>
+        </DockPanel>
     </Border>
-
 </Window>
 
 
 
 ====================================================================================================
-ARQUIVO: C:\Araci-Engine-Front\Araci Engine\Properties\TypePropertiesWindow.xaml.cs
+ARQUIVO: C:\Araci-Engine-Front\Araci Engine\Properties\UnitsWindow.xaml.cs
 ====================================================================================================
 
-﻿using System.Windows;
+using System.Windows;
+using Araci.ViewModels;
 
 namespace Araci.Properties
 {
-    public partial class TypePropertiesWindow : Window
+    public partial class UnitsWindow : Window
     {
-        public TypePropertiesWindow()
+        public UnitsWindow(UnitsSettingsViewModel viewModel)
         {
             InitializeComponent();
+            DataContext = viewModel;
+        }
+
+        private void OkButton_Click(object sender, RoutedEventArgs e)
+        {
+            DialogResult = true;
+        }
+
+        private void CancelButton_Click(object sender, RoutedEventArgs e)
+        {
+            DialogResult = false;
         }
     }
-}
-
-
-====================================================================================================
-ARQUIVO: C:\Araci-Engine-Front\Araci Engine\Resources\Styles\MenuStyles.xaml
-====================================================================================================
-
-﻿<ResourceDictionary
-    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
-    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
-
-    <Style x:Key="MenuButton" TargetType="Button">
-
-        <Setter Property="Height" Value="36"/>
-        <Setter Property="Background" Value="Transparent"/>
-        <Setter Property="BorderThickness" Value="0"/>
-        <Setter Property="HorizontalContentAlignment" Value="Left"/>
-        <Setter Property="Padding" Value="12,0"/>
-
-        <Setter Property="Template">
-            <Setter.Value>
-                <ControlTemplate TargetType="Button">
-
-                    <Border x:Name="Bg"
-                            Background="{TemplateBinding Background}">
-
-                        <ContentPresenter VerticalAlignment="Center"/>
-
-                    </Border>
-
-                    <ControlTemplate.Triggers>
-
-                        <Trigger Property="IsMouseOver" Value="True">
-                            <Setter TargetName="Bg"
-                                    Property="Background"
-                                    Value="#E6E6E6"/>
-                        </Trigger>
-
-                        <Trigger Property="IsPressed" Value="True">
-                            <Setter TargetName="Bg"
-                                    Property="Background"
-                                    Value="#D6D6D6"/>
-                        </Trigger>
-
-                    </ControlTemplate.Triggers>
-
-                </ControlTemplate>
-            </Setter.Value>
-        </Setter>
-
-    </Style>
-
-</ResourceDictionary>
-
-
-
-====================================================================================================
-ARQUIVO: C:\Araci-Engine-Front\Araci Engine\Resources\Styles\RibbonStyles.xaml
-====================================================================================================
-
-﻿<ResourceDictionary xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
-                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
-    <Style x:Key="RibbonTileButton" TargetType="Button">
-        <Setter Property="Width" Value="120"/>
-        <Setter Property="Height" Value="120"/>
-        <Setter Property="Margin" Value="2"/>
-        <Setter Property="Padding" Value="6"/>
-        <Setter Property="Background" Value="Transparent"/>
-        <Setter Property="BorderBrush" Value="Transparent"/>
-        <Setter Property="BorderThickness" Value="1"/>
-        <Setter Property="Template">
-            <Setter.Value>
-                <ControlTemplate TargetType="Button">
-                    <Border x:Name="Border" Background="{TemplateBinding Background}" BorderBrush="{TemplateBinding BorderBrush}" BorderThickness="{TemplateBinding BorderThickness}" CornerRadius="4">
-                        <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
-                    </Border>
-                    <ControlTemplate.Triggers>
-                        <Trigger Property="IsMouseOver" Value="True">
-                            <Setter TargetName="Border" Property="Background" Value="#E8E8E8"/>
-                        </Trigger>
-                        <Trigger Property="IsPressed" Value="True">
-                            <Setter TargetName="Border" Property="Background" Value="#D0D0D0"/>
-                        </Trigger>
-                    </ControlTemplate.Triggers>
-                </ControlTemplate>
-            </Setter.Value>
-        </Setter>
-    </Style>
-
-    <Style x:Key="RibbonToolButton" TargetType="Button">
-        <Setter Property="Width" Value="68"/>
-        <Setter Property="Height" Value="68"/>
-        <Setter Property="Focusable" Value="False"/>
-        <Setter Property="IsTabStop" Value="False"/>
-        <Setter Property="Background" Value="Transparent"/>
-        <Setter Property="BorderBrush" Value="Transparent"/>
-        <Setter Property="BorderThickness" Value="1"/>
-        <Setter Property="Padding" Value="2"/>
-        <Setter Property="Margin" Value="1"/>
-        <Setter Property="Template">
-            <Setter.Value>
-                <ControlTemplate TargetType="Button">
-                    <Border x:Name="Border" Background="{TemplateBinding Background}" BorderBrush="{TemplateBinding BorderBrush}" BorderThickness="{TemplateBinding BorderThickness}" CornerRadius="4">
-                        <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
-                    </Border>
-                    <ControlTemplate.Triggers>
-                        <Trigger Property="IsMouseOver" Value="True">
-                            <Setter TargetName="Border" Property="Background" Value="#E8E8E8"/>
-                        </Trigger>
-                        <Trigger Property="IsPressed" Value="True">
-                            <Setter TargetName="Border" Property="Background" Value="#D0D0D0"/>
-                        </Trigger>
-                        <Trigger Property="IsEnabled" Value="False">
-                            <Setter Property="Opacity" Value="0.45"/>
-                        </Trigger>
-                    </ControlTemplate.Triggers>
-                </ControlTemplate>
-            </Setter.Value>
-        </Setter>
-    </Style>
-</ResourceDictionary>
-
-
-
-====================================================================================================
-ARQUIVO: C:\Araci-Engine-Front\Araci Engine\Ribbon\Tabs\GerenciarTab.xaml
-====================================================================================================
-
-﻿<UserControl x:Class="Araci.Ribbon.Tabs.GerenciarTab"
-             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
-             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-             xmlns:svgc="http://sharpvectors.codeplex.com/svgc/"
-             Background="#F4F4F4"
-             Height="100">
-    <Grid Margin="3">
-        <StackPanel Orientation="Horizontal">
-            <Border Background="#F4F4F4"
-                    BorderBrush="#D0D0D0"
-                    BorderThickness="1"
-                    Padding="3">
-                <DockPanel>
-                    <TextBlock Text="Sistema"
-                               DockPanel.Dock="Bottom"
-                               HorizontalAlignment="Center"
-                               FontSize="11"
-                               FontWeight="SemiBold"
-                               Margin="0,2,0,0"/>
-                    <WrapPanel>
-                        <Button Width="68" Height="68" Background="Transparent" BorderThickness="0">
-                            <StackPanel HorizontalAlignment="Center">
-                                <svgc:SvgViewbox Source="pack://application:,,,/Resources/Icons/configuracoes.svg" Width="32" Height="32"/>
-                                <TextBlock Text="Config" Width="68" TextAlignment="Center" FontSize="11" Foreground="Black" Margin="0,1,0,0" TextWrapping="Wrap"/>
-                            </StackPanel>
-                        </Button>
-                        <Button Width="68" Height="68" Background="Transparent" BorderThickness="0">
-                            <StackPanel HorizontalAlignment="Center">
-                                <svgc:SvgViewbox Source="pack://application:,,,/Resources/Icons/biblioteca.svg" Width="32" Height="32"/>
-                                <TextBlock Text="Biblioteca" Width="68" TextAlignment="Center" FontSize="11" Foreground="Black" Margin="0,1,0,0" TextWrapping="Wrap"/>
-                            </StackPanel>
-                        </Button>
-                        <Button Width="68" Height="68" Background="Transparent" BorderThickness="0" Click="PropriedadesButton_Click">
-                            <StackPanel HorizontalAlignment="Center">
-                                <svgc:SvgViewbox Source="pack://application:,,,/Resources/Icons/propriedades.svg" Width="32" Height="32"/>
-                                <TextBlock Text="Propriedades" Width="68" TextAlignment="Center" FontSize="11" Foreground="Black" Margin="0,1,0,0" TextWrapping="Wrap"/>
-                            </StackPanel>
-                        </Button>
-                    </WrapPanel>
-                </DockPanel>
-            </Border>
-        </StackPanel>
-    </Grid>
-</UserControl>
-
-
-
-====================================================================================================
-ARQUIVO: C:\Araci-Engine-Front\Araci Engine\Ribbon\Tabs\GerenciarTab.xaml.cs
-====================================================================================================
-
-﻿using System.Windows;
-using System.Windows.Controls;
-
-namespace Araci.Ribbon.Tabs
-{
-    public partial class GerenciarTab : UserControl
-    {
-        public GerenciarTab()
-        {
-            InitializeComponent();
-        }
-
-        private void PropriedadesButton_Click(object sender, RoutedEventArgs e)
-        {
-            if (Window.GetWindow(this) is MainWindow mainWindow)
-                mainWindow.MostrarPropriedades();
-        }
-    }
-}
-
-
-====================================================================================================
-ARQUIVO: C:\Araci-Engine-Front\Araci Engine\Service\Composition\EditingComposition.cs
-====================================================================================================
-
-using System;
-using System.Collections.Generic;
-using Araci.Applications.Abstractions;
-using Araci.Applications.Editor;
-using Araci.Applications.Editar.Selecionar;
-using Araci.Applications.UseCases.Editar;
-using Araci.Core.Commands;
-using Araci.Core.Documents;
-using Araci.Core.Events;
-using Araci.Core.SceneQueries;
-using Araci.Models;
-using Araci.ViewModels;
-using Araci.Services.Geometry;
-using Araci.Services.Topology;
-using Araci.Services.Editing;
-using Araci.Services.Viewport;
-using Araci.Services.Settings;
-using Araci.Services.Interaction;
-
-namespace Araci.Services.Composition
-{
-    internal static class EditingComposition
-    {
-        public static VisualUpdateService CreateVisualUpdates(
-            Func<ViewportService?> viewportProvider,
-            TerminalLayoutService terminalLayout,
-            ConnectivityService connectivity,
-            ISceneQueryService sceneQueries,
-            TerminalSnapState terminalSnap,
-            Action refreshCableVertexEdit)
-        {
-            return new VisualUpdateService(
-                viewportProvider,
-                terminalLayout,
-                connectivity,
-                sceneQueries,
-                terminalSnap,
-                refreshCableVertexEdit);
-        }
-
-        public static SelectionService CreateSelection(
-            EditorState editor,
-            IEventBus events,
-            EditarPropriedadesUseCase editarPropriedades,
-            EditorSettings settings)
-        {
-            return new SelectionService(editor, events, editarPropriedades, settings);
-        }
-
-        public static CableVertexEditService CreateCableVertexEdit(
-            SelectionService selection,
-            ISceneQueryService sceneQueries,
-            VisualUpdateService visualUpdates,
-            EditarVerticesCaboUseCase editarVerticesCabo)
-        {
-            return new CableVertexEditService(selection, sceneQueries, visualUpdates, editarVerticesCabo);
-        }
-
-        public static SafeDeleteService CreateSafeDelete(
-            SelectionService selection,
-            CableVertexEditService cableVertexEdit,
-            ExcluirElementoUseCase excluirElemento,
-            HoverService hover,
-            TerminalSnapState terminalSnap,
-            ISceneQueryService sceneQueries)
-        {
-            return new SafeDeleteService(selection, cableVertexEdit, excluirElemento, hover, terminalSnap, sceneQueries);
-        }
-
-        public static ClipboardService CreateClipboard(
-            CopiarElementosUseCase copiarElementos,
-            ColarElementosUseCase colarElementos,
-            SelectionService selection,
-            Func<ViewportService?> viewportProvider,
-            ISceneQueryService sceneQueries,
-            CableVertexEditService cableVertexEdit)
-        {
-            return new ClipboardService(
-                copiarElementos,
-                colarElementos,
-                selection,
-                viewportProvider,
-                sceneQueries,
-                cableVertexEdit);
-        }
-
-        public static MoveServices CreateMoveServices(
-            Func<ViewportService?> viewportProvider,
-            Func<IEnumerable<ElementoViewModel>> sceneElementsProvider,
-            EditorSettings settings,
-            ConnectivityService connectivity,
-            TerminalLayoutService terminalLayout,
-            ISceneQueryService sceneQueries,
-            VisualUpdateService visualUpdates,
-            SelectionService selection,
-            ElementGeometryUpdateService geometryUpdates,
-            CommandManager commands)
-        {
-            var moveHud = new MoveHudService(viewportProvider);
-            var alignmentGuides = new AlignmentGuideService(sceneElementsProvider);
-            var moveConstraints = new MoveConstraintService(settings);
-            var moverElemento = new MoverElementoUseCase(commands, visualUpdates.AtualizarElementoMovido);
-            var rotacionarElemento = new RotacionarElementoUseCase(commands);
-            var redimensionarBarra = new RedimensionarBarraUseCase(commands, geometryUpdates);
-            var move = new MoveService(connectivity, terminalLayout, viewportProvider, sceneQueries, moverElemento);
-            var barraResize = new BarraResizeService(selection, geometryUpdates, redimensionarBarra);
-            var rotation = new RotationService(selection, connectivity, viewportProvider, visualUpdates, rotacionarElemento);
-
-            return new MoveServices(
-                moveHud,
-                alignmentGuides,
-                moveConstraints,
-                moverElemento,
-                rotacionarElemento,
-                redimensionarBarra,
-                move,
-                barraResize,
-                rotation);
-        }
-
-        public static InputRouter CreateInput(
-            ToolService tools,
-            CommandManager commands,
-            ISafeDeleteService safeDelete,
-            ISelectionService selection,
-            IElementCatalog elements,
-            IHoverService hover,
-            Action copySelected,
-            Action paste)
-        {
-            return new InputRouter(tools, commands, safeDelete, selection, elements, hover, copySelected, paste);
-        }
-    }
-
-    internal sealed record MoveServices(
-        MoveHudService MoveHud,
-        AlignmentGuideService AlignmentGuides,
-        MoveConstraintService MoveConstraints,
-        MoverElementoUseCase MoverElemento,
-        RotacionarElementoUseCase RotacionarElemento,
-        RedimensionarBarraUseCase RedimensionarBarra,
-        MoveService Move,
-        BarraResizeService BarraResize,
-        RotationService Rotation);
 }
 
 
@@ -4777,112 +5100,45 @@ namespace Araci.Services.Composition
 
 
 ====================================================================================================
-ARQUIVO: C:\Araci-Engine-Front\Araci Engine\Service\Editing\SelectionService.cs
+ARQUIVO: C:\Araci-Engine-Front\Araci Engine\Service\Composition\PersistenceComposition.cs
 ====================================================================================================
 
 using System;
-using System.Collections.Generic;
-using System.Collections.ObjectModel;
-using System.Linq;
 using Araci.Applications.Abstractions;
-using Araci.Applications.UseCases.Editar;
-using Araci.Core.Events;
-using Araci.Services.Settings;
-using Araci.ViewModels;
+using Araci.Applications.Projects;
+using Araci.Core.Commands;
+using Araci.Core.Documents;
+using Araci.Infrastructure.Persistence;
+using Araci.Services.Geometry;
+using Araci.Services.UI;
+using Araci.Services.Catalog;
 
-namespace Araci.Services.Editing
+namespace Araci.Services.Composition
 {
-    public class SelectionService : ISelectionService
+    internal static class PersistenceComposition
     {
-        private readonly EditorState _editorState;
-        private readonly IEventBus _events;
-        private readonly EditarPropriedadesUseCase _editarPropriedades;
-        private readonly EditorSettings _settings;
-        private readonly ObservableCollection<ElementoViewModel> _selecionados = new();
-
-        public SelectionService(
-            EditorState editorState,
-            IEventBus events,
-            EditarPropriedadesUseCase editarPropriedades,
-            EditorSettings? settings = null)
+        public static ProjectPersistenceService CreateProjects(
+            AraciDocument document,
+            CommandManager commands,
+            ElementRegistryService elements,
+            IElementModelFactory modelFactory,
+            TerminalLayoutService terminalLayout,
+            ElementGeometryService geometry,
+            DialogService dialogs,
+            Action clearTransientState)
         {
-            _editorState = editorState ?? throw new ArgumentNullException(nameof(editorState));
-            _events = events ?? throw new ArgumentNullException(nameof(events));
-            _editarPropriedades = editarPropriedades ?? throw new ArgumentNullException(nameof(editarPropriedades));
-            _settings = settings ?? new EditorSettings();
-        }
+            var serializer = new ProjectSerializer(elements, modelFactory, terminalLayout, geometry);
+            var repository = new FileSystemProjectRepository();
+            var fileDialogs = new ProjectFileDialogService();
 
-        public IReadOnlyList<ElementoViewModel> Selecionados => _selecionados;
-        public ObservableCollection<ElementoViewModel> SelecionadosObservable => _selecionados;
-        public bool TemSelecionados => _selecionados.Count > 0;
-        public event Action? SelectionChanged;
-
-        public void Selecionar(ElementoViewModel vm, bool adicionarAoExistente = false)
-        {
-            if (!adicionarAoExistente)
-                Limpar();
-
-            if (_selecionados.Contains(vm))
-            {
-                AtualizarElementoSelecionado();
-                return;
-            }
-
-            vm.IsSelecionado = true;
-            _selecionados.Add(vm);
-            AtualizarElementoSelecionado();
-            PublicarAlteracao();
-        }
-
-        public void Toggle(ElementoViewModel vm)
-        {
-            if (_selecionados.Contains(vm))
-            {
-                Deselecionar(vm);
-                return;
-            }
-
-            Selecionar(vm, true);
-        }
-
-        public void Deselecionar(ElementoViewModel vm)
-        {
-            if (!_selecionados.Contains(vm))
-                return;
-
-            vm.IsSelecionado = false;
-            _selecionados.Remove(vm);
-            AtualizarElementoSelecionado();
-            PublicarAlteracao();
-        }
-
-        public void Limpar()
-        {
-            if (_selecionados.Count == 0)
-                return;
-
-            foreach (var vm in _selecionados)
-                vm.IsSelecionado = false;
-
-            _selecionados.Clear();
-            AtualizarElementoSelecionado();
-            PublicarAlteracao();
-        }
-
-        private void AtualizarElementoSelecionado()
-        {
-            _editorState.ElementoSelecionado = _selecionados.Count switch
-            {
-                0 => null,
-                1 => _selecionados[0],
-                _ => new PropertiesViewModel(_selecionados, _editarPropriedades, _settings)
-            };
-        }
-
-        private void PublicarAlteracao()
-        {
-            _events.Publish(new SelecaoAlteradaEvent(_selecionados.ToList()));
-            SelectionChanged?.Invoke();
+            return new ProjectPersistenceService(
+                document,
+                commands,
+                serializer,
+                repository,
+                fileDialogs,
+                dialogs,
+                clearTransientState);
         }
     }
 }
@@ -5088,6 +5344,11 @@ namespace Araci.Services
         public void InicializarViewport(ViewportViewModel viewportViewModel)
         {
             Viewport = new ViewportService(viewportViewModel);
+        }
+
+        public void RefreshProperties()
+        {
+            Selection.RefreshProperties();
         }
 
         public EditorState Editor { get; } = new EditorState();
@@ -5526,720 +5787,82 @@ namespace Araci.Services.Settings
 
 
 ====================================================================================================
-ARQUIVO: C:\Araci-Engine-Front\Araci Engine\Service\UI\DialogService.cs
-====================================================================================================
-
-using Araci.Applications.Abstractions;
-using Araci.Services.Simulation;
-using System.Windows;
-
-namespace Araci.Services.UI
-{
-    public class DialogService : IUserDialogService
-    {
-        public void ShowInfo(string title, string message)
-        {
-            Show(title, message, MessageBoxImage.Information);
-        }
-
-        public void ShowWarning(string title, string message)
-        {
-            Show(title, message, MessageBoxImage.Warning);
-        }
-
-        public void ShowError(string title, string message)
-        {
-            Show(title, message, MessageBoxImage.Error);
-        }
-
-        public bool Confirm(string title, string message)
-        {
-            MessageBoxResult result = MessageBox.Show(
-                message,
-                title,
-                MessageBoxButton.YesNo,
-                MessageBoxImage.Question);
-
-            return result == MessageBoxResult.Yes;
-        }
-
-        public void Show(SimulationMessage message)
-        {
-            if (message == null)
-                return;
-
-            MessageBox.Show(message.Text, message.Title, MessageBoxButton.OK, message.Icon);
-        }
-
-        private static void Show(string title, string message, MessageBoxImage icon)
-        {
-            MessageBox.Show(
-                message ?? string.Empty,
-                string.IsNullOrWhiteSpace(title) ? "Araci" : title,
-                MessageBoxButton.OK,
-                icon);
-        }
-    }
-}
-
-
-
-====================================================================================================
-ARQUIVO: C:\Araci-Engine-Front\Araci Engine\Service\UI\TypePropertiesDialogService.cs
-====================================================================================================
-
-using Araci.Applications.Abstractions;
-using System.Windows;
-using Araci.Properties;
-using Araci.ViewModels;
-
-namespace Araci.Services.UI
-{
-    public class TypePropertiesDialogService : ITypePropertiesDialogService
-    {
-        public void Show(TipoElementoViewModel? viewModel)
-        {
-            if (viewModel == null)
-                return;
-
-            var window = new TypePropertiesWindow
-            {
-                DataContext = viewModel
-            };
-
-            if (Application.Current?.MainWindow != null)
-                window.Owner = Application.Current.MainWindow;
-
-            window.ShowDialog();
-        }
-    }
-}
-
-
-
-====================================================================================================
-ARQUIVO: C:\Araci-Engine-Front\Araci Engine\ViewModels\PropertiesViewModel.cs
+ARQUIVO: C:\Araci-Engine-Front\Araci Engine\ViewModels\UnitsSettingsViewModel.cs
 ====================================================================================================
 
 using System;
-using System.Collections;
 using System.Collections.Generic;
-using System.Collections.ObjectModel;
-using System.ComponentModel;
-using System.Globalization;
-using System.Linq;
-using System.Reflection;
-using System.Runtime.CompilerServices;
-using System.Windows.Input;
-using Araci.Applications.UseCases.Editar;
-using Araci.Models.Tipos;
-using Araci.Services;
 using Araci.Services.Settings;
 
 namespace Araci.ViewModels
 {
-    public class PropertiesViewModel : INotifyPropertyChanged
+    public sealed class UnitsSettingsViewModel
     {
-        private readonly IReadOnlyList<ElementoViewModel> _selecionados;
-        private readonly EditarPropriedadesUseCase? _editarPropriedades;
-        private readonly EditorSettings _settings;
-        private object? _elementoSelecionado;
-        private ICommand? _abrirPropriedadesTipoCommand;
-
-        public PropertiesViewModel()
+        public UnitsSettingsViewModel(UnitDisplaySettings settings)
         {
-            _selecionados = Array.Empty<ElementoViewModel>();
-            _settings = new EditorSettings();
+            if (settings == null)
+                throw new ArgumentNullException(nameof(settings));
+
+            Length = settings.Length;
+            Voltage = settings.Voltage;
+            Current = settings.Current;
+            ActivePower = settings.ActivePower;
+            ReactivePower = settings.ReactivePower;
+            ApparentPower = settings.ApparentPower;
+            Percent = settings.Percent;
         }
 
-        public PropertiesViewModel(IEnumerable<ElementoViewModel> selecionados, EditarPropriedadesUseCase? editarPropriedades = null, EditorSettings? settings = null)
+        public IReadOnlyList<UnitOption> LengthOptions { get; } = CreateOptions(UnitKind.LengthMeter, UnitKind.LengthKilometer);
+        public IReadOnlyList<UnitOption> VoltageOptions { get; } = CreateOptions(UnitKind.VoltageVolt, UnitKind.VoltageKV);
+        public IReadOnlyList<UnitOption> CurrentOptions { get; } = CreateOptions(UnitKind.CurrentAmpere);
+        public IReadOnlyList<UnitOption> ActivePowerOptions { get; } = CreateOptions(UnitKind.ActivePowerW, UnitKind.ActivePowerKW, UnitKind.ActivePowerMW);
+        public IReadOnlyList<UnitOption> ReactivePowerOptions { get; } = CreateOptions(UnitKind.ReactivePowerVAr, UnitKind.ReactivePowerKVAr, UnitKind.ReactivePowerMVAr);
+        public IReadOnlyList<UnitOption> ApparentPowerOptions { get; } = CreateOptions(UnitKind.ApparentPowerVA, UnitKind.ApparentPowerKVA, UnitKind.ApparentPowerMVA);
+        public IReadOnlyList<UnitOption> PercentOptions { get; } = CreateOptions(UnitKind.Percent);
+
+        public UnitKind Length { get; set; }
+        public UnitKind Voltage { get; set; }
+        public UnitKind Current { get; set; }
+        public UnitKind ActivePower { get; set; }
+        public UnitKind ReactivePower { get; set; }
+        public UnitKind ApparentPower { get; set; }
+        public UnitKind Percent { get; set; }
+
+        public void ApplyTo(UnitDisplaySettings target)
         {
-            _selecionados = selecionados?.Where(e => e != null).ToList() ?? new List<ElementoViewModel>();
-            _editarPropriedades = editarPropriedades;
-            _settings = settings ?? new EditorSettings();
-            QuantidadeSelecionada = _selecionados.Count;
-            Titulo = CriarTitulo(_selecionados);
-            Propriedades = new ObservableCollection<PropertyDescriptorViewModel>(CriarDescritores(_selecionados, _editarPropriedades, _settings));
+            if (target == null)
+                throw new ArgumentNullException(nameof(target));
+
+            target.Length = Length;
+            target.Voltage = Voltage;
+            target.Current = Current;
+            target.ActivePower = ActivePower;
+            target.ReactivePower = ReactivePower;
+            target.ApparentPower = ApparentPower;
+            target.Percent = Percent;
         }
 
-        public object? ElementoSelecionado
+        private static IReadOnlyList<UnitOption> CreateOptions(params UnitKind[] units)
         {
-            get => _elementoSelecionado;
-            set
-            {
-                if (_elementoSelecionado == value)
-                    return;
+            var options = new List<UnitOption>(units.Length);
 
-                _elementoSelecionado = value;
-                OnPropertyChanged();
-            }
-        }
+            foreach (UnitKind unit in units)
+                options.Add(new UnitOption(unit, UnitFormatter.GetSymbol(unit)));
 
-        public int QuantidadeSelecionada { get; }
-        public string Titulo { get; } = "Propriedades";
-        public ObservableCollection<PropertyDescriptorViewModel> Propriedades { get; } = new();
-        public bool MesmoTipo => _selecionados.Count > 0 && _selecionados.All(e => e.GetType() == _selecionados[0].GetType());
-        public bool ExibirSeletorTipo => MesmoTipo;
-        public IEnumerable TiposDisponiveis => MesmoTipo ? _selecionados[0].TiposDisponiveis : Array.Empty<object>();
-        public bool PodeAbrirPropriedadesTipo => MesmoTipo && Tipo != null;
-
-        public TipoElemento? Tipo
-        {
-            get
-            {
-                if (!MesmoTipo || _selecionados.Count == 0)
-                    return null;
-
-                var primeiro = _selecionados[0].Tipo;
-                return _selecionados.All(e => ReferenceEquals(e.Tipo, primeiro)) ? primeiro : null;
-            }
-            set
-            {
-                if (!MesmoTipo || value == null)
-                    return;
-
-                if (_editarPropriedades == null)
-                    return;
-
-                if (!_editarPropriedades.Executar(_selecionados, nameof(ElementoViewModel.Tipo), value))
-                    return;
-
-                OnPropertyChanged();
-                OnPropertyChanged(nameof(PodeAbrirPropriedadesTipo));
-            }
-        }
-
-        public ICommand AbrirPropriedadesTipoCommand => _abrirPropriedadesTipoCommand ??= new SimpleCommand(AbrirPropriedadesTipo, () => PodeAbrirPropriedadesTipo);
-
-        private void AbrirPropriedadesTipo()
-        {
-            if (!PodeAbrirPropriedadesTipo)
-                return;
-
-            _selecionados[0].AbrirPropriedadesTipoCommand.Execute(null);
-        }
-
-        private static string CriarTitulo(IReadOnlyList<ElementoViewModel> itens)
-        {
-            if (itens.Count == 0)
-                return "Nenhum elemento selecionado";
-
-            string tipo = ObterNomeTipoAmigavel(itens[0]);
-
-            if (itens.All(i => i.GetType() == itens[0].GetType()))
-                return $"{itens.Count} {tipo}{(itens.Count > 1 ? "s" : "")} selecionados";
-
-            return $"{itens.Count} elementos selecionados";
-        }
-
-        private static IEnumerable<PropertyDescriptorViewModel> CriarDescritores(IReadOnlyList<ElementoViewModel> itens, EditarPropriedadesUseCase? editarPropriedades, EditorSettings settings)
-        {
-            if (itens.Count == 0)
-                yield break;
-
-            bool mesmoTipo = itens.All(i => i.GetType() == itens[0].GetType());
-
-            foreach (var descriptor in InstancePropertyCatalog.GetCommonFor(itens))
-            {
-                var props = itens.Select(i => ObterPropriedade(i, descriptor.PropertyName)).ToList();
-
-                if (props.Any(p => p == null))
-                    continue;
-
-                Type tipoValor = props[0]!.PropertyType;
-                bool editavelMesmoTipo = mesmoTipo && descriptor.IsEditable;
-                bool editavelTiposDiferentes = !mesmoTipo && InstancePropertyCatalog.CanEditAcrossMixedTypes(itens, descriptor.PropertyName);
-                bool editavel = (editavelMesmoTipo || editavelTiposDiferentes) && props.All(p => p != null && p.CanWrite && EhTipoEditavel(p.PropertyType)) && TiposCompativeis(props);
-                var valores = itens.Select(i => ObterValor(i, descriptor.PropertyName)).ToList();
-                object? primeiro = valores[0];
-                bool varia = valores.Skip(1).Any(v => !ValoresIguais(primeiro, v));
-
-                yield return new PropertyDescriptorViewModel(itens, descriptor, tipoValor, varia, editavel, editarPropriedades, settings);
-            }
-        }
-
-        private static bool TiposCompativeis(IReadOnlyList<PropertyInfo?> props)
-        {
-            if (props.Count == 0 || props[0] == null)
-                return false;
-
-            Type primeiro = Nullable.GetUnderlyingType(props[0]!.PropertyType) ?? props[0]!.PropertyType;
-
-            foreach (var prop in props.Skip(1))
-            {
-                if (prop == null)
-                    return false;
-
-                Type atual = Nullable.GetUnderlyingType(prop.PropertyType) ?? prop.PropertyType;
-
-                if (atual != primeiro)
-                    return false;
-            }
-
-            return true;
-        }
-
-        private static PropertyInfo? ObterPropriedade(ElementoViewModel item, string nomePropriedade)
-        {
-            var prop = item.GetType().GetProperty(nomePropriedade, BindingFlags.Instance | BindingFlags.Public);
-            return prop == null || prop.GetIndexParameters().Length > 0 ? null : prop;
-        }
-
-        internal static object? ObterValor(ElementoViewModel item, string nomePropriedade)
-        {
-            return ObterPropriedade(item, nomePropriedade)?.GetValue(item);
-        }
-
-        internal static bool ValoresIguais(object? a, object? b)
-        {
-            if (a == null && b == null)
-                return true;
-
-            if (a == null || b == null)
-                return false;
-
-            if (a is double da && b is double db)
-                return Math.Abs(da - db) < 0.000001;
-
-            if (a is float fa && b is float fb)
-                return Math.Abs(fa - fb) < 0.000001f;
-
-            return Equals(a, b);
-        }
-
-        internal static string FormatarValor(object? valor)
-        {
-            return UnitFormatter.Format(valor, UnitKind.None);
-        }
-
-        internal static string FormatarValor(object? valor, InstancePropertyDescriptor descriptor)
-        {
-            return UnitFormatter.Format(valor, descriptor.Unit);
-        }
-
-        internal static string FormatarValor(object? valor, UnitKind baseUnit, UnitKind displayUnit)
-        {
-            return UnitFormatter.Format(valor, baseUnit, displayUnit);
-        }
-
-        internal static bool TentarConverterValor(string valor, Type tipoDestino, out object? convertido)
-        {
-            return TentarConverterValor(valor, tipoDestino, UnitKind.None, out convertido);
-        }
-
-        internal static bool TentarConverterValor(string valor, Type tipoDestino, InstancePropertyDescriptor descriptor, out object? convertido)
-        {
-            return TentarConverterValor(valor, tipoDestino, descriptor.Unit, out convertido);
-        }
-
-        internal static bool TentarConverterValor(string valor, Type tipoDestino, UnitKind baseUnit, UnitKind displayUnit, out object? convertido)
-        {
-            return TentarConverterValorConvertendo(valor, tipoDestino, displayUnit, baseUnit, out convertido);
-        }
-
-        internal static bool TentarConverterValor(string valor, Type tipoDestino, UnitKind unit, out object? convertido)
-        {
-            return TentarConverterValorConvertendo(valor, tipoDestino, unit, unit, out convertido);
-        }
-
-        private static bool TentarConverterValorConvertendo(string valor, Type tipoDestino, UnitKind displayUnit, UnitKind baseUnit, out object? convertido)
-        {
-            convertido = null;
-            Type tipo = Nullable.GetUnderlyingType(tipoDestino) ?? tipoDestino;
-            string valorSemUnidade = UnitFormatter.StripUnit(valor, displayUnit);
-
-            try
-            {
-                if (tipo == typeof(string))
-                {
-                    convertido = valorSemUnidade;
-                    return true;
-                }
-
-                if (tipo == typeof(int))
-                {
-                    if (!int.TryParse(valorSemUnidade, NumberStyles.Integer, CultureInfo.CurrentCulture, out int i))
-                        return false;
-
-                    convertido = i;
-                    return true;
-                }
-
-                if (tipo == typeof(double))
-                {
-                    if (!double.TryParse(valorSemUnidade, NumberStyles.Float | NumberStyles.AllowThousands, CultureInfo.CurrentCulture, out double d))
-                        return false;
-
-                    convertido = UnitFormatter.FromDisplay(d, displayUnit, baseUnit);
-                    return true;
-                }
-
-                if (tipo == typeof(float))
-                {
-                    if (!float.TryParse(valorSemUnidade, NumberStyles.Float | NumberStyles.AllowThousands, CultureInfo.CurrentCulture, out float f))
-                        return false;
-
-                    convertido = (float)UnitFormatter.FromDisplay(f, displayUnit, baseUnit);
-                    return true;
-                }
-
-                if (tipo == typeof(decimal))
-                {
-                    if (!decimal.TryParse(valorSemUnidade, NumberStyles.Float | NumberStyles.AllowThousands, CultureInfo.CurrentCulture, out decimal m))
-                        return false;
-
-                    convertido = (decimal)UnitFormatter.FromDisplay((double)m, displayUnit, baseUnit);
-                    return true;
-                }
-
-                if (tipo == typeof(bool))
-                {
-                    if (!bool.TryParse(valorSemUnidade, out bool b))
-                        return false;
-
-                    convertido = b;
-                    return true;
-                }
-
-                if (tipo.IsEnum)
-                {
-                    convertido = Enum.Parse(tipo, valorSemUnidade, true);
-                    return true;
-                }
-
-                convertido = Convert.ChangeType(valorSemUnidade, tipo, CultureInfo.CurrentCulture);
-                return true;
-            }
-            catch
-            {
-                convertido = null;
-                return false;
-            }
-        }
-
-        private static bool EhTipoEditavel(Type tipo)
-        {
-            Type t = Nullable.GetUnderlyingType(tipo) ?? tipo;
-            return t == typeof(string) || t == typeof(int) || t == typeof(double) || t == typeof(float) || t == typeof(decimal) || t == typeof(bool) || t.IsEnum;
-        }
-
-        private static string ObterNomeTipoAmigavel(ElementoViewModel vm)
-        {
-            return vm.GetType().Name.Replace("ViewModel", string.Empty);
-        }
-
-        public event PropertyChangedEventHandler? PropertyChanged;
-
-        protected virtual void OnPropertyChanged([CallerMemberName] string? nome = null)
-        {
-            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nome));
-        }
-
-        private sealed class SimpleCommand : ICommand
-        {
-            private readonly Action _execute;
-            private readonly Func<bool>? _canExecute;
-
-            public SimpleCommand(Action execute, Func<bool>? canExecute = null)
-            {
-                _execute = execute ?? throw new ArgumentNullException(nameof(execute));
-                _canExecute = canExecute;
-            }
-
-            public bool CanExecute(object? parameter)
-            {
-                return _canExecute?.Invoke() ?? true;
-            }
-
-            public void Execute(object? parameter)
-            {
-                if (CanExecute(parameter))
-                    _execute();
-            }
-
-            public event EventHandler? CanExecuteChanged;
-
-            public void RaiseCanExecuteChanged()
-            {
-                CanExecuteChanged?.Invoke(this, EventArgs.Empty);
-            }
+            return options;
         }
     }
 
-    public class PropertyDescriptorViewModel : INotifyPropertyChanged
+    public sealed class UnitOption
     {
-        private readonly IReadOnlyList<ElementoViewModel> _elementos;
-        private readonly InstancePropertyDescriptor _descriptor;
-        private readonly Type _tipoValor;
-        private readonly EditarPropriedadesUseCase? _editarPropriedades;
-        private string _valor;
-        private bool _varia;
-        private bool _temErro;
-        private string _mensagemErro = string.Empty;
-
-        public PropertyDescriptorViewModel(IReadOnlyList<ElementoViewModel> elementos, InstancePropertyDescriptor descriptor, Type tipoValor, bool varia, bool isEditable, EditarPropriedadesUseCase? editarPropriedades = null)
-            : this(elementos, descriptor, tipoValor, varia, isEditable, editarPropriedades, null)
+        public UnitOption(UnitKind unit, string text)
         {
+            Unit = unit;
+            Text = text;
         }
 
-        public PropertyDescriptorViewModel(IReadOnlyList<ElementoViewModel> elementos, InstancePropertyDescriptor descriptor, Type tipoValor, bool varia, bool isEditable, EditarPropriedadesUseCase? editarPropriedades, EditorSettings? settings)
-        {
-            _elementos = elementos;
-            _descriptor = descriptor;
-            _tipoValor = tipoValor;
-            _editarPropriedades = editarPropriedades;
-            Nome = descriptor.DisplayName;
-            DisplayName = descriptor.DisplayName;
-            PropertyName = descriptor.PropertyName;
-            BaseUnit = descriptor.Unit;
-            DisplayUnit = ResolveDisplayUnit(BaseUnit, settings);
-            Unit = DisplayUnit;
-            UnitSymbol = UnitFormatter.GetSymbol(DisplayUnit);
-            IsEditable = isEditable;
-            IsReadOnly = !isEditable;
-            _varia = varia;
-            _valor = varia ? "<varia>" : PropertiesViewModel.FormatarValor(ObterValorAtual(), BaseUnit, DisplayUnit);
-        }
-
-        public string Nome { get; }
-        public string DisplayName { get; }
-        public string PropertyName { get; }
-        public Type ValueType => _tipoValor;
-        public UnitKind BaseUnit { get; }
-        public UnitKind DisplayUnit { get; }
         public UnitKind Unit { get; }
-        public string UnitSymbol { get; }
-        public bool HasUnit => DisplayUnit != UnitKind.None;
-        public bool IsEditable { get; }
-        public bool IsReadOnly { get; }
-        public bool IsMixed => _varia;
-        public bool Varia => _varia;
-
-        public string Valor
-        {
-            get => _valor;
-            set => AplicarValor(value);
-        }
-
-        public string Value
-        {
-            get => _valor;
-            set => AplicarValor(value);
-        }
-
-        public bool TemErro
-        {
-            get => _temErro;
-            private set
-            {
-                if (_temErro == value)
-                    return;
-
-                _temErro = value;
-                OnPropertyChanged();
-            }
-        }
-
-        public string MensagemErro
-        {
-            get => _mensagemErro;
-            private set
-            {
-                if (_mensagemErro == value)
-                    return;
-
-                _mensagemErro = value;
-                OnPropertyChanged();
-            }
-        }
-
-        private void AplicarValor(string novoValor)
-        {
-            if (!IsEditable)
-                return;
-
-            if (string.Equals(novoValor, _valor, StringComparison.Ordinal))
-                return;
-
-            if (string.Equals(novoValor, "<varia>", StringComparison.OrdinalIgnoreCase))
-                return;
-
-            if (!PropertiesViewModel.TentarConverterValor(novoValor, _tipoValor, BaseUnit, DisplayUnit, out object? convertido))
-            {
-                TemErro = true;
-                MensagemErro = "Valor inválido";
-                _valor = novoValor;
-                OnPropertyChanged(nameof(Valor));
-                OnPropertyChanged(nameof(Value));
-                return;
-            }
-
-            bool alterou = _editarPropriedades?.Executar(_elementos, _descriptor.PropertyName, convertido) == true;
-
-            if (!alterou)
-            {
-                _valor = PropertiesViewModel.FormatarValor(convertido, BaseUnit, DisplayUnit);
-                _varia = false;
-                AtualizarEstadoValido();
-                return;
-            }
-
-            _varia = false;
-            _valor = PropertiesViewModel.FormatarValor(convertido, BaseUnit, DisplayUnit);
-            AtualizarEstadoValido();
-        }
-
-        private static UnitKind ResolveDisplayUnit(UnitKind baseUnit, EditorSettings? settings)
-        {
-            if (baseUnit == UnitKind.None)
-                return UnitKind.None;
-
-            UnitQuantityKind quantity = UnitFormatter.GetQuantity(baseUnit);
-            return settings?.Units.Resolve(quantity) ?? baseUnit;
-        }
-
-        private void AtualizarEstadoValido()
-        {
-            TemErro = false;
-            MensagemErro = string.Empty;
-            OnPropertyChanged(nameof(Valor));
-            OnPropertyChanged(nameof(Value));
-            OnPropertyChanged(nameof(IsMixed));
-            OnPropertyChanged(nameof(Varia));
-        }
-
-        private object? ObterValorAtual()
-        {
-            if (_elementos.Count == 0)
-                return null;
-
-            return PropertiesViewModel.ObterValor(_elementos[0], _descriptor.PropertyName);
-        }
-
-        public event PropertyChangedEventHandler? PropertyChanged;
-
-        protected virtual void OnPropertyChanged([CallerMemberName] string? nome = null)
-        {
-            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nome));
-        }
-    }
-
-    public class PropertyRowViewModel : PropertyDescriptorViewModel
-    {
-        public PropertyRowViewModel(string nome, string valor, bool varia)
-            : base(Array.Empty<ElementoViewModel>(), new InstancePropertyDescriptor(typeof(ElementoViewModel), string.Empty, nome, 0, false), typeof(string), varia, false)
-        {
-        }
-    }
-}
-
-
-
-====================================================================================================
-ARQUIVO: C:\Araci-Engine-Front\Araci Engine\ViewModels\ViewportViewModel.cs
-====================================================================================================
-
-using System;
-using System.Collections.ObjectModel;
-using System.ComponentModel;
-using System.Runtime.CompilerServices;
-using System.Windows;
-using Araci.Applications.Editar.Selecionar;
-using Araci.Applications.Scene;
-using Araci.Core.Documents;
-using Araci.Core.Scenes;
-using Araci.Models;
-using Araci.Services;
-using Araci.Services.Editing;
-
-namespace Araci.ViewModels
-{
-    public class ViewportViewModel : INotifyPropertyChanged
-    {
-        private readonly DocumentSceneSyncService _documentSceneSync;
-        private double _inverseZoom = 1;
-
-        public ViewportViewModel(
-            AraciDocument document,
-            Scene scene,
-            SelectionBoxViewModel selectionBox,
-            TerminalSnapState terminalSnap,
-            CableVertexEditService cableVertexEdit,
-            MoveHudService moveHud,
-            AlignmentGuideService alignmentGuides,
-            DocumentSceneSyncService documentSceneSync)
-        {
-            Document = document ?? throw new ArgumentNullException(nameof(document));
-            Scene = scene ?? throw new ArgumentNullException(nameof(scene));
-            SelectionBox = selectionBox ?? throw new ArgumentNullException(nameof(selectionBox));
-            TerminalSnap = terminalSnap ?? throw new ArgumentNullException(nameof(terminalSnap));
-            CableVertexEdit = cableVertexEdit ?? throw new ArgumentNullException(nameof(cableVertexEdit));
-            MoveHud = moveHud ?? throw new ArgumentNullException(nameof(moveHud));
-            ArgumentNullException.ThrowIfNull(alignmentGuides);
-            AlignmentGuides = alignmentGuides.Linhas;
-            _documentSceneSync = documentSceneSync ?? throw new ArgumentNullException(nameof(documentSceneSync));
-        }
-
-        public AraciDocument Document { get; }
-        public Scene Scene { get; }
-        public SelectionBoxViewModel SelectionBox { get; }
-        public TerminalSnapState TerminalSnap { get; }
-        public CableVertexEditService CableVertexEdit { get; }
-        public MoveHudService MoveHud { get; }
-        public ObservableCollection<AlignmentGuideLineViewModel> AlignmentGuides { get; }
-        public ObservableCollection<ElementoViewModel> Elementos => Scene.Elementos;
-        public double InverseZoom => _inverseZoom;
-        public double CableHandleVisualOffset => -5 * _inverseZoom;
-        public double TerminalMarkerVisualSize => 20 * _inverseZoom;
-        public double TerminalMarkerVisualOffset => -10 * _inverseZoom;
-        public double TerminalMarkerStrokeThickness => 2 * _inverseZoom;
-        public double TerminalMessageVisualOffsetX => 16 * _inverseZoom;
-        public double TerminalMessageVisualOffsetY => -34 * _inverseZoom;
-        public double TerminalMessageFontSize => 12 * _inverseZoom;
-        public Thickness TerminalMessagePadding => new(7 * _inverseZoom, 4 * _inverseZoom, 7 * _inverseZoom, 4 * _inverseZoom);
-        public CornerRadius TerminalMessageCornerRadius => new(5 * _inverseZoom);
-
-        public void AtualizarZoomVisual(double zoom)
-        {
-            double inverseZoom = zoom > 0 ? 1 / zoom : 1;
-
-            if (Math.Abs(_inverseZoom - inverseZoom) < 0.000001)
-                return;
-
-            _inverseZoom = inverseZoom;
-            OnPropertyChanged(nameof(InverseZoom));
-            OnPropertyChanged(nameof(CableHandleVisualOffset));
-            OnPropertyChanged(nameof(TerminalMarkerVisualSize));
-            OnPropertyChanged(nameof(TerminalMarkerVisualOffset));
-            OnPropertyChanged(nameof(TerminalMarkerStrokeThickness));
-            OnPropertyChanged(nameof(TerminalMessageVisualOffsetX));
-            OnPropertyChanged(nameof(TerminalMessageVisualOffsetY));
-            OnPropertyChanged(nameof(TerminalMessageFontSize));
-            OnPropertyChanged(nameof(TerminalMessagePadding));
-            OnPropertyChanged(nameof(TerminalMessageCornerRadius));
-        }
-
-        public void RegistrarViewModel(ElementoViewModel vm)
-        {
-            _documentSceneSync.RegistrarViewModel(vm);
-        }
-
-        public ElementoViewModel? ObterViewModel(Elemento modelo)
-        {
-            return _documentSceneSync.ObterViewModel(modelo);
-        }
-
-        public void AtualizarViewModel(Elemento modelo)
-        {
-            _documentSceneSync.AtualizarViewModel(modelo);
-        }
-
-        public event PropertyChangedEventHandler? PropertyChanged;
-
-        protected virtual void OnPropertyChanged([CallerMemberName] string? nome = null)
-        {
-            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nome));
-        }
+        public string Text { get; }
     }
 }
 

@@ -121,6 +121,7 @@ namespace Araci.Services
                 TerminalLayout,
                 Geometry,
                 Dialogs,
+                Settings,
                 LimparEstadoTransitorioProjeto);
 
             var moveServices = EditingComposition.CreateMoveServices(

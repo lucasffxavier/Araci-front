@@ -12,6 +12,7 @@ using Araci.Models.Tipos;
 using Araci.Services;
 using Araci.Services.Geometry;
 using Araci.Services.Catalog;
+using Araci.Services.Settings;
 
 namespace Araci.Infrastructure.Persistence
 {
@@ -45,10 +46,12 @@ namespace Araci.Infrastructure.Persistence
 
         public ProjectFileDto CreateFileDto(
             AraciDocument document,
-            ProjectMetadataDto metadata)
+            ProjectMetadataDto metadata,
+            UnitDisplaySettings units)
         {
             ArgumentNullException.ThrowIfNull(document);
             ArgumentNullException.ThrowIfNull(metadata);
+            ArgumentNullException.ThrowIfNull(units);
 
             return new ProjectFileDto
             {
@@ -59,10 +62,42 @@ namespace Araci.Infrastructure.Persistence
                 SavedAt = metadata.SavedAt,
                 Generator = metadata.Generator,
                 Notes = metadata.Notes,
+                Units = CreateUnitSettingsDto(units),
                 Elements = document.Elementos
                     .Select(CriarElementoDto)
                     .ToList()
             };
+        }
+
+        public ProjectUnitSettingsDto CreateUnitSettingsDto(UnitDisplaySettings units)
+        {
+            ArgumentNullException.ThrowIfNull(units);
+
+            return new ProjectUnitSettingsDto
+            {
+                Length = units.Length.ToString(),
+                Voltage = units.Voltage.ToString(),
+                Current = units.Current.ToString(),
+                ActivePower = units.ActivePower.ToString(),
+                ReactivePower = units.ReactivePower.ToString(),
+                ApparentPower = units.ApparentPower.ToString(),
+                Percent = units.Percent.ToString()
+            };
+        }
+
+        public void ApplyUnitSettings(ProjectUnitSettingsDto? dto, UnitDisplaySettings target)
+        {
+            ArgumentNullException.ThrowIfNull(target);
+
+            var defaults = new UnitDisplaySettings();
+
+            target.Length = ParseUnit(dto?.Length, UnitQuantityKind.Length, defaults.Length);
+            target.Voltage = ParseUnit(dto?.Voltage, UnitQuantityKind.Voltage, defaults.Voltage);
+            target.Current = ParseUnit(dto?.Current, UnitQuantityKind.Current, defaults.Current);
+            target.ActivePower = ParseUnit(dto?.ActivePower, UnitQuantityKind.ActivePower, defaults.ActivePower);
+            target.ReactivePower = ParseUnit(dto?.ReactivePower, UnitQuantityKind.ReactivePower, defaults.ReactivePower);
+            target.ApparentPower = ParseUnit(dto?.ApparentPower, UnitQuantityKind.ApparentPower, defaults.ApparentPower);
+            target.Percent = ParseUnit(dto?.Percent, UnitQuantityKind.Percent, defaults.Percent);
         }
 
         public IReadOnlyList<Elemento> CreateElements(ProjectFileDto dto)
@@ -128,6 +163,17 @@ namespace Araci.Infrastructure.Persistence
         public int GetVersion(ProjectFileDto dto)
         {
             return dto.Version <= 0 ? 1 : dto.Version;
+        }
+
+        private static UnitKind ParseUnit(string? value, UnitQuantityKind quantity, UnitKind fallback)
+        {
+            if (string.IsNullOrWhiteSpace(value))
+                return fallback;
+
+            if (!Enum.TryParse(value, ignoreCase: true, out UnitKind unit))
+                return fallback;
+
+            return UnitFormatter.GetQuantity(unit) == quantity ? unit : fallback;
         }
 
         private static string NomeProjetoParaSalvar(

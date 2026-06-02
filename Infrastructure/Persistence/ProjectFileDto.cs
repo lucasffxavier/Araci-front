@@ -13,6 +13,7 @@ namespace Araci.Infrastructure.Persistence
         public DateTimeOffset? SavedAt { get; set; }
         public string? Generator { get; set; }
         public string? Notes { get; set; }
+        public ProjectUnitSettingsDto? Units { get; set; }
         public List<ElementDto> Elements { get; set; } = new();
     }
 

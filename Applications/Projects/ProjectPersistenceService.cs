@@ -6,6 +6,7 @@ using Araci.Core.Documents;
 using Araci.Infrastructure.Persistence;
 using Araci.Models;
 using Araci.Services;
+using Araci.Services.Settings;
 
 namespace Araci.Applications.Projects
 {
@@ -17,6 +18,7 @@ namespace Araci.Applications.Projects
         private readonly IProjectRepository _repository;
         private readonly IProjectFileDialogService _fileDialogs;
         private readonly IUserDialogService _dialogs;
+        private readonly EditorSettings _settings;
         private readonly Action _limparEstadoTransitorio;
         private ProjectMetadataDto _metadata = ProjectMetadataDto.CreateNew(ProjectSerializer.UntitledProjectName);
         private string? _currentPath;
@@ -28,6 +30,7 @@ namespace Araci.Applications.Projects
             IProjectRepository repository,
             IProjectFileDialogService fileDialogs,
             IUserDialogService dialogs,
+            EditorSettings settings,
             Action limparEstadoTransitorio)
         {
             _document = document ?? throw new ArgumentNullException(nameof(document));
@@ -36,12 +39,14 @@ namespace Araci.Applications.Projects
             _repository = repository ?? throw new ArgumentNullException(nameof(repository));
             _fileDialogs = fileDialogs ?? throw new ArgumentNullException(nameof(fileDialogs));
             _dialogs = dialogs ?? throw new ArgumentNullException(nameof(dialogs));
+            _settings = settings ?? throw new ArgumentNullException(nameof(settings));
             _limparEstadoTransitorio = limparEstadoTransitorio ?? throw new ArgumentNullException(nameof(limparEstadoTransitorio));
         }
 
         public void Novo()
         {
             _document.Limpar();
+            _serializer.ApplyUnitSettings(null, _settings.Units);
             _limparEstadoTransitorio();
             _commands.Clear();
             _currentPath = null;
@@ -70,7 +75,7 @@ namespace Araci.Applications.Projects
             {
                 DateTimeOffset savedAt = DateTimeOffset.UtcNow;
                 ProjectMetadataDto metadata = _serializer.PrepareMetadataForSave(_metadata, path, savedAt);
-                ProjectFileDto dto = _serializer.CreateFileDto(_document, metadata);
+                ProjectFileDto dto = _serializer.CreateFileDto(_document, metadata, _settings.Units);
                 string json = _serializer.Serialize(dto);
 
                 _repository.WriteAllText(path, json);
@@ -103,6 +108,7 @@ namespace Araci.Applications.Projects
                 }
 
                 var elementos = _serializer.CreateElements(dto);
+                _serializer.ApplyUnitSettings(dto.Units, _settings.Units);
 
                 _document.Limpar();
 

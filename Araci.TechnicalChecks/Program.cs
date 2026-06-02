@@ -14,6 +14,7 @@ using Araci.Core.Commands;
 using Araci.Core.Documents;
 using Araci.Core.Rendering;
 using Araci.DTOs;
+using Araci.Infrastructure.Persistence;
 using Araci.Models;
 using Araci.Models.Tipos;
 using Araci.Properties;
@@ -118,6 +119,13 @@ namespace Araci.TechnicalChecks
                 ("UnitsSettingsViewModel aplica tensao V", UnitsSettingsViewModelAplicaTensaoVolt),
                 ("UnitValueConverter usa settings em runtime", UnitValueConverterUsaSettingsEmRuntime),
                 ("UnitValueConverter converte edicao para unidade base", UnitValueConverterConverteEdicaoParaUnidadeBase),
+                ("Persistencia salva Units no JSON", PersistenciaSalvaUnitsNoJson),
+                ("Persistencia reabre Voltage em V", PersistenciaReabreVoltageEmVolt),
+                ("Persistencia reabre Length em km", PersistenciaReabreLengthEmKm),
+                ("Novo projeto reseta units default", NovoProjetoResetaUnitsDefault),
+                ("Arquivo antigo sem Units abre defaults", ArquivoAntigoSemUnitsAbreDefaults),
+                ("Arquivo com Units invalido usa fallback", ArquivoComUnitsInvalidoUsaFallback),
+                ("Units persistidas nao alteram DTO eletrico", UnitsPersistidasNaoAlteramDtoEletrico),
                 ("DocumentSceneSync cria ViewModel ao adicionar elemento", DocumentSceneSyncCriaViewModelAoAdicionarElemento),
                 ("DocumentSceneSync remove ViewModel ao remover elemento", DocumentSceneSyncRemoveViewModelAoRemoverElemento),
                 ("DocumentSceneSync limpa Scene ao limpar Document", DocumentSceneSyncLimpaSceneAoLimparDocument),
@@ -1847,6 +1855,165 @@ namespace Araci.TechnicalChecks
             Assert(value is double, "ConvertBack deve retornar double.");
             AssertEqual(13.8, (double)value!, "ConvertBack deve salvar kV.");
             UnitValueConverter.CurrentUnits = new UnitDisplaySettings();
+        }
+
+        private static void PersistenciaSalvaUnitsNoJson()
+        {
+            string path = CreateTempProjectPath();
+
+            try
+            {
+                var context = new EditorContext();
+                context.Settings.Units.Voltage = UnitKind.VoltageVolt;
+                context.Settings.Units.Length = UnitKind.LengthKilometer;
+
+                context.Projects.Salvar(path);
+                string json = File.ReadAllText(path);
+
+                AssertContains(json, "\"Units\"", "JSON Units");
+                AssertContains(json, "\"Voltage\": \"VoltageVolt\"", "JSON Voltage");
+                AssertContains(json, "\"Length\": \"LengthKilometer\"", "JSON Length");
+            }
+            finally
+            {
+                DeleteIfExists(path);
+            }
+        }
+
+        private static void PersistenciaReabreVoltageEmVolt()
+        {
+            string path = CreateTempProjectPath();
+
+            try
+            {
+                var source = new EditorContext();
+                source.Settings.Units.Voltage = UnitKind.VoltageVolt;
+                source.Projects.Salvar(path);
+
+                var target = new EditorContext();
+                target.Projects.Abrir(path);
+
+                AssertEqual(UnitKind.VoltageVolt, target.Settings.Units.Voltage, "Voltage apos abrir");
+            }
+            finally
+            {
+                DeleteIfExists(path);
+            }
+        }
+
+        private static void PersistenciaReabreLengthEmKm()
+        {
+            string path = CreateTempProjectPath();
+
+            try
+            {
+                var source = new EditorContext();
+                source.Settings.Units.Length = UnitKind.LengthKilometer;
+                source.Projects.Salvar(path);
+
+                var target = new EditorContext();
+                target.Projects.Abrir(path);
+
+                AssertEqual(UnitKind.LengthKilometer, target.Settings.Units.Length, "Length apos abrir");
+            }
+            finally
+            {
+                DeleteIfExists(path);
+            }
+        }
+
+        private static void NovoProjetoResetaUnitsDefault()
+        {
+            var context = new EditorContext();
+            context.Settings.Units.Voltage = UnitKind.VoltageVolt;
+            context.Settings.Units.Length = UnitKind.LengthKilometer;
+
+            context.Projects.Novo();
+
+            AssertEqual(UnitKind.VoltageKV, context.Settings.Units.Voltage, "Voltage apos Novo");
+            AssertEqual(UnitKind.LengthMeter, context.Settings.Units.Length, "Length apos Novo");
+        }
+
+        private static void ArquivoAntigoSemUnitsAbreDefaults()
+        {
+            string path = CreateTempProjectPath();
+
+            try
+            {
+                File.WriteAllText(path, "{\"Version\":1,\"ProjectName\":\"Antigo\",\"Elements\":[]}");
+
+                var context = new EditorContext();
+                context.Settings.Units.Voltage = UnitKind.VoltageVolt;
+                context.Settings.Units.Length = UnitKind.LengthKilometer;
+                context.Projects.Abrir(path);
+
+                AssertEqual(UnitKind.VoltageKV, context.Settings.Units.Voltage, "Voltage arquivo antigo");
+                AssertEqual(UnitKind.LengthMeter, context.Settings.Units.Length, "Length arquivo antigo");
+            }
+            finally
+            {
+                DeleteIfExists(path);
+            }
+        }
+
+        private static void ArquivoComUnitsInvalidoUsaFallback()
+        {
+            string path = CreateTempProjectPath();
+
+            try
+            {
+                File.WriteAllText(
+                    path,
+                    "{\"Version\":1,\"ProjectName\":\"Invalido\",\"Units\":{\"Voltage\":\"LengthMeter\",\"Length\":\"NaoExiste\"},\"Elements\":[]}");
+
+                var context = new EditorContext();
+                context.Settings.Units.Voltage = UnitKind.VoltageVolt;
+                context.Settings.Units.Length = UnitKind.LengthKilometer;
+                context.Projects.Abrir(path);
+
+                AssertEqual(UnitKind.VoltageKV, context.Settings.Units.Voltage, "Voltage invalido fallback");
+                AssertEqual(UnitKind.LengthMeter, context.Settings.Units.Length, "Length invalido fallback");
+            }
+            finally
+            {
+                DeleteIfExists(path);
+            }
+        }
+
+        private static void UnitsPersistidasNaoAlteramDtoEletrico()
+        {
+            string path = CreateTempProjectPath();
+
+            try
+            {
+                AraciDocument document = CreateBranchDocument();
+                CircuitDto before = new CircuitBuilder(new ParameterReader(document)).Build();
+                var source = new EditorContext();
+                source.Settings.Units.Voltage = UnitKind.VoltageVolt;
+                source.Settings.Units.Length = UnitKind.LengthKilometer;
+
+                foreach (Elemento elemento in document.Elementos)
+                    source.Document.AdicionarElemento(elemento);
+
+                source.Projects.Salvar(path);
+
+                var target = new EditorContext();
+                target.Projects.Abrir(path);
+                CircuitDto after = new CircuitBuilder(new ParameterReader(target.Document)).Build();
+
+                AssertEqual(before.Loads.Count, after.Loads.Count, "Loads.Count apos units");
+                AssertEqual(before.Lines.Count, after.Lines.Count, "Lines.Count apos units");
+
+                if (before.Loads.Count > 0)
+                {
+                    AssertEqual(before.Loads[0].Tensao, after.Loads[0].Tensao, "Load.Tensao apos units");
+                    AssertEqual(before.Loads[0].PotenciaAtiva, after.Loads[0].PotenciaAtiva, "Load.PotenciaAtiva apos units");
+                }
+            }
+            finally
+            {
+                DeleteIfExists(path);
+            }
         }
 
         private static void DocumentSceneSyncCriaViewModelAoAdicionarElemento()
@@ -3621,7 +3788,7 @@ namespace Araci.TechnicalChecks
 
         private static AraciDocument SaveAndLoad(AraciDocument document)
         {
-            string path = Path.Combine(Path.GetTempPath(), $"araci-check-{Guid.NewGuid():N}.araci");
+            string path = CreateTempProjectPath();
 
             try
             {
@@ -3639,9 +3806,19 @@ namespace Araci.TechnicalChecks
             }
             finally
             {
-                if (File.Exists(path))
-                    File.Delete(path);
+                DeleteIfExists(path);
             }
+        }
+
+        private static string CreateTempProjectPath()
+        {
+            return Path.Combine(Path.GetTempPath(), $"araci-check-{Guid.NewGuid():N}.araci");
+        }
+
+        private static void DeleteIfExists(string path)
+        {
+            if (File.Exists(path))
+                File.Delete(path);
         }
 
         private static T FindById<T>(AraciDocument document, Guid id)

@@ -7,6 +7,7 @@ using Araci.Infrastructure.Persistence;
 using Araci.Services.Geometry;
 using Araci.Services.UI;
 using Araci.Services.Catalog;
+using Araci.Services.Settings;
 
 namespace Araci.Services.Composition
 {
@@ -20,6 +21,7 @@ namespace Araci.Services.Composition
             TerminalLayoutService terminalLayout,
             ElementGeometryService geometry,
             DialogService dialogs,
+            EditorSettings settings,
             Action clearTransientState)
         {
             var serializer = new ProjectSerializer(elements, modelFactory, terminalLayout, geometry);
@@ -33,6 +35,7 @@ namespace Araci.Services.Composition
                 repository,
                 fileDialogs,
                 dialogs,
+                settings,
                 clearTransientState);
         }
     }
