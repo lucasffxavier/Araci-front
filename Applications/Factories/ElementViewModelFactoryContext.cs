@@ -2,6 +2,7 @@ using System;
 using Araci.Services;
 using Araci.Services.Geometry;
 using Araci.Services.UI;
+using Araci.Services.Naming;
 
 namespace Araci.Applications.Factories
 {

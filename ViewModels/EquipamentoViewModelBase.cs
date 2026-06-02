@@ -3,6 +3,7 @@ using Araci.Models;
 using Araci.Services;
 using Araci.Services.UI;
 using Araci.Services.Catalog;
+using Araci.Services.Naming;
 
 namespace Araci.ViewModels
 {

@@ -2,6 +2,7 @@ using System;
 using Araci.Core.Documents;
 using Araci.Models;
 using Araci.Services;
+using Araci.Services.Naming;
 
 namespace Araci.Core.Commands
 {

@@ -30,6 +30,7 @@ using Araci.Services.Simulation;
 using Araci.Services.UI;
 using Araci.Services.Settings;
 using Araci.Services.Catalog;
+using Araci.Services.Naming;
 
 namespace Araci.Services
 {

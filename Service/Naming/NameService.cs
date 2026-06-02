@@ -4,7 +4,7 @@ using Araci.Core.Documents;
 using Araci.Models;
 using Araci.Services.Catalog;
 
-namespace Araci.Services
+namespace Araci.Services.Naming
 {
     public class NameService
     {
