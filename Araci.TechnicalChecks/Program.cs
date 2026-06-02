@@ -13,6 +13,7 @@ using Araci.Applications.Analisar.FluxoDeCorrente;
 using Araci.Applications.Diagrama;
 using Araci.Applications.Editar.Base;
 using Araci.Applications.UseCases.Analise;
+using Araci.Applications.UseCases.Editar;
 using Araci.Applications.UseCases.Projeto;
 using Araci.Core.Commands;
 using Araci.Core.Documents;
@@ -132,6 +133,20 @@ namespace Araci.TechnicalChecks
                 ("FluxoDeCorrenteApplication delega para use case", FluxoDeCorrenteApplicationDelegaParaUseCase),
                 ("ExecutarSimulacaoUseCase mostra warning em excecao", ExecutarSimulacaoUseCaseMostraWarningEmExcecao),
                 ("ExecutarSimulacaoUseCase sem options nao confirma exportacao", ExecutarSimulacaoUseCaseSemOptionsNaoConfirmaExportacao),
+                ("NovoProjetoUseCase chama Novo", NovoProjetoUseCaseChamaNovo),
+                ("AbrirProjetoUseCase chama AbrirComDialogo", AbrirProjetoUseCaseChamaAbrirComDialogo),
+                ("AbrirProjetoUseCase chama Abrir path", AbrirProjetoUseCaseChamaAbrirPath),
+                ("SalvarProjetoUseCase chama SalvarComDialogo", SalvarProjetoUseCaseChamaSalvarComDialogo),
+                ("SalvarProjetoUseCase chama Salvar path", SalvarProjetoUseCaseChamaSalvarPath),
+                ("EditorContext expoe use cases de projeto", EditorContextExpoeUseCasesDeProjeto),
+                ("NovoProjetoUseCase real reseta units default", NovoProjetoUseCaseRealResetaUnitsDefault),
+                ("Salvar Abrir via use case preserva Units", SalvarAbrirViaUseCasePreservaUnits),
+                ("AtualizarPropriedadesSelecionadasUseCase preserva selecao", AtualizarPropriedadesSelecionadasUseCasePreservaSelecao),
+                ("SelecionarElementosUseCase seleciona elemento", SelecionarElementosUseCaseSelecionaElemento),
+                ("SelecionarElementosUseCase limpa selecao", SelecionarElementosUseCaseLimpaSelecao),
+                ("SelecionarElementosUseCase cria painel propriedades multipla selecao", SelecionarElementosUseCaseCriaPainelPropriedadesMultiplaSelecao),
+                ("EditorContext expoe use cases de selecao", EditorContextExpoeUseCasesDeSelecao),
+                ("EditorContext RefreshProperties preserva selecao", EditorContextRefreshPropertiesPreservaSelecao),
                 ("UnitValueConverter usa settings em runtime", UnitValueConverterUsaSettingsEmRuntime),
                 ("UnitValueConverter converte edicao para unidade base", UnitValueConverterConverteEdicaoParaUnidadeBase),
                 ("Persistencia salva Units no JSON", PersistenciaSalvaUnitsNoJson),
@@ -1981,6 +1996,182 @@ namespace Araci.TechnicalChecks
             useCase.ExecutarFluxoDeCorrenteAsync().GetAwaiter().GetResult();
 
             AssertEqual(0, dialogs.ConfirmChamadas, "Sem options nao deve confirmar exportacao");
+        }
+
+        private static void NovoProjetoUseCaseChamaNovo()
+        {
+            var projects = new FakeProjectPersistenceService();
+            var useCase = new NovoProjetoUseCase(projects);
+
+            useCase.Executar();
+
+            AssertEqual(1, projects.NovoChamadas, "Novo chamadas");
+        }
+
+        private static void AbrirProjetoUseCaseChamaAbrirComDialogo()
+        {
+            var projects = new FakeProjectPersistenceService();
+            var useCase = new AbrirProjetoUseCase(projects);
+
+            useCase.ExecutarComDialogo();
+
+            AssertEqual(1, projects.AbrirComDialogoChamadas, "AbrirComDialogo chamadas");
+        }
+
+        private static void AbrirProjetoUseCaseChamaAbrirPath()
+        {
+            var projects = new FakeProjectPersistenceService();
+            var useCase = new AbrirProjetoUseCase(projects);
+
+            useCase.Executar("teste.araci");
+
+            AssertEqual(1, projects.AbrirChamadas, "Abrir chamadas");
+            AssertEqual("teste.araci", projects.LastAbrirPath, "Abrir path");
+        }
+
+        private static void SalvarProjetoUseCaseChamaSalvarComDialogo()
+        {
+            var projects = new FakeProjectPersistenceService();
+            var useCase = new SalvarProjetoUseCase(projects);
+
+            useCase.ExecutarComDialogo();
+
+            AssertEqual(1, projects.SalvarComDialogoChamadas, "SalvarComDialogo chamadas");
+        }
+
+        private static void SalvarProjetoUseCaseChamaSalvarPath()
+        {
+            var projects = new FakeProjectPersistenceService();
+            var useCase = new SalvarProjetoUseCase(projects);
+
+            useCase.Executar("teste.araci");
+
+            AssertEqual(1, projects.SalvarChamadas, "Salvar chamadas");
+            AssertEqual("teste.araci", projects.LastSalvarPath, "Salvar path");
+        }
+
+        private static void EditorContextExpoeUseCasesDeProjeto()
+        {
+            var context = new EditorContext();
+
+            Assert(context.NovoProjeto != null, "EditorContext.NovoProjeto deve existir.");
+            Assert(context.AbrirProjeto != null, "EditorContext.AbrirProjeto deve existir.");
+            Assert(context.SalvarProjeto != null, "EditorContext.SalvarProjeto deve existir.");
+        }
+
+        private static void NovoProjetoUseCaseRealResetaUnitsDefault()
+        {
+            var context = new EditorContext();
+            context.Settings.Units.Voltage = UnitKind.VoltageVolt;
+            context.Settings.Units.Length = UnitKind.LengthKilometer;
+
+            context.NovoProjeto.Executar();
+
+            AssertEqual(UnitKind.VoltageKV, context.Settings.Units.Voltage, "NovoProjetoUseCase Voltage default");
+            AssertEqual(UnitKind.LengthMeter, context.Settings.Units.Length, "NovoProjetoUseCase Length default");
+        }
+
+        private static void SalvarAbrirViaUseCasePreservaUnits()
+        {
+            string path = CreateTempProjectPath();
+
+            try
+            {
+                var source = new EditorContext();
+                source.Settings.Units.Voltage = UnitKind.VoltageVolt;
+                source.SalvarProjeto.Executar(path);
+
+                var target = new EditorContext();
+                target.AbrirProjeto.Executar(path);
+
+                AssertEqual(UnitKind.VoltageVolt, target.Settings.Units.Voltage, "Voltage via use cases");
+            }
+            finally
+            {
+                DeleteIfExists(path);
+            }
+        }
+
+        private static void AtualizarPropriedadesSelecionadasUseCasePreservaSelecao()
+        {
+            EditorContext context = CreateContextWithViewport();
+            Carga load = CreateLoad("CARGA-REFRESH-SELECAO", 120, 40);
+            context.Document.AdicionarElemento(load);
+            ElementoViewModel vm = GetVm(context, load);
+
+            context.Selection.Selecionar(vm);
+            context.AtualizarPropriedadesSelecionadas.Executar();
+
+            AssertEqual(1, context.Selection.Selecionados.Count, "Selecionados apos refresh");
+            Assert(ReferenceEquals(vm, context.Selection.Selecionados[0]), "Refresh deve preservar item selecionado.");
+            Assert(vm.IsSelecionado, "Refresh deve preservar estado visual selecionado.");
+        }
+
+        private static void SelecionarElementosUseCaseSelecionaElemento()
+        {
+            EditorContext context = CreateContextWithViewport();
+            Carga load = CreateLoad("CARGA-USECASE-SEL", 120, 40);
+            context.Document.AdicionarElemento(load);
+            ElementoViewModel vm = GetVm(context, load);
+
+            context.SelecionarElementos.Selecionar(vm);
+
+            AssertEqual(1, context.Selection.Selecionados.Count, "Selecionados.Count");
+            Assert(ReferenceEquals(vm, context.Editor.ElementoSelecionado), "Editor.ElementoSelecionado deve receber o VM.");
+            Assert(vm.IsSelecionado, "VM deve ficar selecionado.");
+        }
+
+        private static void SelecionarElementosUseCaseLimpaSelecao()
+        {
+            EditorContext context = CreateContextWithViewport();
+            Carga load = CreateLoad("CARGA-USECASE-LIMPAR", 120, 40);
+            context.Document.AdicionarElemento(load);
+            ElementoViewModel vm = GetVm(context, load);
+
+            context.SelecionarElementos.Selecionar(vm);
+            context.SelecionarElementos.Limpar();
+
+            AssertEqual(0, context.Selection.Selecionados.Count, "Selecionados.Count apos limpar");
+            Assert(context.Editor.ElementoSelecionado == null, "Editor.ElementoSelecionado deve ficar null.");
+            Assert(!vm.IsSelecionado, "VM deve sair da selecao.");
+        }
+
+        private static void SelecionarElementosUseCaseCriaPainelPropriedadesMultiplaSelecao()
+        {
+            EditorContext context = CreateContextWithViewport();
+            Carga load1 = CreateLoad("CARGA-USECASE-MULTI-1", 120, 40);
+            Carga load2 = CreateLoad("CARGA-USECASE-MULTI-2", 130, 45);
+            context.Document.AdicionarElemento(load1);
+            context.Document.AdicionarElemento(load2);
+            ElementoViewModel vm1 = GetVm(context, load1);
+            ElementoViewModel vm2 = GetVm(context, load2);
+
+            context.SelecionarElementos.Selecionar(new[] { vm1, vm2 });
+
+            AssertEqual(2, context.Selection.Selecionados.Count, "Selecionados.Count multiplo");
+            Assert(context.Editor.ElementoSelecionado is PropertiesViewModel, "Selecao multipla deve criar PropertiesViewModel.");
+        }
+
+        private static void EditorContextExpoeUseCasesDeSelecao()
+        {
+            var context = new EditorContext();
+
+            Assert(context.SelecionarElementos != null, "EditorContext.SelecionarElementos deve existir.");
+            Assert(context.AtualizarPropriedadesSelecionadas != null, "EditorContext.AtualizarPropriedadesSelecionadas deve existir.");
+        }
+
+        private static void EditorContextRefreshPropertiesPreservaSelecao()
+        {
+            EditorContext context = CreateContextWithViewport();
+            Carga load = CreateLoad("CARGA-CONTEXT-REFRESH", 120, 40);
+            context.Document.AdicionarElemento(load);
+            ElementoViewModel vm = GetVm(context, load);
+
+            context.SelecionarElementos.Selecionar(vm);
+            context.RefreshProperties();
+
+            AssertEqual(1, context.Selection.Selecionados.Count, "Selecionados.Count apos EditorContext.RefreshProperties");
+            Assert(ReferenceEquals(vm, context.Selection.Selecionados[0]), "EditorContext.RefreshProperties deve preservar selecionado.");
         }
 
         private static void UnitValueConverterUsaSettingsEmRuntime()
@@ -4020,6 +4211,44 @@ namespace Araci.TechnicalChecks
             {
                 ShowMessageChamadas++;
                 LastSimulationMessage = message;
+            }
+        }
+
+        private sealed class FakeProjectPersistenceService : IProjectPersistenceService
+        {
+            public int NovoChamadas { get; private set; }
+            public int SalvarComDialogoChamadas { get; private set; }
+            public int AbrirComDialogoChamadas { get; private set; }
+            public int SalvarChamadas { get; private set; }
+            public int AbrirChamadas { get; private set; }
+            public string? LastSalvarPath { get; private set; }
+            public string? LastAbrirPath { get; private set; }
+
+            public void Novo()
+            {
+                NovoChamadas++;
+            }
+
+            public void SalvarComDialogo()
+            {
+                SalvarComDialogoChamadas++;
+            }
+
+            public void AbrirComDialogo()
+            {
+                AbrirComDialogoChamadas++;
+            }
+
+            public void Salvar(string path)
+            {
+                SalvarChamadas++;
+                LastSalvarPath = path;
+            }
+
+            public void Abrir(string path)
+            {
+                AbrirChamadas++;
+                LastAbrirPath = path;
             }
         }
 

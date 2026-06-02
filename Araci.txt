@@ -85,6 +85,8 @@ Araci Engine
 │   │   ├── CircuitDtoBuilder.cs
 │   │   └── SimulationPipeline.cs
 │   └── UseCases
+│       ├── Analise
+│       │   └── ExecutarSimulacaoUseCase.cs
 │       ├── Diagrama
 │       │   ├── InserirCaboUseCase.cs
 │       │   └── InserirElementoUseCase.cs
@@ -98,7 +100,10 @@ Araci Engine
 │       │   ├── RedimensionarBarraUseCase.cs
 │       │   └── RotacionarElementoUseCase.cs
 │       └── Projeto
-│           └── AlterarUnidadesProjetoUseCase.cs
+│           ├── AbrirProjetoUseCase.cs
+│           ├── AlterarUnidadesProjetoUseCase.cs
+│           ├── NovoProjetoUseCase.cs
+│           └── SalvarProjetoUseCase.cs
 ├── Araci.TechnicalChecks
 │   ├── Araci.TechnicalChecks.csproj
 │   └── Program.cs
@@ -420,52 +425,22 @@ Araci Engine
 
 
 ====================================================================================================
-ARQUIVO: C:\Araci-Engine-Front\Araci Engine\Applications\Abstractions\ISimulationGateway.cs
+ARQUIVO: C:\Araci-Engine-Front\Araci Engine\Applications\Abstractions\IProjectPersistenceService.cs
 ====================================================================================================
-
-using System.Threading.Tasks;
-using Araci.DTOs;
 
 namespace Araci.Applications.Abstractions
 {
-    public interface ISimulationGateway
+    public interface IProjectPersistenceService
     {
-        Task<SimulationResultDto> SimularAsync(CircuitDto circuit);
+        void Novo();
 
-        Task<string> SimularTextoAsync(CircuitDto circuit);
-    }
-}
+        void SalvarComDialogo();
 
+        void AbrirComDialogo();
 
+        void Salvar(string path);
 
-====================================================================================================
-ARQUIVO: C:\Araci-Engine-Front\Araci Engine\Applications\Abstractions\ISimulationPipeline.cs
-====================================================================================================
-
-using System.Threading.Tasks;
-using Araci.DTOs;
-
-namespace Araci.Applications.Abstractions
-{
-    public interface ISimulationPipeline
-    {
-        Task<SimulationResultDto> ExecutarFluxoDeCorrenteAsync();
-    }
-}
-
-
-
-====================================================================================================
-ARQUIVO: C:\Araci-Engine-Front\Araci Engine\Applications\Abstractions\ISimulationResultApplier.cs
-====================================================================================================
-
-using Araci.DTOs;
-
-namespace Araci.Applications.Abstractions
-{
-    public interface ISimulationResultApplier
-    {
-        void Apply(SimulationResultDto resultado);
+        void Abrir(string path);
     }
 }
 
@@ -490,113 +465,6 @@ namespace Araci.Applications.Abstractions
         bool Confirm(string title, string message);
 
         void Show(SimulationMessage message);
-    }
-}
-
-
-
-====================================================================================================
-ARQUIVO: C:\Araci-Engine-Front\Araci Engine\Applications\Analisar\FluxoDeCorrente\FluxoDeCorrenteApplication.cs
-====================================================================================================
-
-using System;
-using System.Threading.Tasks;
-using Araci.Applications.Abstractions;
-using Araci.DTOs;
-using Araci.Services;
-using Araci.Services.Simulation;
-
-namespace Araci.Applications.Analisar.FluxoDeCorrente
-{
-    public class FluxoDeCorrenteApplication
-    {
-        private readonly ISimulationPipeline _simulation;
-        private readonly SimulationExportService _simulationExport;
-        private readonly SimulationMessageBuilder _simulationMessages;
-        private readonly IUserDialogService _dialogs;
-
-        public FluxoDeCorrenteApplication(
-            ISimulationPipeline simulation,
-            SimulationExportService simulationExport,
-            SimulationMessageBuilder simulationMessages,
-            IUserDialogService dialogs)
-        {
-            _simulation = simulation ?? throw new ArgumentNullException(nameof(simulation));
-            _simulationExport = simulationExport ?? throw new ArgumentNullException(nameof(simulationExport));
-            _simulationMessages = simulationMessages ?? throw new ArgumentNullException(nameof(simulationMessages));
-            _dialogs = dialogs ?? throw new ArgumentNullException(nameof(dialogs));
-        }
-
-        public SimulationResultDto Resultado { get; private set; } = new();
-
-        public void Executar()
-        {
-            ExecutarAsync().GetAwaiter().GetResult();
-        }
-
-        public Task ExecutarAsync()
-        {
-            return ExecuteCoreAsync(null);
-        }
-
-        public async Task ExecutarAsync(FluxoDeCorrenteOptions options)
-        {
-            await ExecuteCoreAsync(options);
-        }
-
-        private async Task ExecuteCoreAsync(FluxoDeCorrenteOptions? options)
-        {
-            string? dssPath = null;
-
-            try
-            {
-                Resultado = await _simulation.ExecutarFluxoDeCorrenteAsync();
-
-                if (options != null)
-                    dssPath = SalvarArquivos(options, Resultado);
-
-                MostrarResultado(Resultado, dssPath);
-            }
-            catch (Exception ex)
-            {
-                _dialogs.ShowWarning("Fluxo de corrente", ex.Message);
-            }
-        }
-
-        private string? SalvarArquivos(FluxoDeCorrenteOptions options, SimulationResultDto resultado)
-        {
-            try
-            {
-                SimulationExportPaths paths = _simulationExport.GetPaths(options);
-
-                if (_simulationExport.Exists(paths) && !ConfirmarSubstituicao())
-                    return null;
-
-                return _simulationExport.Save(options, resultado);
-            }
-            catch (Exception ex)
-            {
-                _dialogs.ShowWarning(
-                    "Fluxo de corrente",
-                    $"A simula\u00E7\u00E3o foi aplicada, mas n\u00E3o foi poss\u00EDvel salvar os arquivos.\n\n{ex.Message}");
-
-                return null;
-            }
-        }
-
-        private bool ConfirmarSubstituicao()
-        {
-            return _dialogs.Confirm(
-                "Fluxo de corrente",
-                "Um ou mais arquivos de sa\u00EDda j\u00E1 existem. Deseja substituir?");
-        }
-
-        private void MostrarResultado(SimulationResultDto resultado, string? dssPath)
-        {
-            SimulationMessage message = _simulationMessages.Build(resultado, dssPath);
-
-            _dialogs.Show(message);
-        }
     }
 }
 
@@ -751,29 +619,31 @@ namespace Araci.Applications.Projects
 
 
 ====================================================================================================
-ARQUIVO: C:\Araci-Engine-Front\Araci Engine\Applications\Simulation\CircuitDtoBuilder.cs
+ARQUIVO: C:\Araci-Engine-Front\Araci Engine\Applications\UseCases\Projeto\AbrirProjetoUseCase.cs
 ====================================================================================================
 
 using System;
-using Araci.Core.Documents;
-using Araci.DTOs;
+using Araci.Applications.Abstractions;
 
-namespace Araci.Applications.Simulation
+namespace Araci.Applications.UseCases.Projeto
 {
-    public class CircuitDtoBuilder
+    public class AbrirProjetoUseCase
     {
-        private readonly AraciDocument _document;
+        private readonly IProjectPersistenceService _projects;
 
-        public CircuitDtoBuilder(AraciDocument document)
+        public AbrirProjetoUseCase(IProjectPersistenceService projects)
         {
-            _document = document ?? throw new ArgumentNullException(nameof(document));
+            _projects = projects ?? throw new ArgumentNullException(nameof(projects));
         }
 
-        public CircuitDto Build()
+        public void ExecutarComDialogo()
         {
-            ParameterReader reader = new(_document);
-            CircuitBuilder builder = new(reader);
-            return builder.Build();
+            _projects.AbrirComDialogo();
+        }
+
+        public void Executar(string path)
+        {
+            _projects.Abrir(path);
         }
     }
 }
@@ -781,39 +651,58 @@ namespace Araci.Applications.Simulation
 
 
 ====================================================================================================
-ARQUIVO: C:\Araci-Engine-Front\Araci Engine\Applications\Simulation\SimulationPipeline.cs
+ARQUIVO: C:\Araci-Engine-Front\Araci Engine\Applications\UseCases\Projeto\NovoProjetoUseCase.cs
 ====================================================================================================
 
 using System;
-using System.Threading.Tasks;
 using Araci.Applications.Abstractions;
-using Araci.DTOs;
 
-namespace Araci.Applications.Simulation
+namespace Araci.Applications.UseCases.Projeto
 {
-    public class SimulationPipeline : ISimulationPipeline
+    public class NovoProjetoUseCase
     {
-        private readonly CircuitDtoBuilder _circuitBuilder;
-        private readonly ISimulationGateway _gateway;
-        private readonly ISimulationResultApplier _simulationResults;
+        private readonly IProjectPersistenceService _projects;
 
-        public SimulationPipeline(
-            CircuitDtoBuilder circuitBuilder,
-            ISimulationGateway gateway,
-            ISimulationResultApplier simulationResults)
+        public NovoProjetoUseCase(IProjectPersistenceService projects)
         {
-            _circuitBuilder = circuitBuilder ?? throw new ArgumentNullException(nameof(circuitBuilder));
-            _gateway = gateway ?? throw new ArgumentNullException(nameof(gateway));
-            _simulationResults = simulationResults ?? throw new ArgumentNullException(nameof(simulationResults));
+            _projects = projects ?? throw new ArgumentNullException(nameof(projects));
         }
 
-        public async Task<SimulationResultDto> ExecutarFluxoDeCorrenteAsync()
+        public void Executar()
         {
-            CircuitDto dto = _circuitBuilder.Build();
-            SimulationResultDto resultado = await _gateway.SimularAsync(dto);
-            _simulationResults.Apply(resultado);
+            _projects.Novo();
+        }
+    }
+}
 
-            return resultado;
+
+
+====================================================================================================
+ARQUIVO: C:\Araci-Engine-Front\Araci Engine\Applications\UseCases\Projeto\SalvarProjetoUseCase.cs
+====================================================================================================
+
+using System;
+using Araci.Applications.Abstractions;
+
+namespace Araci.Applications.UseCases.Projeto
+{
+    public class SalvarProjetoUseCase
+    {
+        private readonly IProjectPersistenceService _projects;
+
+        public SalvarProjetoUseCase(IProjectPersistenceService projects)
+        {
+            _projects = projects ?? throw new ArgumentNullException(nameof(projects));
+        }
+
+        public void ExecutarComDialogo()
+        {
+            _projects.SalvarComDialogo();
+        }
+
+        public void Executar(string path)
+        {
+            _projects.Salvar(path);
         }
     }
 }
@@ -830,12 +719,15 @@ using System.IO;
 using System.Linq;
 using System.Text.Json;
 using System.Threading;
+using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Input;
 using Araci.API;
 using Araci.Applications.Abstractions;
+using Araci.Applications.Analisar.FluxoDeCorrente;
 using Araci.Applications.Diagrama;
 using Araci.Applications.Editar.Base;
+using Araci.Applications.UseCases.Analise;
 using Araci.Applications.UseCases.Projeto;
 using Araci.Core.Commands;
 using Araci.Core.Documents;
@@ -851,6 +743,7 @@ using Araci.Services.Topology;
 using Araci.Services.Editing;
 using Araci.Services.Catalog;
 using Araci.Services.Settings;
+using Araci.Services.Simulation;
 
 namespace Araci.TechnicalChecks
 {
@@ -948,6 +841,20 @@ namespace Araci.TechnicalChecks
                 ("AlterarUnidadesProjetoUseCase aplica VoltageVolt", AlterarUnidadesProjetoUseCaseAplicaVoltageVolt),
                 ("AlterarUnidadesProjetoUseCase chama refresh", AlterarUnidadesProjetoUseCaseChamaRefresh),
                 ("AlterarUnidadesProjetoUseCase preserva copia completa", AlterarUnidadesProjetoUseCasePreservaCopiaCompleta),
+                ("ExecutarSimulacaoUseCase chama pipeline", ExecutarSimulacaoUseCaseChamaPipeline),
+                ("ExecutarSimulacaoUseCase atualiza Resultado", ExecutarSimulacaoUseCaseAtualizaResultado),
+                ("ExecutarSimulacaoUseCase mostra mensagem", ExecutarSimulacaoUseCaseMostraMensagem),
+                ("FluxoDeCorrenteApplication delega para use case", FluxoDeCorrenteApplicationDelegaParaUseCase),
+                ("ExecutarSimulacaoUseCase mostra warning em excecao", ExecutarSimulacaoUseCaseMostraWarningEmExcecao),
+                ("ExecutarSimulacaoUseCase sem options nao confirma exportacao", ExecutarSimulacaoUseCaseSemOptionsNaoConfirmaExportacao),
+                ("NovoProjetoUseCase chama Novo", NovoProjetoUseCaseChamaNovo),
+                ("AbrirProjetoUseCase chama AbrirComDialogo", AbrirProjetoUseCaseChamaAbrirComDialogo),
+                ("AbrirProjetoUseCase chama Abrir path", AbrirProjetoUseCaseChamaAbrirPath),
+                ("SalvarProjetoUseCase chama SalvarComDialogo", SalvarProjetoUseCaseChamaSalvarComDialogo),
+                ("SalvarProjetoUseCase chama Salvar path", SalvarProjetoUseCaseChamaSalvarPath),
+                ("EditorContext expoe use cases de projeto", EditorContextExpoeUseCasesDeProjeto),
+                ("NovoProjetoUseCase real reseta units default", NovoProjetoUseCaseRealResetaUnitsDefault),
+                ("Salvar Abrir via use case preserva Units", SalvarAbrirViaUseCasePreservaUnits),
                 ("UnitValueConverter usa settings em runtime", UnitValueConverterUsaSettingsEmRuntime),
                 ("UnitValueConverter converte edicao para unidade base", UnitValueConverterConverteEdicaoParaUnidadeBase),
                 ("Persistencia salva Units no JSON", PersistenciaSalvaUnitsNoJson),
@@ -2721,6 +2628,176 @@ namespace Araci.TechnicalChecks
             AssertEqual(UnitKind.ReactivePowerKVAr, settings.Units.ReactivePower, "UseCase preserva ReactivePower default");
             AssertEqual(UnitKind.ApparentPowerKVA, settings.Units.ApparentPower, "UseCase preserva ApparentPower default");
             AssertEqual(UnitKind.Percent, settings.Units.Percent, "UseCase preserva Percent default");
+        }
+
+        private static void ExecutarSimulacaoUseCaseChamaPipeline()
+        {
+            var pipeline = new FakeSimulationPipeline();
+            var dialogs = new FakeDialogService();
+            var useCase = CriarExecutarSimulacaoUseCase(pipeline, dialogs);
+
+            useCase.ExecutarFluxoDeCorrenteAsync().GetAwaiter().GetResult();
+
+            AssertEqual(1, pipeline.ExecutarFluxoDeCorrenteChamadas, "Chamadas ao pipeline");
+        }
+
+        private static void ExecutarSimulacaoUseCaseAtualizaResultado()
+        {
+            var resultado = new SimulationResultDto
+            {
+                Sucesso = true,
+                Mensagem = "ok",
+                Script = "script"
+            };
+            var pipeline = new FakeSimulationPipeline(resultado);
+            var useCase = CriarExecutarSimulacaoUseCase(pipeline, new FakeDialogService());
+
+            useCase.ExecutarFluxoDeCorrenteAsync().GetAwaiter().GetResult();
+
+            Assert(ReferenceEquals(resultado, useCase.Resultado), "Resultado deve ser o retornado pelo pipeline.");
+        }
+
+        private static void ExecutarSimulacaoUseCaseMostraMensagem()
+        {
+            var dialogs = new FakeDialogService();
+            var useCase = CriarExecutarSimulacaoUseCase(new FakeSimulationPipeline(), dialogs);
+
+            useCase.ExecutarFluxoDeCorrenteAsync().GetAwaiter().GetResult();
+
+            AssertEqual(1, dialogs.ShowMessageChamadas, "Show message chamadas");
+            AssertEqual("Fluxo de corrente", dialogs.LastSimulationMessage?.Title, "Titulo da mensagem");
+        }
+
+        private static void FluxoDeCorrenteApplicationDelegaParaUseCase()
+        {
+            var pipeline = new FakeSimulationPipeline();
+            var useCase = CriarExecutarSimulacaoUseCase(pipeline, new FakeDialogService());
+            var app = new FluxoDeCorrenteApplication(useCase);
+
+            app.ExecutarAsync().GetAwaiter().GetResult();
+
+            AssertEqual(1, pipeline.ExecutarFluxoDeCorrenteChamadas, "Wrapper deve chamar use case");
+            Assert(ReferenceEquals(useCase.Resultado, app.Resultado), "Wrapper deve expor Resultado do use case.");
+        }
+
+        private static void ExecutarSimulacaoUseCaseMostraWarningEmExcecao()
+        {
+            var pipeline = new FakeSimulationPipeline
+            {
+                ExceptionToThrow = new InvalidOperationException("falha")
+            };
+            var dialogs = new FakeDialogService();
+            var useCase = CriarExecutarSimulacaoUseCase(pipeline, dialogs);
+
+            useCase.ExecutarFluxoDeCorrenteAsync().GetAwaiter().GetResult();
+
+            AssertEqual(1, dialogs.WarningChamadas, "Warning chamadas");
+            AssertEqual("Fluxo de corrente", dialogs.LastWarningTitle, "Warning titulo");
+            AssertEqual("falha", dialogs.LastWarningMessage, "Warning mensagem");
+        }
+
+        private static void ExecutarSimulacaoUseCaseSemOptionsNaoConfirmaExportacao()
+        {
+            var dialogs = new FakeDialogService();
+            var useCase = CriarExecutarSimulacaoUseCase(new FakeSimulationPipeline(), dialogs);
+
+            useCase.ExecutarFluxoDeCorrenteAsync().GetAwaiter().GetResult();
+
+            AssertEqual(0, dialogs.ConfirmChamadas, "Sem options nao deve confirmar exportacao");
+        }
+
+        private static void NovoProjetoUseCaseChamaNovo()
+        {
+            var projects = new FakeProjectPersistenceService();
+            var useCase = new NovoProjetoUseCase(projects);
+
+            useCase.Executar();
+
+            AssertEqual(1, projects.NovoChamadas, "Novo chamadas");
+        }
+
+        private static void AbrirProjetoUseCaseChamaAbrirComDialogo()
+        {
+            var projects = new FakeProjectPersistenceService();
+            var useCase = new AbrirProjetoUseCase(projects);
+
+            useCase.ExecutarComDialogo();
+
+            AssertEqual(1, projects.AbrirComDialogoChamadas, "AbrirComDialogo chamadas");
+        }
+
+        private static void AbrirProjetoUseCaseChamaAbrirPath()
+        {
+            var projects = new FakeProjectPersistenceService();
+            var useCase = new AbrirProjetoUseCase(projects);
+
+            useCase.Executar("teste.araci");
+
+            AssertEqual(1, projects.AbrirChamadas, "Abrir chamadas");
+            AssertEqual("teste.araci", projects.LastAbrirPath, "Abrir path");
+        }
+
+        private static void SalvarProjetoUseCaseChamaSalvarComDialogo()
+        {
+            var projects = new FakeProjectPersistenceService();
+            var useCase = new SalvarProjetoUseCase(projects);
+
+            useCase.ExecutarComDialogo();
+
+            AssertEqual(1, projects.SalvarComDialogoChamadas, "SalvarComDialogo chamadas");
+        }
+
+        private static void SalvarProjetoUseCaseChamaSalvarPath()
+        {
+            var projects = new FakeProjectPersistenceService();
+            var useCase = new SalvarProjetoUseCase(projects);
+
+            useCase.Executar("teste.araci");
+
+            AssertEqual(1, projects.SalvarChamadas, "Salvar chamadas");
+            AssertEqual("teste.araci", projects.LastSalvarPath, "Salvar path");
+        }
+
+        private static void EditorContextExpoeUseCasesDeProjeto()
+        {
+            var context = new EditorContext();
+
+            Assert(context.NovoProjeto != null, "EditorContext.NovoProjeto deve existir.");
+            Assert(context.AbrirProjeto != null, "EditorContext.AbrirProjeto deve existir.");
+            Assert(context.SalvarProjeto != null, "EditorContext.SalvarProjeto deve existir.");
+        }
+
+        private static void NovoProjetoUseCaseRealResetaUnitsDefault()
+        {
+            var context = new EditorContext();
+            context.Settings.Units.Voltage = UnitKind.VoltageVolt;
+            context.Settings.Units.Length = UnitKind.LengthKilometer;
+
+            context.NovoProjeto.Executar();
+
+            AssertEqual(UnitKind.VoltageKV, context.Settings.Units.Voltage, "NovoProjetoUseCase Voltage default");
+            AssertEqual(UnitKind.LengthMeter, context.Settings.Units.Length, "NovoProjetoUseCase Length default");
+        }
+
+        private static void SalvarAbrirViaUseCasePreservaUnits()
+        {
+            string path = CreateTempProjectPath();
+
+            try
+            {
+                var source = new EditorContext();
+                source.Settings.Units.Voltage = UnitKind.VoltageVolt;
+                source.SalvarProjeto.Executar(path);
+
+                var target = new EditorContext();
+                target.AbrirProjeto.Executar(path);
+
+                AssertEqual(UnitKind.VoltageVolt, target.Settings.Units.Voltage, "Voltage via use cases");
+            }
+            finally
+            {
+                DeleteIfExists(path);
+            }
         }
 
         private static void UnitValueConverterUsaSettingsEmRuntime()
@@ -4682,6 +4759,125 @@ namespace Araci.TechnicalChecks
             AssertEqual(load.Nome, dto.Lines[1].Barra2, $"{name}.LineSecundario.Barra2");
         }
 
+        private static ExecutarSimulacaoUseCase CriarExecutarSimulacaoUseCase(
+            FakeSimulationPipeline pipeline,
+            FakeDialogService dialogs)
+        {
+            return new ExecutarSimulacaoUseCase(
+                pipeline,
+                new SimulationExportService(),
+                new SimulationMessageBuilder(),
+                dialogs);
+        }
+
+        private sealed class FakeSimulationPipeline : ISimulationPipeline
+        {
+            private readonly SimulationResultDto _resultado;
+
+            public FakeSimulationPipeline()
+                : this(new SimulationResultDto
+                {
+                    Sucesso = true,
+                    Mensagem = "ok",
+                    Script = "new circuit"
+                })
+            {
+            }
+
+            public FakeSimulationPipeline(SimulationResultDto resultado)
+            {
+                _resultado = resultado;
+            }
+
+            public int ExecutarFluxoDeCorrenteChamadas { get; private set; }
+            public Exception? ExceptionToThrow { get; set; }
+
+            public Task<SimulationResultDto> ExecutarFluxoDeCorrenteAsync()
+            {
+                ExecutarFluxoDeCorrenteChamadas++;
+
+                if (ExceptionToThrow != null)
+                    throw ExceptionToThrow;
+
+                return Task.FromResult(_resultado);
+            }
+        }
+
+        private sealed class FakeDialogService : IUserDialogService
+        {
+            public int WarningChamadas { get; private set; }
+            public int ConfirmChamadas { get; private set; }
+            public int ShowMessageChamadas { get; private set; }
+            public string? LastWarningTitle { get; private set; }
+            public string? LastWarningMessage { get; private set; }
+            public SimulationMessage? LastSimulationMessage { get; private set; }
+
+            public void ShowInfo(string title, string message)
+            {
+            }
+
+            public void ShowWarning(string title, string message)
+            {
+                WarningChamadas++;
+                LastWarningTitle = title;
+                LastWarningMessage = message;
+            }
+
+            public void ShowError(string title, string message)
+            {
+            }
+
+            public bool Confirm(string title, string message)
+            {
+                ConfirmChamadas++;
+                return true;
+            }
+
+            public void Show(SimulationMessage message)
+            {
+                ShowMessageChamadas++;
+                LastSimulationMessage = message;
+            }
+        }
+
+        private sealed class FakeProjectPersistenceService : IProjectPersistenceService
+        {
+            public int NovoChamadas { get; private set; }
+            public int SalvarComDialogoChamadas { get; private set; }
+            public int AbrirComDialogoChamadas { get; private set; }
+            public int SalvarChamadas { get; private set; }
+            public int AbrirChamadas { get; private set; }
+            public string? LastSalvarPath { get; private set; }
+            public string? LastAbrirPath { get; private set; }
+
+            public void Novo()
+            {
+                NovoChamadas++;
+            }
+
+            public void SalvarComDialogo()
+            {
+                SalvarComDialogoChamadas++;
+            }
+
+            public void AbrirComDialogo()
+            {
+                AbrirComDialogoChamadas++;
+            }
+
+            public void Salvar(string path)
+            {
+                SalvarChamadas++;
+                LastSalvarPath = path;
+            }
+
+            public void Abrir(string path)
+            {
+                AbrirChamadas++;
+                LastAbrirPath = path;
+            }
+        }
+
         private static AraciDocument SaveAndLoad(AraciDocument document)
         {
             string path = CreateTempProjectPath();
@@ -4929,696 +5125,42 @@ namespace Araci.TechnicalChecks
 
 
 ====================================================================================================
-ARQUIVO: C:\Araci-Engine-Front\Araci Engine\DTOs\ParameterReader.cs
+ARQUIVO: C:\Araci-Engine-Front\Araci Engine\Core\Documents\AraciDocument.cs
 ====================================================================================================
 
-using System;
-using System.Collections.Generic;
-using System.Globalization;
-using System.Linq;
-using Araci.API;
-using Araci.Core.Documents;
+using System.Collections.ObjectModel;
 using Araci.Models;
-using Araci.Services;
-using Araci.Services.Topology;
 
-namespace Araci.DTOs
+namespace Araci.Core.Documents
 {
-    public class ParameterReader
+    public class AraciDocument
     {
-        private readonly CoreApi _api;
-        private readonly ConnectivityService? _connectivity;
-        private readonly TopologyValidator? _topology;
-        private readonly ElectricGraphBuilder? _graphBuilder;
-
-        public ParameterReader(CoreApi api)
+        public AraciDocument()
         {
-            _api = api ?? throw new ArgumentNullException(nameof(api));
-            _connectivity = new ConnectivityService(api.Document);
+            Elementos = new ObservableCollection<Elemento>();
         }
 
-        public ParameterReader(EditorContext context)
-            : this(
-                new CoreApi(context),
-                new ConnectivityService(context.Document),
-                new TopologyValidator(
-                    context.Document,
-                    new ConnectivityService(context.Document),
-                    context.ElectricGraph),
-                context.ElectricGraph)
+        public ObservableCollection<Elemento> Elementos { get; }
+
+        public void AdicionarElemento(Elemento elemento)
         {
+            if (Elementos.Contains(elemento))
+                return;
+
+            Elementos.Add(elemento);
         }
 
-        public ParameterReader(AraciDocument document)
-            : this(
-                new CoreApi(document),
-                new ConnectivityService(document),
-                new TopologyValidator(document),
-                new ElectricGraphBuilder(document))
+        public void RemoverElemento(Elemento elemento)
         {
+            if (!Elementos.Contains(elemento))
+                return;
+
+            Elementos.Remove(elemento);
         }
 
-        private ParameterReader(
-            CoreApi api,
-            ConnectivityService connectivity,
-            TopologyValidator topology,
-            ElectricGraphBuilder? graphBuilder)
+        public void Limpar()
         {
-            _api = api ?? throw new ArgumentNullException(nameof(api));
-            _connectivity = connectivity ?? throw new ArgumentNullException(nameof(connectivity));
-            _topology = topology ?? throw new ArgumentNullException(nameof(topology));
-            _graphBuilder = graphBuilder;
-        }
-
-        public TopologyValidationResult? ValidateTopology()
-        {
-            return _topology?.Validate();
-        }
-
-        public IList<LoadData> GetLoads()
-        {
-            ElectricGraph? graph = _graphBuilder?.Build();
-
-            return _api.ObterElementos<Carga>()
-                .Where(carga => carga.ParticipaDoGrafoEletrico)
-                .Select(carga => new LoadData
-                {
-                    Id = carga.Id.ToString(),
-                    Nome = ReadString(carga, "Nome"),
-                    Barra = ResolverBarraEquipamento(carga, graph),
-                    Fases = ReadInt(carga, "Fases"),
-                    R = ReadDouble(carga, "Carga resistencia", "Carga resistência"),
-                    X = ReadDouble(carga, "Carga reatancia", "Carga reatância"),
-                    PotenciaAtiva = ReadDouble(carga, "PotenciaAtiva"),
-                    PotenciaReativa = ReadDouble(carga, "PotenciaReativa"),
-                    Tensao = ReadKvWithDefault(carga, 12.47, "TensaoKV", "Tensao", "TensaoLinha"),
-                    Conexao = ReadString(carga, "Carga conexao", "Conexao"),
-                    Modelo = ReadInt(carga, "Carga modelo", "ModeloCarga", "Modelo")
-                })
-                .ToList();
-        }
-
-        public IList<LineData> GetLines()
-        {
-            ElectricGraph? graph = _graphBuilder?.Build();
-
-            return _api.ObterElementos<Cabo>()
-                .Where(cabo => cabo.ParticipaDoGrafoEletrico)
-                .Select(cabo => new LineData
-                {
-                    Id = cabo.Id.ToString(),
-                    Nome = ReadString(cabo, "Nome"),
-                    Barra1 = ResolverBus1(cabo, graph),
-                    Barra2 = ResolverBus2(cabo, graph),
-                    Fases = ReadInt(cabo, "Fases"),
-                    Comprimento = ReadDouble(cabo, "Comprimento"),
-                    R1 = ReadDouble(cabo, "R1", "Resistencia"),
-                    X1 = ReadDouble(cabo, "X1", "Reatancia"),
-                    R0 = ReadDouble(cabo, "R0"),
-                    X0 = ReadDouble(cabo, "X0"),
-                    C1 = ReadDouble(cabo, "C1"),
-                    C0 = ReadDouble(cabo, "C0")
-                })
-                .ToList();
-        }
-
-        public IList<TransformerData> GetTransformers()
-        {
-            return _api.ObterElementos<Transformador>()
-                .Where(transformador => transformador.ParticipaDoGrafoEletrico)
-                .Select(transformador => new TransformerData
-                {
-                    Id = transformador.Id.ToString(),
-                    Nome = ReadString(transformador, "Nome"),
-                    Fases = ReadIntWithDefault(transformador, 3, "Fases"),
-                    Enrolamentos = ReadIntWithDefault(transformador, 2, "Enrolamentos"),
-                    BarraPrimario = ResolverBarraTransformador(transformador, Transformador.TERMINAL_PRIMARIO),
-                    BarraSecundario = ResolverBarraTransformador(transformador, Transformador.TERMINAL_SECUNDARIO),
-                    TensaoPrimarioKV = ReadKvFromInstanceWithDefault(transformador, 13.8, "TensaoPrimarioKV", "TensaoPrimariaKV", "TensaoAltaKV", "TensaoATKV"),
-                    TensaoSecundarioKV = ReadKvFromInstanceWithDefault(transformador, 0.38, "TensaoSecundarioKV", "TensaoSecundariaKV", "TensaoBaixaKV", "TensaoBTKV"),
-                    PotenciaKVA = ReadPowerKvaFromInstance(transformador),
-                    RPercentual = ReadDoubleWithDefault(transformador, 1, "RPercentual", "ResistenciaPercentual", "PercentR"),
-                    XPercentual = ReadDoubleWithDefault(transformador, 5, "XPercentual", "ReatanciaPercentual", "PercentX"),
-                    LigacaoPrimario = ReadStringWithDefault(transformador, "Wye", "LigacaoPrimario", "LigacaoPrimaria", "ConexaoPrimario", "ConexaoPrimaria"),
-                    LigacaoSecundario = ReadStringWithDefault(transformador, "Wye", "LigacaoSecundario", "LigacaoSecundaria", "ConexaoSecundario", "ConexaoSecundaria")
-                })
-                .ToList();
-        }
-
-        private static double ReadPowerKvaFromInstance(Elemento elemento)
-        {
-            double aparente = ReadDoubleFrom(elemento.Parametros, "PotenciaAparente", "PotenciaAparenteKVA", "PotenciaKVA", "PotenciaNominalKVA");
-            return aparente > 0 ? aparente : 500;
-        }
-
-        private static double ReadKvFromInstanceWithDefault(Elemento elemento, double defaultValue, params string[] names)
-        {
-            double modelValue = ReadKvFrom(elemento.Parametros, names);
-            return modelValue > 0 ? modelValue : defaultValue;
-        }
-
-        public IList<GeneratorData> GetGenerators()
-        {
-            ElectricGraph? graph = _graphBuilder?.Build();
-
-            return _api.ObterElementos<Gerador>()
-                .Where(gerador => gerador.ParticipaDoGrafoEletrico)
-                .Select(gerador => new GeneratorData
-                {
-                    Id = gerador.Id.ToString(),
-                    Nome = ReadString(gerador, "Nome"),
-                    Barra = ResolverBarraEquipamento(gerador, graph),
-                    Fases = ReadIntWithDefault(gerador, 3, "Fases"),
-                    Tensao = ReadKvWithDefault(gerador, 12.47, "TensaoKV", "Tensao", "TensaoLinha"),
-                    Potencia = ReadPositiveDoubleByPriority(gerador, "PotenciaAtiva", "Potencia", "PotenciaAparente"),
-                    FP = ReadDoubleWithDefault(gerador, 0.98, "FP", "FatorPotencia")
-                })
-                .ToList();
-        }
-
-        public IList<ExternalSourceData> GetSins()
-        {
-            ElectricGraph? graph = _graphBuilder?.Build();
-
-            return _api.ObterElementos<Sin>()
-                .Where(sin => sin.ParticipaDoGrafoEletrico)
-                .Select(sin => new ExternalSourceData
-                {
-                    Id = sin.Id.ToString(),
-                    Nome = ReadString(sin, "Nome"),
-                    Barra = ResolverBarraEquipamento(sin, graph),
-                    Fases = ReadIntWithDefault(sin, 3, "Fases"),
-                    Tensao = ReadKvWithDefault(sin, 12.47, "TensaoKV", "Tensao", "TensaoLinha", "TensaoBaseKV"),
-                    PotenciaCurtoMVA = ReadDouble(sin, "PotenciaCurtoMVA", "PotenciaCurtoCircuitoMva"),
-                    RelacaoXR = ReadDouble(sin, "RelacaoXR", "X/R")
-                })
-                .ToList();
-        }
-
-        private IList<Elemento> GetElementsByTypeName(params string[] typeNames)
-        {
-            return _api.ObterElementos()
-                .Where(elemento => typeNames.Any(typeName =>
-                    string.Equals(elemento.GetType().Name, typeName, StringComparison.OrdinalIgnoreCase) ||
-                    string.Equals(elemento.Tipo?.NomeTipo, typeName, StringComparison.OrdinalIgnoreCase)))
-                .ToList();
-        }
-
-        private string ResolverBus1(Cabo cabo)
-        {
-            return ResolverBusPorElementoETerminal(cabo.OrigemId, cabo.OrigemTerminalId) ??
-                _connectivity?.ResolverBus1Estrito(cabo) ??
-                string.Empty;
-        }
-
-        private string ResolverBus1(Cabo cabo, ElectricGraph? graph)
-        {
-            return ResolverBusPorGrafo(cabo, graph, origem: true) ?? ResolverBus1(cabo);
-        }
-
-        private string ResolverBus2(Cabo cabo)
-        {
-            return ResolverBusPorElementoETerminal(cabo.DestinoId, cabo.DestinoTerminalId) ??
-                _connectivity?.ResolverBus2Estrito(cabo) ??
-                string.Empty;
-        }
-
-        private string ResolverBus2(Cabo cabo, ElectricGraph? graph)
-        {
-            return ResolverBusPorGrafo(cabo, graph, origem: false) ?? ResolverBus2(cabo);
-        }
-
-        private static string? ResolverBusPorGrafo(
-            Cabo cabo,
-            ElectricGraph? graph,
-            bool origem)
-        {
-            ElectricGraphEdge? edge = graph?.FindEdgeByCable(cabo);
-
-            if (edge == null)
-                return null;
-
-            if (!edge.IsValid)
-                return string.Empty;
-
-            string elementId = origem ? edge.FromElementId : edge.ToElementId;
-            string terminalId = origem ? edge.FromTerminalId : edge.ToTerminalId;
-            ElectricGraphNode? node = graph?.FindNode(elementId);
-
-            return ResolverBarraPorTerminal(node?.SourceElement, terminalId) ??
-                node?.Name ??
-                string.Empty;
-        }
-
-        private string ResolverBarraEquipamento(ElementoEquipamento equipamento)
-        {
-            return _connectivity?.ResolverBusNameParaEquipamentoEstrito(equipamento) ?? string.Empty;
-        }
-
-        private string ResolverBarraEquipamento(
-            ElementoEquipamento equipamento,
-            ElectricGraph? graph)
-        {
-            return ResolverBarraPorGrafo(equipamento, graph) ??
-                ResolverBarraEquipamento(equipamento);
-        }
-
-        private static string? ResolverBarraPorGrafo(
-            ElementoEquipamento equipamento,
-            ElectricGraph? graph)
-        {
-            return graph?.FindNodeByElement(equipamento)?.Name;
-        }
-
-        private static string ResolverBarraTransformador(
-            Transformador transformador,
-            string terminalId)
-        {
-            return ResolverBarraTerminalTransformador(transformador, terminalId);
-        }
-
-        private string? ResolverBusPorElementoETerminal(string elementId, string terminalId)
-        {
-            Elemento? elemento = _connectivity?.ObterElementoPorId(elementId);
-            return ResolverBarraPorTerminal(elemento, terminalId);
-        }
-
-        private static string? ResolverBarraPorTerminal(Elemento? elemento, string terminalId)
-        {
-            return elemento is Transformador transformador &&
-                EhTerminalTransformador(terminalId)
-                    ? ResolverBarraTerminalTransformador(transformador, terminalId)
-                    : null;
-        }
-
-        private static string ResolverBarraTerminalTransformador(
-            Transformador transformador,
-            string terminalId)
-        {
-            string nome = NomeBarramento(transformador);
-            string terminal = string.Equals(terminalId, Transformador.TERMINAL_PRIMARIO, StringComparison.OrdinalIgnoreCase)
-                ? Transformador.TERMINAL_PRIMARIO
-                : Transformador.TERMINAL_SECUNDARIO;
-
-            return $"{nome}_{terminal}";
-        }
-
-        private static bool EhTerminalTransformador(string terminalId)
-        {
-            return string.Equals(terminalId, Transformador.TERMINAL_PRIMARIO, StringComparison.OrdinalIgnoreCase) ||
-                string.Equals(terminalId, Transformador.TERMINAL_SECUNDARIO, StringComparison.OrdinalIgnoreCase);
-        }
-
-        private static string NomeBarramento(Elemento elemento)
-        {
-            if (!string.IsNullOrWhiteSpace(elemento.Nome))
-                return elemento.Nome.Trim();
-
-            string id = elemento.Id.ToString("N");
-            return id.Length >= 8 ? $"BUS-{id[..8]}" : $"BUS-{id}";
-        }
-
-        private static string ReadBarra(Elemento elemento, params string[] names)
-        {
-            string valor = ReadString(elemento, names);
-
-            if (!string.IsNullOrWhiteSpace(valor))
-                return valor;
-
-            if (elemento is ITerminalOwner owner)
-                return owner.Terminais.FirstOrDefault()?.Barra ?? string.Empty;
-
-            return string.Empty;
-        }
-
-        private static string ReadString(Elemento elemento, params string[] names)
-        {
-            return ReadValueAsString(elemento, names) ?? string.Empty;
-        }
-
-        private static int ReadInt(Elemento elemento, params string[] names)
-        {
-            return (int)ReadDouble(elemento, names);
-        }
-
-        private static double ReadDouble(Elemento elemento, params string[] names)
-        {
-            object? value = ReadValueObject(elemento, names);
-
-            if (value is double doubleValue)
-                return ElectricalValueParser.ToNumber(doubleValue);
-
-            if (value is int intValue)
-                return intValue;
-
-            if (value is string text)
-                return ElectricalValueParser.ToNumber(text);
-
-            return 0;
-        }
-
-        private static double ReadKv(Elemento elemento, params string[] names)
-        {
-            object? value = ReadValueObject(elemento, names);
-
-            if (value is double doubleValue)
-                return ElectricalValueParser.ToNumber(doubleValue);
-
-            if (value is int intValue)
-                return intValue;
-
-            if (value is string text)
-                return ElectricalValueParser.ToNumber(text);
-
-            return 0;
-        }
-
-        private static double ReadPowerKva(Elemento elemento)
-        {
-            double modelMva = ReadDoubleFrom(elemento.Parametros, "PotenciaMVA", "PotenciaNominalMVA");
-
-            if (modelMva > 0)
-                return modelMva * 1000;
-
-            double typeMva = elemento.Tipo == null
-                ? 0
-                : ReadDoubleFrom(elemento.Tipo.Parametros, "PotenciaMVA", "PotenciaNominalMVA");
-
-            if (typeMva > 0)
-                return typeMva * 1000;
-
-            double modelKva = ReadDoubleFrom(elemento.Parametros, "PotenciaKVA", "PotenciaNominalKVA");
-            double typeKva = elemento.Tipo == null
-                ? 0
-                : ReadDoubleFrom(elemento.Tipo.Parametros, "PotenciaKVA", "PotenciaNominalKVA");
-
-            if (modelKva > 0 && !NearlyEqual(modelKva, 500))
-                return modelKva;
-
-            if (typeKva > 0)
-                return typeKva;
-
-            return modelKva;
-        }
-
-        private static int ReadIntWithDefault(Elemento elemento, int defaultValue, params string[] names)
-        {
-            return (int)ReadDoubleWithDefault(elemento, defaultValue, names);
-        }
-
-        private static double ReadDoubleWithDefault(
-            Elemento elemento,
-            double defaultValue,
-            params string[] names)
-        {
-            double modelValue = ReadDoubleFrom(elemento.Parametros, names);
-            double typeValue = elemento.Tipo == null
-                ? 0
-                : ReadDoubleFrom(elemento.Tipo.Parametros, names);
-
-            if (modelValue > 0)
-                return modelValue;
-
-            if (typeValue > 0)
-                return typeValue;
-
-            return defaultValue;
-        }
-
-        private static double ReadPositiveDoubleByPriority(Elemento elemento, params string[] names)
-        {
-            double modelValue = ReadPositiveDoubleFrom(elemento.Parametros, names);
-
-            if (modelValue > 0)
-                return modelValue;
-
-            return elemento.Tipo == null
-                ? 0
-                : ReadPositiveDoubleFrom(elemento.Tipo.Parametros, names);
-        }
-
-        private static double ReadKvWithDefault(
-            Elemento elemento,
-            double defaultValue,
-            params string[] names)
-        {
-            double modelValue = ReadKvFrom(elemento.Parametros, names);
-            double typeValue = elemento.Tipo == null
-                ? 0
-                : ReadKvFrom(elemento.Tipo.Parametros, names);
-
-            if (modelValue > 0)
-                return modelValue;
-
-            if (typeValue > 0)
-                return typeValue;
-
-            return defaultValue;
-        }
-
-        private static string ReadStringWithDefault(
-            Elemento elemento,
-            string defaultValue,
-            params string[] names)
-        {
-            string modelValue = ReadStringFrom(elemento.Parametros, names);
-            string typeValue = elemento.Tipo == null
-                ? string.Empty
-                : ReadStringFrom(elemento.Tipo.Parametros, names);
-
-            if (!string.IsNullOrWhiteSpace(modelValue))
-                return modelValue;
-
-            if (!string.IsNullOrWhiteSpace(typeValue))
-                return typeValue;
-
-            return defaultValue;
-        }
-
-        private static string? ReadValueAsString(Elemento elemento, params string[] names)
-        {
-            object? value = ReadValueObject(elemento, names);
-
-            return value switch
-            {
-                IFormattable formattable => formattable.ToString(null, CultureInfo.InvariantCulture),
-                _ => value?.ToString()
-            };
-        }
-
-        private static object? ReadValueObject(Elemento elemento, params string[] names)
-        {
-            foreach (string name in names)
-            {
-                if (elemento.Parametros.TryGetValue(name, out Parameter? parametro))
-                    return parametro.ValorObjeto;
-            }
-
-            foreach (string name in names)
-            {
-                Parameter? parametro;
-                if (elemento.Tipo?.Parametros.TryGetValue(name, out parametro) == true)
-                    return parametro.ValorObjeto;
-            }
-
-            return null;
-        }
-
-        private static double ReadDoubleFrom(
-            IReadOnlyDictionary<string, Parameter> parametros,
-            params string[] names)
-        {
-            object? value = ReadValueObjectFrom(parametros, names);
-
-            if (value is double doubleValue)
-                return ElectricalValueParser.ToNumber(doubleValue);
-
-            if (value is int intValue)
-                return intValue;
-
-            if (value is string text)
-                return ElectricalValueParser.ToNumber(text);
-
-            return 0;
-        }
-
-        private static double ReadPositiveDoubleFrom(
-            IReadOnlyDictionary<string, Parameter> parametros,
-            params string[] names)
-        {
-            foreach (string name in names)
-            {
-                double value = ReadDoubleFrom(parametros, name);
-
-                if (value > 0)
-                    return value;
-            }
-
-            return 0;
-        }
-
-        private static double ReadKvFrom(
-            IReadOnlyDictionary<string, Parameter> parametros,
-            params string[] names)
-        {
-            object? value = ReadValueObjectFrom(parametros, names);
-
-            if (value is double doubleValue)
-                return ElectricalValueParser.ToNumber(doubleValue);
-
-            if (value is int intValue)
-                return intValue;
-
-            if (value is string text)
-                return ElectricalValueParser.ToNumber(text);
-
-            return 0;
-        }
-
-        private static string ReadStringFrom(
-            IReadOnlyDictionary<string, Parameter> parametros,
-            params string[] names)
-        {
-            object? value = ReadValueObjectFrom(parametros, names);
-
-            return value switch
-            {
-                IFormattable formattable => formattable.ToString(null, CultureInfo.InvariantCulture),
-                _ => value?.ToString() ?? string.Empty
-            };
-        }
-
-        private static object? ReadValueObjectFrom(
-            IReadOnlyDictionary<string, Parameter> parametros,
-            params string[] names)
-        {
-            foreach (string name in names)
-            {
-                if (parametros.TryGetValue(name, out Parameter? parametro))
-                    return parametro.ValorObjeto;
-            }
-
-            return null;
-        }
-
-        private static bool NearlyEqual(double left, double right)
-        {
-            return Math.Abs(left - right) < 0.000001;
-        }
-
-        public class LoadData
-        {
-            public string Id { get; set; } = string.Empty;
-
-            public string Nome { get; set; } = string.Empty;
-
-            public string Barra { get; set; } = string.Empty;
-
-            public int Fases { get; set; }
-
-            public double R { get; set; }
-
-            public double X { get; set; }
-
-            public double PotenciaAtiva { get; set; }
-
-            public double PotenciaReativa { get; set; }
-
-            public double Tensao { get; set; }
-
-            public string Conexao { get; set; } = string.Empty;
-
-            public int Modelo { get; set; }
-        }
-
-        public class LineData
-        {
-            public string Id { get; set; } = string.Empty;
-
-            public string Nome { get; set; } = string.Empty;
-
-            public string Barra1 { get; set; } = string.Empty;
-
-            public string Barra2 { get; set; } = string.Empty;
-
-            public int Fases { get; set; }
-
-            public double Comprimento { get; set; }
-
-            public double R1 { get; set; }
-
-            public double X1 { get; set; }
-
-            public double R0 { get; set; }
-
-            public double X0 { get; set; }
-
-            public double C1 { get; set; }
-
-            public double C0 { get; set; }
-        }
-
-        public class TransformerData
-        {
-            public string Id { get; set; } = string.Empty;
-
-            public string Nome { get; set; } = string.Empty;
-
-            public int Fases { get; set; }
-
-            public int Enrolamentos { get; set; }
-
-            public string BarraPrimario { get; set; } = string.Empty;
-
-            public string BarraSecundario { get; set; } = string.Empty;
-
-            public double TensaoPrimarioKV { get; set; }
-
-            public double TensaoSecundarioKV { get; set; }
-
-            public double PotenciaKVA { get; set; }
-
-            public double RPercentual { get; set; }
-
-            public double XPercentual { get; set; }
-
-            public string LigacaoPrimario { get; set; } = string.Empty;
-
-            public string LigacaoSecundario { get; set; } = string.Empty;
-        }
-
-        public class GeneratorData
-        {
-            public string Id { get; set; } = string.Empty;
-
-            public string Nome { get; set; } = string.Empty;
-
-            public string Barra { get; set; } = string.Empty;
-
-            public int Fases { get; set; }
-
-            public double Tensao { get; set; }
-
-            public double Potencia { get; set; }
-
-            public double FP { get; set; }
-        }
-
-        public class ExternalSourceData
-        {
-            public string Id { get; set; } = string.Empty;
-
-            public string Nome { get; set; } = string.Empty;
-
-            public string Barra { get; set; } = string.Empty;
-
-            public int Fases { get; set; }
-
-            public double Tensao { get; set; }
-
-            public double PotenciaCurtoMVA { get; set; }
-
-            public double RelacaoXR { get; set; }
+            Elementos.Clear();
         }
     }
 }
@@ -5626,39 +5168,494 @@ namespace Araci.DTOs
 
 
 ====================================================================================================
-ARQUIVO: C:\Araci-Engine-Front\Araci Engine\Infrastructure\Simulation\FastApiOpenDssGateway.cs
+ARQUIVO: C:\Araci-Engine-Front\Araci Engine\Infrastructure\Persistence\ProjectFileDto.cs
 ====================================================================================================
 
 using System;
-using System.Threading.Tasks;
-using Araci.Applications.Abstractions;
-using Araci.DTOs;
+using System.Collections.Generic;
+using System.Text.Json;
 
-namespace Araci.Infrastructure.Simulation
+namespace Araci.Infrastructure.Persistence
 {
-    public sealed class FastApiOpenDssGateway : ISimulationGateway
+    public sealed class ProjectFileDto
     {
-        private readonly SimulationApiClient _client;
+        public int Version { get; set; }
+        public string? AppName { get; set; }
+        public string? ProjectName { get; set; }
+        public DateTimeOffset? CreatedAt { get; set; }
+        public DateTimeOffset? SavedAt { get; set; }
+        public string? Generator { get; set; }
+        public string? Notes { get; set; }
+        public ProjectUnitSettingsDto? Units { get; set; }
+        public List<ElementDto> Elements { get; set; } = new();
+    }
 
-        public FastApiOpenDssGateway()
-            : this(new SimulationApiClient())
+    public sealed class ProjectMetadataDto
+    {
+        public string AppName { get; set; } = ProjectSerializer.AppName;
+        public string ProjectName { get; set; } = ProjectSerializer.UntitledProjectName;
+        public DateTimeOffset? CreatedAt { get; set; }
+        public DateTimeOffset? SavedAt { get; set; }
+        public string Generator { get; set; } = ProjectSerializer.AppName;
+        public string? Notes { get; set; }
+
+        public static ProjectMetadataDto CreateNew(string projectName)
         {
+            return new ProjectMetadataDto
+            {
+                AppName = ProjectSerializer.AppName,
+                ProjectName = string.IsNullOrWhiteSpace(projectName)
+                    ? ProjectSerializer.UntitledProjectName
+                    : projectName,
+                Generator = ProjectSerializer.AppName
+            };
+        }
+    }
+
+    public sealed class ElementDto
+    {
+        public string Kind { get; set; } = string.Empty;
+        public string? DomainRole { get; set; }
+        public Guid Id { get; set; }
+        public double X { get; set; }
+        public double Y { get; set; }
+        public double Rotation { get; set; }
+        public double Scale { get; set; } = 1;
+        public TypeRefDto? Type { get; set; }
+        public List<ParameterDto> Parameters { get; set; } = new();
+        public List<TerminalDto> Terminals { get; set; } = new();
+        public List<PointDto> Vertices { get; set; } = new();
+    }
+
+    public sealed class TypeRefDto
+    {
+        public string NomeTipo { get; set; } = string.Empty;
+        public string Familia { get; set; } = string.Empty;
+        public string Categoria { get; set; } = string.Empty;
+    }
+
+    public sealed class ParameterDto
+    {
+        public string Name { get; set; } = string.Empty;
+        public string Type { get; set; } = string.Empty;
+        public JsonElement Value { get; set; }
+    }
+
+    public sealed class TerminalDto
+    {
+        public string Id { get; set; } = string.Empty;
+        public double X { get; set; }
+        public double Y { get; set; }
+        public string? Barra { get; set; }
+    }
+
+    public sealed class PointDto
+    {
+        public double X { get; set; }
+        public double Y { get; set; }
+    }
+}
+
+
+
+====================================================================================================
+ARQUIVO: C:\Araci-Engine-Front\Araci Engine\Infrastructure\Persistence\ProjectSerializer.cs
+====================================================================================================
+
+using System;
+using System.Collections.Generic;
+using System.IO;
+using System.Linq;
+using System.Text.Json;
+using System.Text.Json.Serialization;
+using System.Windows;
+using Araci.Applications.Abstractions;
+using Araci.Core.Documents;
+using Araci.Models;
+using Araci.Models.Tipos;
+using Araci.Services;
+using Araci.Services.Geometry;
+using Araci.Services.Catalog;
+using Araci.Services.Settings;
+
+namespace Araci.Infrastructure.Persistence
+{
+    public sealed class ProjectSerializer
+    {
+        public const int CurrentVersion = 1;
+        public const string AppName = "Araci Engine";
+        public const string UntitledProjectName = "Sem titulo";
+
+        private readonly ElementRegistryService _elements;
+        private readonly IElementModelFactory _modelFactory;
+        private readonly TerminalLayoutService _terminalLayout;
+        private readonly ElementGeometryService _geometry;
+        private readonly JsonSerializerOptions _jsonOptions = new()
+        {
+            WriteIndented = true,
+            DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull
+        };
+
+        public ProjectSerializer(
+            ElementRegistryService elements,
+            IElementModelFactory modelFactory,
+            TerminalLayoutService terminalLayout,
+            ElementGeometryService geometry)
+        {
+            _elements = elements ?? throw new ArgumentNullException(nameof(elements));
+            _modelFactory = modelFactory ?? throw new ArgumentNullException(nameof(modelFactory));
+            _terminalLayout = terminalLayout ?? throw new ArgumentNullException(nameof(terminalLayout));
+            _geometry = geometry ?? throw new ArgumentNullException(nameof(geometry));
         }
 
-        public FastApiOpenDssGateway(SimulationApiClient client)
+        public ProjectFileDto CreateFileDto(
+            AraciDocument document,
+            ProjectMetadataDto metadata,
+            UnitDisplaySettings units)
         {
-            _client = client ?? throw new ArgumentNullException(nameof(client));
+            ArgumentNullException.ThrowIfNull(document);
+            ArgumentNullException.ThrowIfNull(metadata);
+            ArgumentNullException.ThrowIfNull(units);
+
+            return new ProjectFileDto
+            {
+                Version = CurrentVersion,
+                AppName = metadata.AppName,
+                ProjectName = metadata.ProjectName,
+                CreatedAt = metadata.CreatedAt,
+                SavedAt = metadata.SavedAt,
+                Generator = metadata.Generator,
+                Notes = metadata.Notes,
+                Units = CreateUnitSettingsDto(units),
+                Elements = document.Elementos
+                    .Select(CriarElementoDto)
+                    .ToList()
+            };
         }
 
-        public Task<SimulationResultDto> SimularAsync(CircuitDto circuit)
+        public ProjectUnitSettingsDto CreateUnitSettingsDto(UnitDisplaySettings units)
         {
-            return _client.SimularTipadoAsync(circuit);
+            ArgumentNullException.ThrowIfNull(units);
+
+            return new ProjectUnitSettingsDto
+            {
+                Length = units.Length.ToString(),
+                Voltage = units.Voltage.ToString(),
+                Current = units.Current.ToString(),
+                ActivePower = units.ActivePower.ToString(),
+                ReactivePower = units.ReactivePower.ToString(),
+                ApparentPower = units.ApparentPower.ToString(),
+                Percent = units.Percent.ToString()
+            };
         }
 
-        public Task<string> SimularTextoAsync(CircuitDto circuit)
+        public void ApplyUnitSettings(ProjectUnitSettingsDto? dto, UnitDisplaySettings target)
         {
-            return _client.SimularAsync(circuit);
+            ArgumentNullException.ThrowIfNull(target);
+
+            var defaults = new UnitDisplaySettings();
+
+            target.Length = ParseUnit(dto?.Length, UnitQuantityKind.Length, defaults.Length);
+            target.Voltage = ParseUnit(dto?.Voltage, UnitQuantityKind.Voltage, defaults.Voltage);
+            target.Current = ParseUnit(dto?.Current, UnitQuantityKind.Current, defaults.Current);
+            target.ActivePower = ParseUnit(dto?.ActivePower, UnitQuantityKind.ActivePower, defaults.ActivePower);
+            target.ReactivePower = ParseUnit(dto?.ReactivePower, UnitQuantityKind.ReactivePower, defaults.ReactivePower);
+            target.ApparentPower = ParseUnit(dto?.ApparentPower, UnitQuantityKind.ApparentPower, defaults.ApparentPower);
+            target.Percent = ParseUnit(dto?.Percent, UnitQuantityKind.Percent, defaults.Percent);
         }
+
+        public IReadOnlyList<Elemento> CreateElements(ProjectFileDto dto)
+        {
+            ArgumentNullException.ThrowIfNull(dto);
+
+            return dto.Elements
+                .Select(CriarElemento)
+                .Where(e => e != null)
+                .Cast<Elemento>()
+                .ToList();
+        }
+
+        public string Serialize(ProjectFileDto dto)
+        {
+            return JsonSerializer.Serialize(dto, _jsonOptions);
+        }
+
+        public ProjectFileDto Deserialize(string json)
+        {
+            return JsonSerializer.Deserialize<ProjectFileDto>(json, _jsonOptions)
+                ?? new ProjectFileDto();
+        }
+
+        public ProjectMetadataDto PrepareMetadataForSave(
+            ProjectMetadataDto currentMetadata,
+            string path,
+            DateTimeOffset savedAt)
+        {
+            ArgumentNullException.ThrowIfNull(currentMetadata);
+
+            string projectName = NomeProjetoParaSalvar(currentMetadata, path);
+
+            return new ProjectMetadataDto
+            {
+                AppName = AppName,
+                ProjectName = projectName,
+                CreatedAt = currentMetadata.CreatedAt ?? savedAt,
+                SavedAt = savedAt,
+                Generator = AppName,
+                Notes = currentMetadata.Notes
+            };
+        }
+
+        public ProjectMetadataDto CreateMetadataFromFile(ProjectFileDto dto, string path)
+        {
+            DateTimeOffset now = DateTimeOffset.UtcNow;
+            string projectName = string.IsNullOrWhiteSpace(dto.ProjectName)
+                ? Path.GetFileNameWithoutExtension(path)
+                : dto.ProjectName;
+
+            return new ProjectMetadataDto
+            {
+                AppName = string.IsNullOrWhiteSpace(dto.AppName) ? AppName : dto.AppName,
+                ProjectName = string.IsNullOrWhiteSpace(projectName) ? UntitledProjectName : projectName,
+                CreatedAt = dto.CreatedAt ?? dto.SavedAt ?? now,
+                SavedAt = dto.SavedAt ?? now,
+                Generator = string.IsNullOrWhiteSpace(dto.Generator) ? AppName : dto.Generator,
+                Notes = dto.Notes
+            };
+        }
+
+        public int GetVersion(ProjectFileDto dto)
+        {
+            return dto.Version <= 0 ? 1 : dto.Version;
+        }
+
+        private static UnitKind ParseUnit(string? value, UnitQuantityKind quantity, UnitKind fallback)
+        {
+            if (string.IsNullOrWhiteSpace(value))
+                return fallback;
+
+            if (!Enum.TryParse(value, ignoreCase: true, out UnitKind unit))
+                return fallback;
+
+            return UnitFormatter.GetQuantity(unit) == quantity ? unit : fallback;
+        }
+
+        private static string NomeProjetoParaSalvar(
+            ProjectMetadataDto metadata,
+            string path)
+        {
+            if (!string.IsNullOrWhiteSpace(metadata.ProjectName) &&
+                !string.Equals(metadata.ProjectName, UntitledProjectName, StringComparison.OrdinalIgnoreCase))
+            {
+                return metadata.ProjectName;
+            }
+
+            string name = Path.GetFileNameWithoutExtension(path);
+            return string.IsNullOrWhiteSpace(name) ? UntitledProjectName : name;
+        }
+
+        private ElementDto CriarElementoDto(Elemento elemento)
+        {
+            return new ElementDto
+            {
+                Kind = ObterKind(elemento),
+                DomainRole = elemento.DomainRole.ToString(),
+                Id = elemento.Id,
+                X = elemento.PosicaoX,
+                Y = elemento.PosicaoY,
+                Rotation = elemento.Rotacao,
+                Scale = elemento.Escala,
+                Type = CriarTypeRef(elemento.Tipo),
+                Parameters = elemento.Parametros.Values
+                    .Select(CriarParameterDto)
+                    .ToList(),
+                Terminals = (elemento as ITerminalOwner)?.Terminais
+                    .Select(CriarTerminalDto)
+                    .ToList() ?? new List<TerminalDto>(),
+                Vertices = elemento is Cabo cabo
+                    ? cabo.Vertices.Select(CriarPointDto).ToList()
+                    : new List<PointDto>()
+            };
+        }
+
+        private Elemento? CriarElemento(ElementDto dto)
+        {
+            Elemento? elemento = _modelFactory.CreateModel(dto.Kind);
+
+            if (elemento == null)
+                return null;
+
+            elemento.Id = dto.Id == Guid.Empty ? Guid.NewGuid() : dto.Id;
+            elemento.PosicaoX = dto.X;
+            elemento.PosicaoY = dto.Y;
+            elemento.Rotacao = dto.Rotation;
+            elemento.Escala = dto.Scale == 0 ? 1 : dto.Scale;
+            elemento.Tipo = ResolverTipo(dto.Kind, dto.Type);
+
+            AplicarParametros(elemento, dto.Parameters);
+            NormalizarParametros(elemento);
+            AplicarVertices(elemento, dto.Vertices);
+            _terminalLayout.AtualizarTerminais(elemento);
+            RestaurarTerminais(elemento, dto.Terminals);
+
+            return elemento;
+        }
+
+        private void AplicarParametros(Elemento elemento, IEnumerable<ParameterDto> parametros)
+        {
+            foreach (ParameterDto dto in parametros)
+            {
+                if (!elemento.PossuiParametro(dto.Name))
+                    continue;
+
+                Parameter parameter = elemento.Parametros[dto.Name];
+                parameter.ValorObjeto = ConverterValor(dto, parameter.Tipo);
+            }
+        }
+
+        private static void NormalizarParametros(Elemento elemento)
+        {
+            if (elemento is Barra barra)
+                barra.Altura = barra.Altura;
+        }
+
+        private static object? ConverterValor(ParameterDto dto, Type destino)
+        {
+            if (dto.Value.ValueKind is JsonValueKind.Null or JsonValueKind.Undefined)
+                return null;
+
+            if (destino == typeof(string))
+                return dto.Value.GetString() ?? string.Empty;
+
+            if (destino == typeof(int))
+                return dto.Value.GetInt32();
+
+            if (destino == typeof(double))
+                return dto.Value.GetDouble();
+
+            if (destino == typeof(bool))
+                return dto.Value.GetBoolean();
+
+            if (destino == typeof(Guid))
+                return dto.Value.GetGuid();
+
+            return dto.Value.ToString();
+        }
+
+        private void AplicarVertices(Elemento elemento, IEnumerable<PointDto> vertices)
+        {
+            if (elemento is not Cabo cabo)
+                return;
+
+            cabo.Vertices.Clear();
+
+            foreach (PointDto p in vertices)
+                cabo.Vertices.Add(new Point(p.X, p.Y));
+
+            cabo.PreviewPonto = null;
+
+            if (cabo.Vertices.Count > 0)
+                cabo.DefinirOrigem(cabo.Vertices[0]);
+
+            if (cabo.Vertices.Count > 1)
+                cabo.DefinirDestino(cabo.Vertices[^1]);
+        }
+
+        private void RestaurarTerminais(Elemento elemento, IEnumerable<TerminalDto> terminais)
+        {
+            if (elemento is not ITerminalOwner owner)
+                return;
+
+            Size tamanho = _geometry.ObterTamanho(elemento);
+
+            foreach (TerminalDto dto in terminais)
+            {
+                Terminal? terminal = owner.Terminais.FirstOrDefault(t =>
+                    string.Equals(t.Id, dto.Id, StringComparison.OrdinalIgnoreCase));
+
+                if (terminal == null)
+                    continue;
+
+                if (elemento is Cabo || tamanho.IsEmpty)
+                    terminal.DefinirPosicaoVisual(new Point(dto.X, dto.Y));
+                else
+                    terminal.DefinirPosicaoVisual(new Point(dto.X, dto.Y), tamanho.Width, tamanho.Height);
+
+                terminal.Barra = dto.Barra;
+            }
+        }
+
+        private TipoElemento? ResolverTipo(string kind, TypeRefDto? dto)
+        {
+            return _elements.ResolveType(
+                kind,
+                dto?.NomeTipo,
+                dto?.Familia,
+                dto?.Categoria);
+        }
+
+        private string ObterKind(Elemento elemento)
+        {
+            return _elements.GetKind(elemento);
+        }
+
+        private static TypeRefDto? CriarTypeRef(TipoElemento? tipo)
+        {
+            return tipo == null
+                ? null
+                : new TypeRefDto
+                {
+                    NomeTipo = tipo.NomeTipo,
+                    Familia = tipo.Familia,
+                    Categoria = tipo.Categoria
+                };
+        }
+
+        private static ParameterDto CriarParameterDto(Parameter parameter)
+        {
+            return new ParameterDto
+            {
+                Name = parameter.Nome,
+                Type = parameter.Tipo.FullName ?? parameter.Tipo.Name,
+                Value = JsonSerializer.SerializeToElement(parameter.ValorObjeto, parameter.Tipo)
+            };
+        }
+
+        private static TerminalDto CriarTerminalDto(Terminal terminal)
+        {
+            return new TerminalDto
+            {
+                Id = terminal.Id,
+                X = terminal.Posicao.X,
+                Y = terminal.Posicao.Y,
+                Barra = terminal.Barra
+            };
+        }
+
+        private static PointDto CriarPointDto(Point point)
+        {
+            return new PointDto { X = point.X, Y = point.Y };
+        }
+    }
+}
+
+
+
+====================================================================================================
+ARQUIVO: C:\Araci-Engine-Front\Araci Engine\Infrastructure\Persistence\ProjectUnitSettingsDto.cs
+====================================================================================================
+
+namespace Araci.Infrastructure.Persistence
+{
+    public sealed class ProjectUnitSettingsDto
+    {
+        public string? Length { get; set; }
+        public string? Voltage { get; set; }
+        public string? Current { get; set; }
+        public string? ActivePower { get; set; }
+        public string? ReactivePower { get; set; }
+        public string? ApparentPower { get; set; }
+        public string? Percent { get; set; }
     }
 }
 
@@ -5747,123 +5744,61 @@ namespace Araci
 
 
 ====================================================================================================
-ARQUIVO: C:\Araci-Engine-Front\Araci Engine\Ribbon\Tabs\AnaliseTab.xaml
-====================================================================================================
-
-﻿<UserControl x:Class="Araci.Ribbon.Tabs.AnaliseTab"
-             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
-             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-             xmlns:svgc="http://sharpvectors.codeplex.com/svgc/"
-             Background="#F4F4F4"
-             Height="100">
-
-    <Grid Margin="3">
-
-        <!-- 🔑 ESSENCIAL: StackPanel horizontal -->
-        <StackPanel Orientation="Horizontal">
-
-            <Border Background="#F4F4F4"
-                    BorderBrush="#D0D0D0"
-                    BorderThickness="1"
-                    Padding="3">
-
-                <DockPanel>
-
-                    <!-- TÍTULO -->
-                    <TextBlock Text="Simulação"
-                               DockPanel.Dock="Bottom"
-                               HorizontalAlignment="Center"
-                               FontSize="11"
-                               FontWeight="SemiBold"
-                               Margin="0,2,0,0"/>
-
-                    <!-- BOTÕES -->
-                    <WrapPanel>
-
-                        <Button Width="68" Height="68"
-                                Background="Transparent"
-                                BorderThickness="0"
-                                Click="FluxoButton_Click">
-
-                            <StackPanel HorizontalAlignment="Center">
-
-                                <svgc:SvgViewbox Source="pack://application:,,,/Resources/Icons/fluxo.svg"
-                                                  Width="32"
-                                                  Height="32"/>
-
-                                <TextBlock Text="Fluxo"
-                                           Width="68"
-                                           TextAlignment="Center"
-                                           FontSize="11"
-                                           Foreground="Black"
-                                           Margin="0,1,0,0"
-                                           TextWrapping="Wrap"/>
-
-                            </StackPanel>
-
-                        </Button>
-
-                    </WrapPanel>
-
-                </DockPanel>
-
-            </Border>
-
-        </StackPanel>
-
-    </Grid>
-
-</UserControl>
-
-
-
-====================================================================================================
-ARQUIVO: C:\Araci-Engine-Front\Araci Engine\Ribbon\Tabs\AnaliseTab.xaml.cs
+ARQUIVO: C:\Araci-Engine-Front\Araci Engine\Ribbon\Tabs\ArquivoMenuView.xaml.cs
 ====================================================================================================
 
 using System.Windows;
 using System.Windows.Controls;
-using Araci.Applications.Analisar.FluxoDeCorrente;
 using Araci.Services;
 
 namespace Araci.Ribbon.Tabs
 {
-    public partial class AnaliseTab : UserControl
+    public partial class ArquivoMenuView : UserControl
     {
-        public AnaliseTab()
+        public ArquivoMenuView()
         {
             InitializeComponent();
         }
 
         private EditorContext? Context =>
-            DataContext as EditorContext;
+            DataContext as EditorContext ??
+            Window.GetWindow(this)?.DataContext as EditorContext;
 
-        private async void FluxoButton_Click(object sender, RoutedEventArgs e)
+        private void Novo_Click(object sender, RoutedEventArgs e)
         {
-            if (Context == null)
-                return;
+            Context?.NovoProjeto.Executar();
+        }
 
-            FluxoDeCorrenteWindow window = new()
-            {
-                Owner = Window.GetWindow(this)
-            };
+        private void Abrir_Click(object sender, RoutedEventArgs e)
+        {
+            Context?.AbrirProjeto.ExecutarComDialogo();
+        }
 
-            bool? result = window.ShowDialog();
-
-            if (result != true)
-                return;
-
-            FluxoDeCorrenteApplication app = new(
-                Context.Simulation,
-                Context.SimulationExport,
-                Context.SimulationMessages,
-                Context.Dialogs);
-
-            await app.ExecutarAsync(window.Options);
+        private void Salvar_Click(object sender, RoutedEventArgs e)
+        {
+            Context?.SalvarProjeto.ExecutarComDialogo();
         }
     }
 }
 
+
+
+====================================================================================================
+ARQUIVO: C:\Araci-Engine-Front\Araci Engine\Ribbon\Tabs\ArquivoTab.xaml.cs
+====================================================================================================
+
+﻿using System.Windows.Controls;
+
+namespace Araci.Ribbon.Tabs
+{
+    public partial class ArquivoTab : UserControl
+    {
+        public ArquivoTab()
+        {
+            InitializeComponent();
+        }
+    }
+}
 
 
 ====================================================================================================
@@ -5947,39 +5882,50 @@ namespace Araci.Services.Composition
 
 
 ====================================================================================================
-ARQUIVO: C:\Araci-Engine-Front\Araci Engine\Service\Composition\SimulationComposition.cs
+ARQUIVO: C:\Araci-Engine-Front\Araci Engine\Service\Composition\PersistenceComposition.cs
 ====================================================================================================
 
 using System;
-using Araci.Applications.Simulation;
+using Araci.Applications.Abstractions;
+using Araci.Applications.Projects;
+using Araci.Core.Commands;
 using Araci.Core.Documents;
-using Araci.Infrastructure.Simulation;
-using Araci.Services.Simulation;
+using Araci.Infrastructure.Persistence;
+using Araci.Services.Geometry;
+using Araci.Services.UI;
+using Araci.Services.Catalog;
+using Araci.Services.Settings;
 
 namespace Araci.Services.Composition
 {
-    internal static class SimulationComposition
+    internal static class PersistenceComposition
     {
-        public static SimulationComponents Create(
+        public static ProjectPersistenceService CreateProjects(
             AraciDocument document,
-            Action notifySimulationResultViewModels)
+            CommandManager commands,
+            ElementRegistryService elements,
+            IElementModelFactory modelFactory,
+            TerminalLayoutService terminalLayout,
+            ElementGeometryService geometry,
+            DialogService dialogs,
+            EditorSettings settings,
+            Action clearTransientState)
         {
-            var results = new SimulationResultApplier(document, notifySimulationResultViewModels);
-            var gateway = new FastApiOpenDssGateway();
-            var circuitDtoBuilder = new CircuitDtoBuilder(document);
-            var pipeline = new SimulationPipeline(circuitDtoBuilder, gateway, results);
-            var export = new SimulationExportService();
-            var messages = new SimulationMessageBuilder();
+            var serializer = new ProjectSerializer(elements, modelFactory, terminalLayout, geometry);
+            var repository = new FileSystemProjectRepository();
+            var fileDialogs = new ProjectFileDialogService();
 
-            return new SimulationComponents(results, pipeline, export, messages);
+            return new ProjectPersistenceService(
+                document,
+                commands,
+                serializer,
+                repository,
+                fileDialogs,
+                dialogs,
+                settings,
+                clearTransientState);
         }
     }
-
-    internal sealed record SimulationComponents(
-        SimulationResultApplier Results,
-        SimulationPipeline Pipeline,
-        SimulationExportService Export,
-        SimulationMessageBuilder Messages);
 }
 
 
@@ -6006,6 +5952,7 @@ using Araci.Applications.Editar.Mover;
 using Araci.Applications.Editar.Selecionar;
 using Araci.Applications.Projects;
 using Araci.Applications.Simulation;
+using Araci.Applications.UseCases.Analise;
 using Araci.Applications.UseCases.Editar;
 using Araci.Applications.UseCases.Diagrama;
 using Araci.Applications.UseCases.Projeto;
@@ -6052,11 +5999,12 @@ namespace Araci.Services
             Geometry = core.Geometry;
             TerminalLayout = core.TerminalLayout;
 
-            var simulation = SimulationComposition.Create(Document, NotifySimulationResultViewModels);
+            var simulation = SimulationComposition.Create(Document, NotifySimulationResultViewModels, Dialogs);
             SimulationResults = simulation.Results;
             Simulation = simulation.Pipeline;
             SimulationExport = simulation.Export;
             SimulationMessages = simulation.Messages;
+            ExecutarSimulacao = simulation.ExecutarSimulacao;
 
             VisualUpdates = EditingComposition.CreateVisualUpdates(
                 () => Viewport,
@@ -6114,6 +6062,9 @@ namespace Araci.Services
                 Dialogs,
                 Settings,
                 LimparEstadoTransitorioProjeto);
+            NovoProjeto = new NovoProjetoUseCase(Projects);
+            AbrirProjeto = new AbrirProjetoUseCase(Projects);
+            SalvarProjeto = new SalvarProjetoUseCase(Projects);
 
             var moveServices = EditingComposition.CreateMoveServices(
                 () => Viewport,
@@ -6206,6 +6157,9 @@ namespace Araci.Services
         public SafeDeleteService SafeDelete { get; }
         public ClipboardService Clipboard { get; }
         public ProjectPersistenceService Projects { get; }
+        public NovoProjetoUseCase NovoProjeto { get; }
+        public AbrirProjetoUseCase AbrirProjeto { get; }
+        public SalvarProjetoUseCase SalvarProjeto { get; }
         public VisualUpdateService VisualUpdates { get; }
         public SelectionService Selection { get; }
         public MoveService Move { get; }
@@ -6221,6 +6175,7 @@ namespace Araci.Services
         public SimulationPipeline Simulation { get; }
         public SimulationExportService SimulationExport { get; }
         public SimulationMessageBuilder SimulationMessages { get; }
+        public ExecutarSimulacaoUseCase ExecutarSimulacao { get; }
         public TypePropertiesDialogService TypePropertiesDialogs { get; }
         public DialogService Dialogs { get; }
         public ElementGeometryService Geometry { get; }
@@ -6365,254 +6320,6 @@ namespace Araci.Services
             Tools.VoltarParaSelecao();
         }
 
-    }
-}
-
-
-
-====================================================================================================
-ARQUIVO: C:\Araci-Engine-Front\Araci Engine\Service\Simulation\SimulationExportService.cs
-====================================================================================================
-
-using System;
-using System.IO;
-using System.Text;
-using System.Text.Json;
-using Araci.Applications.Analisar.FluxoDeCorrente;
-using Araci.DTOs;
-
-namespace Araci.Services.Simulation
-{
-    public class SimulationExportService
-    {
-        public SimulationExportPaths GetPaths(FluxoDeCorrenteOptions options)
-        {
-            if (options == null)
-                throw new ArgumentNullException(nameof(options));
-
-            string baseName = SanitizarNomeArquivo(options.NomeArquivo);
-            string dssFileName = baseName.EndsWith(".dss", StringComparison.OrdinalIgnoreCase)
-                ? baseName
-                : $"{baseName}.dss";
-
-            string jsonBaseName = Path.GetFileNameWithoutExtension(dssFileName);
-            string dssPath = Path.Combine(options.PastaSaida, dssFileName);
-            string jsonPath = Path.Combine(options.PastaSaida, $"{jsonBaseName}_resultado.json");
-
-            return new SimulationExportPaths(dssPath, jsonPath);
-        }
-
-        public bool Exists(SimulationExportPaths paths)
-        {
-            if (paths == null)
-                throw new ArgumentNullException(nameof(paths));
-
-            return File.Exists(paths.DssPath) || File.Exists(paths.JsonPath);
-        }
-
-        public string Save(FluxoDeCorrenteOptions options, SimulationResultDto resultado)
-        {
-            if (resultado == null)
-                throw new ArgumentNullException(nameof(resultado));
-
-            SimulationExportPaths paths = GetPaths(options);
-            Directory.CreateDirectory(options.PastaSaida);
-
-            File.WriteAllText(paths.DssPath, resultado.Script, Encoding.UTF8);
-
-            var jsonOptions = new JsonSerializerOptions
-            {
-                WriteIndented = true
-            };
-
-            string json = JsonSerializer.Serialize(resultado, jsonOptions);
-            File.WriteAllText(paths.JsonPath, json, Encoding.UTF8);
-
-            return paths.DssPath;
-        }
-
-        private static string SanitizarNomeArquivo(string nomeArquivo)
-        {
-            string nome = string.IsNullOrWhiteSpace(nomeArquivo)
-                ? "circuito"
-                : nomeArquivo.Trim();
-
-            foreach (char invalid in Path.GetInvalidFileNameChars())
-                nome = nome.Replace(invalid.ToString(), string.Empty);
-
-            return string.IsNullOrWhiteSpace(nome) ? "circuito" : nome;
-        }
-    }
-
-    public class SimulationExportPaths
-    {
-        public SimulationExportPaths(string dssPath, string jsonPath)
-        {
-            DssPath = dssPath;
-            JsonPath = jsonPath;
-        }
-
-        public string DssPath { get; }
-
-        public string JsonPath { get; }
-    }
-}
-
-
-
-====================================================================================================
-ARQUIVO: C:\Araci-Engine-Front\Araci Engine\Service\Simulation\SimulationMessageBuilder.cs
-====================================================================================================
-
-using System.Text;
-using System.Windows;
-using Araci.DTOs;
-
-namespace Araci.Services.Simulation
-{
-    public class SimulationMessageBuilder
-    {
-        public SimulationMessage Build(SimulationResultDto resultado, string? dssPath)
-        {
-            var message = new StringBuilder();
-
-            message.AppendLine(resultado.Sucesso ? "Fluxo resolvido com sucesso." : "Fluxo retornou falha.");
-
-            if (!string.IsNullOrWhiteSpace(resultado.Mensagem))
-                message.AppendLine(resultado.Mensagem);
-
-            if (!string.IsNullOrWhiteSpace(dssPath))
-            {
-                message.AppendLine();
-                message.AppendLine("Arquivo DSS salvo em:");
-                message.AppendLine(dssPath);
-            }
-
-            if (resultado.Avisos.Count > 0)
-            {
-                message.AppendLine();
-                message.AppendLine("Avisos:");
-
-                foreach (string aviso in resultado.Avisos)
-                    message.AppendLine($"- {aviso}");
-            }
-
-            if (!string.IsNullOrWhiteSpace(resultado.Script))
-            {
-                message.AppendLine();
-                message.AppendLine("Script DSS gerado:");
-                message.AppendLine(resultado.Script);
-            }
-
-            return new SimulationMessage(
-                "Fluxo de corrente",
-                message.ToString(),
-                resultado.Sucesso ? MessageBoxImage.Information : MessageBoxImage.Warning);
-        }
-    }
-
-    public class SimulationMessage
-    {
-        public SimulationMessage(string title, string text, MessageBoxImage icon)
-        {
-            Title = title;
-            Text = text;
-            Icon = icon;
-        }
-
-        public string Title { get; }
-
-        public string Text { get; }
-
-        public MessageBoxImage Icon { get; }
-    }
-}
-
-
-
-====================================================================================================
-ARQUIVO: C:\Araci-Engine-Front\Araci Engine\Service\Simulation\SimulationResultApplier.cs
-====================================================================================================
-
-using System;
-using System.Globalization;
-using System.Linq;
-using Araci.Applications.Abstractions;
-using Araci.Core.Documents;
-using Araci.DTOs;
-using Araci.Models;
-
-namespace Araci.Services.Simulation
-{
-    public class SimulationResultApplier : ISimulationResultApplier
-    {
-        private readonly AraciDocument _document;
-        private readonly Action? _notifyViewModels;
-
-        public SimulationResultApplier(
-            AraciDocument document,
-            Action? notifyViewModels = null)
-        {
-            _document = document ?? throw new ArgumentNullException(nameof(document));
-            _notifyViewModels = notifyViewModels;
-        }
-
-        public void Apply(SimulationResultDto resultado)
-        {
-            if (resultado == null)
-                throw new ArgumentNullException(nameof(resultado));
-
-            foreach (LineResultDto lineResult in resultado.Lines)
-            {
-                Cabo? cabo = _document.Elementos
-                    .OfType<Cabo>()
-                    .FirstOrDefault(c => string.Equals(c.Id.ToString(), lineResult.Id, StringComparison.OrdinalIgnoreCase));
-
-                if (cabo != null)
-                    AplicarCorrentes(cabo, lineResult);
-            }
-
-            foreach (LoadResultDto loadResult in resultado.Loads)
-            {
-                Carga? carga = _document.Elementos
-                    .OfType<Carga>()
-                    .FirstOrDefault(c => string.Equals(c.Id.ToString(), loadResult.Id, StringComparison.OrdinalIgnoreCase));
-
-                if (carga != null)
-                    AplicarCorrentes(carga, loadResult);
-            }
-
-            _notifyViewModels?.Invoke();
-        }
-
-        private static void AplicarCorrentes(Cabo cabo, LineResultDto resultado)
-        {
-            double corrente = resultado.Corrente;
-
-            cabo.CorrenteLinha = FormatPolar(resultado.CorrenteLinha ?? corrente, 0);
-            cabo.CorrenteFaseA = FormatPolar(resultado.CorrenteFaseA ?? corrente, resultado.AnguloFaseA ?? 0);
-            cabo.CorrenteFaseB = FormatPolar(resultado.CorrenteFaseB ?? corrente, resultado.AnguloFaseB ?? -120);
-            cabo.CorrenteFaseC = FormatPolar(resultado.CorrenteFaseC ?? corrente, resultado.AnguloFaseC ?? 120);
-        }
-
-        private static void AplicarCorrentes(Carga carga, LoadResultDto resultado)
-        {
-            double corrente = resultado.Corrente;
-
-            carga.CorrenteLinha = FormatPolar(resultado.CorrenteLinha ?? corrente, 0);
-            carga.CorrenteFaseA = FormatPolar(resultado.CorrenteFaseA ?? corrente, resultado.AnguloFaseA ?? 0);
-            carga.CorrenteFaseB = FormatPolar(resultado.CorrenteFaseB ?? corrente, resultado.AnguloFaseB ?? -120);
-            carga.CorrenteFaseC = FormatPolar(resultado.CorrenteFaseC ?? corrente, resultado.AnguloFaseC ?? 120);
-        }
-
-        private static string FormatPolar(double magnitude, double angle)
-        {
-            return string.Format(
-                CultureInfo.InvariantCulture,
-                "{0:0.##}\u2220{1:0.##}\u00B0",
-                magnitude,
-                angle);
-        }
     }
 }
 

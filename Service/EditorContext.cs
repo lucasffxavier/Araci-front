@@ -95,6 +95,8 @@ namespace Araci.Services
             ExcluirElemento = new ExcluirElementoUseCase(Document, Connectivity, Commands);
             EditarPropriedades = new EditarPropriedadesUseCase(Commands);
             Selection = EditingComposition.CreateSelection(Editor, Events, EditarPropriedades, Settings);
+            SelecionarElementos = new SelecionarElementosUseCase(Selection);
+            AtualizarPropriedadesSelecionadas = new AtualizarPropriedadesSelecionadasUseCase(Selection);
             EditarVerticesCabo = new EditarVerticesCaboUseCase(Commands);
             CableVertexEdit = EditingComposition.CreateCableVertexEdit(
                 Selection,
@@ -126,6 +128,9 @@ namespace Araci.Services
                 Dialogs,
                 Settings,
                 LimparEstadoTransitorioProjeto);
+            NovoProjeto = new NovoProjetoUseCase(Projects);
+            AbrirProjeto = new AbrirProjetoUseCase(Projects);
+            SalvarProjeto = new SalvarProjetoUseCase(Projects);
 
             var moveServices = EditingComposition.CreateMoveServices(
                 () => Viewport,
@@ -202,7 +207,7 @@ namespace Araci.Services
 
         public void RefreshProperties()
         {
-            Selection.RefreshProperties();
+            AtualizarPropriedadesSelecionadas.Executar();
         }
 
         public EditorState Editor { get; } = new EditorState();
@@ -218,8 +223,13 @@ namespace Araci.Services
         public SafeDeleteService SafeDelete { get; }
         public ClipboardService Clipboard { get; }
         public ProjectPersistenceService Projects { get; }
+        public NovoProjetoUseCase NovoProjeto { get; }
+        public AbrirProjetoUseCase AbrirProjeto { get; }
+        public SalvarProjetoUseCase SalvarProjeto { get; }
         public VisualUpdateService VisualUpdates { get; }
         public SelectionService Selection { get; }
+        public SelecionarElementosUseCase SelecionarElementos { get; }
+        public AtualizarPropriedadesSelecionadasUseCase AtualizarPropriedadesSelecionadas { get; }
         public MoveService Move { get; }
         public BarraResizeService BarraResize { get; }
         public RotationService Rotation { get; }

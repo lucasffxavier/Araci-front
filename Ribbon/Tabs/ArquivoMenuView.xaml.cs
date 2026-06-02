@@ -17,17 +17,17 @@ namespace Araci.Ribbon.Tabs
 
         private void Novo_Click(object sender, RoutedEventArgs e)
         {
-            Context?.Projects.Novo();
+            Context?.NovoProjeto.Executar();
         }
 
         private void Abrir_Click(object sender, RoutedEventArgs e)
         {
-            Context?.Projects.AbrirComDialogo();
+            Context?.AbrirProjeto.ExecutarComDialogo();
         }
 
         private void Salvar_Click(object sender, RoutedEventArgs e)
         {
-            Context?.Projects.SalvarComDialogo();
+            Context?.SalvarProjeto.ExecutarComDialogo();
         }
     }
 }
