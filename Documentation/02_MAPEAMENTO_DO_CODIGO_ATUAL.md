@@ -266,9 +266,9 @@ Arquivos principais:
 - `DTOs/CircuitDto.cs`
 - `DTOs/SimulationApiClient.cs`
 - `Infrastructure/Simulation/FastApiOpenDssGateway.cs`
-- `Service/SimulationResultApplier.cs`
-- `Service/SimulationExportService.cs`
-- `Service/SimulationMessageBuilder.cs`
+- `Service/Simulation/SimulationResultApplier.cs`
+- `Service/Simulation/SimulationExportService.cs`
+- `Service/Simulation/SimulationMessageBuilder.cs`
 - `Applications/Analisar/FluxoDeCorrente/FluxoDeCorrenteApplication.cs`
 
 Responsabilidade real:
@@ -366,7 +366,7 @@ Os tipos ficam em `Models/Tipos`:
 - `TipoSin`
 - `TipoTransformador`
 
-`Service/TypeLibraryService.cs` instancia coleções padrão para cabos, cargas, geradores, SIN, transformadores e barras. Exemplos reais:
+`Service/Catalog/TypeLibraryService.cs` instancia coleções padrão para cabos, cargas, geradores, SIN, transformadores e barras. Exemplos reais:
 
 - `TipoCabo` padrão `LC-500MCM`.
 - `TipoCarga` padrão `Carga MT`.
@@ -386,7 +386,7 @@ Conexões são representadas principalmente por:
 - `Models/TerminalDirection.cs`
 - `Models/TerminalPlacement.cs`
 - `Models/Cabo.cs`
-- `Service/ConnectivityService.cs`
+- `Service/Topology/ConnectivityService.cs`
 
 `Terminal` contém:
 
@@ -417,16 +417,16 @@ Conexões são representadas principalmente por:
 
 A topologia elétrica é tratada por:
 
-- `Service/ElectricGraph.cs`
-- `Service/ElectricGraphBuilder.cs`
-- `Service/ElectricGraphNode.cs`
-- `Service/ElectricGraphEdge.cs`
-- `Service/ElectricGraphTerminal.cs`
-- `Service/TopologyValidator.cs`
-- `Service/TopologyValidationResult.cs`
-- `Service/TopologyIssue.cs`
-- `Service/OperationalGraphState.cs`
-- `Service/OperationalGraphStateBuilder.cs`
+- `Service/Topology/ElectricGraph.cs`
+- `Service/Topology/ElectricGraphBuilder.cs`
+- `Service/Topology/ElectricGraphNode.cs`
+- `Service/Topology/ElectricGraphEdge.cs`
+- `Service/Topology/ElectricGraphTerminal.cs`
+- `Service/Topology/TopologyValidator.cs`
+- `Service/Topology/TopologyValidationResult.cs`
+- `Service/Topology/TopologyIssue.cs`
+- `Service/Topology/OperationalGraphState.cs`
+- `Service/Topology/OperationalGraphStateBuilder.cs`
 
 `ElectricGraphBuilder` cria nós para elementos que participam do grafo elétrico e são `ITerminalOwner`, exceto `Cabo`. Cabos viram arestas. A validação de aresta verifica origem, destino, existência de elemento, existência de terminal, conexão com o mesmo elemento, mesmo terminal e duplicidade.
 
@@ -789,18 +789,18 @@ O código trata a API como endpoint FastAPI/OpenDSS, mas o serviço Python/FastA
 
 ## 9.5 Aplicação de resultados
 
-`Service/SimulationResultApplier.cs` aplica resultados:
+`Service/Simulation/SimulationResultApplier.cs` aplica resultados:
 
 - `LineResultDto` atualiza `Cabo.CorrenteLinha`, `CorrenteFaseA`, `CorrenteFaseB`, `CorrenteFaseC`.
 - `LoadResultDto` atualiza `Carga.CorrenteLinha`, `CorrenteFaseA`, `CorrenteFaseB`, `CorrenteFaseC`.
 - O formato usado é polar, com símbolo de ângulo e grau.
 
-`Service/SimulationExportService.cs` exporta:
+`Service/Simulation/SimulationExportService.cs` exporta:
 
 - script `.dss`;
 - JSON de resultado.
 
-`Service/SimulationMessageBuilder.cs` monta mensagem de sucesso/falha, avisos, caminho DSS e script gerado.
+`Service/Simulation/SimulationMessageBuilder.cs` monta mensagem de sucesso/falha, avisos, caminho DSS e script gerado.
 
 # 10. Scene Graph e Rendering
 
@@ -847,7 +847,7 @@ Arquivos em `Core/Rendering`:
 
 `Core/Viewport/Camera.cs` mantém zoom e offset com `INotifyPropertyChanged`.
 
-`Service/ViewportService.cs` e `Service/ViewportNavigationService.cs` coordenam tamanho de viewport, conversão tela/mundo, pan e zoom. `ViewportView.xaml.cs` aplica a câmera por `MatrixTransform` nas camadas principais.
+`Service/Viewport/ViewportService.cs` e `Service/Viewport/ViewportNavigationService.cs` coordenam tamanho de viewport, conversão tela/mundo, pan e zoom. `ViewportView.xaml.cs` aplica a câmera por `MatrixTransform` nas camadas principais.
 
 # 11. Fluxos Principais
 
@@ -897,7 +897,7 @@ Arquivos envolvidos:
 - `Applications/Editor/InputRouter.cs`
 - `Applications/Editar/Selecionar/SelecionarTool.cs`
 - `Applications/Editar/Selecionar/SelectionController.cs`
-- `Service/SelectionService.cs`
+- `Service/Editing/SelectionService.cs`
 - `Core/SceneQueries/SceneQueryService.cs`
 
 ## 11.3 Movimentação
@@ -921,10 +921,10 @@ SelecionarTool detecta elemento selecionado
 Arquivos envolvidos:
 
 - `Applications/Editar/Selecionar/DragMoveController.cs`
-- `Service/MoveService.cs`
+- `Service/Editing/MoveService.cs`
 - `Applications/UseCases/Editar/MoverElementoUseCase.cs`
 - `Core/Commands/MoveElementoCommand.cs`
-- `Service/ConnectivityService.cs`
+- `Service/Topology/ConnectivityService.cs`
 
 ## 11.4 Rotação
 
@@ -944,7 +944,7 @@ Arquivos envolvidos:
 
 - `Applications/Editor/InputRouter.cs`
 - `Applications/Editar/Selecionar/SelecionarTool.cs`
-- `Service/RotationService.cs`
+- `Service/Editing/RotationService.cs`
 - `Applications/UseCases/Editar/RotacionarElementoUseCase.cs`
 - `Core/Commands/RotateElementoCommand.cs`
 
@@ -969,8 +969,8 @@ Arquivos envolvidos:
 
 - `Applications/Diagrama/InserirCabo/InserirCabo.cs`
 - `Applications/UseCases/Diagrama/InserirCaboUseCase.cs`
-- `Service/SnapService.cs`
-- `Service/ConnectivityService.cs`
+- `Service/Interaction/SnapService.cs`
+- `Service/Topology/ConnectivityService.cs`
 - `ViewModels/CaboViewModel.cs`
 - `Models/Cabo.cs`
 

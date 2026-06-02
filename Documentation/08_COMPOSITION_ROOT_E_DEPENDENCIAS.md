@@ -4,6 +4,8 @@ Este documento descreve a composição de objetos e o gerenciamento de dependên
 
 A composição atual não usa um container de injeção de dependência externo. O código monta explicitamente objetos por construtores, concentrando a maior parte da criação em `Service/EditorContext.cs` e em classes auxiliares de composição localizadas em `Service/Composition`. Essa abordagem torna a cadeia de dependências visível no código, embora também concentre muitas responsabilidades de montagem em um ponto central.
 
+A pasta `Service` está organizada em grupos por responsabilidade (`Catalog`, `Composition`, `Editing`, `Geometry`, `Interaction`, `Naming`, `Settings`, `Simulation`, `Topology`, `UI` e `Viewport`). A raiz de `Service` mantém apenas `EditorContext.cs` e `EditorState.cs`.
+
 Os principais arquivos analisados para este documento são:
 
 | Arquivo | Papel na composição |
@@ -911,4 +913,3 @@ Em uma arquitetura-alvo baseada em Use Cases, Domain-Centric Design, Service Lay
 O desenho atual já contém blocos compatíveis com a arquitetura-alvo: use cases, abstrações (`IProjectPersistenceService`, `ISimulationPipeline`, `ISimulationGateway`, `IElementCatalog`, `IElementModelFactory`, `IElementViewModelFactory`), serviços de aplicação e composições separadas por área. A principal diferença é que o `EditorContext` ainda acumula o papel de contexto de sessão, service locator para a UI e composition root de alto nível.
 
 Uma evolução natural seria preservar a clareza da composição manual, mas reduzir o acoplamento dos code-behinds ao contexto completo, expondo ViewModels ou facades mais específicos para arquivo, edição, diagrama, análise e viewport. Isso aproximaria a aplicação de um desenho mais modular sem contradizer os contratos e serviços já existentes no código.
-

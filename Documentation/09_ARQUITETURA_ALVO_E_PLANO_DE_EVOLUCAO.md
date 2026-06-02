@@ -118,7 +118,7 @@ O código atual possui separação física parcial:
 - `Models`: elementos de domínio, terminais, parâmetros e tipos;
 - `Core`: documento, comandos, scene, rendering, spatial e viewport;
 - `Applications`: use cases, factories, editor, simulação e projetos;
-- `Service`: serviços de edição, topologia, composição, geometria, seleção e viewport;
+- `Service`: serviços organizados por responsabilidade em `Catalog`, `Composition`, `Editing`, `Geometry`, `Interaction`, `Naming`, `Settings`, `Simulation`, `Topology`, `UI` e `Viewport`, com `EditorContext.cs` e `EditorState.cs` na raiz;
 - `Infrastructure`: persistência e simulação externa;
 - `DTOs`: DTOs e lógica de leitura/construção de circuito para simulação;
 - `ViewModels`, `Views`, `Controls`, `Ribbon`, `Properties`: apresentação WPF.
@@ -685,4 +685,3 @@ A Arquitetura Alvo não exige descartar essa base. Ela propõe tornar as frontei
 Essa evolução é especialmente importante porque a visão do Araci vai além de um editor gráfico. Catálogo, anotações, blocos, DXF, DWG, IFC, múltiplos diagramas, GIS, ERP e 3D só podem ser incorporados de forma sustentável se reforçarem o núcleo do produto: modelagem elétrica estruturada, persistível, editável, validável e preparada para simulação.
 
 Portanto, a arquitetura alvo suporta a evolução para uma plataforma CAD/BIM elétrica completa porque preserva o centro de domínio já existente e organiza a expansão em torno de contratos, use cases, serviços e adaptadores. O caminho recomendado é incremental: consolidar o que já existe, reduzir acoplamentos reais e introduzir novas capacidades planejadas sem quebrar a coerência do modelo elétrico.
-

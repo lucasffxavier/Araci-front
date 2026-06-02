@@ -153,6 +153,17 @@ Properties/
 Resources/
 Ribbon/
 Service/
+  Catalog/
+  Composition/
+  Editing/
+  Geometry/
+  Interaction/
+  Naming/
+  Settings/
+  Simulation/
+  Topology/
+  UI/
+  Viewport/
 ViewModels/
 Views/
 Araci.TechnicalChecks/

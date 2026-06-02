@@ -1,4 +1,4 @@
-// Service/SnapService.cs
+// Service/Interaction/SnapService.cs
 
 using System;
 using System.Collections.Generic;
