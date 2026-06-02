@@ -8,6 +8,7 @@ using Araci.Core.SceneQueries;
 using Araci.Services;
 using Araci.ViewModels;
 using Araci.Services.Editing;
+using Araci.Services.Interaction;
 
 namespace Araci.Applications.Editar.Alinhar
 {

@@ -4,7 +4,7 @@ using Araci.Applications.Abstractions;
 using Araci.Core.SceneQueries;
 using Araci.ViewModels;
 
-namespace Araci.Services
+namespace Araci.Services.Interaction
 {
     public class HoverService : IHoverService
     {

@@ -1,4 +1,5 @@
 using System.Windows;
+using Araci.Services.Interaction;
 
 namespace Araci.Applications.Abstractions
 {

@@ -15,6 +15,7 @@ using Araci.Services.Topology;
 using Araci.Services.Editing;
 using Araci.Services.Viewport;
 using Araci.Services.Settings;
+using Araci.Services.Interaction;
 
 namespace Araci.Services.Composition
 {

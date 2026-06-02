@@ -12,6 +12,7 @@ using Araci.ViewModels;
 using CoreScene = Araci.Core.Scenes.Scene;
 using Araci.Services.Topology;
 using Araci.Services.Editing;
+using Araci.Services.Interaction;
 
 namespace Araci.Applications.Diagrama.InserirCabo
 {

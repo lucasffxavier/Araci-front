@@ -9,6 +9,7 @@ using Araci.Applications.Editar.Selecionar;
 using Araci.Services;
 using Araci.ViewModels;
 using Araci.Services.Editing;
+using Araci.Services.Interaction;
 
 namespace Araci.Applications.Editor
 {

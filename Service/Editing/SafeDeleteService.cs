@@ -6,6 +6,7 @@ using Araci.Applications.UseCases.Editar;
 using Araci.Core.SceneQueries;
 using Araci.ViewModels;
 using Araci.Services;
+using Araci.Services.Interaction;
 
 namespace Araci.Services.Editing
 {

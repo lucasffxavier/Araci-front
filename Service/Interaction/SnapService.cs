@@ -9,7 +9,7 @@ using Araci.Models;
 using Araci.Services.Settings;
 using Araci.ViewModels;
 
-namespace Araci.Services
+namespace Araci.Services.Interaction
 {
     public class SnapService
     {

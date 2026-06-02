@@ -9,6 +9,7 @@ using Araci.Services.Topology;
 using Araci.Services.UI;
 using Araci.Services.Settings;
 using Araci.Services.Catalog;
+using Araci.Services.Interaction;
 
 namespace Araci.Services.Composition
 {
