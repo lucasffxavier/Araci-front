@@ -19,21 +19,24 @@ namespace Araci.ViewModels
     {
         private readonly IReadOnlyList<ElementoViewModel> _selecionados;
         private readonly EditarPropriedadesUseCase? _editarPropriedades;
+        private readonly EditorSettings _settings;
         private object? _elementoSelecionado;
         private ICommand? _abrirPropriedadesTipoCommand;
 
         public PropertiesViewModel()
         {
             _selecionados = Array.Empty<ElementoViewModel>();
+            _settings = new EditorSettings();
         }
 
-        public PropertiesViewModel(IEnumerable<ElementoViewModel> selecionados, EditarPropriedadesUseCase? editarPropriedades = null)
+        public PropertiesViewModel(IEnumerable<ElementoViewModel> selecionados, EditarPropriedadesUseCase? editarPropriedades = null, EditorSettings? settings = null)
         {
             _selecionados = selecionados?.Where(e => e != null).ToList() ?? new List<ElementoViewModel>();
             _editarPropriedades = editarPropriedades;
+            _settings = settings ?? new EditorSettings();
             QuantidadeSelecionada = _selecionados.Count;
             Titulo = CriarTitulo(_selecionados);
-            Propriedades = new ObservableCollection<PropertyDescriptorViewModel>(CriarDescritores(_selecionados, _editarPropriedades));
+            Propriedades = new ObservableCollection<PropertyDescriptorViewModel>(CriarDescritores(_selecionados, _editarPropriedades, _settings));
         }
 
         public object? ElementoSelecionado
@@ -106,7 +109,7 @@ namespace Araci.ViewModels
             return $"{itens.Count} elementos selecionados";
         }
 
-        private static IEnumerable<PropertyDescriptorViewModel> CriarDescritores(IReadOnlyList<ElementoViewModel> itens, EditarPropriedadesUseCase? editarPropriedades)
+        private static IEnumerable<PropertyDescriptorViewModel> CriarDescritores(IReadOnlyList<ElementoViewModel> itens, EditarPropriedadesUseCase? editarPropriedades, EditorSettings settings)
         {
             if (itens.Count == 0)
                 yield break;
@@ -128,7 +131,7 @@ namespace Araci.ViewModels
                 object? primeiro = valores[0];
                 bool varia = valores.Skip(1).Any(v => !ValoresIguais(primeiro, v));
 
-                yield return new PropertyDescriptorViewModel(itens, descriptor, tipoValor, varia, editavel, editarPropriedades);
+                yield return new PropertyDescriptorViewModel(itens, descriptor, tipoValor, varia, editavel, editarPropriedades, settings);
             }
         }
 
@@ -191,6 +194,11 @@ namespace Araci.ViewModels
             return UnitFormatter.Format(valor, descriptor.Unit);
         }
 
+        internal static string FormatarValor(object? valor, UnitKind baseUnit, UnitKind displayUnit)
+        {
+            return UnitFormatter.Format(valor, baseUnit, displayUnit);
+        }
+
         internal static bool TentarConverterValor(string valor, Type tipoDestino, out object? convertido)
         {
             return TentarConverterValor(valor, tipoDestino, UnitKind.None, out convertido);
@@ -201,11 +209,21 @@ namespace Araci.ViewModels
             return TentarConverterValor(valor, tipoDestino, descriptor.Unit, out convertido);
         }
 
+        internal static bool TentarConverterValor(string valor, Type tipoDestino, UnitKind baseUnit, UnitKind displayUnit, out object? convertido)
+        {
+            return TentarConverterValorConvertendo(valor, tipoDestino, displayUnit, baseUnit, out convertido);
+        }
+
         internal static bool TentarConverterValor(string valor, Type tipoDestino, UnitKind unit, out object? convertido)
+        {
+            return TentarConverterValorConvertendo(valor, tipoDestino, unit, unit, out convertido);
+        }
+
+        private static bool TentarConverterValorConvertendo(string valor, Type tipoDestino, UnitKind displayUnit, UnitKind baseUnit, out object? convertido)
         {
             convertido = null;
             Type tipo = Nullable.GetUnderlyingType(tipoDestino) ?? tipoDestino;
-            string valorSemUnidade = UnitFormatter.StripUnit(valor, unit);
+            string valorSemUnidade = UnitFormatter.StripUnit(valor, displayUnit);
 
             try
             {
@@ -229,7 +247,7 @@ namespace Araci.ViewModels
                     if (!double.TryParse(valorSemUnidade, NumberStyles.Float | NumberStyles.AllowThousands, CultureInfo.CurrentCulture, out double d))
                         return false;
 
-                    convertido = UnitFormatter.FromDisplay(d, unit);
+                    convertido = UnitFormatter.FromDisplay(d, displayUnit, baseUnit);
                     return true;
                 }
 
@@ -238,7 +256,7 @@ namespace Araci.ViewModels
                     if (!float.TryParse(valorSemUnidade, NumberStyles.Float | NumberStyles.AllowThousands, CultureInfo.CurrentCulture, out float f))
                         return false;
 
-                    convertido = (float)UnitFormatter.FromDisplay(f, unit);
+                    convertido = (float)UnitFormatter.FromDisplay(f, displayUnit, baseUnit);
                     return true;
                 }
 
@@ -247,7 +265,7 @@ namespace Araci.ViewModels
                     if (!decimal.TryParse(valorSemUnidade, NumberStyles.Float | NumberStyles.AllowThousands, CultureInfo.CurrentCulture, out decimal m))
                         return false;
 
-                    convertido = (decimal)UnitFormatter.FromDisplay((double)m, unit);
+                    convertido = (decimal)UnitFormatter.FromDisplay((double)m, displayUnit, baseUnit);
                     return true;
                 }
 
@@ -337,6 +355,11 @@ namespace Araci.ViewModels
         private string _mensagemErro = string.Empty;
 
         public PropertyDescriptorViewModel(IReadOnlyList<ElementoViewModel> elementos, InstancePropertyDescriptor descriptor, Type tipoValor, bool varia, bool isEditable, EditarPropriedadesUseCase? editarPropriedades = null)
+            : this(elementos, descriptor, tipoValor, varia, isEditable, editarPropriedades, null)
+        {
+        }
+
+        public PropertyDescriptorViewModel(IReadOnlyList<ElementoViewModel> elementos, InstancePropertyDescriptor descriptor, Type tipoValor, bool varia, bool isEditable, EditarPropriedadesUseCase? editarPropriedades, EditorSettings? settings)
         {
             _elementos = elementos;
             _descriptor = descriptor;
@@ -345,21 +368,25 @@ namespace Araci.ViewModels
             Nome = descriptor.DisplayName;
             DisplayName = descriptor.DisplayName;
             PropertyName = descriptor.PropertyName;
-            Unit = descriptor.Unit;
-            UnitSymbol = descriptor.UnitSymbol;
+            BaseUnit = descriptor.Unit;
+            DisplayUnit = ResolveDisplayUnit(BaseUnit, settings);
+            Unit = DisplayUnit;
+            UnitSymbol = UnitFormatter.GetSymbol(DisplayUnit);
             IsEditable = isEditable;
             IsReadOnly = !isEditable;
             _varia = varia;
-            _valor = varia ? "<varia>" : PropertiesViewModel.FormatarValor(ObterValorAtual(), descriptor);
+            _valor = varia ? "<varia>" : PropertiesViewModel.FormatarValor(ObterValorAtual(), BaseUnit, DisplayUnit);
         }
 
         public string Nome { get; }
         public string DisplayName { get; }
         public string PropertyName { get; }
         public Type ValueType => _tipoValor;
+        public UnitKind BaseUnit { get; }
+        public UnitKind DisplayUnit { get; }
         public UnitKind Unit { get; }
         public string UnitSymbol { get; }
-        public bool HasUnit => Unit != UnitKind.None;
+        public bool HasUnit => DisplayUnit != UnitKind.None;
         public bool IsEditable { get; }
         public bool IsReadOnly { get; }
         public bool IsMixed => _varia;
@@ -414,7 +441,7 @@ namespace Araci.ViewModels
             if (string.Equals(novoValor, "<varia>", StringComparison.OrdinalIgnoreCase))
                 return;
 
-            if (!PropertiesViewModel.TentarConverterValor(novoValor, _tipoValor, _descriptor, out object? convertido))
+            if (!PropertiesViewModel.TentarConverterValor(novoValor, _tipoValor, BaseUnit, DisplayUnit, out object? convertido))
             {
                 TemErro = true;
                 MensagemErro = "Valor inválido";
@@ -428,15 +455,24 @@ namespace Araci.ViewModels
 
             if (!alterou)
             {
-                _valor = PropertiesViewModel.FormatarValor(convertido, _descriptor);
+                _valor = PropertiesViewModel.FormatarValor(convertido, BaseUnit, DisplayUnit);
                 _varia = false;
                 AtualizarEstadoValido();
                 return;
             }
 
             _varia = false;
-            _valor = PropertiesViewModel.FormatarValor(convertido, _descriptor);
+            _valor = PropertiesViewModel.FormatarValor(convertido, BaseUnit, DisplayUnit);
             AtualizarEstadoValido();
+        }
+
+        private static UnitKind ResolveDisplayUnit(UnitKind baseUnit, EditorSettings? settings)
+        {
+            if (baseUnit == UnitKind.None)
+                return UnitKind.None;
+
+            UnitQuantityKind quantity = UnitFormatter.GetQuantity(baseUnit);
+            return settings?.Units.Resolve(quantity) ?? baseUnit;
         }
 
         private void AtualizarEstadoValido()

@@ -41,9 +41,10 @@ namespace Araci.Services.Composition
         public static SelectionService CreateSelection(
             EditorState editor,
             IEventBus events,
-            EditarPropriedadesUseCase editarPropriedades)
+            EditarPropriedadesUseCase editarPropriedades,
+            EditorSettings settings)
         {
-            return new SelectionService(editor, events, editarPropriedades);
+            return new SelectionService(editor, events, editarPropriedades, settings);
         }
 
         public static CableVertexEditService CreateCableVertexEdit(

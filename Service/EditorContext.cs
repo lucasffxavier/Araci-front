@@ -91,7 +91,7 @@ namespace Araci.Services
             ColarElementos = new ColarElementosUseCase(CopiarElementos, Document, Names, Commands, ObterDestinoColagem);
             ExcluirElemento = new ExcluirElementoUseCase(Document, Connectivity, Commands);
             EditarPropriedades = new EditarPropriedadesUseCase(Commands);
-            Selection = EditingComposition.CreateSelection(Editor, Events, EditarPropriedades);
+            Selection = EditingComposition.CreateSelection(Editor, Events, EditarPropriedades, Settings);
             EditarVerticesCabo = new EditarVerticesCaboUseCase(Commands);
             CableVertexEdit = EditingComposition.CreateCableVertexEdit(
                 Selection,

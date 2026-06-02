@@ -5,6 +5,7 @@ using System.Linq;
 using Araci.Applications.Abstractions;
 using Araci.Applications.UseCases.Editar;
 using Araci.Core.Events;
+using Araci.Services.Settings;
 using Araci.ViewModels;
 
 namespace Araci.Services.Editing
@@ -14,16 +15,19 @@ namespace Araci.Services.Editing
         private readonly EditorState _editorState;
         private readonly IEventBus _events;
         private readonly EditarPropriedadesUseCase _editarPropriedades;
+        private readonly EditorSettings _settings;
         private readonly ObservableCollection<ElementoViewModel> _selecionados = new();
 
         public SelectionService(
             EditorState editorState,
             IEventBus events,
-            EditarPropriedadesUseCase editarPropriedades)
+            EditarPropriedadesUseCase editarPropriedades,
+            EditorSettings? settings = null)
         {
             _editorState = editorState ?? throw new ArgumentNullException(nameof(editorState));
             _events = events ?? throw new ArgumentNullException(nameof(events));
             _editarPropriedades = editarPropriedades ?? throw new ArgumentNullException(nameof(editarPropriedades));
+            _settings = settings ?? new EditorSettings();
         }
 
         public IReadOnlyList<ElementoViewModel> Selecionados => _selecionados;
@@ -89,7 +93,7 @@ namespace Araci.Services.Editing
             {
                 0 => null,
                 1 => _selecionados[0],
-                _ => new PropertiesViewModel(_selecionados, _editarPropriedades)
+                _ => new PropertiesViewModel(_selecionados, _editarPropriedades, _settings)
             };
         }
 

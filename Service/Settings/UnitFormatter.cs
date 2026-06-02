@@ -60,18 +60,24 @@ namespace Araci.Services.Settings
 
         public static string Format(object? value, UnitKind unit)
         {
+            UnitKind baseUnit = GetBaseUnit(GetQuantity(unit));
+            return Format(value, baseUnit, unit);
+        }
+
+        public static string Format(object? value, UnitKind baseUnit, UnitKind displayUnit)
+        {
             if (value == null)
                 return string.Empty;
 
             string text = value switch
             {
-                double d => ToDisplay(d, unit).ToString("N2", CultureInfo.CurrentCulture),
-                float f => ToDisplay(f, unit).ToString("N2", CultureInfo.CurrentCulture),
-                decimal m => ((decimal)ToDisplay((double)m, unit)).ToString("N2", CultureInfo.CurrentCulture),
+                double d => ToDisplay(d, baseUnit, displayUnit).ToString("N2", CultureInfo.CurrentCulture),
+                float f => ToDisplay(f, baseUnit, displayUnit).ToString("N2", CultureInfo.CurrentCulture),
+                decimal m => ((decimal)ToDisplay((double)m, baseUnit, displayUnit)).ToString("N2", CultureInfo.CurrentCulture),
                 _ => value.ToString() ?? string.Empty
             };
 
-            string symbol = GetSymbol(unit);
+            string symbol = GetSymbol(displayUnit);
             return string.IsNullOrWhiteSpace(symbol) ? text : $"{text} {symbol}";
         }
 
@@ -96,12 +102,22 @@ namespace Araci.Services.Settings
         public static double ToDisplay(double baseValue, UnitKind displayUnit)
         {
             UnitKind baseUnit = GetBaseUnit(GetQuantity(displayUnit));
+            return ToDisplay(baseValue, baseUnit, displayUnit);
+        }
+
+        public static double ToDisplay(double baseValue, UnitKind baseUnit, UnitKind displayUnit)
+        {
             return Convert(baseValue, baseUnit, displayUnit);
         }
 
         public static double FromDisplay(double displayValue, UnitKind displayUnit)
         {
             UnitKind baseUnit = GetBaseUnit(GetQuantity(displayUnit));
+            return FromDisplay(displayValue, displayUnit, baseUnit);
+        }
+
+        public static double FromDisplay(double displayValue, UnitKind displayUnit, UnitKind baseUnit)
+        {
             return Convert(displayValue, displayUnit, baseUnit);
         }
 
@@ -144,3 +160,4 @@ namespace Araci.Services.Settings
         }
     }
 }
+

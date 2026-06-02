@@ -21,6 +21,7 @@ using Araci.ViewModels;
 using Araci.Services.Topology;
 using Araci.Services.Editing;
 using Araci.Services.Catalog;
+using Araci.Services.Settings;
 
 namespace Araci.TechnicalChecks
 {
@@ -105,6 +106,12 @@ namespace Araci.TechnicalChecks
                 ("Catalogo preserva Ribbon ordem e atalhos", CatalogoPreservaRibbonOrdemEAtalhos),
                 ("Catalogo preserva propriedades nao editaveis", CatalogoPreservaPropriedadesNaoEditaveis),
                 ("Catalogo preserva edicao mista", CatalogoPreservaEdicaoMista),
+                ("UnitFormatter converte kV e V", UnitFormatterConverteKvEVolt),
+                ("UnitFormatter converte m e km", UnitFormatterConverteMetroEKilometro),
+                ("PropertiesViewModel default mantem kV", PropertiesViewModelDefaultMantemKv),
+                ("PropertiesViewModel exibe tensao em V", PropertiesViewModelExibeTensaoEmVolt),
+                ("PropertiesViewModel edita tensao em V e salva kV", PropertiesViewModelEditaTensaoEmVoltESalvaKv),
+                ("PropertiesViewModel edita comprimento em km e salva m", PropertiesViewModelEditaComprimentoEmKmESalvaMetro),
                 ("DocumentSceneSync cria ViewModel ao adicionar elemento", DocumentSceneSyncCriaViewModelAoAdicionarElemento),
                 ("DocumentSceneSync remove ViewModel ao remover elemento", DocumentSceneSyncRemoveViewModelAoRemoverElemento),
                 ("DocumentSceneSync limpa Scene ao limpar Document", DocumentSceneSyncLimpaSceneAoLimparDocument),
@@ -1684,6 +1691,82 @@ namespace Araci.TechnicalChecks
             Assert(!context.Elements.CanEditAcrossMixedTypes(vms, "Nome"), "Nome nao deve permitir edicao mista.");
         }
 
+        private static void UnitFormatterConverteKvEVolt()
+        {
+            AssertEqual(13800.0, UnitFormatter.Convert(13.8, UnitKind.VoltageKV, UnitKind.VoltageVolt), "13.8 kV em V");
+            AssertEqual(13.8, UnitFormatter.Convert(13800.0, UnitKind.VoltageVolt, UnitKind.VoltageKV), "13800 V em kV");
+        }
+
+        private static void UnitFormatterConverteMetroEKilometro()
+        {
+            AssertEqual(2.0, UnitFormatter.Convert(2000.0, UnitKind.LengthMeter, UnitKind.LengthKilometer), "2000 m em km");
+            AssertEqual(2000.0, UnitFormatter.Convert(2.0, UnitKind.LengthKilometer, UnitKind.LengthMeter), "2 km em m");
+        }
+
+        private static void PropertiesViewModelDefaultMantemKv()
+        {
+            EditorContext context = CreateContextWithViewport();
+            Transformador transformador = CreateTransformador("TR-UNITS-DEFAULT");
+            context.Document.AdicionarElemento(transformador);
+
+            PropertyDescriptorViewModel propriedade = GetPropertyRow(
+                new PropertiesViewModel(new[] { GetVm(context, transformador) }, context.EditarPropriedades, context.Settings),
+                "TensaoPrimarioKV");
+
+            AssertEqual(UnitKind.VoltageKV, propriedade.BaseUnit, "BaseUnit default");
+            AssertEqual(UnitKind.VoltageKV, propriedade.DisplayUnit, "DisplayUnit default");
+            AssertEqual("kV", propriedade.UnitSymbol, "UnitSymbol default");
+        }
+
+        private static void PropertiesViewModelExibeTensaoEmVolt()
+        {
+            EditorContext context = CreateContextWithViewport();
+            context.Settings.Units.Voltage = UnitKind.VoltageVolt;
+            Transformador transformador = CreateTransformador("TR-UNITS-V");
+            context.Document.AdicionarElemento(transformador);
+
+            PropertyDescriptorViewModel propriedade = GetPropertyRow(
+                new PropertiesViewModel(new[] { GetVm(context, transformador) }, context.EditarPropriedades, context.Settings),
+                "TensaoPrimarioKV");
+
+            AssertEqual(UnitKind.VoltageKV, propriedade.BaseUnit, "BaseUnit tensao em V");
+            AssertEqual(UnitKind.VoltageVolt, propriedade.DisplayUnit, "DisplayUnit tensao em V");
+            Assert(propriedade.Valor.Contains("13.800") || propriedade.Valor.Contains("13,800"), "Tensao deve ser exibida convertida para V.");
+            Assert(propriedade.Valor.EndsWith(" V", StringComparison.Ordinal), "Tensao deve exibir simbolo V.");
+        }
+
+        private static void PropertiesViewModelEditaTensaoEmVoltESalvaKv()
+        {
+            EditorContext context = CreateContextWithViewport();
+            context.Settings.Units.Voltage = UnitKind.VoltageVolt;
+            Transformador transformador = CreateTransformador("TR-UNITS-EDIT-V");
+            context.Document.AdicionarElemento(transformador);
+
+            PropertyDescriptorViewModel propriedade = GetPropertyRow(
+                new PropertiesViewModel(new[] { GetVm(context, transformador) }, context.EditarPropriedades, context.Settings),
+                "TensaoPrimarioKV");
+
+            propriedade.Valor = "13800 V";
+
+            AssertEqual(13.8, transformador.TensaoPrimarioKV, "TensaoPrimarioKV apos edicao em V");
+        }
+
+        private static void PropertiesViewModelEditaComprimentoEmKmESalvaMetro()
+        {
+            EditorContext context = CreateContextWithViewport();
+            context.Settings.Units.Length = UnitKind.LengthKilometer;
+            Barra barra = CreateBar("BARRA-UNITS-KM");
+            context.Document.AdicionarElemento(barra);
+
+            PropertyDescriptorViewModel propriedade = GetPropertyRow(
+                new PropertiesViewModel(new[] { GetVm(context, barra) }, context.EditarPropriedades, context.Settings),
+                "Altura");
+
+            propriedade.Valor = "2 km";
+
+            AssertEqual(2000.0, barra.Altura, "Altura apos edicao em km");
+        }
+
         private static void DocumentSceneSyncCriaViewModelAoAdicionarElemento()
         {
             EditorContext context = CreateContextWithViewport();
@@ -2944,6 +3027,16 @@ namespace Araci.TechnicalChecks
                 throw new InvalidOperationException($"Propriedade '{propertyName}' nao encontrada em {viewModelType.Name}.");
 
             return descriptor;
+        }
+
+        private static PropertyDescriptorViewModel GetPropertyRow(PropertiesViewModel properties, string propertyName)
+        {
+            PropertyDescriptorViewModel? row = properties.Propriedades.FirstOrDefault(p => p.PropertyName == propertyName);
+
+            if (row == null)
+                throw new InvalidOperationException($"Linha de propriedade '{propertyName}' nao encontrada.");
+
+            return row;
         }
 
         private static AraciDocument CreateBranchDocument()
