@@ -16,6 +16,7 @@ using Araci.Applications.Editar.Mover;
 using Araci.Applications.Editar.Selecionar;
 using Araci.Applications.Projects;
 using Araci.Applications.Simulation;
+using Araci.Applications.UseCases.Analise;
 using Araci.Applications.UseCases.Editar;
 using Araci.Applications.UseCases.Diagrama;
 using Araci.Applications.UseCases.Projeto;
@@ -62,11 +63,12 @@ namespace Araci.Services
             Geometry = core.Geometry;
             TerminalLayout = core.TerminalLayout;
 
-            var simulation = SimulationComposition.Create(Document, NotifySimulationResultViewModels);
+            var simulation = SimulationComposition.Create(Document, NotifySimulationResultViewModels, Dialogs);
             SimulationResults = simulation.Results;
             Simulation = simulation.Pipeline;
             SimulationExport = simulation.Export;
             SimulationMessages = simulation.Messages;
+            ExecutarSimulacao = simulation.ExecutarSimulacao;
 
             VisualUpdates = EditingComposition.CreateVisualUpdates(
                 () => Viewport,
@@ -231,6 +233,7 @@ namespace Araci.Services
         public SimulationPipeline Simulation { get; }
         public SimulationExportService SimulationExport { get; }
         public SimulationMessageBuilder SimulationMessages { get; }
+        public ExecutarSimulacaoUseCase ExecutarSimulacao { get; }
         public TypePropertiesDialogService TypePropertiesDialogs { get; }
         public DialogService Dialogs { get; }
         public ElementGeometryService Geometry { get; }

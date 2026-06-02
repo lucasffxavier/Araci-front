@@ -4,12 +4,15 @@ using System.IO;
 using System.Linq;
 using System.Text.Json;
 using System.Threading;
+using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Input;
 using Araci.API;
 using Araci.Applications.Abstractions;
+using Araci.Applications.Analisar.FluxoDeCorrente;
 using Araci.Applications.Diagrama;
 using Araci.Applications.Editar.Base;
+using Araci.Applications.UseCases.Analise;
 using Araci.Applications.UseCases.Projeto;
 using Araci.Core.Commands;
 using Araci.Core.Documents;
@@ -25,6 +28,7 @@ using Araci.Services.Topology;
 using Araci.Services.Editing;
 using Araci.Services.Catalog;
 using Araci.Services.Settings;
+using Araci.Services.Simulation;
 
 namespace Araci.TechnicalChecks
 {
@@ -122,6 +126,12 @@ namespace Araci.TechnicalChecks
                 ("AlterarUnidadesProjetoUseCase aplica VoltageVolt", AlterarUnidadesProjetoUseCaseAplicaVoltageVolt),
                 ("AlterarUnidadesProjetoUseCase chama refresh", AlterarUnidadesProjetoUseCaseChamaRefresh),
                 ("AlterarUnidadesProjetoUseCase preserva copia completa", AlterarUnidadesProjetoUseCasePreservaCopiaCompleta),
+                ("ExecutarSimulacaoUseCase chama pipeline", ExecutarSimulacaoUseCaseChamaPipeline),
+                ("ExecutarSimulacaoUseCase atualiza Resultado", ExecutarSimulacaoUseCaseAtualizaResultado),
+                ("ExecutarSimulacaoUseCase mostra mensagem", ExecutarSimulacaoUseCaseMostraMensagem),
+                ("FluxoDeCorrenteApplication delega para use case", FluxoDeCorrenteApplicationDelegaParaUseCase),
+                ("ExecutarSimulacaoUseCase mostra warning em excecao", ExecutarSimulacaoUseCaseMostraWarningEmExcecao),
+                ("ExecutarSimulacaoUseCase sem options nao confirma exportacao", ExecutarSimulacaoUseCaseSemOptionsNaoConfirmaExportacao),
                 ("UnitValueConverter usa settings em runtime", UnitValueConverterUsaSettingsEmRuntime),
                 ("UnitValueConverter converte edicao para unidade base", UnitValueConverterConverteEdicaoParaUnidadeBase),
                 ("Persistencia salva Units no JSON", PersistenciaSalvaUnitsNoJson),
@@ -1895,6 +1905,82 @@ namespace Araci.TechnicalChecks
             AssertEqual(UnitKind.ReactivePowerKVAr, settings.Units.ReactivePower, "UseCase preserva ReactivePower default");
             AssertEqual(UnitKind.ApparentPowerKVA, settings.Units.ApparentPower, "UseCase preserva ApparentPower default");
             AssertEqual(UnitKind.Percent, settings.Units.Percent, "UseCase preserva Percent default");
+        }
+
+        private static void ExecutarSimulacaoUseCaseChamaPipeline()
+        {
+            var pipeline = new FakeSimulationPipeline();
+            var dialogs = new FakeDialogService();
+            var useCase = CriarExecutarSimulacaoUseCase(pipeline, dialogs);
+
+            useCase.ExecutarFluxoDeCorrenteAsync().GetAwaiter().GetResult();
+
+            AssertEqual(1, pipeline.ExecutarFluxoDeCorrenteChamadas, "Chamadas ao pipeline");
+        }
+
+        private static void ExecutarSimulacaoUseCaseAtualizaResultado()
+        {
+            var resultado = new SimulationResultDto
+            {
+                Sucesso = true,
+                Mensagem = "ok",
+                Script = "script"
+            };
+            var pipeline = new FakeSimulationPipeline(resultado);
+            var useCase = CriarExecutarSimulacaoUseCase(pipeline, new FakeDialogService());
+
+            useCase.ExecutarFluxoDeCorrenteAsync().GetAwaiter().GetResult();
+
+            Assert(ReferenceEquals(resultado, useCase.Resultado), "Resultado deve ser o retornado pelo pipeline.");
+        }
+
+        private static void ExecutarSimulacaoUseCaseMostraMensagem()
+        {
+            var dialogs = new FakeDialogService();
+            var useCase = CriarExecutarSimulacaoUseCase(new FakeSimulationPipeline(), dialogs);
+
+            useCase.ExecutarFluxoDeCorrenteAsync().GetAwaiter().GetResult();
+
+            AssertEqual(1, dialogs.ShowMessageChamadas, "Show message chamadas");
+            AssertEqual("Fluxo de corrente", dialogs.LastSimulationMessage?.Title, "Titulo da mensagem");
+        }
+
+        private static void FluxoDeCorrenteApplicationDelegaParaUseCase()
+        {
+            var pipeline = new FakeSimulationPipeline();
+            var useCase = CriarExecutarSimulacaoUseCase(pipeline, new FakeDialogService());
+            var app = new FluxoDeCorrenteApplication(useCase);
+
+            app.ExecutarAsync().GetAwaiter().GetResult();
+
+            AssertEqual(1, pipeline.ExecutarFluxoDeCorrenteChamadas, "Wrapper deve chamar use case");
+            Assert(ReferenceEquals(useCase.Resultado, app.Resultado), "Wrapper deve expor Resultado do use case.");
+        }
+
+        private static void ExecutarSimulacaoUseCaseMostraWarningEmExcecao()
+        {
+            var pipeline = new FakeSimulationPipeline
+            {
+                ExceptionToThrow = new InvalidOperationException("falha")
+            };
+            var dialogs = new FakeDialogService();
+            var useCase = CriarExecutarSimulacaoUseCase(pipeline, dialogs);
+
+            useCase.ExecutarFluxoDeCorrenteAsync().GetAwaiter().GetResult();
+
+            AssertEqual(1, dialogs.WarningChamadas, "Warning chamadas");
+            AssertEqual("Fluxo de corrente", dialogs.LastWarningTitle, "Warning titulo");
+            AssertEqual("falha", dialogs.LastWarningMessage, "Warning mensagem");
+        }
+
+        private static void ExecutarSimulacaoUseCaseSemOptionsNaoConfirmaExportacao()
+        {
+            var dialogs = new FakeDialogService();
+            var useCase = CriarExecutarSimulacaoUseCase(new FakeSimulationPipeline(), dialogs);
+
+            useCase.ExecutarFluxoDeCorrenteAsync().GetAwaiter().GetResult();
+
+            AssertEqual(0, dialogs.ConfirmChamadas, "Sem options nao deve confirmar exportacao");
         }
 
         private static void UnitValueConverterUsaSettingsEmRuntime()
@@ -3854,6 +3940,87 @@ namespace Araci.TechnicalChecks
             AssertEqual($"{transformador.Nome}_PRIMARIO", dto.Lines[0].Barra2, $"{name}.LinePrimario.Barra2");
             AssertEqual($"{transformador.Nome}_SECUNDARIO", dto.Lines[1].Barra1, $"{name}.LineSecundario.Barra1");
             AssertEqual(load.Nome, dto.Lines[1].Barra2, $"{name}.LineSecundario.Barra2");
+        }
+
+        private static ExecutarSimulacaoUseCase CriarExecutarSimulacaoUseCase(
+            FakeSimulationPipeline pipeline,
+            FakeDialogService dialogs)
+        {
+            return new ExecutarSimulacaoUseCase(
+                pipeline,
+                new SimulationExportService(),
+                new SimulationMessageBuilder(),
+                dialogs);
+        }
+
+        private sealed class FakeSimulationPipeline : ISimulationPipeline
+        {
+            private readonly SimulationResultDto _resultado;
+
+            public FakeSimulationPipeline()
+                : this(new SimulationResultDto
+                {
+                    Sucesso = true,
+                    Mensagem = "ok",
+                    Script = "new circuit"
+                })
+            {
+            }
+
+            public FakeSimulationPipeline(SimulationResultDto resultado)
+            {
+                _resultado = resultado;
+            }
+
+            public int ExecutarFluxoDeCorrenteChamadas { get; private set; }
+            public Exception? ExceptionToThrow { get; set; }
+
+            public Task<SimulationResultDto> ExecutarFluxoDeCorrenteAsync()
+            {
+                ExecutarFluxoDeCorrenteChamadas++;
+
+                if (ExceptionToThrow != null)
+                    throw ExceptionToThrow;
+
+                return Task.FromResult(_resultado);
+            }
+        }
+
+        private sealed class FakeDialogService : IUserDialogService
+        {
+            public int WarningChamadas { get; private set; }
+            public int ConfirmChamadas { get; private set; }
+            public int ShowMessageChamadas { get; private set; }
+            public string? LastWarningTitle { get; private set; }
+            public string? LastWarningMessage { get; private set; }
+            public SimulationMessage? LastSimulationMessage { get; private set; }
+
+            public void ShowInfo(string title, string message)
+            {
+            }
+
+            public void ShowWarning(string title, string message)
+            {
+                WarningChamadas++;
+                LastWarningTitle = title;
+                LastWarningMessage = message;
+            }
+
+            public void ShowError(string title, string message)
+            {
+            }
+
+            public bool Confirm(string title, string message)
+            {
+                ConfirmChamadas++;
+                return true;
+            }
+
+            public void Show(SimulationMessage message)
+            {
+                ShowMessageChamadas++;
+                LastSimulationMessage = message;
+            }
         }
 
         private static AraciDocument SaveAndLoad(AraciDocument document)
