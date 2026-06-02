@@ -5,6 +5,7 @@ using Araci.Models;
 using Araci.Services;
 using Araci.ViewModels;
 using CoreScene = Araci.Core.Scenes.Scene;
+using Araci.Services.Geometry;
 
 namespace Araci.Applications.Diagrama
 {

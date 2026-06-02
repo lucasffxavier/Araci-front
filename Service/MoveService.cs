@@ -6,6 +6,8 @@ using Araci.Applications.UseCases.Editar;
 using Araci.Core.SceneQueries;
 using Araci.Models;
 using Araci.ViewModels;
+using Araci.Services.Geometry;
+using Araci.Services.Topology;
 
 namespace Araci.Services
 {

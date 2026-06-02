@@ -1,8 +1,10 @@
 using System;
 using System.Collections.Generic;
 using Araci.Models;
+using Araci.Services;
+using Araci.Services.Topology;
 
-namespace Araci.Services
+namespace Araci.Services.Geometry
 {
     public class ElementGeometryUpdateService
     {

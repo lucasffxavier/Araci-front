@@ -1,7 +1,8 @@
 using System.Collections.Generic;
 using Araci.Models;
+using Araci.Services;
 
-namespace Araci.Services
+namespace Araci.Services.Geometry
 {
     public class TerminalLayoutService
     {

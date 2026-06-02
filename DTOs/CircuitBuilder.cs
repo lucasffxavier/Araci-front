@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using Araci.Services;
+using Araci.Services.Topology;
 
 namespace Araci.DTOs
 {

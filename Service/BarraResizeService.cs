@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Linq;
 using System.Windows;
 using System.Windows.Input;
@@ -6,6 +6,7 @@ using Araci.Applications.UseCases.Editar;
 using Araci.Core.Rendering;
 using Araci.Models;
 using Araci.ViewModels;
+using Araci.Services.Geometry;
 
 namespace Araci.Services
 {

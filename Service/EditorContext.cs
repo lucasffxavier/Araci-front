@@ -22,6 +22,8 @@ using Araci.Models;
 using Araci.Services.Composition;
 using Araci.ViewModels;
 using CoreScene = Araci.Core.Scenes.Scene;
+using Araci.Services.Geometry;
+using Araci.Services.Topology;
 
 namespace Araci.Services
 {

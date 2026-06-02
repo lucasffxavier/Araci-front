@@ -3,6 +3,7 @@ using Araci.Applications.Abstractions;
 using Araci.Core.Commands;
 using Araci.Models;
 using Araci.Services;
+using Araci.Services.Geometry;
 
 namespace Araci.Applications.UseCases.Editar
 {

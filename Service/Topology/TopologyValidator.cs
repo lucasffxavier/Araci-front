@@ -4,7 +4,7 @@ using System.Linq;
 using Araci.Core.Documents;
 using Araci.Models;
 
-namespace Araci.Services
+namespace Araci.Services.Topology
 {
     public class TopologyValidator
     {

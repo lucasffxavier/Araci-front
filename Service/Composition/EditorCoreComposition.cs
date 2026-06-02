@@ -4,6 +4,8 @@ using Araci.Applications.Factories;
 using Araci.Applications.Simulation;
 using Araci.ViewModels;
 using CoreScene = Araci.Core.Scenes.Scene;
+using Araci.Services.Geometry;
+using Araci.Services.Topology;
 
 namespace Araci.Services.Composition
 {

@@ -3,6 +3,7 @@ using System.Windows;
 using Araci.Core.SceneNodes;
 using Araci.Models;
 using Araci.Services;
+using Araci.Services.Geometry;
 
 namespace Araci.ViewModels
 {

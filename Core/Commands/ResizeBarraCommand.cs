@@ -1,6 +1,7 @@
-﻿using System;
+using System;
 using Araci.Models;
 using Araci.Services;
+using Araci.Services.Geometry;
 
 namespace Araci.Core.Commands
 {

@@ -1,6 +1,6 @@
 using Araci.Models;
 
-namespace Araci.Services
+namespace Araci.Services.Topology
 {
     public class TopologyIssue
     {

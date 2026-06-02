@@ -1,4 +1,4 @@
-namespace Araci.Services
+namespace Araci.Services.Topology
 {
     public enum TopologyIssueSeverity
     {

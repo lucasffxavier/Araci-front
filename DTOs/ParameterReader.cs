@@ -6,6 +6,7 @@ using Araci.API;
 using Araci.Core.Documents;
 using Araci.Models;
 using Araci.Services;
+using Araci.Services.Topology;
 
 namespace Araci.DTOs
 {

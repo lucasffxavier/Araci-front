@@ -3,8 +3,9 @@ using System.Collections.Generic;
 using System.Linq;
 using Araci.Core.Documents;
 using Araci.Models;
+using Araci.Services;
 
-namespace Araci.Services
+namespace Araci.Services.Topology
 {
     public class ElectricGraphBuilder
     {

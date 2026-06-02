@@ -10,6 +10,7 @@ using Araci.Core.Documents;
 using Araci.Models;
 using Araci.Models.Tipos;
 using Araci.Services;
+using Araci.Services.Geometry;
 
 namespace Araci.Infrastructure.Persistence
 {

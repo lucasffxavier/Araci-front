@@ -1,8 +1,9 @@
 using System.Windows;
 using Araci.Core.Rendering;
 using Araci.Models;
+using Araci.Services;
 
-namespace Araci.Services
+namespace Araci.Services.Geometry
 {
     public class ElementGeometryService
     {

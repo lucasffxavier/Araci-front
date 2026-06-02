@@ -4,6 +4,7 @@ using System.Linq;
 using Araci.Applications.UseCases.Editar;
 using Araci.Models;
 using Araci.ViewModels;
+using Araci.Services.Topology;
 
 namespace Araci.Services
 {

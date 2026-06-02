@@ -5,6 +5,7 @@ using Araci.Core.Commands;
 using Araci.Core.Documents;
 using Araci.Models;
 using Araci.Services;
+using Araci.Services.Geometry;
 
 namespace Araci.Applications.UseCases.Diagrama
 {

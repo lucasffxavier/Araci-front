@@ -2,7 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 
-namespace Araci.Services
+namespace Araci.Services.Topology
 {
     public class OperationalGraphState
     {

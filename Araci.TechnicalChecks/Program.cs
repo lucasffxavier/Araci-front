@@ -18,6 +18,7 @@ using Araci.Models;
 using Araci.Models.Tipos;
 using Araci.Services;
 using Araci.ViewModels;
+using Araci.Services.Topology;
 
 namespace Araci.TechnicalChecks
 {

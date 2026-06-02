@@ -3,6 +3,7 @@ using Araci.Applications.Abstractions;
 using Araci.Models;
 using Araci.Services;
 using Araci.ViewModels;
+using Araci.Services.Geometry;
 
 namespace Araci.Applications.Factories
 {

@@ -7,6 +7,7 @@ using Araci.Core.Documents;
 using Araci.Models;
 using Araci.Services;
 using Araci.ViewModels;
+using Araci.Services.Topology;
 
 namespace Araci.Applications.UseCases.Editar
 {

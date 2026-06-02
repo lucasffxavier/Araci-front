@@ -2,7 +2,7 @@ using System;
 using System.Collections.Generic;
 using Araci.Models;
 
-namespace Araci.Services
+namespace Araci.Services.Topology
 {
     public class ElectricGraphNode
     {

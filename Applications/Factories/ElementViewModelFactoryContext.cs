@@ -1,5 +1,6 @@
 using System;
 using Araci.Services;
+using Araci.Services.Geometry;
 
 namespace Araci.Applications.Factories
 {
