@@ -10,6 +10,7 @@ using Araci.API;
 using Araci.Applications.Abstractions;
 using Araci.Applications.Diagrama;
 using Araci.Applications.Editar.Base;
+using Araci.Applications.UseCases.Projeto;
 using Araci.Core.Commands;
 using Araci.Core.Documents;
 using Araci.Core.Rendering;
@@ -117,6 +118,10 @@ namespace Araci.TechnicalChecks
                 ("UnitsSettingsViewModel copia defaults", UnitsSettingsViewModelCopiaDefaults),
                 ("UnitsSettingsViewModel ApplyTo altera settings", UnitsSettingsViewModelApplyToAlteraSettings),
                 ("UnitsSettingsViewModel aplica tensao V", UnitsSettingsViewModelAplicaTensaoVolt),
+                ("UnitsSettingsViewModel ToUnitDisplaySettings copia selecoes", UnitsSettingsViewModelToUnitDisplaySettingsCopiaSelecoes),
+                ("AlterarUnidadesProjetoUseCase aplica VoltageVolt", AlterarUnidadesProjetoUseCaseAplicaVoltageVolt),
+                ("AlterarUnidadesProjetoUseCase chama refresh", AlterarUnidadesProjetoUseCaseChamaRefresh),
+                ("AlterarUnidadesProjetoUseCase preserva copia completa", AlterarUnidadesProjetoUseCasePreservaCopiaCompleta),
                 ("UnitValueConverter usa settings em runtime", UnitValueConverterUsaSettingsEmRuntime),
                 ("UnitValueConverter converte edicao para unidade base", UnitValueConverterConverteEdicaoParaUnidadeBase),
                 ("Persistencia salva Units no JSON", PersistenciaSalvaUnitsNoJson),
@@ -1825,6 +1830,71 @@ namespace Araci.TechnicalChecks
             viewModel.ApplyTo(settings);
 
             AssertEqual(UnitKind.VoltageVolt, settings.Voltage, "Voltage aplicado em V");
+        }
+
+        private static void UnitsSettingsViewModelToUnitDisplaySettingsCopiaSelecoes()
+        {
+            var viewModel = new UnitsSettingsViewModel(new UnitDisplaySettings())
+            {
+                Length = UnitKind.LengthKilometer,
+                Voltage = UnitKind.VoltageVolt,
+                ActivePower = UnitKind.ActivePowerMW,
+                ReactivePower = UnitKind.ReactivePowerMVAr,
+                ApparentPower = UnitKind.ApparentPowerMVA
+            };
+
+            UnitDisplaySettings settings = viewModel.ToUnitDisplaySettings();
+
+            AssertEqual(UnitKind.LengthKilometer, settings.Length, "ToUnitDisplaySettings.Length");
+            AssertEqual(UnitKind.VoltageVolt, settings.Voltage, "ToUnitDisplaySettings.Voltage");
+            AssertEqual(UnitKind.ActivePowerMW, settings.ActivePower, "ToUnitDisplaySettings.ActivePower");
+            AssertEqual(UnitKind.ReactivePowerMVAr, settings.ReactivePower, "ToUnitDisplaySettings.ReactivePower");
+            AssertEqual(UnitKind.ApparentPowerMVA, settings.ApparentPower, "ToUnitDisplaySettings.ApparentPower");
+        }
+
+        private static void AlterarUnidadesProjetoUseCaseAplicaVoltageVolt()
+        {
+            var settings = new EditorSettings();
+            var novasUnidades = new UnitDisplaySettings
+            {
+                Voltage = UnitKind.VoltageVolt
+            };
+            var useCase = new AlterarUnidadesProjetoUseCase(settings, () => { });
+
+            useCase.Executar(novasUnidades);
+
+            AssertEqual(UnitKind.VoltageVolt, settings.Units.Voltage, "UseCase Voltage");
+        }
+
+        private static void AlterarUnidadesProjetoUseCaseChamaRefresh()
+        {
+            var settings = new EditorSettings();
+            bool refreshChamado = false;
+            var useCase = new AlterarUnidadesProjetoUseCase(settings, () => refreshChamado = true);
+
+            useCase.Executar(new UnitDisplaySettings());
+
+            Assert(refreshChamado, "UseCase deve chamar refreshProperties.");
+        }
+
+        private static void AlterarUnidadesProjetoUseCasePreservaCopiaCompleta()
+        {
+            var settings = new EditorSettings();
+            var unidades = new UnitDisplaySettings
+            {
+                Voltage = UnitKind.VoltageVolt
+            };
+            var useCase = new AlterarUnidadesProjetoUseCase(settings, () => { });
+
+            useCase.Executar(unidades);
+
+            AssertEqual(UnitKind.VoltageVolt, settings.Units.Voltage, "UseCase preserva Voltage");
+            AssertEqual(UnitKind.LengthMeter, settings.Units.Length, "UseCase preserva Length default");
+            AssertEqual(UnitKind.CurrentAmpere, settings.Units.Current, "UseCase preserva Current default");
+            AssertEqual(UnitKind.ActivePowerKW, settings.Units.ActivePower, "UseCase preserva ActivePower default");
+            AssertEqual(UnitKind.ReactivePowerKVAr, settings.Units.ReactivePower, "UseCase preserva ReactivePower default");
+            AssertEqual(UnitKind.ApparentPowerKVA, settings.Units.ApparentPower, "UseCase preserva ApparentPower default");
+            AssertEqual(UnitKind.Percent, settings.Units.Percent, "UseCase preserva Percent default");
         }
 
         private static void UnitValueConverterUsaSettingsEmRuntime()

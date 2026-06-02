@@ -60,10 +60,7 @@ namespace Araci
             };
 
             if (window.ShowDialog() == true)
-            {
-                viewModel.ApplyTo(_context.Settings.Units);
-                _context.RefreshProperties();
-            }
+                _context.AlterarUnidadesProjeto.Executar(viewModel.ToUnitDisplaySettings());
 
             FocarViewport();
         }

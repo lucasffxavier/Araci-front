@@ -18,6 +18,7 @@ using Araci.Applications.Projects;
 using Araci.Applications.Simulation;
 using Araci.Applications.UseCases.Editar;
 using Araci.Applications.UseCases.Diagrama;
+using Araci.Applications.UseCases.Projeto;
 using Araci.Models;
 using Araci.Services.Composition;
 using Araci.ViewModels;
@@ -162,6 +163,7 @@ namespace Araci.Services
                 Hover,
                 Clipboard.CopiarSelecionados,
                 Clipboard.Colar);
+            AlterarUnidadesProjeto = new AlterarUnidadesProjetoUseCase(Settings, RefreshProperties);
             Navigation = ViewportComposition.CreateNavigation(() => Viewport);
         }
 
@@ -247,6 +249,7 @@ namespace Araci.Services
         public RotacionarElementoUseCase RotacionarElemento { get; }
         public RedimensionarBarraUseCase RedimensionarBarra { get; }
         public EditarVerticesCaboUseCase EditarVerticesCabo { get; }
+        public AlterarUnidadesProjetoUseCase AlterarUnidadesProjeto { get; }
 
         public TransactionScope BeginTransaction()
         {

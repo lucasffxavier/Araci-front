@@ -50,6 +50,13 @@ namespace Araci.ViewModels
             target.Percent = Percent;
         }
 
+        public UnitDisplaySettings ToUnitDisplaySettings()
+        {
+            var settings = new UnitDisplaySettings();
+            ApplyTo(settings);
+            return settings;
+        }
+
         private static IReadOnlyList<UnitOption> CreateOptions(params UnitKind[] units)
         {
             var options = new List<UnitOption>(units.Length);
