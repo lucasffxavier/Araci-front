@@ -2,7 +2,7 @@ using Araci.Applications.Abstractions;
 using Araci.Services.Simulation;
 using System.Windows;
 
-namespace Araci.Services
+namespace Araci.Services.UI
 {
     public class DialogService : IUserDialogService
     {

@@ -1,4 +1,3 @@
-using Araci.Services;
 using Araci.Services.Simulation;
 
 namespace Araci.Applications.Abstractions

@@ -6,6 +6,7 @@ using Araci.ViewModels;
 using CoreScene = Araci.Core.Scenes.Scene;
 using Araci.Services.Geometry;
 using Araci.Services.Topology;
+using Araci.Services.UI;
 
 namespace Araci.Services.Composition
 {

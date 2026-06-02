@@ -3,7 +3,7 @@ using System.Windows;
 using Araci.Properties;
 using Araci.ViewModels;
 
-namespace Araci.Services
+namespace Araci.Services.UI
 {
     public class TypePropertiesDialogService : ITypePropertiesDialogService
     {

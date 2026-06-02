@@ -1,5 +1,6 @@
 using Araci.Applications.Abstractions;
 using Microsoft.Win32;
+using Araci.Services.UI;
 
 namespace Araci.Infrastructure.Persistence
 {
