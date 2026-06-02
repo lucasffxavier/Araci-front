@@ -1,7 +1,8 @@
-﻿using System;
+using System;
 using System.Globalization;
 using System.Windows.Data;
 using Araci.Services;
+using Araci.Services.Settings;
 
 namespace Araci.Properties
 {

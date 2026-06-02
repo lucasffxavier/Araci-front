@@ -2,6 +2,7 @@ using System;
 using System.Windows;
 using Araci.Applications.Editar.Base;
 using Araci.Services;
+using Araci.Services.Settings;
 
 namespace Araci.Services.Editing
 {

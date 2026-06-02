@@ -28,6 +28,7 @@ using Araci.Services.Editing;
 using Araci.Services.Viewport;
 using Araci.Services.Simulation;
 using Araci.Services.UI;
+using Araci.Services.Settings;
 
 namespace Araci.Services
 {

@@ -1,5 +1,6 @@
-﻿using System;
+using System;
 using Araci.Services;
+using Araci.Services.Settings;
 
 namespace Araci.ViewModels
 {

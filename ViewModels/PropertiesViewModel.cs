@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
@@ -11,6 +11,7 @@ using System.Windows.Input;
 using Araci.Applications.UseCases.Editar;
 using Araci.Models.Tipos;
 using Araci.Services;
+using Araci.Services.Settings;
 
 namespace Araci.ViewModels
 {
@@ -416,7 +417,7 @@ namespace Araci.ViewModels
             if (!PropertiesViewModel.TentarConverterValor(novoValor, _tipoValor, _descriptor, out object? convertido))
             {
                 TemErro = true;
-                MensagemErro = "Valor inválido";
+                MensagemErro = "Valor inv�lido";
                 _valor = novoValor;
                 OnPropertyChanged(nameof(Valor));
                 OnPropertyChanged(nameof(Value));

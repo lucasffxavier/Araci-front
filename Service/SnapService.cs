@@ -6,6 +6,7 @@ using System.Linq;
 using System.Windows;
 using Araci.Core.SceneQueries;
 using Araci.Models;
+using Araci.Services.Settings;
 using Araci.ViewModels;
 
 namespace Araci.Services

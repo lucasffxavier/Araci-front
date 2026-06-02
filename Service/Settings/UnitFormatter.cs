@@ -1,7 +1,7 @@
-﻿using System;
+using System;
 using System.Globalization;
 
-namespace Araci.Services
+namespace Araci.Services.Settings
 {
     public static class UnitFormatter
     {

@@ -2,6 +2,7 @@ using System.Collections.Generic;
 using Araci.Core.Rendering;
 using Araci.Services;
 using Araci.ViewModels;
+using Araci.Services.Settings;
 
 namespace Araci.Applications.Factories
 {
