@@ -338,12 +338,12 @@ Os controles concretos são:
 
 | Controle | Renderização observada |
 |---|---|
-| `BarraControl` | Usa `SvgViewbox` com `Assets/Svg/barra.svg`, overlay de seleção/hover, overlay de preview e handles superior/inferior. |
+| `BarraControl` | Usa `SvgViewbox` com `Resources/Svg/barra.svg`, overlay de seleção/hover, overlay de preview e handles superior/inferior. |
 | `CaboControl` | Usa `Canvas`, `Polyline` visível, `Polyline` transparente para hit area e elipses para handles intermediários. |
-| `CargaControl` | Usa `SvgViewbox` com `Assets/Svg/carga.svg`, overlay de preview e overlay de seleção/hover. |
-| `GeradorControl` | Usa `SvgViewbox` com `Assets/Svg/gerador.svg`, overlay de preview e overlay de seleção/hover. |
-| `SinControl` | Usa `SvgViewbox` com `Assets/Svg/sin.svg`, overlay de preview e overlay de seleção/hover. |
-| `TransformadorControl` | Usa `SvgViewbox` com `Assets/Svg/transformador.svg`, stretch uniforme e overlays mascarados por `VisualBrush`. |
+| `CargaControl` | Usa `SvgViewbox` com `Resources/Svg/carga.svg`, overlay de preview e overlay de seleção/hover. |
+| `GeradorControl` | Usa `SvgViewbox` com `Resources/Svg/gerador.svg`, overlay de preview e overlay de seleção/hover. |
+| `SinControl` | Usa `SvgViewbox` com `Resources/Svg/sin.svg`, overlay de preview e overlay de seleção/hover. |
+| `TransformadorControl` | Usa `SvgViewbox` com `Resources/Svg/transformador.svg`, stretch uniforme e overlays mascarados por `VisualBrush`. |
 
 `CaboControl` é o controle mais especializado. Ele observa `Cabo.Vertices.CollectionChanged`, recalcula a polilinha em coordenadas locais subtraindo `WorldX` e `WorldY`, inclui `PreviewPonto` quando presente e controla a exibição de handles de vértices intermediários quando o cabo está selecionado ou em hover.
 
@@ -673,7 +673,7 @@ Os acoplamentos reais mais relevantes são:
 | `SceneQueryService` | `Scene`, `SpatialHashGrid`, `ElementoViewModel`, `ITerminalOwner`, `CaboViewModel` | Consulta espacial conhece detalhes de cabos, rotação e terminais. |
 | `MoveService` | `ConnectivityService`, `TerminalLayoutService`, `ViewportService`, `ISceneQueryService`, `MoverElementoUseCase` | Movimento visual também atualiza conectividade e histórico. |
 | `CableVertexEditService` | Seleção, queries, visual updates e use case de edição | Edição visual de vértices executa caso de uso e invalida cena. |
-| Controles WPF | SVGs em `Assets/Svg` e ViewModels específicos | Controles carregam assets por URI pack e fazem bindings por nomes de propriedades. |
+| Controles WPF | SVGs em `Resources/Svg` e ViewModels específicos | Controles carregam assets por URI pack e fazem bindings por nomes de propriedades. |
 
 Um ponto arquitetural importante é que `Scene` depende diretamente de `ElementoViewModel`. Isso torna a cena uma estrutura de apresentação, não um scene graph puramente geométrico ou independente de WPF. Os nós (`ElementoNode`) estão em `Core`, mas são consumidos por ViewModels e não formam uma árvore própria de renderização.
 

@@ -12,7 +12,7 @@ namespace Araci.Controls
     public class TransformadorControl : ElementoControlBase
     {
         private static readonly Uri SvgSource =
-            new("pack://application:,,,/Assets/Svg/transformador.svg");
+            new("pack://application:,,,/Resources/Svg/transformador.svg");
 
         private readonly Grid _root;
         private readonly SvgViewbox _svg;

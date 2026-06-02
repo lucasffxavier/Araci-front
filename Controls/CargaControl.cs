@@ -23,7 +23,7 @@ namespace Araci.Controls
             _svg = new SvgViewbox
             {
                 Stretch = Stretch.Fill,
-                Source = new Uri("pack://application:,,,/Assets/Svg/carga.svg")
+                Source = new Uri("pack://application:,,,/Resources/Svg/carga.svg")
             };
 
             _overlay = new Border
