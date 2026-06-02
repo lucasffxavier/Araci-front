@@ -78,8 +78,6 @@ Araci Engine/
 |       |-- Diagrama/
 |       |-- Editar/
 |-- Araci.TechnicalChecks/
-|-- Assets/
-|   |-- Svg/
 |-- Controls/
 |   |-- Base/
 |   |-- Converters/
@@ -106,6 +104,8 @@ Araci Engine/
 |-- Properties/
 |   |-- Types/
 |-- Resources/
+|   |-- Icons/
+|   |-- Svg/
 |   |-- Icons/
 |   |-- Styles/
 |   |-- Templates/
