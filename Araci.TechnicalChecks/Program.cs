@@ -20,6 +20,7 @@ using Araci.Services;
 using Araci.ViewModels;
 using Araci.Services.Topology;
 using Araci.Services.Editing;
+using Araci.Services.Catalog;
 
 namespace Araci.TechnicalChecks
 {

@@ -2,6 +2,7 @@ using System;
 using System.Linq;
 using Araci.Core.Documents;
 using Araci.Models;
+using Araci.Services.Catalog;
 
 namespace Araci.Services
 {

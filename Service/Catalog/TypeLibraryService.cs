@@ -2,7 +2,7 @@ using System.Collections.ObjectModel;
 using System.Linq;
 using Araci.Models.Tipos;
 
-namespace Araci.Services
+namespace Araci.Services.Catalog
 {
     public class TypeLibraryService
     {

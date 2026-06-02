@@ -13,6 +13,7 @@ using Araci.Services;
 using Araci.ViewModels.Base;
 using Araci.ViewModels.VisualStates;
 using Araci.Services.UI;
+using Araci.Services.Catalog;
 
 namespace Araci.ViewModels
 {

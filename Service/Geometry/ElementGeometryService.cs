@@ -2,6 +2,7 @@ using System.Windows;
 using Araci.Core.Rendering;
 using Araci.Models;
 using Araci.Services;
+using Araci.Services.Catalog;
 
 namespace Araci.Services.Geometry
 {

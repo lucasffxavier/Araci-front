@@ -6,6 +6,7 @@ using Araci.Core.Documents;
 using Araci.Infrastructure.Persistence;
 using Araci.Services.Geometry;
 using Araci.Services.UI;
+using Araci.Services.Catalog;
 
 namespace Araci.Services.Composition
 {

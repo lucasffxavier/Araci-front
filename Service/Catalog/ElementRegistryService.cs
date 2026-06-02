@@ -8,7 +8,7 @@ using Araci.Models;
 using Araci.Models.Tipos;
 using Araci.ViewModels;
 
-namespace Araci.Services
+namespace Araci.Services.Catalog
 {
     public class ElementRegistryService : IElementCatalog
     {

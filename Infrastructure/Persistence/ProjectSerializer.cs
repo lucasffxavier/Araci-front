@@ -11,6 +11,7 @@ using Araci.Models;
 using Araci.Models.Tipos;
 using Araci.Services;
 using Araci.Services.Geometry;
+using Araci.Services.Catalog;
 
 namespace Araci.Infrastructure.Persistence
 {

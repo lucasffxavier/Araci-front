@@ -1,6 +1,7 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using Araci.Services;
+using Araci.Services.Catalog;
 
 namespace Araci.ViewModels
 {

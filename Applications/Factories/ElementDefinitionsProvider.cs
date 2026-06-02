@@ -7,6 +7,7 @@ using Araci.Models;
 using Araci.Models.Tipos;
 using Araci.Services;
 using Araci.ViewModels;
+using Araci.Services.Catalog;
 
 namespace Araci.Applications.Factories
 {
