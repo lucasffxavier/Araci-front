@@ -9,6 +9,7 @@ using Araci.Core.SceneQueries;
 using Araci.Models;
 using Araci.Services;
 using Araci.ViewModels;
+using Araci.Services.Editing;
 
 namespace Araci.Applications.Editar.Selecionar
 {

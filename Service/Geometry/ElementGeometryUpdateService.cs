@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using Araci.Models;
 using Araci.Services;
 using Araci.Services.Topology;
+using Araci.Services.Editing;
 
 namespace Araci.Services.Geometry
 {

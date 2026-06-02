@@ -5,6 +5,7 @@ using System.Windows;
 using Araci.Applications.Editar.Base;
 using Araci.Services;
 using Araci.ViewModels;
+using Araci.Services.Editing;
 
 namespace Araci.Applications.Editar.Selecionar
 {

@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Linq;
@@ -7,7 +7,7 @@ using Araci.Applications.UseCases.Editar;
 using Araci.Core.Events;
 using Araci.ViewModels;
 
-namespace Araci.Services
+namespace Araci.Services.Editing
 {
     public class SelectionService : ISelectionService
     {

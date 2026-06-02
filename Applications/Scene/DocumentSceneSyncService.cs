@@ -10,6 +10,7 @@ using Araci.Models;
 using Araci.Services;
 using Araci.ViewModels;
 using CoreScene = Araci.Core.Scenes.Scene;
+using Araci.Services.Editing;
 
 namespace Araci.Applications.Scene
 {

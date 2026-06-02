@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Windows;
 using System.Windows.Input;
 using Araci.Applications.Abstractions;
@@ -7,6 +7,7 @@ using Araci.Core.Commands;
 using Araci.Core.SceneQueries;
 using Araci.Services;
 using Araci.ViewModels;
+using Araci.Services.Editing;
 
 namespace Araci.Applications.Editar.Alinhar
 {

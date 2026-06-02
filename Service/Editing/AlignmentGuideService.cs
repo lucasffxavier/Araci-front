@@ -1,11 +1,11 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Linq;
 using System.Windows;
 using Araci.ViewModels;
 
-namespace Araci.Services
+namespace Araci.Services.Editing
 {
     public class AlignmentGuideService
     {

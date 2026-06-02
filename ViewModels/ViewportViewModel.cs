@@ -9,6 +9,7 @@ using Araci.Core.Documents;
 using Araci.Core.Scenes;
 using Araci.Models;
 using Araci.Services;
+using Araci.Services.Editing;
 
 namespace Araci.ViewModels
 {

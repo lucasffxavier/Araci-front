@@ -1,10 +1,11 @@
-﻿using System;
+using System;
 using System.Windows;
 using System.Windows.Input;
 using Araci.Applications.Editar.Base;
 using Araci.Core.SceneQueries;
 using Araci.Services;
 using Araci.ViewModels;
+using Araci.Services.Editing;
 
 namespace Araci.Applications.Editar.Selecionar
 {

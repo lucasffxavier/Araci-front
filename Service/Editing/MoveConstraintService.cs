@@ -1,8 +1,9 @@
 using System;
 using System.Windows;
 using Araci.Applications.Editar.Base;
+using Araci.Services;
 
-namespace Araci.Services
+namespace Araci.Services.Editing
 {
     public class MoveConstraintService
     {

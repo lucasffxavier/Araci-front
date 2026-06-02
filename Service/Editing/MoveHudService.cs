@@ -1,8 +1,9 @@
-﻿using System.ComponentModel;
+using System.ComponentModel;
 using System;
 using System.Windows;
+using Araci.Services;
 
-namespace Araci.Services
+namespace Araci.Services.Editing
 {
     public class MoveHudService : INotifyPropertyChanged
     {

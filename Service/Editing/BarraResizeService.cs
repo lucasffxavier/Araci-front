@@ -8,7 +8,7 @@ using Araci.Models;
 using Araci.ViewModels;
 using Araci.Services.Geometry;
 
-namespace Araci.Services
+namespace Araci.Services.Editing
 {
     public class BarraResizeService
     {

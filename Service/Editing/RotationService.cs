@@ -5,8 +5,9 @@ using Araci.Applications.UseCases.Editar;
 using Araci.Models;
 using Araci.ViewModels;
 using Araci.Services.Topology;
+using Araci.Services;
 
-namespace Araci.Services
+namespace Araci.Services.Editing
 {
     public class RotationService
     {

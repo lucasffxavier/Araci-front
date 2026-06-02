@@ -5,8 +5,9 @@ using Araci.Applications.Editar.Selecionar;
 using Araci.Applications.UseCases.Editar;
 using Araci.Core.SceneQueries;
 using Araci.ViewModels;
+using Araci.Services;
 
-namespace Araci.Services
+namespace Araci.Services.Editing
 {
     public class SafeDeleteService : ISafeDeleteService
     {

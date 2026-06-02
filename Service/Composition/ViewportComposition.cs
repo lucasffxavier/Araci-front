@@ -7,6 +7,7 @@ using Araci.Core.Documents;
 using Araci.Core.SceneQueries;
 using Araci.ViewModels;
 using CoreScene = Araci.Core.Scenes.Scene;
+using Araci.Services.Editing;
 
 namespace Araci.Services.Composition
 {

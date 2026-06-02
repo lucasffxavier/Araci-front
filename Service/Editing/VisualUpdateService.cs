@@ -5,8 +5,9 @@ using Araci.Models;
 using Araci.ViewModels;
 using Araci.Services.Geometry;
 using Araci.Services.Topology;
+using Araci.Services;
 
-namespace Araci.Services
+namespace Araci.Services.Editing
 {
     public class VisualUpdateService
     {
