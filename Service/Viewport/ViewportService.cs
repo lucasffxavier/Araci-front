@@ -6,7 +6,7 @@ using Araci.Core.Viewport;
 using Araci.Models;
 using Araci.ViewModels;
 
-namespace Araci.Services
+namespace Araci.Services.Viewport
 {
     public class ViewportService
     {

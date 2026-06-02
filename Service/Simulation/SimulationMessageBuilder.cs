@@ -2,7 +2,7 @@ using System.Text;
 using System.Windows;
 using Araci.DTOs;
 
-namespace Araci.Services
+namespace Araci.Services.Simulation
 {
     public class SimulationMessageBuilder
     {

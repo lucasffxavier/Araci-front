@@ -2,6 +2,7 @@ using System.ComponentModel;
 using System;
 using System.Windows;
 using Araci.Services;
+using Araci.Services.Viewport;
 
 namespace Araci.Services.Editing
 {

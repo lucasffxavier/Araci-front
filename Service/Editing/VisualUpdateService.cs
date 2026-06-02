@@ -6,6 +6,7 @@ using Araci.ViewModels;
 using Araci.Services.Geometry;
 using Araci.Services.Topology;
 using Araci.Services;
+using Araci.Services.Viewport;
 
 namespace Araci.Services.Editing
 {

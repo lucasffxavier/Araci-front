@@ -3,6 +3,7 @@ using System.Threading.Tasks;
 using Araci.Applications.Abstractions;
 using Araci.DTOs;
 using Araci.Services;
+using Araci.Services.Simulation;
 
 namespace Araci.Applications.Analisar.FluxoDeCorrente
 {

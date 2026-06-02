@@ -2,6 +2,7 @@ using System;
 using Araci.Applications.Simulation;
 using Araci.Core.Documents;
 using Araci.Infrastructure.Simulation;
+using Araci.Services.Simulation;
 
 namespace Araci.Services.Composition
 {

@@ -1,7 +1,7 @@
 using System.Windows;
 using System.Windows.Input;
 
-namespace Araci.Services
+namespace Araci.Services.Viewport
 {
     public class ViewportNavigationService
     {

@@ -6,7 +6,7 @@ using Araci.Core.Documents;
 using Araci.DTOs;
 using Araci.Models;
 
-namespace Araci.Services
+namespace Araci.Services.Simulation
 {
     public class SimulationResultApplier : ISimulationResultApplier
     {

@@ -5,7 +5,7 @@ using System.Text.Json;
 using Araci.Applications.Analisar.FluxoDeCorrente;
 using Araci.DTOs;
 
-namespace Araci.Services
+namespace Araci.Services.Simulation
 {
     public class SimulationExportService
     {
