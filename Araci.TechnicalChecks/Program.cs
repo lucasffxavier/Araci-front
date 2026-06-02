@@ -16,6 +16,7 @@ using Araci.Core.Rendering;
 using Araci.DTOs;
 using Araci.Models;
 using Araci.Models.Tipos;
+using Araci.Properties;
 using Araci.Services;
 using Araci.ViewModels;
 using Araci.Services.Topology;
@@ -112,6 +113,11 @@ namespace Araci.TechnicalChecks
                 ("PropertiesViewModel exibe tensao em V", PropertiesViewModelExibeTensaoEmVolt),
                 ("PropertiesViewModel edita tensao em V e salva kV", PropertiesViewModelEditaTensaoEmVoltESalvaKv),
                 ("PropertiesViewModel edita comprimento em km e salva m", PropertiesViewModelEditaComprimentoEmKmESalvaMetro),
+                ("UnitsSettingsViewModel copia defaults", UnitsSettingsViewModelCopiaDefaults),
+                ("UnitsSettingsViewModel ApplyTo altera settings", UnitsSettingsViewModelApplyToAlteraSettings),
+                ("UnitsSettingsViewModel aplica tensao V", UnitsSettingsViewModelAplicaTensaoVolt),
+                ("UnitValueConverter usa settings em runtime", UnitValueConverterUsaSettingsEmRuntime),
+                ("UnitValueConverter converte edicao para unidade base", UnitValueConverterConverteEdicaoParaUnidadeBase),
                 ("DocumentSceneSync cria ViewModel ao adicionar elemento", DocumentSceneSyncCriaViewModelAoAdicionarElemento),
                 ("DocumentSceneSync remove ViewModel ao remover elemento", DocumentSceneSyncRemoveViewModelAoRemoverElemento),
                 ("DocumentSceneSync limpa Scene ao limpar Document", DocumentSceneSyncLimpaSceneAoLimparDocument),
@@ -1765,6 +1771,82 @@ namespace Araci.TechnicalChecks
             propriedade.Valor = "2 km";
 
             AssertEqual(2000.0, barra.Altura, "Altura apos edicao em km");
+        }
+
+        private static void UnitsSettingsViewModelCopiaDefaults()
+        {
+            var settings = new UnitDisplaySettings();
+            var viewModel = new UnitsSettingsViewModel(settings);
+
+            AssertEqual(UnitKind.LengthMeter, viewModel.Length, "Length default");
+            AssertEqual(UnitKind.VoltageKV, viewModel.Voltage, "Voltage default");
+            AssertEqual(UnitKind.CurrentAmpere, viewModel.Current, "Current default");
+            AssertEqual(UnitKind.ActivePowerKW, viewModel.ActivePower, "ActivePower default");
+            AssertEqual(UnitKind.ReactivePowerKVAr, viewModel.ReactivePower, "ReactivePower default");
+            AssertEqual(UnitKind.ApparentPowerKVA, viewModel.ApparentPower, "ApparentPower default");
+            AssertEqual(UnitKind.Percent, viewModel.Percent, "Percent default");
+        }
+
+        private static void UnitsSettingsViewModelApplyToAlteraSettings()
+        {
+            var settings = new UnitDisplaySettings();
+            var viewModel = new UnitsSettingsViewModel(settings)
+            {
+                Length = UnitKind.LengthKilometer,
+                ActivePower = UnitKind.ActivePowerMW,
+                ReactivePower = UnitKind.ReactivePowerMVAr,
+                ApparentPower = UnitKind.ApparentPowerMVA
+            };
+
+            viewModel.ApplyTo(settings);
+
+            AssertEqual(UnitKind.LengthKilometer, settings.Length, "Length aplicado");
+            AssertEqual(UnitKind.ActivePowerMW, settings.ActivePower, "ActivePower aplicado");
+            AssertEqual(UnitKind.ReactivePowerMVAr, settings.ReactivePower, "ReactivePower aplicado");
+            AssertEqual(UnitKind.ApparentPowerMVA, settings.ApparentPower, "ApparentPower aplicado");
+        }
+
+        private static void UnitsSettingsViewModelAplicaTensaoVolt()
+        {
+            var settings = new UnitDisplaySettings();
+            var viewModel = new UnitsSettingsViewModel(settings)
+            {
+                Voltage = UnitKind.VoltageVolt
+            };
+
+            viewModel.ApplyTo(settings);
+
+            AssertEqual(UnitKind.VoltageVolt, settings.Voltage, "Voltage aplicado em V");
+        }
+
+        private static void UnitValueConverterUsaSettingsEmRuntime()
+        {
+            UnitValueConverter.CurrentUnits = new UnitDisplaySettings
+            {
+                Voltage = UnitKind.VoltageVolt
+            };
+
+            var converter = new UnitValueConverter();
+            string text = converter.Convert(13.8, typeof(string), "VoltageKV", System.Globalization.CultureInfo.CurrentCulture)?.ToString() ?? string.Empty;
+
+            Assert(text.Contains("13.800") || text.Contains("13,800"), "Converter deve exibir tensao em V.");
+            Assert(text.EndsWith(" V", StringComparison.Ordinal), "Converter deve usar simbolo V.");
+            UnitValueConverter.CurrentUnits = new UnitDisplaySettings();
+        }
+
+        private static void UnitValueConverterConverteEdicaoParaUnidadeBase()
+        {
+            UnitValueConverter.CurrentUnits = new UnitDisplaySettings
+            {
+                Voltage = UnitKind.VoltageVolt
+            };
+
+            var converter = new UnitValueConverter();
+            object? value = converter.ConvertBack("13800 V", typeof(double), "VoltageKV", System.Globalization.CultureInfo.CurrentCulture);
+
+            Assert(value is double, "ConvertBack deve retornar double.");
+            AssertEqual(13.8, (double)value!, "ConvertBack deve salvar kV.");
+            UnitValueConverter.CurrentUnits = new UnitDisplaySettings();
         }
 
         private static void DocumentSceneSyncCriaViewModelAoAdicionarElemento()

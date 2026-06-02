@@ -35,6 +35,14 @@ namespace Araci.Services.Editing
         public bool TemSelecionados => _selecionados.Count > 0;
         public event Action? SelectionChanged;
 
+        public void RefreshProperties()
+        {
+            if (_selecionados.Count == 1)
+                _editorState.ElementoSelecionado = null;
+
+            AtualizarElementoSelecionado();
+        }
+
         public void Selecionar(ElementoViewModel vm, bool adicionarAoExistente = false)
         {
             if (!adicionarAoExistente)

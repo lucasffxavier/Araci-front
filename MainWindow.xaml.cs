@@ -1,4 +1,6 @@
-﻿using Araci.Services;
+using Araci.Services;
+using Araci.Properties;
+using Araci.ViewModels;
 using System.Windows;
 using System.Windows.Controls.Primitives;
 
@@ -13,6 +15,7 @@ namespace Araci
         {
             InitializeComponent();
             _context = new EditorContext();
+            UnitValueConverter.CurrentUnits = _context.Settings.Units;
             Viewport.Inicializar(_context);
             InicializarRibbon();
         }
@@ -46,6 +49,23 @@ namespace Araci
         {
             PropertiesColumn.Width = _propertiesColumnWidth;
             PropertiesHost.Visibility = Visibility.Visible;
+        }
+
+        public void MostrarConfiguracaoUnidades()
+        {
+            var viewModel = new UnitsSettingsViewModel(_context.Settings.Units);
+            var window = new UnitsWindow(viewModel)
+            {
+                Owner = this
+            };
+
+            if (window.ShowDialog() == true)
+            {
+                viewModel.ApplyTo(_context.Settings.Units);
+                _context.RefreshProperties();
+            }
+
+            FocarViewport();
         }
 
         private void OnPropertiesCloseRequested(object sender, RoutedEventArgs e)

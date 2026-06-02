@@ -195,6 +195,11 @@ namespace Araci.Services
             Viewport = new ViewportService(viewportViewModel);
         }
 
+        public void RefreshProperties()
+        {
+            Selection.RefreshProperties();
+        }
+
         public EditorState Editor { get; } = new EditorState();
         public EditorSettings Settings { get; } = new EditorSettings();
         public MoveHudService MoveHud { get; }

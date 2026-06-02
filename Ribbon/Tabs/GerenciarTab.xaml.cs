@@ -15,5 +15,11 @@ namespace Araci.Ribbon.Tabs
             if (Window.GetWindow(this) is MainWindow mainWindow)
                 mainWindow.MostrarPropriedades();
         }
+
+        private void UnidadesButton_Click(object sender, RoutedEventArgs e)
+        {
+            if (Window.GetWindow(this) is MainWindow mainWindow)
+                mainWindow.MostrarConfiguracaoUnidades();
+        }
     }
 }
