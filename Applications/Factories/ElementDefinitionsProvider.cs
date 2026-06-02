@@ -38,7 +38,7 @@ namespace Araci.Applications.Factories
                 () => _types.TiposCabos,
                 _ => Size.Empty,
                 e => AtualizarTerminaisCabo((Cabo)e),
-                Ribbon("Cabo", "cabo.png", 10, "CB"),
+                Ribbon("Cabo", "cabo.svg", 10, "CB"),
                 true,
                 _properties.Cabo());
 
@@ -55,7 +55,7 @@ namespace Araci.Applications.Factories
                 () => _types.TiposCargas,
                 _ => EquipamentoSize(),
                 e => ((Carga)e).AtualizarTerminais(ElementGeometryDefaults.EquipamentoLargura, ElementGeometryDefaults.EquipamentoAltura),
-                Ribbon("Carga", "carga.png", 20, "CG"),
+                Ribbon("Carga", "carga.svg", 20, "CG"),
                 false,
                 _properties.Carga());
 
@@ -72,7 +72,7 @@ namespace Araci.Applications.Factories
                 () => _types.TiposGeradores,
                 _ => EquipamentoSize(),
                 e => ((Gerador)e).AtualizarTerminais(ElementGeometryDefaults.EquipamentoLargura, ElementGeometryDefaults.EquipamentoAltura),
-                Ribbon("Gerador", "gerador.png", 30, "GE"),
+                Ribbon("Gerador", "gerador.svg", 30, "GE"),
                 false,
                 _properties.Gerador());
 
@@ -89,7 +89,7 @@ namespace Araci.Applications.Factories
                 () => _types.TiposSin,
                 _ => EquipamentoSize(),
                 e => ((Sin)e).AtualizarTerminais(ElementGeometryDefaults.EquipamentoLargura, ElementGeometryDefaults.EquipamentoAltura),
-                Ribbon("SIN", "sin.png", 40, "SI"),
+                Ribbon("SIN", "sin.svg", 40, "SI"),
                 false,
                 _properties.Sin());
 
@@ -106,7 +106,7 @@ namespace Araci.Applications.Factories
                 () => _types.TiposTransformadores,
                 _ => TransformadorSize(),
                 e => ((Transformador)e).AtualizarTerminais(ElementGeometryDefaults.TransformadorLargura, ElementGeometryDefaults.TransformadorAltura),
-                Ribbon("Trafo", "transformador.png", 50, "TR"),
+                Ribbon("Trafo", "transformador.svg", 50, "TR"),
                 false,
                 _properties.Transformador());
 
@@ -123,7 +123,7 @@ namespace Araci.Applications.Factories
                 () => _types.TiposBarras,
                 e => new Size(ElementGeometryDefaults.BarraLargura, ((Barra)e).Altura),
                 e => ((Barra)e).AtualizarTerminais(ElementGeometryDefaults.BarraLargura),
-                Ribbon("Barra", "barra.png", 60, "BA"),
+                Ribbon("Barra", "barra.svg", 60, "BA"),
                 false,
                 _properties.Barra());
         }
