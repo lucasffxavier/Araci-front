@@ -44,6 +44,7 @@ namespace Araci.TechnicalChecks
                 ("Cabo invalido bloqueia DTO final", CaboInvalidoBloqueiaDto),
                 ("Cabo duplicado gera erro topologico", CaboDuplicadoGeraErro),
                 ("Elementos existentes permanecem eletricos", ElementosExistentesPermanecemEletricos),
+                ("ElementoAnotativo nao participa do grafo eletrico", ElementoAnotativoNaoParticipaDoGrafoEletrico),
                 ("ElectricGraph Build nao altera Document", ElectricGraphBuildNaoAlteraDocument),
                 ("ElectricGraph inclui eletricos e ignora anotativo", ElectricGraphIncluiEletricosEIgnoraAnotativo),
                 ("DTO permanece identico com anotativo no Document", DtoPermaneceIdenticoComAnotativoNoDocument),
@@ -352,6 +353,14 @@ namespace Araci.TechnicalChecks
             }
         }
 
+        private static void ElementoAnotativoNaoParticipaDoGrafoEletrico()
+        {
+            Elemento annotation = new FakeAnnotationElement();
+
+            AssertEqual(ElementoDomainRole.Anotacao, annotation.DomainRole, "ElementoAnotativo.DomainRole");
+            Assert(!annotation.ParticipaDoGrafoEletrico, "ElementoAnotativo nao deve participar do grafo eletrico.");
+        }
+
         private static void ElectricGraphBuildNaoAlteraDocument()
         {
             SimpleCircuit circuit = CreateSimpleCircuit();
@@ -461,7 +470,7 @@ namespace Araci.TechnicalChecks
             };
 
             Assert(carga.ParticipaDoGrafoEletrico, "Carga deve ser eletrica apesar do nome livre.");
-            AssertEqual(ElementoDomainRole.Grafico, annotation.DomainRole, "Anotativo.DomainRole");
+            AssertEqual(ElementoDomainRole.Anotacao, annotation.DomainRole, "Anotativo.DomainRole");
             Assert(!annotation.ParticipaDoGrafoEletrico, "Anotativo nao deve virar eletrico por nome ou Tipo.");
         }
 
@@ -4484,7 +4493,7 @@ namespace Araci.TechnicalChecks
             Barra Bar,
             Barra OtherBar);
 
-        private sealed class FakeAnnotationElement : Elemento
+        private sealed class FakeAnnotationElement : ElementoAnotativo
         {
             public override Elemento Clonar()
             {
