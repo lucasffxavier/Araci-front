@@ -3,6 +3,7 @@ using System.Windows;
 using System.Windows.Input;
 using Araci.Applications.Abstractions;
 using Araci.Applications.Editar.Base;
+using Araci.Applications.Editar.Selecionar;
 using Araci.Applications.Factories;
 using Araci.Core.Commands;
 using Araci.Core.Documents;
@@ -25,6 +26,7 @@ namespace Araci.Applications.Desenhar.InserirLinha
         private readonly ElementoFactory _factory;
         private readonly CoreScene _scene;
         private readonly ISceneQueryService _sceneQueries;
+        private readonly LinhaEndpointEditService _linhaEndpointEdit;
         private readonly Action _voltarParaSelecao;
         private Point? _pontoInicial;
         private LinhaAnotativaViewModel? _preview;
@@ -36,6 +38,7 @@ namespace Araci.Applications.Desenhar.InserirLinha
             ElementoFactory factory,
             CoreScene scene,
             ISceneQueryService sceneQueries,
+            LinhaEndpointEditService linhaEndpointEdit,
             Action voltarParaSelecao)
         {
             _commands = commands ?? throw new ArgumentNullException(nameof(commands));
@@ -44,6 +47,7 @@ namespace Araci.Applications.Desenhar.InserirLinha
             _factory = factory ?? throw new ArgumentNullException(nameof(factory));
             _scene = scene ?? throw new ArgumentNullException(nameof(scene));
             _sceneQueries = sceneQueries ?? throw new ArgumentNullException(nameof(sceneQueries));
+            _linhaEndpointEdit = linhaEndpointEdit ?? throw new ArgumentNullException(nameof(linhaEndpointEdit));
             _voltarParaSelecao = voltarParaSelecao ?? throw new ArgumentNullException(nameof(voltarParaSelecao));
         }
 
@@ -63,29 +67,36 @@ namespace Araci.Applications.Desenhar.InserirLinha
         public void Cancelar()
         {
             LimparPreview();
+            _linhaEndpointEdit.LimparSnapInsercao();
             _pontoInicial = null;
         }
 
         public void OnMouseDown(ElementoViewModel? vm, Point position, ToolInputState inputState)
         {
+            Point? snap = _linhaEndpointEdit.AtualizarSnapInsercao(_scene.Elementos, position);
+            Point ponto = snap ?? position;
+
             if (!_pontoInicial.HasValue)
             {
-                Iniciar(position);
+                Iniciar(ponto);
                 return;
             }
 
             FinalizarSegmento(
-                position,
-                inputState.IsShiftPressed,
+                ponto,
+                inputState.IsShiftPressed && !snap.HasValue,
                 inputState.IsControlPressed);
         }
 
         public void OnMouseMove(Point position, ToolInputState inputState)
         {
+            Point? snap = _linhaEndpointEdit.AtualizarSnapInsercao(_scene.Elementos, position);
+            Point ponto = snap ?? position;
+
             if (!_pontoInicial.HasValue)
                 return;
 
-            AtualizarPreview(position, inputState.IsShiftPressed);
+            AtualizarPreview(ponto, inputState.IsShiftPressed && !snap.HasValue);
         }
 
         public void OnMouseUp(Point position, ToolInputState inputState)
@@ -140,6 +151,7 @@ namespace Araci.Applications.Desenhar.InserirLinha
             }
 
             LimparPreview();
+            _linhaEndpointEdit.LimparSnapInsercao();
             _pontoInicial = null;
             _voltarParaSelecao();
         }

@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Linq;
 using System.Windows;
@@ -13,6 +14,7 @@ namespace Araci.Applications.Editar.Selecionar
 {
     public class LinhaEndpointEditService
     {
+        private const double ToleranciaSnapInsercao = 12.0;
         private readonly ISelectionService _selection;
         private readonly ISceneQueryService _sceneQueries;
         private readonly MoverElementoUseCase _moverElemento;
@@ -36,7 +38,7 @@ namespace Araci.Applications.Editar.Selecionar
         }
 
         public ObservableCollection<LinhaEndpointHandleViewModel> Handles { get; } = new();
-
+        public ObservableCollection<LinhaEndpointSnapViewModel> InsertionSnapHandles { get; } = new();
         public bool IsEditing => _interaction.IsDragging;
 
         public void Refresh()
@@ -105,7 +107,61 @@ namespace Araci.Applications.Editar.Selecionar
         {
             LimparEdicao();
             LimparHandleAtivo();
+            LimparSnapInsercao();
             Handles.Clear();
+        }
+
+        public Point? AtualizarSnapInsercao(IEnumerable<ElementoViewModel> elementos, Point position)
+        {
+            Point? snap = ObterPontaMaisProxima(elementos, position, ToleranciaSnapInsercao);
+            DefinirSnapInsercao(snap);
+            return snap;
+        }
+
+        public void LimparSnapInsercao()
+        {
+            if (InsertionSnapHandles.Count == 0)
+                return;
+
+            InsertionSnapHandles.Clear();
+        }
+
+        private void DefinirSnapInsercao(Point? ponto)
+        {
+            InsertionSnapHandles.Clear();
+
+            if (ponto.HasValue)
+                InsertionSnapHandles.Add(new LinhaEndpointSnapViewModel(ponto.Value.X, ponto.Value.Y));
+        }
+
+        private static Point? ObterPontaMaisProxima(IEnumerable<ElementoViewModel> elementos, Point position, double tolerancia)
+        {
+            double melhorDistancia = tolerancia * tolerancia;
+            Point? melhor = null;
+
+            foreach (LinhaAnotativaViewModel linha in elementos.OfType<LinhaAnotativaViewModel>())
+            {
+                if (linha.IsPreview)
+                    continue;
+
+                Avaliar(linha.PontoInicial);
+                Avaliar(linha.PontoFinal);
+            }
+
+            return melhor;
+
+            void Avaliar(Point ponto)
+            {
+                double dx = ponto.X - position.X;
+                double dy = ponto.Y - position.Y;
+                double distancia = dx * dx + dy * dy;
+
+                if (distancia > melhorDistancia)
+                    return;
+
+                melhorDistancia = distancia;
+                melhor = ponto;
+            }
         }
 
         private void RebuildHandles()

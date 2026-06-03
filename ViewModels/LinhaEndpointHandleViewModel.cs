@@ -23,4 +23,16 @@ namespace Araci.ViewModels
         public double Y { get; }
         public bool IsActive { get; }
     }
+
+    public class LinhaEndpointSnapViewModel
+    {
+        public LinhaEndpointSnapViewModel(double x, double y)
+        {
+            X = x;
+            Y = y;
+        }
+
+        public double X { get; }
+        public double Y { get; }
+    }
 }

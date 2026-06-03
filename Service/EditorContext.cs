@@ -377,6 +377,7 @@ namespace Araci.Services
                 ElementoFactory,
                 Scene,
                 SceneQueries,
+                LinhaEndpointEdit,
                 () => Tools.VoltarParaSelecao());
         }
 
