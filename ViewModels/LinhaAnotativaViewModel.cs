@@ -90,6 +90,10 @@ namespace Araci.ViewModels
 
         public double Comprimento => Math.Sqrt(X2 * X2 + Y2 * Y2);
 
+        public Point PontoInicial => new(Linha.PosicaoX, Linha.PosicaoY);
+
+        public Point PontoFinal => new(Linha.PosicaoX + X2, Linha.PosicaoY + Y2);
+
         public DoubleCollection? StrokeDashArray => CriarStrokeDashArray(EstiloLinha);
 
         public string Nome
@@ -212,6 +216,8 @@ namespace Araci.ViewModels
         protected override void NotificarGeometria()
         {
             base.NotificarGeometria();
+            OnPropertyChanged(nameof(PontoInicial));
+            OnPropertyChanged(nameof(PontoFinal));
             OnPropertyChanged(nameof(Comprimento));
         }
 

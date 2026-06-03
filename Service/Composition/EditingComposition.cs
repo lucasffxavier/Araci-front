@@ -56,6 +56,15 @@ namespace Araci.Services.Composition
             return new CableVertexEditService(selection, sceneQueries, visualUpdates, editarVerticesCabo);
         }
 
+        public static LinhaEndpointEditService CreateLinhaEndpointEdit(
+            SelectionService selection,
+            ISceneQueryService sceneQueries,
+            MoverElementoUseCase moverElemento,
+            VisualUpdateService visualUpdates)
+        {
+            return new LinhaEndpointEditService(selection, sceneQueries, moverElemento, visualUpdates.AtualizarElementoMovido);
+        }
+
         public static SafeDeleteService CreateSafeDelete(
             SelectionService selection,
             CableVertexEditService cableVertexEdit,

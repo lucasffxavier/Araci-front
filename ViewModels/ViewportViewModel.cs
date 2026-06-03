@@ -24,6 +24,7 @@ namespace Araci.ViewModels
             SelectionBoxViewModel selectionBox,
             TerminalSnapState terminalSnap,
             CableVertexEditService cableVertexEdit,
+            LinhaEndpointEditService linhaEndpointEdit,
             MoveHudService moveHud,
             AlignmentGuideService alignmentGuides,
             DocumentSceneSyncService documentSceneSync)
@@ -33,6 +34,7 @@ namespace Araci.ViewModels
             SelectionBox = selectionBox ?? throw new ArgumentNullException(nameof(selectionBox));
             TerminalSnap = terminalSnap ?? throw new ArgumentNullException(nameof(terminalSnap));
             CableVertexEdit = cableVertexEdit ?? throw new ArgumentNullException(nameof(cableVertexEdit));
+            LinhaEndpointEdit = linhaEndpointEdit ?? throw new ArgumentNullException(nameof(linhaEndpointEdit));
             MoveHud = moveHud ?? throw new ArgumentNullException(nameof(moveHud));
             ArgumentNullException.ThrowIfNull(alignmentGuides);
             AlignmentGuides = alignmentGuides.Linhas;
@@ -44,11 +46,15 @@ namespace Araci.ViewModels
         public SelectionBoxViewModel SelectionBox { get; }
         public TerminalSnapState TerminalSnap { get; }
         public CableVertexEditService CableVertexEdit { get; }
+        public LinhaEndpointEditService LinhaEndpointEdit { get; }
         public MoveHudService MoveHud { get; }
         public ObservableCollection<AlignmentGuideLineViewModel> AlignmentGuides { get; }
         public ObservableCollection<ElementoViewModel> Elementos => Scene.Elementos;
         public double InverseZoom => _inverseZoom;
         public double CableHandleVisualOffset => -5 * _inverseZoom;
+        public double LinhaHandleVisualSize => 10 * _inverseZoom;
+        public double LinhaHandleVisualOffset => -5 * _inverseZoom;
+        public double LinhaHandleStrokeThickness => 1.5 * _inverseZoom;
         public double TerminalMarkerVisualSize => 20 * _inverseZoom;
         public double TerminalMarkerVisualOffset => -10 * _inverseZoom;
         public double TerminalMarkerStrokeThickness => 2 * _inverseZoom;
@@ -68,6 +74,9 @@ namespace Araci.ViewModels
             _inverseZoom = inverseZoom;
             OnPropertyChanged(nameof(InverseZoom));
             OnPropertyChanged(nameof(CableHandleVisualOffset));
+            OnPropertyChanged(nameof(LinhaHandleVisualSize));
+            OnPropertyChanged(nameof(LinhaHandleVisualOffset));
+            OnPropertyChanged(nameof(LinhaHandleStrokeThickness));
             OnPropertyChanged(nameof(TerminalMarkerVisualSize));
             OnPropertyChanged(nameof(TerminalMarkerVisualOffset));
             OnPropertyChanged(nameof(TerminalMarkerStrokeThickness));

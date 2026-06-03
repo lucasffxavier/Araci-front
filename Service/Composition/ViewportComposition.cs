@@ -21,6 +21,7 @@ namespace Araci.Services.Composition
             SelectionBoxViewModel selectionBox,
             TerminalSnapState terminalSnap,
             CableVertexEditService cableVertexEdit,
+            LinhaEndpointEditService linhaEndpointEdit,
             MoveHudService moveHud,
             AlignmentGuideService alignmentGuides,
             ElementoFactory elementoFactory,
@@ -45,6 +46,7 @@ namespace Araci.Services.Composition
                 selectionBox,
                 terminalSnap,
                 cableVertexEdit,
+                linhaEndpointEdit,
                 moveHud,
                 alignmentGuides,
                 documentSceneSync);

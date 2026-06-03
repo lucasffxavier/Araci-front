@@ -77,7 +77,7 @@ namespace Araci.Services
                 Connectivity,
                 SceneQueries,
                 TerminalSnap,
-                RefreshCableVertexEdit);
+                RefreshEditingHandles);
             Names = new NameService(Document, Elements);
             GeometryUpdates = new ElementGeometryUpdateService(TerminalLayout, Connectivity, VisualUpdates);
             var elementoModelFactory = new ElementoModelFactory(Elements);
@@ -153,6 +153,12 @@ namespace Araci.Services
             Move = moveServices.Move;
             BarraResize = moveServices.BarraResize;
             Rotation = moveServices.Rotation;
+            LinhaEndpointEdit = EditingComposition.CreateLinhaEndpointEdit(
+                Selection,
+                SceneQueries,
+                MoverElemento,
+                VisualUpdates);
+            Selection.SelectionChanged += LinhaEndpointEdit.Refresh;
 
             Tools = new ToolService(
                 Elements,
@@ -194,6 +200,7 @@ namespace Araci.Services
                 SelectionBox,
                 TerminalSnap,
                 CableVertexEdit,
+                LinhaEndpointEdit,
                 MoveHud,
                 AlignmentGuides,
                 ElementoFactory,
@@ -220,6 +227,7 @@ namespace Araci.Services
         public SelectionBoxViewModel SelectionBox { get; } = new SelectionBoxViewModel();
         public TerminalSnapState TerminalSnap { get; } = new TerminalSnapState();
         public CableVertexEditService CableVertexEdit { get; }
+        public LinhaEndpointEditService LinhaEndpointEdit { get; }
         public CommandManager Commands { get; } = new CommandManager();
         ICommandHistory IEditorSession.Commands => Commands;
         public SafeDeleteService SafeDelete { get; }
@@ -384,9 +392,10 @@ namespace Araci.Services
                 centro.Y + ColarElementosUseCase.OffsetPadrao);
         }
 
-        private void RefreshCableVertexEdit()
+        private void RefreshEditingHandles()
         {
             CableVertexEdit?.Refresh();
+            LinhaEndpointEdit?.Refresh();
         }
 
         private void LimparEstadoTransitorioProjeto()
@@ -394,6 +403,7 @@ namespace Araci.Services
             Selection.Limpar();
             Hover.Clear();
             CableVertexEdit.Clear();
+            LinhaEndpointEdit.Clear();
             TerminalSnap.Limpar();
             SelectionBox.Visivel = false;
             MoveHud.Visivel = false;

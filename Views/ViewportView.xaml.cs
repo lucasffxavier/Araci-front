@@ -40,6 +40,7 @@ namespace Araci.Views
             AlignmentGuideLayer.RenderTransform = _cameraTransform;
             SelectionLayer.RenderTransform = _cameraTransform;
             CableVertexHandleLayer.RenderTransform = _cameraTransform;
+            LinhaEndpointHandleLayer.RenderTransform = _cameraTransform;
             TerminalSnapLayer.RenderTransform = _cameraTransform;
             _context.Viewport.Camera.PropertyChanged += OnCameraChanged;
             AtualizarCameraTransform();

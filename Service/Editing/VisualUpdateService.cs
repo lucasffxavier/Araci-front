@@ -17,7 +17,7 @@ namespace Araci.Services.Editing
         private readonly ConnectivityService _connectivity;
         private readonly ISceneQueryService _sceneQueries;
         private readonly TerminalSnapState _terminalSnap;
-        private readonly Action _refreshCableVertexEdit;
+        private readonly Action _refreshEditingHandles;
 
         public VisualUpdateService(
             Func<ViewportService?> viewportProvider,
@@ -25,14 +25,14 @@ namespace Araci.Services.Editing
             ConnectivityService connectivity,
             ISceneQueryService sceneQueries,
             TerminalSnapState terminalSnap,
-            Action refreshCableVertexEdit)
+            Action refreshEditingHandles)
         {
             _viewportProvider = viewportProvider ?? throw new ArgumentNullException(nameof(viewportProvider));
             _terminalLayout = terminalLayout ?? throw new ArgumentNullException(nameof(terminalLayout));
             _connectivity = connectivity ?? throw new ArgumentNullException(nameof(connectivity));
             _sceneQueries = sceneQueries ?? throw new ArgumentNullException(nameof(sceneQueries));
             _terminalSnap = terminalSnap ?? throw new ArgumentNullException(nameof(terminalSnap));
-            _refreshCableVertexEdit = refreshCableVertexEdit ?? throw new ArgumentNullException(nameof(refreshCableVertexEdit));
+            _refreshEditingHandles = refreshEditingHandles ?? throw new ArgumentNullException(nameof(refreshEditingHandles));
         }
 
         public void AtualizarElementoMovido(Elemento elemento)
@@ -40,7 +40,7 @@ namespace Araci.Services.Editing
             _viewportProvider()?.AtualizarViewModel(elemento);
             _terminalLayout.AtualizarTerminais(elemento);
             _sceneQueries.Invalidate();
-            _refreshCableVertexEdit();
+            _refreshEditingHandles();
         }
 
         public void AtualizarElementoRotacionado(Elemento elemento)
@@ -81,7 +81,7 @@ namespace Araci.Services.Editing
 
             _sceneQueries.Invalidate();
             _terminalSnap.Limpar();
-            _refreshCableVertexEdit();
+            _refreshEditingHandles();
         }
 
         private void AtualizarCabo(Cabo cabo)
@@ -94,7 +94,7 @@ namespace Araci.Services.Editing
         {
             _sceneQueries.Invalidate();
             _terminalSnap.Limpar();
-            _refreshCableVertexEdit();
+            _refreshEditingHandles();
         }
     }
 }
