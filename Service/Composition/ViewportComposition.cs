@@ -22,6 +22,7 @@ namespace Araci.Services.Composition
             TerminalSnapState terminalSnap,
             CableVertexEditService cableVertexEdit,
             LinhaEndpointEditService linhaEndpointEdit,
+            RetanguloResizeService retanguloResize,
             MoveHudService moveHud,
             AlignmentGuideService alignmentGuides,
             ElementoFactory elementoFactory,
@@ -47,6 +48,7 @@ namespace Araci.Services.Composition
                 terminalSnap,
                 cableVertexEdit,
                 linhaEndpointEdit,
+                retanguloResize,
                 moveHud,
                 alignmentGuides,
                 documentSceneSync);

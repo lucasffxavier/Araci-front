@@ -109,6 +109,8 @@ namespace Araci.Services
             Rotation = moveServices.Rotation;
             LinhaEndpointEdit = EditingComposition.CreateLinhaEndpointEdit(Selection, SceneQueries, MoverElemento, VisualUpdates);
             Selection.SelectionChanged += LinhaEndpointEdit.Refresh;
+            RetanguloResize = EditingComposition.CreateRetanguloResize(Selection, SceneQueries, MoverElemento, VisualUpdates);
+            Selection.SelectionChanged += RetanguloResize.Refresh;
 
             Tools = new ToolService(
                 Elements,
@@ -138,7 +140,7 @@ namespace Araci.Services
 
         public ViewportViewModel CriarViewportViewModel()
         {
-            return ViewportComposition.CreateViewModel(Document, Scene, SelectionBox, TerminalSnap, CableVertexEdit, LinhaEndpointEdit, MoveHud, AlignmentGuides, ElementoFactory, Selection, Hover, SceneQueries);
+            return ViewportComposition.CreateViewModel(Document, Scene, SelectionBox, TerminalSnap, CableVertexEdit, LinhaEndpointEdit, RetanguloResize, MoveHud, AlignmentGuides, ElementoFactory, Selection, Hover, SceneQueries);
         }
 
         public void InicializarViewport(ViewportViewModel viewportViewModel)
@@ -160,6 +162,7 @@ namespace Araci.Services
         public TerminalSnapState TerminalSnap { get; } = new TerminalSnapState();
         public CableVertexEditService CableVertexEdit { get; }
         public LinhaEndpointEditService LinhaEndpointEdit { get; }
+        public RetanguloResizeService RetanguloResize { get; }
         public CommandManager Commands { get; } = new CommandManager();
         ICommandHistory IEditorSession.Commands => Commands;
         public SafeDeleteService SafeDelete { get; }
@@ -225,12 +228,12 @@ namespace Araci.Services
 
         private SelecionarTool CriarSelecionarTool()
         {
-            return new SelecionarTool(SceneQueries, Selection, SelectionBox, CableVertexEdit, LinhaEndpointEdit, BarraResize, Move, MoveHud, AlignmentGuides, MoveConstraints, Rotation);
+            return new SelecionarTool(SceneQueries, Selection, SelectionBox, CableVertexEdit, LinhaEndpointEdit, RetanguloResize, BarraResize, Move, MoveHud, AlignmentGuides, MoveConstraints, Rotation);
         }
 
         private MoverTool CriarMoverTool()
         {
-            return new MoverTool(SceneQueries, Selection, SelectionBox, CableVertexEdit, LinhaEndpointEdit, BarraResize, Move, MoveHud, AlignmentGuides, MoveConstraints, Rotation);
+            return new MoverTool(SceneQueries, Selection, SelectionBox, CableVertexEdit, LinhaEndpointEdit, RetanguloResize, BarraResize, Move, MoveHud, AlignmentGuides, MoveConstraints, Rotation);
         }
 
         private AlinharTool CriarAlinharTool()
@@ -274,6 +277,7 @@ namespace Araci.Services
         {
             CableVertexEdit?.Refresh();
             LinhaEndpointEdit?.Refresh();
+            RetanguloResize?.Refresh();
         }
 
         private void LimparEstadoTransitorioProjeto()
@@ -282,6 +286,7 @@ namespace Araci.Services
             Hover.Clear();
             CableVertexEdit.Clear();
             LinhaEndpointEdit.Clear();
+            RetanguloResize.Clear();
             TerminalSnap.Limpar();
             SelectionBox.Visivel = false;
             MoveHud.Visivel = false;

@@ -17,6 +17,7 @@ namespace Araci.Applications.Editar.Selecionar
         private readonly DragMoveController _dragMove;
         private readonly CableVertexEditService _cableVertexEdit;
         private readonly LinhaEndpointEditService _linhaEndpointEdit;
+        private readonly RetanguloResizeService _retanguloResize;
         private readonly BarraResizeService _barraResize;
         private readonly AlignmentGuideService _alignmentGuides;
         private readonly RotationService _rotation;
@@ -28,6 +29,7 @@ namespace Araci.Applications.Editar.Selecionar
             SelectionBoxViewModel selectionBox,
             CableVertexEditService cableVertexEdit,
             LinhaEndpointEditService linhaEndpointEdit,
+            RetanguloResizeService retanguloResize,
             BarraResizeService barraResize,
             MoveService move,
             MoveHudService moveHud,
@@ -39,22 +41,14 @@ namespace Araci.Applications.Editar.Selecionar
         {
             _queries = queries ?? throw new ArgumentNullException(nameof(queries));
             _selection = new SelectionController(selection ?? throw new ArgumentNullException(nameof(selection)));
-            _selectionBox = new SelectionBoxController(
-                selectionBox ?? throw new ArgumentNullException(nameof(selectionBox)),
-                _queries,
-                selection);
+            _selectionBox = new SelectionBoxController(selectionBox ?? throw new ArgumentNullException(nameof(selectionBox)), _queries, selection);
             _cableVertexEdit = cableVertexEdit ?? throw new ArgumentNullException(nameof(cableVertexEdit));
             _linhaEndpointEdit = linhaEndpointEdit ?? throw new ArgumentNullException(nameof(linhaEndpointEdit));
+            _retanguloResize = retanguloResize ?? throw new ArgumentNullException(nameof(retanguloResize));
             _barraResize = barraResize ?? throw new ArgumentNullException(nameof(barraResize));
             _alignmentGuides = alignmentGuides ?? throw new ArgumentNullException(nameof(alignmentGuides));
             _rotation = rotation ?? throw new ArgumentNullException(nameof(rotation));
-            _dragMove = new DragMoveController(
-                selection,
-                move ?? throw new ArgumentNullException(nameof(move)),
-                moveHud ?? throw new ArgumentNullException(nameof(moveHud)),
-                _alignmentGuides,
-                moveConstraints ?? throw new ArgumentNullException(nameof(moveConstraints)),
-                mostrarHud);
+            _dragMove = new DragMoveController(selection, move ?? throw new ArgumentNullException(nameof(move)), moveHud ?? throw new ArgumentNullException(nameof(moveHud)), _alignmentGuides, moveConstraints ?? throw new ArgumentNullException(nameof(moveConstraints)), mostrarHud);
             _modoSoMover = modoSoMover;
         }
 
@@ -63,6 +57,7 @@ namespace Araci.Applications.Editar.Selecionar
 
         public bool IsBusy =>
             _barraResize.IsResizing ||
+            _retanguloResize.IsResizing ||
             _linhaEndpointEdit.IsEditing ||
             _dragMove.IsActive ||
             _selectionBox.IsActive ||
@@ -71,6 +66,7 @@ namespace Araci.Applications.Editar.Selecionar
         public void Ativar()
         {
             _linhaEndpointEdit.Refresh();
+            _retanguloResize.Refresh();
 
             if (!_modoSoMover)
                 _cableVertexEdit.Refresh();
@@ -80,17 +76,20 @@ namespace Araci.Applications.Editar.Selecionar
         {
             Cancelar();
             _linhaEndpointEdit.Clear();
+            _retanguloResize.Clear();
             _cableVertexEdit.Clear();
         }
 
         public void Cancelar()
         {
             _barraResize.Cancel();
+            _retanguloResize.Cancel();
             _linhaEndpointEdit.Cancel();
             _dragMove.Cancel();
             _selectionBox.Cancel();
             _cableVertexEdit.Cancel();
             _linhaEndpointEdit.Refresh();
+            _retanguloResize.Refresh();
             _cableVertexEdit.Refresh();
             _alignmentGuides.Limpar();
         }
@@ -103,8 +102,16 @@ namespace Araci.Applications.Editar.Selecionar
             if (!_modoSoMover && _barraResize.TryBegin(position))
                 return;
 
+            if (_retanguloResize.TryBegin(position))
+            {
+                _linhaEndpointEdit.Clear();
+                _cableVertexEdit.Clear();
+                return;
+            }
+
             if (_linhaEndpointEdit.TryBegin(position))
             {
+                _retanguloResize.Clear();
                 _cableVertexEdit.Clear();
                 return;
             }
@@ -130,11 +137,13 @@ namespace Araci.Applications.Editar.Selecionar
                     if (!podeMover)
                     {
                         _linhaEndpointEdit.Refresh();
+                        _retanguloResize.Refresh();
                         return;
                     }
                 }
 
                 _linhaEndpointEdit.Clear();
+                _retanguloResize.Clear();
                 _dragMove.Begin(position);
                 return;
             }
@@ -150,6 +159,12 @@ namespace Araci.Applications.Editar.Selecionar
             if (_barraResize.IsResizing)
             {
                 _barraResize.Update(position);
+                return;
+            }
+
+            if (_retanguloResize.IsResizing)
+            {
+                _retanguloResize.Update(position, inputState);
                 return;
             }
 
@@ -180,6 +195,13 @@ namespace Araci.Applications.Editar.Selecionar
             if (_barraResize.IsResizing)
             {
                 _barraResize.End();
+                RefreshEditHandles();
+                return;
+            }
+
+            if (_retanguloResize.IsResizing)
+            {
+                _retanguloResize.End();
                 _linhaEndpointEdit.Refresh();
                 _cableVertexEdit.Refresh();
                 return;
@@ -188,6 +210,7 @@ namespace Araci.Applications.Editar.Selecionar
             if (_linhaEndpointEdit.IsEditing)
             {
                 _linhaEndpointEdit.End();
+                _retanguloResize.Refresh();
                 _cableVertexEdit.Refresh();
                 return;
             }
@@ -201,15 +224,13 @@ namespace Araci.Applications.Editar.Selecionar
             if (_dragMove.IsActive)
             {
                 _dragMove.End();
-                _linhaEndpointEdit.Refresh();
-                _cableVertexEdit.Refresh();
+                RefreshEditHandles();
             }
 
             if (_selectionBox.IsActive)
             {
                 _selectionBox.End();
-                _linhaEndpointEdit.Refresh();
-                _cableVertexEdit.Refresh();
+                RefreshEditHandles();
             }
         }
 
@@ -218,12 +239,19 @@ namespace Araci.Applications.Editar.Selecionar
             if (!_modoSoMover && key == Key.Space)
             {
                 _rotation.RotateSelectionClockwise();
-                _linhaEndpointEdit.Refresh();
+                RefreshEditHandles();
                 return;
             }
 
             if (!_modoSoMover && key == Key.Delete)
                 _cableVertexEdit.TryRemoveActive();
+        }
+
+        private void RefreshEditHandles()
+        {
+            _linhaEndpointEdit.Refresh();
+            _retanguloResize.Refresh();
+            _cableVertexEdit.Refresh();
         }
     }
 }

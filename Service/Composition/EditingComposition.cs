@@ -5,7 +5,6 @@ using Araci.Applications.Editor;
 using Araci.Applications.Editar.Selecionar;
 using Araci.Applications.UseCases.Editar;
 using Araci.Core.Commands;
-using Araci.Core.Documents;
 using Araci.Core.Events;
 using Araci.Core.SceneQueries;
 using Araci.Models;
@@ -29,68 +28,37 @@ namespace Araci.Services.Composition
             TerminalSnapState terminalSnap,
             Action refreshCableVertexEdit)
         {
-            return new VisualUpdateService(
-                viewportProvider,
-                terminalLayout,
-                connectivity,
-                sceneQueries,
-                terminalSnap,
-                refreshCableVertexEdit);
+            return new VisualUpdateService(viewportProvider, terminalLayout, connectivity, sceneQueries, terminalSnap, refreshCableVertexEdit);
         }
 
-        public static SelectionService CreateSelection(
-            EditorState editor,
-            IEventBus events,
-            EditarPropriedadesUseCase editarPropriedades,
-            EditorSettings settings)
+        public static SelectionService CreateSelection(EditorState editor, IEventBus events, EditarPropriedadesUseCase editarPropriedades, EditorSettings settings)
         {
             return new SelectionService(editor, events, editarPropriedades, settings);
         }
 
-        public static CableVertexEditService CreateCableVertexEdit(
-            SelectionService selection,
-            ISceneQueryService sceneQueries,
-            VisualUpdateService visualUpdates,
-            EditarVerticesCaboUseCase editarVerticesCabo)
+        public static CableVertexEditService CreateCableVertexEdit(SelectionService selection, ISceneQueryService sceneQueries, VisualUpdateService visualUpdates, EditarVerticesCaboUseCase editarVerticesCabo)
         {
             return new CableVertexEditService(selection, sceneQueries, visualUpdates, editarVerticesCabo);
         }
 
-        public static LinhaEndpointEditService CreateLinhaEndpointEdit(
-            SelectionService selection,
-            ISceneQueryService sceneQueries,
-            MoverElementoUseCase moverElemento,
-            VisualUpdateService visualUpdates)
+        public static LinhaEndpointEditService CreateLinhaEndpointEdit(SelectionService selection, ISceneQueryService sceneQueries, MoverElementoUseCase moverElemento, VisualUpdateService visualUpdates)
         {
             return new LinhaEndpointEditService(selection, sceneQueries, moverElemento, visualUpdates.AtualizarElementoMovido);
         }
 
-        public static SafeDeleteService CreateSafeDelete(
-            SelectionService selection,
-            CableVertexEditService cableVertexEdit,
-            ExcluirElementoUseCase excluirElemento,
-            HoverService hover,
-            TerminalSnapState terminalSnap,
-            ISceneQueryService sceneQueries)
+        public static RetanguloResizeService CreateRetanguloResize(SelectionService selection, ISceneQueryService sceneQueries, MoverElementoUseCase moverElemento, VisualUpdateService visualUpdates)
+        {
+            return new RetanguloResizeService(selection, sceneQueries, moverElemento, visualUpdates.AtualizarElementoMovido);
+        }
+
+        public static SafeDeleteService CreateSafeDelete(SelectionService selection, CableVertexEditService cableVertexEdit, ExcluirElementoUseCase excluirElemento, HoverService hover, TerminalSnapState terminalSnap, ISceneQueryService sceneQueries)
         {
             return new SafeDeleteService(selection, cableVertexEdit, excluirElemento, hover, terminalSnap, sceneQueries);
         }
 
-        public static ClipboardService CreateClipboard(
-            CopiarElementosUseCase copiarElementos,
-            ColarElementosUseCase colarElementos,
-            SelectionService selection,
-            Func<ViewportService?> viewportProvider,
-            ISceneQueryService sceneQueries,
-            CableVertexEditService cableVertexEdit)
+        public static ClipboardService CreateClipboard(CopiarElementosUseCase copiarElementos, ColarElementosUseCase colarElementos, SelectionService selection, Func<ViewportService?> viewportProvider, ISceneQueryService sceneQueries, CableVertexEditService cableVertexEdit)
         {
-            return new ClipboardService(
-                copiarElementos,
-                colarElementos,
-                selection,
-                viewportProvider,
-                sceneQueries,
-                cableVertexEdit);
+            return new ClipboardService(copiarElementos, colarElementos, selection, viewportProvider, sceneQueries, cableVertexEdit);
         }
 
         public static MoveServices CreateMoveServices(
@@ -115,27 +83,10 @@ namespace Araci.Services.Composition
             var barraResize = new BarraResizeService(selection, geometryUpdates, redimensionarBarra);
             var rotation = new RotationService(selection, connectivity, viewportProvider, visualUpdates, rotacionarElemento);
 
-            return new MoveServices(
-                moveHud,
-                alignmentGuides,
-                moveConstraints,
-                moverElemento,
-                rotacionarElemento,
-                redimensionarBarra,
-                move,
-                barraResize,
-                rotation);
+            return new MoveServices(moveHud, alignmentGuides, moveConstraints, moverElemento, rotacionarElemento, redimensionarBarra, move, barraResize, rotation);
         }
 
-        public static InputRouter CreateInput(
-            ToolService tools,
-            CommandManager commands,
-            ISafeDeleteService safeDelete,
-            ISelectionService selection,
-            IElementCatalog elements,
-            IHoverService hover,
-            Action copySelected,
-            Action paste)
+        public static InputRouter CreateInput(ToolService tools, CommandManager commands, ISafeDeleteService safeDelete, ISelectionService selection, IElementCatalog elements, IHoverService hover, Action copySelected, Action paste)
         {
             return new InputRouter(tools, commands, safeDelete, selection, elements, hover, copySelected, paste);
         }
