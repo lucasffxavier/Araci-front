@@ -4,6 +4,7 @@ using System.Collections.Specialized;
 using System.ComponentModel;
 using System.Linq;
 using System.Windows;
+using Araci.Core.SceneNodes;
 using Araci.Core.Scenes;
 using Araci.Core.Spatial;
 using Araci.Models;
@@ -132,6 +133,9 @@ namespace Araci.Core.SceneQueries
             if (vm is CaboViewModel cabo)
                 return CriarCandidatoCabo(cabo, point, tolerance, order);
 
+            if (vm is LinhaAnotativaViewModel linha)
+                return CriarCandidatoLinhaAnotativa(linha, point, tolerance, order);
+
             return ContemPontoElemento(vm, point)
                 ? new HitCandidate(vm, 0, 0, order)
                 : null;
@@ -183,6 +187,7 @@ namespace Araci.Core.SceneQueries
         private static bool UsaGeometriaExpandida(ElementoViewModel vm)
         {
             return Math.Abs(vm.Rotacao) > 0.000001 ||
+                vm is LinhaAnotativaViewModel ||
                 vm.Modelo is ITerminalOwner;
         }
 
@@ -214,6 +219,18 @@ namespace Araci.Core.SceneQueries
 
             return distancia <= tolerance
                 ? new HitCandidate(cabo, distancia, 2, order)
+                : null;
+        }
+
+        private static HitCandidate? CriarCandidatoLinhaAnotativa(LinhaAnotativaViewModel linha, Point point, double tolerance, int order)
+        {
+            if (linha.Node is not LinhaAnotativaNode node)
+                return null;
+
+            double distancia = DistanciaPontoSegmento(point, node.PontoInicial, node.PontoFinal);
+
+            return distancia <= tolerance
+                ? new HitCandidate(linha, distancia, 2, order)
                 : null;
         }
 

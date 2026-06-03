@@ -100,9 +100,26 @@ namespace Araci.Services.Editing
             _editorState.ElementoSelecionado = _selecionados.Count switch
             {
                 0 => null,
-                1 => _selecionados[0],
+                1 => CriarPainelSelecaoUnica(_selecionados[0]),
                 _ => new PropertiesViewModel(_selecionados, _editarPropriedades, _settings)
             };
+        }
+
+        private object CriarPainelSelecaoUnica(ElementoViewModel vm)
+        {
+            return UsaPainelEspecifico(vm)
+                ? vm
+                : new PropertiesViewModel(_selecionados, _editarPropriedades, _settings);
+        }
+
+        private static bool UsaPainelEspecifico(ElementoViewModel vm)
+        {
+            return vm is BarraViewModel or
+                CaboViewModel or
+                CargaViewModel or
+                GeradorViewModel or
+                SinViewModel or
+                TransformadorViewModel;
         }
 
         private void PublicarAlteracao()

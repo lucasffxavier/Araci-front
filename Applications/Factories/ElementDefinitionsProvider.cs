@@ -142,7 +142,8 @@ namespace Araci.Applications.Factories
                 _ => Size.Empty,
                 _ => { },
                 new ElementRibbonMetadata("Linha", "Desenhar", "linha.svg", 0, false, null),
-                false);
+                false,
+                _properties.LinhaAnotativa());
         }
 
         private Barra CriarBarra()

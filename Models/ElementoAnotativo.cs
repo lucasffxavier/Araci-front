@@ -8,7 +8,7 @@ namespace Araci.Models
 
         protected ElementoAnotativo()
         {
-            DefinirParametro(new Parameter<string>(PARAM_COR_LINHA, "#FFFFFFFF"));
+            DefinirParametro(new Parameter<string>(PARAM_COR_LINHA, "#FF000000"));
             DefinirParametro(new Parameter<double>(PARAM_ESPESSURA_LINHA, 1.0));
             DefinirParametro(new Parameter<bool>(PARAM_VISIVEL, true));
         }

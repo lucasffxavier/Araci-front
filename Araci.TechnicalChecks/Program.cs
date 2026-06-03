@@ -7,6 +7,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Input;
+using System.Windows.Media;
 using Araci.API;
 using Araci.Applications.Abstractions;
 using Araci.Applications.Analisar.FluxoDeCorrente;
@@ -19,6 +20,7 @@ using Araci.Applications.UseCases.Projeto;
 using Araci.Core.Commands;
 using Araci.Core.Documents;
 using Araci.Core.Rendering;
+using Araci.Core.SceneQueries;
 using Araci.DTOs;
 using Araci.Infrastructure.Persistence;
 using Araci.Models;
@@ -118,6 +120,7 @@ namespace Araci.TechnicalChecks
                 ("Viewport continua focavel", ViewportContinuaFocavel),
                 ("Catalogo preserva Ribbon ordem e atalhos", CatalogoPreservaRibbonOrdemEAtalhos),
                 ("Catalogo registra LinhaAnotativa com ViewModel minima", CatalogoRegistraLinhaAnotativaComViewModelMinima),
+                ("LinhaAnotativa expoe propriedades cor e hit-test", LinhaAnotativaExpoePropriedadesCorEHitTest),
                 ("Catalogo preserva propriedades nao editaveis", CatalogoPreservaPropriedadesNaoEditaveis),
                 ("Catalogo preserva edicao mista", CatalogoPreservaEdicaoMista),
                 ("UnitFormatter converte kV e V", UnitFormatterConverteKvEVolt),
@@ -149,6 +152,7 @@ namespace Araci.TechnicalChecks
                 ("Salvar Abrir via use case preserva Units", SalvarAbrirViaUseCasePreservaUnits),
                 ("AtualizarPropriedadesSelecionadasUseCase preserva selecao", AtualizarPropriedadesSelecionadasUseCasePreservaSelecao),
                 ("SelecionarElementosUseCase seleciona elemento", SelecionarElementosUseCaseSelecionaElemento),
+                ("Selecionar LinhaAnotativa usa painel generico", SelecionarLinhaAnotativaUsaPainelGenerico),
                 ("SelecionarElementosUseCase limpa selecao", SelecionarElementosUseCaseLimpaSelecao),
                 ("SelecionarElementosUseCase cria painel propriedades multipla selecao", SelecionarElementosUseCaseCriaPainelPropriedadesMultiplaSelecao),
                 ("EditorContext expoe use cases de selecao", EditorContextExpoeUseCasesDeSelecao),
@@ -370,7 +374,7 @@ namespace Araci.TechnicalChecks
             Assert(annotation.PossuiParametro(ElementoAnotativo.PARAM_COR_LINHA), "ElementoAnotativo deve possuir parametro CorLinha.");
             Assert(annotation.PossuiParametro(ElementoAnotativo.PARAM_ESPESSURA_LINHA), "ElementoAnotativo deve possuir parametro EspessuraLinha.");
             Assert(annotation.PossuiParametro(ElementoAnotativo.PARAM_VISIVEL), "ElementoAnotativo deve possuir parametro Visivel.");
-            AssertEqual("#FFFFFFFF", annotation.CorLinha, "ElementoAnotativo.CorLinha default");
+            AssertEqual("#FF000000", annotation.CorLinha, "ElementoAnotativo.CorLinha default");
             AssertEqual(1.0, annotation.EspessuraLinha, "ElementoAnotativo.EspessuraLinha default");
             AssertEqual(true, annotation.Visivel, "ElementoAnotativo.Visivel default");
 
@@ -429,6 +433,7 @@ namespace Araci.TechnicalChecks
             Assert(linha.PossuiParametro(LinhaAnotativa.PARAM_Y2), "LinhaAnotativa deve possuir parametro Y2.");
             AssertEqual(100.0, linha.X2, "LinhaAnotativa.X2 default");
             AssertEqual(0.0, linha.Y2, "LinhaAnotativa.Y2 default");
+            AssertEqual("#FF000000", linha.CorLinha, "LinhaAnotativa.CorLinha default");
 
             linha.Nome = "Linha teste";
             linha.CorLinha = "#FF102030";
@@ -1974,6 +1979,127 @@ namespace Araci.TechnicalChecks
             AssertContains(xaml, "StrokeThickness=\"{Binding RenderData.StrokeThickness}\"", "LinhaAnotativa.Template.StrokeThickness");
         }
 
+        private static void LinhaAnotativaExpoePropriedadesCorEHitTest()
+        {
+            EditorContext context = CreateContextWithViewport();
+            var provider = new ElementInstancePropertyProvider();
+            IReadOnlyList<InstancePropertyDescriptor> descriptors = provider.LinhaAnotativa();
+
+            AssertEqual(6, descriptors.Count, "LinhaAnotativa descriptors.Count");
+            AssertDescriptor(descriptors[0], "Nome", "Nome", 10, false);
+            AssertDescriptor(descriptors[1], "X2", "X2", 20, true);
+            AssertDescriptor(descriptors[2], "Y2", "Y2", 30, true);
+            AssertDescriptor(descriptors[3], "CorLinha", "Cor da linha", 40, true);
+            AssertDescriptor(descriptors[4], "EspessuraLinha", "Espessura da linha", 50, true);
+            AssertDescriptor(descriptors[5], "Visivel", "Visível", 60, true);
+
+            ElementDefinition? definition = context.Elements.FindByKind(ElementKinds.LinhaAnotativa);
+
+            if (definition == null)
+                throw new InvalidOperationException("LinhaAnotativa deve estar registrada no catalogo.");
+
+            Assert(definition.PropriedadesInstancia.Count > 0, "LinhaAnotativa deve registrar propriedades de instancia.");
+
+            IReadOnlyList<InstancePropertyDescriptor> catalogProperties = context.Elements.GetInstanceProperties(typeof(LinhaAnotativaViewModel));
+            AssertEqual(6, catalogProperties.Count, "LinhaAnotativa catalog properties.Count");
+
+            var linha = new LinhaAnotativa
+            {
+                PosicaoX = 10,
+                PosicaoY = 20,
+                X2 = 100,
+                Y2 = 0
+            };
+
+            AssertEqual("#FF000000", linha.CorLinha, "LinhaAnotativa.CorLinha default preta");
+
+            if (context.ElementoFactory.CriarViewModel(linha) is not LinhaAnotativaViewModel vm)
+                throw new InvalidOperationException("LinhaAnotativa deve criar LinhaAnotativaViewModel.");
+
+            AssertBrushColor("#FF000000", vm.RenderData.Stroke, "LinhaAnotativa.RenderData.Stroke default");
+
+            PropertiesViewModel properties = new(new[] { vm }, context.EditarPropriedades, context.Settings);
+            AssertPropertyRow(properties, "Nome", "Nome", true);
+            AssertPropertyRow(properties, "X2", "X2", false);
+            AssertPropertyRow(properties, "Y2", "Y2", false);
+            AssertPropertyRow(properties, "CorLinha", "Cor da linha", false);
+            AssertPropertyRow(properties, "EspessuraLinha", "Espessura da linha", false);
+            AssertPropertyRow(properties, "Visivel", "Visível", false);
+
+            ElementoRenderData antes = vm.RenderData;
+            GetPropertyRow(properties, "X2").Value = "160";
+
+            AssertEqual(160, vm.X2, "LinhaAnotativa.Properties.X2");
+            AssertEqual(160, vm.RenderData.PontoLocalFinal.X, "LinhaAnotativa.RenderData.X2 editado");
+            Assert(!ReferenceEquals(antes, vm.RenderData), "RenderData deve ser recalculado apos X2.");
+
+            vm.CorLinha = "#FF00AAFF";
+            AssertBrushColor("#FF00AAFF", vm.RenderData.Stroke, "LinhaAnotativa.RenderData.Stroke editado");
+
+            vm.EspessuraLinha = 3.25;
+            AssertEqual(3.25, vm.RenderData.StrokeThickness, "LinhaAnotativa.RenderData.StrokeThickness editado");
+
+            vm.Visivel = false;
+            AssertEqual(false, vm.Visivel, "LinhaAnotativa.Visivel editado");
+
+            context.Document.AdicionarElemento(linha);
+            SceneHitResult? hit = context.SceneQueries.HitTest(new Point(80, 23), 6);
+
+            Assert(hit?.Elemento is LinhaAnotativaViewModel, "HitTest deve encontrar LinhaAnotativa proxima ao segmento.");
+
+            EditorContext previewContext = CreateContextWithViewport();
+            var previewLinha = new LinhaAnotativa
+            {
+                PosicaoX = 0,
+                PosicaoY = 0,
+                X2 = 100,
+                Y2 = 0
+            };
+
+            if (previewContext.ElementoFactory.CriarViewModel(previewLinha) is not LinhaAnotativaViewModel preview)
+                throw new InvalidOperationException("LinhaAnotativa preview deve criar ViewModel.");
+
+            preview.IsPreview = true;
+            previewContext.Scene.Elementos.Add(preview);
+
+            Assert(previewContext.SceneQueries.HitTest(new Point(50, 0), 6) == null, "HitTest nao deve retornar preview de LinhaAnotativa.");
+        }
+
+        private static void AssertDescriptor(
+            InstancePropertyDescriptor descriptor,
+            string propertyName,
+            string displayName,
+            int order,
+            bool isEditable)
+        {
+            AssertEqual(propertyName, descriptor.PropertyName, $"{propertyName}.PropertyName");
+            AssertEqual(displayName, descriptor.DisplayName, $"{propertyName}.DisplayName");
+            AssertEqual(order, descriptor.Order, $"{propertyName}.Order");
+            AssertEqual(isEditable, descriptor.IsEditable, $"{propertyName}.IsEditable");
+            AssertEqual(typeof(LinhaAnotativaViewModel), descriptor.OwnerType, $"{propertyName}.OwnerType");
+        }
+
+        private static void AssertPropertyRow(
+            PropertiesViewModel properties,
+            string propertyName,
+            string displayName,
+            bool isReadOnly)
+        {
+            PropertyDescriptorViewModel row = GetPropertyRow(properties, propertyName);
+
+            AssertEqual(displayName, row.DisplayName, $"{propertyName}.DisplayName");
+            AssertEqual(isReadOnly, row.IsReadOnly, $"{propertyName}.IsReadOnly");
+            AssertEqual(!isReadOnly, row.IsEditable, $"{propertyName}.IsEditable");
+        }
+
+        private static void AssertBrushColor(string expected, Brush brush, string name)
+        {
+            if (brush is not SolidColorBrush solid)
+                throw new InvalidOperationException($"{name}: brush nao e SolidColorBrush.");
+
+            AssertEqual(expected, solid.Color.ToString(), name);
+        }
+
         private static void CatalogoPreservaPropriedadesNaoEditaveis()
         {
             EditorContext context = new();
@@ -2395,6 +2521,40 @@ namespace Araci.TechnicalChecks
             AssertEqual(1, context.Selection.Selecionados.Count, "Selecionados.Count");
             Assert(ReferenceEquals(vm, context.Editor.ElementoSelecionado), "Editor.ElementoSelecionado deve receber o VM.");
             Assert(vm.IsSelecionado, "VM deve ficar selecionado.");
+        }
+
+        private static void SelecionarLinhaAnotativaUsaPainelGenerico()
+        {
+            EditorContext context = CreateContextWithViewport();
+            var linha = new LinhaAnotativa
+            {
+                Nome = "Linha Painel",
+                PosicaoX = 0,
+                PosicaoY = 0,
+                X2 = 100,
+                Y2 = 25
+            };
+
+            context.Document.AdicionarElemento(linha);
+
+            if (GetVm(context, linha) is not LinhaAnotativaViewModel vm)
+                throw new InvalidOperationException("ViewModel de LinhaAnotativa nao encontrada.");
+
+            context.SelecionarElementos.Selecionar(vm);
+
+            AssertEqual(1, context.Selection.Selecionados.Count, "Linha selecionados.Count");
+            Assert(vm.IsSelecionado, "Linha VM deve ficar selecionada.");
+            Assert(context.Editor.ElementoSelecionado is PropertiesViewModel, "LinhaAnotativa deve usar PropertiesViewModel.");
+
+            var properties = (PropertiesViewModel)context.Editor.ElementoSelecionado!;
+
+            AssertContains(properties.Titulo, "LinhaAnotativa", "LinhaAnotativa PropertiesViewModel.Titulo");
+            AssertPropertyRow(properties, "Nome", "Nome", true);
+            AssertPropertyRow(properties, "X2", "X2", false);
+            AssertPropertyRow(properties, "Y2", "Y2", false);
+            AssertPropertyRow(properties, "CorLinha", "Cor da linha", false);
+            AssertPropertyRow(properties, "EspessuraLinha", "Espessura da linha", false);
+            AssertPropertyRow(properties, "Visivel", "Visível", false);
         }
 
         private static void SelecionarElementosUseCaseLimpaSelecao()
