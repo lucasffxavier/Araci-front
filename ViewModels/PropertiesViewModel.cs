@@ -462,10 +462,26 @@ namespace Araci.ViewModels
             if (!IsEditable)
                 return;
 
-            if (string.Equals(novoValor, _valor, StringComparison.Ordinal))
+            if (string.Equals(novoValor, "<varia>", StringComparison.OrdinalIgnoreCase))
                 return;
 
-            if (string.Equals(novoValor, "<varia>", StringComparison.OrdinalIgnoreCase))
+            if (IsColor)
+            {
+                if (!ColorPickerWindow.TryNormalizeHexColor(novoValor, out string corNormalizada))
+                {
+                    TemErro = true;
+                    MensagemErro = "Valor inválido";
+                    _valor = novoValor;
+                    OnPropertyChanged(nameof(Valor));
+                    OnPropertyChanged(nameof(Value));
+                    OnPropertyChanged(nameof(ColorBrush));
+                    return;
+                }
+
+                novoValor = corNormalizada;
+            }
+
+            if (string.Equals(novoValor, _valor, StringComparison.Ordinal))
                 return;
 
             if (!PropertiesViewModel.TentarConverterValor(novoValor, _tipoValor, BaseUnit, DisplayUnit, out object? convertido))
@@ -479,19 +495,23 @@ namespace Araci.ViewModels
                 return;
             }
 
-            bool alterou = _editarPropriedades?.Executar(_elementos, _descriptor.PropertyName, convertido) == true;
+            _editarPropriedades?.Executar(_elementos, _descriptor.PropertyName, convertido);
+            AtualizarValorLocal(convertido);
+        }
 
-            if (!alterou)
-            {
-                _valor = PropertiesViewModel.FormatarValor(convertido, BaseUnit, DisplayUnit);
-                _varia = false;
-                AtualizarEstadoValido();
-                return;
-            }
-
+        private void AtualizarValorLocal(object? convertido)
+        {
             _varia = false;
-            _valor = PropertiesViewModel.FormatarValor(convertido, BaseUnit, DisplayUnit);
+            _valor = FormatarValorLocal(convertido);
             AtualizarEstadoValido();
+        }
+
+        private string FormatarValorLocal(object? convertido)
+        {
+            if (IsColor && convertido is string cor && ColorPickerWindow.TryNormalizeHexColor(cor, out string corNormalizada))
+                return corNormalizada;
+
+            return PropertiesViewModel.FormatarValor(convertido, BaseUnit, DisplayUnit);
         }
 
         private static UnitKind ResolveDisplayUnit(UnitKind baseUnit, EditorSettings? settings)

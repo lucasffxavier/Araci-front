@@ -10,10 +10,17 @@ namespace Araci.Properties
 {
     public partial class ColorPickerWindow : Window
     {
+        private const double HexWidth = 38;
+        private const double HexHeight = 44;
+        private const double HexStepX = 36;
+        private const double HexStepY = 32;
+
         public ColorPickerWindow(string? initialColor)
         {
             InitializeComponent();
             PaletteColors = CreatePaletteColors();
+            PaletteWidth = CalculatePaletteWidth(PaletteColors);
+            PaletteHeight = CalculatePaletteHeight(PaletteColors);
             DataContext = this;
             HexTextBox.Text = TryNormalizeHexColor(initialColor, out string normalized)
                 ? normalized
@@ -21,6 +28,8 @@ namespace Araci.Properties
         }
 
         public IReadOnlyList<ColorSwatch> PaletteColors { get; }
+        public double PaletteWidth { get; }
+        public double PaletteHeight { get; }
         public string SelectedColorHex { get; private set; } = "#FF000000";
 
         public static bool TryNormalizeHexColor(string? input, out string normalized)
@@ -63,46 +72,61 @@ namespace Araci.Properties
                 "#FF000000",
                 "#FFFFFFFF",
                 "#FFFF0000",
+                "#FFFFFF00",
                 "#FF00FF00",
-                "#FF0000FF"
+                "#FF00FFFF",
+                "#FF0000FF",
+                "#FFFF00FF"
             };
 
-            double[] saturations = { 1.0, 0.85, 0.65, 0.45, 0.25 };
-            double[] values = { 0.95, 0.75, 0.55, 0.35, 0.18 };
-
-            for (int hue = 0; hue < 360; hue += 15)
+            foreach (ColorSwatch swatch in GenerateHexPaletteSwatches())
             {
-                foreach (double saturation in saturations)
-                {
-                    foreach (double value in values)
-                    {
-                        string hex = ToHex(HsvToColor(hue, saturation, value));
-
-                        if (!colors.Contains(hex, StringComparer.OrdinalIgnoreCase))
-                            colors.Add(hex);
-                    }
-                }
-            }
-
-            for (int gray = 0; gray <= 255; gray += 17)
-            {
-                string hex = $"#FF{gray:X2}{gray:X2}{gray:X2}";
-
-                if (!colors.Contains(hex, StringComparer.OrdinalIgnoreCase))
-                    colors.Add(hex);
+                if (!colors.Contains(swatch.Hex, StringComparer.OrdinalIgnoreCase))
+                    colors.Add(swatch.Hex);
             }
 
             return colors;
         }
 
-        private static IReadOnlyList<ColorSwatch> CreatePaletteColors()
+        public static IReadOnlyList<int> GenerateHexPaletteRowCounts()
+        {
+            return new[] { 7, 8, 9, 10, 11, 12, 13, 12, 11, 10, 9, 8, 7 };
+        }
+
+        public static IReadOnlyList<ColorSwatch> GenerateHexPaletteSwatches()
         {
             var swatches = new List<ColorSwatch>();
+            IReadOnlyList<int> rowCounts = GenerateHexPaletteRowCounts();
+            int maxColumns = rowCounts.Max();
+            double mainWidth = (maxColumns - 1) * HexStepX + HexWidth;
 
-            foreach (string color in GeneratePaletteHexColors())
-                swatches.Add(new ColorSwatch(color, CriarBrush(color)));
+            for (int row = 0; row < rowCounts.Count; row++)
+            {
+                int columns = rowCounts[row];
+                double rowWidth = (columns - 1) * HexStepX + HexWidth;
+                double startX = (mainWidth - rowWidth) / 2;
+                double y = row * HexStepY;
+
+                for (int column = 0; column < columns; column++)
+                {
+                    double normalizedX = columns == 1 ? 0.5 : column / (double)(columns - 1);
+                    double normalizedY = row / (double)(rowCounts.Count - 1);
+                    double centerDistance = DistanceFromCenter(normalizedX, normalizedY);
+                    double hue = normalizedX * 330.0 + normalizedY * 45.0;
+                    double saturation = Math.Clamp(0.28 + centerDistance * 0.72, 0.22, 1.0);
+                    double value = Math.Clamp(1.0 - centerDistance * 0.46 - normalizedY * 0.08, 0.36, 1.0);
+                    string hex = ToHex(HsvToColor(hue % 360.0, saturation, value));
+
+                    AddSwatch(swatches, hex, startX + column * HexStepX, y);
+                }
+            }
 
             return swatches;
+        }
+
+        private static IReadOnlyList<ColorSwatch> CreatePaletteColors()
+        {
+            return GenerateHexPaletteSwatches();
         }
 
         private void OnHexTextChanged(object sender, TextChangedEventArgs e)
@@ -194,6 +218,52 @@ namespace Araci.Properties
             return $"#{color.A:X2}{color.R:X2}{color.G:X2}{color.B:X2}";
         }
 
+        private static PointCollection CreateHexPoints(double width, double height)
+        {
+            return new PointCollection
+            {
+                new(width / 2, 0),
+                new(width, height * 0.25),
+                new(width, height * 0.75),
+                new(width / 2, height),
+                new(0, height * 0.75),
+                new(0, height * 0.25)
+            };
+        }
+
+        private static void AddSwatch(List<ColorSwatch> swatches, string hex, double x, double y)
+        {
+            swatches.Add(new ColorSwatch(
+                hex,
+                CriarBrush(hex),
+                x,
+                y,
+                HexWidth,
+                HexHeight,
+                CreateHexPoints(HexWidth, HexHeight)));
+        }
+
+        private static double DistanceFromCenter(double normalizedX, double normalizedY)
+        {
+            double dx = normalizedX - 0.5;
+            double dy = normalizedY - 0.5;
+            return Math.Clamp(Math.Sqrt(dx * dx + dy * dy) / Math.Sqrt(0.5), 0, 1);
+        }
+
+        private static double CalculatePaletteWidth(IReadOnlyList<ColorSwatch> swatches)
+        {
+            return swatches.Count == 0
+                ? 0
+                : swatches.Max(s => s.X + s.Width) + 2;
+        }
+
+        private static double CalculatePaletteHeight(IReadOnlyList<ColorSwatch> swatches)
+        {
+            return swatches.Count == 0
+                ? 0
+                : swatches.Max(s => s.Y + s.Height) + 2;
+        }
+
         private static SolidColorBrush CriarBrush(string color)
         {
             byte a = byte.Parse(color.Substring(1, 2), NumberStyles.HexNumber, CultureInfo.InvariantCulture);
@@ -206,14 +276,24 @@ namespace Araci.Properties
 
         public sealed class ColorSwatch
         {
-            public ColorSwatch(string hex, Brush brush)
+            public ColorSwatch(string hex, Brush brush, double x, double y, double width, double height, PointCollection points)
             {
                 Hex = hex;
                 Brush = brush;
+                X = x;
+                Y = y;
+                Width = width;
+                Height = height;
+                Points = points;
             }
 
             public string Hex { get; }
             public Brush Brush { get; }
+            public double X { get; }
+            public double Y { get; }
+            public double Width { get; }
+            public double Height { get; }
+            public PointCollection Points { get; }
         }
     }
 }

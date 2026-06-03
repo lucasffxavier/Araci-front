@@ -2153,18 +2153,31 @@ namespace Araci.TechnicalChecks
             Assert(!ColorPickerWindow.TryNormalizeHexColor("#GG112233", out _), "ColorPicker deve rejeitar hexadecimal invalido.");
 
             IReadOnlyList<string> paletteColors = ColorPickerWindow.GeneratePaletteHexColors();
-            Assert(paletteColors.Count >= 80, "ColorPicker paleta deve conter pelo menos 80 cores.");
+            Assert(paletteColors.Count >= 100, "ColorPicker paleta deve conter pelo menos 100 cores.");
             Assert(paletteColors.Contains("#FF000000"), "ColorPicker paleta deve conter preto.");
             Assert(paletteColors.Contains("#FFFFFFFF"), "ColorPicker paleta deve conter branco.");
             Assert(paletteColors.Contains("#FFFF0000"), "ColorPicker paleta deve conter vermelho.");
             Assert(paletteColors.Contains("#FF00FF00"), "ColorPicker paleta deve conter verde.");
             Assert(paletteColors.Contains("#FF0000FF"), "ColorPicker paleta deve conter azul.");
+            Assert(paletteColors.Contains("#FFFFFF00"), "ColorPicker paleta deve conter amarelo.");
+            Assert(paletteColors.Contains("#FF00FFFF"), "ColorPicker paleta deve conter ciano.");
+            Assert(paletteColors.Contains("#FFFF00FF"), "ColorPicker paleta deve conter magenta.");
             Assert(paletteColors.Any(c => !c.EndsWith("000000", StringComparison.OrdinalIgnoreCase) &&
                                           !c.EndsWith("FFFFFF", StringComparison.OrdinalIgnoreCase) &&
                                           !c.EndsWith("FF0000", StringComparison.OrdinalIgnoreCase) &&
                                           !c.EndsWith("00FF00", StringComparison.OrdinalIgnoreCase) &&
                                           !c.EndsWith("0000FF", StringComparison.OrdinalIgnoreCase)),
                 "ColorPicker paleta deve conter tons intermediarios.");
+            IReadOnlyList<ColorPickerWindow.ColorSwatch> swatches = ColorPickerWindow.GenerateHexPaletteSwatches();
+            Assert(swatches.Count >= 100, "ColorPicker swatches hexagonais devem conter pelo menos 100 cores.");
+            Assert(swatches.All(s => s.Points.Count == 6), "ColorPicker swatches devem usar seis pontos.");
+            IReadOnlyList<int> rowCounts = ColorPickerWindow.GenerateHexPaletteRowCounts();
+            AssertEqual(13, rowCounts.Count, "ColorPicker linhas da paleta hexagonal.Count");
+            AssertEqual(7, rowCounts[0], "ColorPicker primeira linha hexagonal");
+            AssertEqual(13, rowCounts[6], "ColorPicker linha central hexagonal");
+            AssertEqual(7, rowCounts[^1], "ColorPicker ultima linha hexagonal");
+            Assert(rowCounts.Distinct().Count() > 1, "ColorPicker paleta deve usar contagens variaveis por linha.");
+            AssertEqual(rowCounts.Sum(), swatches.Count, "ColorPicker swatches nao devem incluir escala de cinza separada.");
 
             ElementDefinition? definition = context.Elements.FindByKind(ElementKinds.LinhaAnotativa);
 
@@ -2225,11 +2238,26 @@ namespace Araci.TechnicalChecks
             AssertContains(templateXaml, "IsColor", "PropertiesTemplate.IsColor");
             AssertContains(templateXaml, "ColorBrush", "PropertiesTemplate.ColorBrush");
             AssertContains(templateXaml, "EscolherCorCommand", "PropertiesTemplate.EscolherCorCommand");
+            Assert(!templateXaml.Contains("TextBlock Text=\"{Binding Valor}\"", StringComparison.OrdinalIgnoreCase),
+                "PropertiesTemplate cor nao deve exibir texto hexadecimal visivel.");
+            Assert(!templateXaml.Contains("<Line", StringComparison.OrdinalIgnoreCase),
+                "PropertiesTemplate amostra de cor nao deve conter Line.");
 
             string colorPickerXaml = File.ReadAllText(FindProjectFile("Properties/ColorPickerWindow.xaml"));
+            string colorPickerCode = File.ReadAllText(FindProjectFile("Properties/ColorPickerWindow.xaml.cs"));
             AssertContains(colorPickerXaml, "ColorPaletteItemsControl", "ColorPickerWindow.Paleta.ItemsControl");
-            AssertContains(colorPickerXaml, "UniformGrid", "ColorPickerWindow.Paleta.UniformGrid");
+            AssertContains(colorPickerXaml, "Canvas", "ColorPickerWindow.Paleta.Canvas");
+            AssertContains(colorPickerXaml, "Polygon", "ColorPickerWindow.Paleta.Polygon");
             AssertContains(colorPickerXaml, "PaletteColors", "ColorPickerWindow.Paleta.Binding");
+            AssertContains(colorPickerXaml, "HorizontalAlignment=\"Center\"", "ColorPickerWindow.Paleta.Center");
+            Assert(!colorPickerXaml.Contains("<Border BorderBrush=\"#4A4A4A\"", StringComparison.OrdinalIgnoreCase), "ColorPicker paleta nao deve estar em caixa com borda.");
+            Assert(!colorPickerCode.Contains("GrayScaleTopGap", StringComparison.OrdinalIgnoreCase), "ColorPicker nao deve gerar faixa de cinza separada.");
+            Assert(!colorPickerXaml.Contains("Content=\"Preto\"", StringComparison.OrdinalIgnoreCase), "ColorPicker rapido nao deve exibir Preto.");
+            Assert(!colorPickerXaml.Contains("Content=\"Vermelho\"", StringComparison.OrdinalIgnoreCase), "ColorPicker rapido nao deve exibir Vermelho.");
+            Assert(!colorPickerXaml.Contains("Content=\"Verde\"", StringComparison.OrdinalIgnoreCase), "ColorPicker rapido nao deve exibir Verde.");
+            Assert(!colorPickerXaml.Contains("Content=\"Azul\"", StringComparison.OrdinalIgnoreCase), "ColorPicker rapido nao deve exibir Azul.");
+            Assert(!colorPickerXaml.Contains("Content=\"Cinza\"", StringComparison.OrdinalIgnoreCase), "ColorPicker rapido nao deve exibir Cinza.");
+            Assert(!colorPickerXaml.Contains("Content=\"Branco\"", StringComparison.OrdinalIgnoreCase), "ColorPicker rapido nao deve exibir Branco.");
 
             ElementoRenderData antes = vm.RenderData;
             vm.X2 = 160;
@@ -2240,15 +2268,21 @@ namespace Araci.TechnicalChecks
             AssertEqual(200, vm.Comprimento, "LinhaAnotativa.Comprimento editado");
             Assert(!ReferenceEquals(antes, vm.RenderData), "RenderData deve ser recalculado apos X2.");
 
+            corRow.Value = "#FFFF0000";
+            AssertEqual("#FFFF0000", vm.CorLinha, "LinhaAnotativa.CorLinha via propriedade vermelho");
+            AssertEqual("#FFFF0000", corRow.Valor, "PropertyDescriptorViewModel.CorLinha.Valor vermelho");
+            AssertBrushColor("#FFFF0000", corRow.ColorBrush, "PropertyDescriptorViewModel.CorLinha.ColorBrush vermelho");
+
             corRow.Value = "#FF00AAFF";
             AssertEqual("#FF00AAFF", vm.CorLinha, "LinhaAnotativa.CorLinha via propriedade");
+            AssertEqual("#FF00AAFF", corRow.Valor, "PropertyDescriptorViewModel.CorLinha.Valor editado");
             AssertBrushColor("#FF00AAFF", vm.RenderData.Stroke, "LinhaAnotativa.RenderData.Stroke editado");
             AssertBrushColor("#FF00AAFF", corRow.ColorBrush, "PropertyDescriptorViewModel.CorLinha.ColorBrush editado");
 
             context.Commands.Undo();
 
-            AssertEqual("#FF000000", vm.CorLinha, "LinhaAnotativa.CorLinha apos undo");
-            AssertBrushColor("#FF000000", vm.RenderData.Stroke, "LinhaAnotativa.RenderData.Stroke apos undo");
+            AssertEqual("#FFFF0000", vm.CorLinha, "LinhaAnotativa.CorLinha apos undo");
+            AssertBrushColor("#FFFF0000", vm.RenderData.Stroke, "LinhaAnotativa.RenderData.Stroke apos undo");
 
             context.Commands.Redo();
 
@@ -2273,8 +2307,11 @@ namespace Araci.TechnicalChecks
 
             AssertEqual("#FF336699", vm.CorLinha, "LinhaAnotativa multipla primeira CorLinha");
             AssertEqual("#FF336699", vm2.CorLinha, "LinhaAnotativa multipla segunda CorLinha");
+            AssertEqual("#FF336699", corMultiplas.Valor, "LinhaAnotativa multipla Valor");
+            Assert(!corMultiplas.Varia, "LinhaAnotativa multipla Varia deve ser false apos aplicar cor.");
             AssertBrushColor("#FF336699", vm.RenderData.Stroke, "LinhaAnotativa multipla primeira Stroke");
             AssertBrushColor("#FF336699", vm2.RenderData.Stroke, "LinhaAnotativa multipla segunda Stroke");
+            AssertBrushColor("#FF336699", corMultiplas.ColorBrush, "LinhaAnotativa multipla ColorBrush");
 
             context.Commands.Undo();
 
