@@ -7,9 +7,12 @@ using System.Globalization;
 using System.Linq;
 using System.Reflection;
 using System.Runtime.CompilerServices;
+using System.Windows;
 using System.Windows.Input;
+using System.Windows.Media;
 using Araci.Applications.UseCases.Editar;
 using Araci.Models.Tipos;
+using Araci.Properties;
 using Araci.Services;
 using Araci.Services.Settings;
 
@@ -366,6 +369,7 @@ namespace Araci.ViewModels
         private readonly InstancePropertyDescriptor _descriptor;
         private readonly Type _tipoValor;
         private readonly EditarPropriedadesUseCase? _editarPropriedades;
+        private ICommand? _escolherCorCommand;
         private string _valor;
         private bool _varia;
         private bool _temErro;
@@ -391,6 +395,7 @@ namespace Araci.ViewModels
             UnitSymbol = UnitFormatter.GetSymbol(DisplayUnit);
             IsEditable = isEditable;
             IsReadOnly = !isEditable;
+            IsColor = descriptor.IsColor;
             _varia = varia;
             _valor = varia ? "<varia>" : PropertiesViewModel.FormatarValor(ObterValorAtual(), BaseUnit, DisplayUnit);
         }
@@ -406,8 +411,13 @@ namespace Araci.ViewModels
         public bool HasUnit => DisplayUnit != UnitKind.None;
         public bool IsEditable { get; }
         public bool IsReadOnly { get; }
+        public bool IsColor { get; }
         public bool IsMixed => _varia;
         public bool Varia => _varia;
+        public Brush ColorBrush => CriarColorBrush(_valor);
+        public ICommand? EscolherCorCommand => IsColor
+            ? _escolherCorCommand ??= new ColorCommand(EscolherCor, () => IsEditable)
+            : null;
 
         public string Valor
         {
@@ -465,6 +475,7 @@ namespace Araci.ViewModels
                 _valor = novoValor;
                 OnPropertyChanged(nameof(Valor));
                 OnPropertyChanged(nameof(Value));
+                OnPropertyChanged(nameof(ColorBrush));
                 return;
             }
 
@@ -498,10 +509,38 @@ namespace Araci.ViewModels
             MensagemErro = string.Empty;
             OnPropertyChanged(nameof(Valor));
             OnPropertyChanged(nameof(Value));
+            OnPropertyChanged(nameof(ColorBrush));
             OnPropertyChanged(nameof(IsMixed));
             OnPropertyChanged(nameof(Varia));
         }
 
+        private void EscolherCor()
+        {
+            var window = new ColorPickerWindow(_valor)
+            {
+                Owner = Application.Current?.MainWindow
+            };
+
+            if (window.ShowDialog() == true)
+                Valor = window.SelectedColorHex;
+        }
+
+        private static Brush CriarColorBrush(string value)
+        {
+            try
+            {
+                if (ColorPickerWindow.TryNormalizeColor(value, out string normalized) &&
+                    ColorConverter.ConvertFromString(normalized) is Color color)
+                {
+                    return new SolidColorBrush(color);
+                }
+            }
+            catch (FormatException)
+            {
+            }
+
+            return Brushes.Black;
+        }
         private object? ObterValorAtual()
         {
             if (_elementos.Count == 0)
@@ -510,6 +549,34 @@ namespace Araci.ViewModels
             return PropertiesViewModel.ObterValor(_elementos[0], _descriptor.PropertyName);
         }
 
+        private sealed class ColorCommand : ICommand
+        {
+            private readonly Action _execute;
+            private readonly Func<bool>? _canExecute;
+
+            public ColorCommand(Action execute, Func<bool>? canExecute = null)
+            {
+                _execute = execute ?? throw new ArgumentNullException(nameof(execute));
+                _canExecute = canExecute;
+            }
+
+            public bool CanExecute(object? parameter)
+            {
+                return _canExecute?.Invoke() ?? true;
+            }
+
+            public void Execute(object? parameter)
+            {
+                if (CanExecute(parameter))
+                    _execute();
+            }
+
+            public event EventHandler? CanExecuteChanged
+            {
+                add { }
+                remove { }
+            }
+        }
         public event PropertyChangedEventHandler? PropertyChanged;
 
         protected virtual void OnPropertyChanged([CallerMemberName] string? nome = null)
@@ -526,4 +593,10 @@ namespace Araci.ViewModels
         }
     }
 }
+
+
+
+
+
+
 

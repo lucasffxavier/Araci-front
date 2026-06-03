@@ -2140,7 +2140,31 @@ namespace Araci.TechnicalChecks
             AssertDescriptor(descriptors[1], "Comprimento", "Comprimento", 20, false);
             AssertEqual(UnitKind.LengthMeter, descriptors[1].Unit, "Comprimento.Unit");
             AssertDescriptor(descriptors[2], "CorLinha", "Cor da linha", 30, true);
+            Assert(descriptors[2].IsColor, "CorLinha deve ser marcada como propriedade de cor.");
             AssertDescriptor(descriptors[3], "EspessuraLinha", "Espessura da linha", 40, true);
+            Assert(ColorPickerWindow.TryNormalizeHexColor("#000000", out string pretoNormalizado), "ColorPicker deve aceitar #RRGGBB.");
+            AssertEqual("#FF000000", pretoNormalizado, "ColorPicker #000000 normalizado");
+            Assert(ColorPickerWindow.TryNormalizeHexColor("000000", out string pretoSemHashNormalizado), "ColorPicker deve aceitar RRGGBB.");
+            AssertEqual("#FF000000", pretoSemHashNormalizado, "ColorPicker 000000 normalizado");
+            Assert(ColorPickerWindow.TryNormalizeHexColor("#FF112233", out string corNormalizada), "ColorPicker deve aceitar #AARRGGBB.");
+            AssertEqual("#FF112233", corNormalizada, "ColorPicker #FF112233 normalizado");
+            Assert(ColorPickerWindow.TryNormalizeHexColor("FF112233", out string corSemHashNormalizada), "ColorPicker deve aceitar AARRGGBB.");
+            AssertEqual("#FF112233", corSemHashNormalizada, "ColorPicker FF112233 normalizado");
+            Assert(!ColorPickerWindow.TryNormalizeHexColor("#GG112233", out _), "ColorPicker deve rejeitar hexadecimal invalido.");
+
+            IReadOnlyList<string> paletteColors = ColorPickerWindow.GeneratePaletteHexColors();
+            Assert(paletteColors.Count >= 80, "ColorPicker paleta deve conter pelo menos 80 cores.");
+            Assert(paletteColors.Contains("#FF000000"), "ColorPicker paleta deve conter preto.");
+            Assert(paletteColors.Contains("#FFFFFFFF"), "ColorPicker paleta deve conter branco.");
+            Assert(paletteColors.Contains("#FFFF0000"), "ColorPicker paleta deve conter vermelho.");
+            Assert(paletteColors.Contains("#FF00FF00"), "ColorPicker paleta deve conter verde.");
+            Assert(paletteColors.Contains("#FF0000FF"), "ColorPicker paleta deve conter azul.");
+            Assert(paletteColors.Any(c => !c.EndsWith("000000", StringComparison.OrdinalIgnoreCase) &&
+                                          !c.EndsWith("FFFFFF", StringComparison.OrdinalIgnoreCase) &&
+                                          !c.EndsWith("FF0000", StringComparison.OrdinalIgnoreCase) &&
+                                          !c.EndsWith("00FF00", StringComparison.OrdinalIgnoreCase) &&
+                                          !c.EndsWith("0000FF", StringComparison.OrdinalIgnoreCase)),
+                "ColorPicker paleta deve conter tons intermediarios.");
 
             ElementDefinition? definition = context.Elements.FindByKind(ElementKinds.LinhaAnotativa);
 
@@ -2174,6 +2198,10 @@ namespace Araci.TechnicalChecks
             AssertPropertyRow(properties, "Comprimento", "Comprimento", true);
             AssertPropertyRow(properties, "CorLinha", "Cor da linha", false);
             AssertPropertyRow(properties, "EspessuraLinha", "Espessura da linha", false);
+            PropertyDescriptorViewModel corRow = GetPropertyRow(properties, "CorLinha");
+            Assert(corRow.IsColor, "PropertyDescriptorViewModel.CorLinha.IsColor");
+            Assert(corRow.EscolherCorCommand != null, "PropertyDescriptorViewModel.CorLinha.EscolherCorCommand");
+            AssertBrushColor("#FF000000", corRow.ColorBrush, "PropertyDescriptorViewModel.CorLinha.ColorBrush");
             Assert(properties.ExibirSeletorTipo, "Painel da LinhaAnotativa deve exibir seletor de tipo.");
             Assert(properties.PodeAbrirPropriedadesTipo, "Painel da LinhaAnotativa deve permitir abrir propriedades de tipo.");
             Assert(properties.Tipo is TipoLinhaAnotativa, "Painel da LinhaAnotativa deve expor TipoLinhaAnotativa.");
@@ -2182,6 +2210,26 @@ namespace Araci.TechnicalChecks
             Assert(!properties.Propriedades.Any(p => p.PropertyName == "Y2"), "Painel da LinhaAnotativa nao deve exibir Y2.");
             Assert(!properties.Propriedades.Any(p => p.PropertyName == "Visivel"), "Painel da LinhaAnotativa nao deve exibir Visivel.");
             Assert(!properties.Propriedades.Any(p => p.PropertyName == "EstiloLinha"), "Painel da LinhaAnotativa nao deve exibir EstiloLinha como instancia.");
+            var invalidColorRow = new PropertyDescriptorViewModel(
+                Array.Empty<ElementoViewModel>(),
+                new InstancePropertyDescriptor(typeof(LinhaAnotativaViewModel), "CorLinha", "Cor da linha", 0, isColor: true),
+                typeof(string),
+                false,
+                true);
+
+            invalidColorRow.Value = "cor invalida";
+            Assert(invalidColorRow.IsColor, "PropertyDescriptorViewModel.Cor invalida.IsColor");
+            AssertBrushColor("#FF000000", invalidColorRow.ColorBrush, "PropertyDescriptorViewModel.Cor invalida.ColorBrush fallback");
+
+            string templateXaml = File.ReadAllText(FindProjectFile("Resources/Templates/DataTemplates.xaml"));
+            AssertContains(templateXaml, "IsColor", "PropertiesTemplate.IsColor");
+            AssertContains(templateXaml, "ColorBrush", "PropertiesTemplate.ColorBrush");
+            AssertContains(templateXaml, "EscolherCorCommand", "PropertiesTemplate.EscolherCorCommand");
+
+            string colorPickerXaml = File.ReadAllText(FindProjectFile("Properties/ColorPickerWindow.xaml"));
+            AssertContains(colorPickerXaml, "ColorPaletteItemsControl", "ColorPickerWindow.Paleta.ItemsControl");
+            AssertContains(colorPickerXaml, "UniformGrid", "ColorPickerWindow.Paleta.UniformGrid");
+            AssertContains(colorPickerXaml, "PaletteColors", "ColorPickerWindow.Paleta.Binding");
 
             ElementoRenderData antes = vm.RenderData;
             vm.X2 = 160;
@@ -2192,8 +2240,51 @@ namespace Araci.TechnicalChecks
             AssertEqual(200, vm.Comprimento, "LinhaAnotativa.Comprimento editado");
             Assert(!ReferenceEquals(antes, vm.RenderData), "RenderData deve ser recalculado apos X2.");
 
-            vm.CorLinha = "#FF00AAFF";
+            corRow.Value = "#FF00AAFF";
+            AssertEqual("#FF00AAFF", vm.CorLinha, "LinhaAnotativa.CorLinha via propriedade");
             AssertBrushColor("#FF00AAFF", vm.RenderData.Stroke, "LinhaAnotativa.RenderData.Stroke editado");
+            AssertBrushColor("#FF00AAFF", corRow.ColorBrush, "PropertyDescriptorViewModel.CorLinha.ColorBrush editado");
+
+            context.Commands.Undo();
+
+            AssertEqual("#FF000000", vm.CorLinha, "LinhaAnotativa.CorLinha apos undo");
+            AssertBrushColor("#FF000000", vm.RenderData.Stroke, "LinhaAnotativa.RenderData.Stroke apos undo");
+
+            context.Commands.Redo();
+
+            AssertEqual("#FF00AAFF", vm.CorLinha, "LinhaAnotativa.CorLinha apos redo");
+            AssertBrushColor("#FF00AAFF", vm.RenderData.Stroke, "LinhaAnotativa.RenderData.Stroke apos redo");
+
+            var linha2 = new LinhaAnotativa
+            {
+                PosicaoX = 20,
+                PosicaoY = 30,
+                X2 = 80,
+                Y2 = 10
+            };
+
+            if (context.ElementoFactory.CriarViewModel(linha2) is not LinhaAnotativaViewModel vm2)
+                throw new InvalidOperationException("Segunda LinhaAnotativa deve criar LinhaAnotativaViewModel.");
+
+            PropertiesViewModel multiplasLinhas = new(new[] { vm, vm2 }, context.EditarPropriedades, context.Settings);
+            PropertyDescriptorViewModel corMultiplas = GetPropertyRow(multiplasLinhas, "CorLinha");
+
+            corMultiplas.Value = "#FF336699";
+
+            AssertEqual("#FF336699", vm.CorLinha, "LinhaAnotativa multipla primeira CorLinha");
+            AssertEqual("#FF336699", vm2.CorLinha, "LinhaAnotativa multipla segunda CorLinha");
+            AssertBrushColor("#FF336699", vm.RenderData.Stroke, "LinhaAnotativa multipla primeira Stroke");
+            AssertBrushColor("#FF336699", vm2.RenderData.Stroke, "LinhaAnotativa multipla segunda Stroke");
+
+            context.Commands.Undo();
+
+            AssertEqual("#FF00AAFF", vm.CorLinha, "LinhaAnotativa multipla primeira CorLinha undo");
+            AssertEqual("#FF000000", vm2.CorLinha, "LinhaAnotativa multipla segunda CorLinha undo");
+
+            context.Commands.Redo();
+
+            AssertEqual("#FF336699", vm.CorLinha, "LinhaAnotativa multipla primeira CorLinha redo");
+            AssertEqual("#FF336699", vm2.CorLinha, "LinhaAnotativa multipla segunda CorLinha redo");
 
             vm.EspessuraLinha = 3.25;
             AssertEqual(3.25, vm.RenderData.StrokeThickness, "LinhaAnotativa.RenderData.StrokeThickness editado");

@@ -110,7 +110,7 @@ namespace Araci.Applications.Factories
             {
                 Prop<LinhaAnotativaViewModel>("Nome", "Nome", 10, false),
                 Prop<LinhaAnotativaViewModel>("Comprimento", "Comprimento", 20, false, unit: UnitKind.LengthMeter),
-                Prop<LinhaAnotativaViewModel>("CorLinha", "Cor da linha", 30),
+                Prop<LinhaAnotativaViewModel>("CorLinha", "Cor da linha", 30, isColor: true),
                 Prop<LinhaAnotativaViewModel>("EspessuraLinha", "Espessura da linha", 40)
             };
         }
@@ -121,10 +121,11 @@ namespace Araci.Applications.Factories
             int order,
             bool isEditable = true,
             bool allowMixedTypeEdit = false,
-            UnitKind unit = UnitKind.None)
+            UnitKind unit = UnitKind.None,
+            bool isColor = false)
             where T : ElementoViewModel
         {
-            return new InstancePropertyDescriptor(typeof(T), propertyName, displayName, order, isEditable, allowMixedTypeEdit, unit);
+            return new InstancePropertyDescriptor(typeof(T), propertyName, displayName, order, isEditable, allowMixedTypeEdit, unit, isColor);
         }
     }
 }

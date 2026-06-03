@@ -6,7 +6,7 @@ namespace Araci.ViewModels
 {
     public sealed class InstancePropertyDescriptor
     {
-        public InstancePropertyDescriptor(Type ownerType, string propertyName, string displayName, int order, bool isEditable = true, bool allowMixedTypeEdit = false, UnitKind unit = UnitKind.None)
+        public InstancePropertyDescriptor(Type ownerType, string propertyName, string displayName, int order, bool isEditable = true, bool allowMixedTypeEdit = false, UnitKind unit = UnitKind.None, bool isColor = false)
         {
             OwnerType = ownerType ?? throw new ArgumentNullException(nameof(ownerType));
             PropertyName = propertyName ?? throw new ArgumentNullException(nameof(propertyName));
@@ -15,6 +15,7 @@ namespace Araci.ViewModels
             IsEditable = isEditable;
             AllowMixedTypeEdit = allowMixedTypeEdit;
             Unit = unit;
+            IsColor = isColor;
         }
 
         public Type OwnerType { get; }
@@ -24,6 +25,7 @@ namespace Araci.ViewModels
         public bool IsEditable { get; }
         public bool AllowMixedTypeEdit { get; }
         public UnitKind Unit { get; }
+        public bool IsColor { get; }
         public bool HasUnit => Unit != UnitKind.None;
         public string UnitSymbol => UnitFormatter.GetSymbol(Unit);
     }
