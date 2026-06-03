@@ -2,11 +2,11 @@ using System;
 using System.Collections.ObjectModel;
 using System.Linq;
 using System.Windows;
-using Araci.Applications.UseCases.Editar;
+using Araci.Applications.Abstractions;
 using Araci.Applications.Editar.Base;
+using Araci.Applications.UseCases.Editar;
 using Araci.Core.SceneQueries;
 using Araci.Models;
-using Araci.Services;
 using Araci.ViewModels;
 
 namespace Araci.Applications.Editar.Selecionar

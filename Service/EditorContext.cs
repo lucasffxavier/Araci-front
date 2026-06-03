@@ -304,6 +304,7 @@ namespace Araci.Services
                 Selection,
                 SelectionBox,
                 CableVertexEdit,
+                LinhaEndpointEdit,
                 BarraResize,
                 Move,
                 MoveHud,
@@ -319,6 +320,7 @@ namespace Araci.Services
                 Selection,
                 SelectionBox,
                 CableVertexEdit,
+                LinhaEndpointEdit,
                 BarraResize,
                 Move,
                 MoveHud,
@@ -411,6 +413,5 @@ namespace Araci.Services
             SceneQueries.Invalidate();
             Tools.VoltarParaSelecao();
         }
-
     }
 }
