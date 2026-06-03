@@ -13,35 +13,9 @@ namespace Araci.Applications.Editar.Mover
     {
         private readonly SelecionarTool _selecionarTool;
 
-        public MoverTool(
-            ISceneQueryService queries,
-            SelectionService selection,
-            SelectionBoxViewModel selectionBox,
-            CableVertexEditService cableVertexEdit,
-            LinhaEndpointEditService linhaEndpointEdit,
-            RetanguloResizeService retanguloResize,
-            BarraResizeService barraResize,
-            MoveService move,
-            MoveHudService moveHud,
-            AlignmentGuideService alignmentGuides,
-            MoveConstraintService moveConstraints,
-            RotationService rotation)
+        public MoverTool(ISceneQueryService queries, SelectionService selection, SelectionBoxViewModel selectionBox, CableVertexEditService cableVertexEdit, LinhaEndpointEditService linhaEndpointEdit, RetanguloResizeService retanguloResize, CirculoResizeService circuloResize, BarraResizeService barraResize, MoveService move, MoveHudService moveHud, AlignmentGuideService alignmentGuides, MoveConstraintService moveConstraints, RotationService rotation)
         {
-            _selecionarTool = new SelecionarTool(
-                queries,
-                selection,
-                selectionBox,
-                cableVertexEdit,
-                linhaEndpointEdit,
-                retanguloResize,
-                barraResize,
-                move,
-                moveHud,
-                alignmentGuides,
-                moveConstraints,
-                rotation,
-                modoSoMover: true,
-                mostrarHud: true);
+            _selecionarTool = new SelecionarTool(queries, selection, selectionBox, cableVertexEdit, linhaEndpointEdit, retanguloResize, circuloResize, barraResize, move, moveHud, alignmentGuides, moveConstraints, rotation, modoSoMover: true, mostrarHud: true);
         }
 
         public string Nome => "Mover";

@@ -26,6 +26,7 @@ namespace Araci.ViewModels
             CableVertexEditService cableVertexEdit,
             LinhaEndpointEditService linhaEndpointEdit,
             RetanguloResizeService retanguloResize,
+            CirculoResizeService circuloResize,
             MoveHudService moveHud,
             AlignmentGuideService alignmentGuides,
             DocumentSceneSyncService documentSceneSync)
@@ -37,6 +38,7 @@ namespace Araci.ViewModels
             CableVertexEdit = cableVertexEdit ?? throw new ArgumentNullException(nameof(cableVertexEdit));
             LinhaEndpointEdit = linhaEndpointEdit ?? throw new ArgumentNullException(nameof(linhaEndpointEdit));
             RetanguloResize = retanguloResize ?? throw new ArgumentNullException(nameof(retanguloResize));
+            CirculoResize = circuloResize ?? throw new ArgumentNullException(nameof(circuloResize));
             MoveHud = moveHud ?? throw new ArgumentNullException(nameof(moveHud));
             ArgumentNullException.ThrowIfNull(alignmentGuides);
             AlignmentGuides = alignmentGuides.Linhas;
@@ -50,6 +52,7 @@ namespace Araci.ViewModels
         public CableVertexEditService CableVertexEdit { get; }
         public LinhaEndpointEditService LinhaEndpointEdit { get; }
         public RetanguloResizeService RetanguloResize { get; }
+        public CirculoResizeService CirculoResize { get; }
         public MoveHudService MoveHud { get; }
         public ObservableCollection<AlignmentGuideLineViewModel> AlignmentGuides { get; }
         public ObservableCollection<ElementoViewModel> Elementos => Scene.Elementos;
@@ -61,6 +64,9 @@ namespace Araci.ViewModels
         public double RetanguloHandleVisualSize => 10 * _inverseZoom;
         public double RetanguloHandleVisualOffset => -5 * _inverseZoom;
         public double RetanguloHandleStrokeThickness => 1.5 * _inverseZoom;
+        public double CirculoHandleVisualSize => 10 * _inverseZoom;
+        public double CirculoHandleVisualOffset => -5 * _inverseZoom;
+        public double CirculoHandleStrokeThickness => 1.5 * _inverseZoom;
         public double TerminalMarkerVisualSize => 20 * _inverseZoom;
         public double TerminalMarkerVisualOffset => -10 * _inverseZoom;
         public double TerminalMarkerStrokeThickness => 2 * _inverseZoom;
@@ -86,6 +92,9 @@ namespace Araci.ViewModels
             OnPropertyChanged(nameof(RetanguloHandleVisualSize));
             OnPropertyChanged(nameof(RetanguloHandleVisualOffset));
             OnPropertyChanged(nameof(RetanguloHandleStrokeThickness));
+            OnPropertyChanged(nameof(CirculoHandleVisualSize));
+            OnPropertyChanged(nameof(CirculoHandleVisualOffset));
+            OnPropertyChanged(nameof(CirculoHandleStrokeThickness));
             OnPropertyChanged(nameof(TerminalMarkerVisualSize));
             OnPropertyChanged(nameof(TerminalMarkerVisualOffset));
             OnPropertyChanged(nameof(TerminalMarkerStrokeThickness));

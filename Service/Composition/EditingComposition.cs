@@ -20,13 +20,7 @@ namespace Araci.Services.Composition
 {
     internal static class EditingComposition
     {
-        public static VisualUpdateService CreateVisualUpdates(
-            Func<ViewportService?> viewportProvider,
-            TerminalLayoutService terminalLayout,
-            ConnectivityService connectivity,
-            ISceneQueryService sceneQueries,
-            TerminalSnapState terminalSnap,
-            Action refreshCableVertexEdit)
+        public static VisualUpdateService CreateVisualUpdates(Func<ViewportService?> viewportProvider, TerminalLayoutService terminalLayout, ConnectivityService connectivity, ISceneQueryService sceneQueries, TerminalSnapState terminalSnap, Action refreshCableVertexEdit)
         {
             return new VisualUpdateService(viewportProvider, terminalLayout, connectivity, sceneQueries, terminalSnap, refreshCableVertexEdit);
         }
@@ -51,6 +45,11 @@ namespace Araci.Services.Composition
             return new RetanguloResizeService(selection, sceneQueries, moverElemento, visualUpdates.AtualizarElementoMovido);
         }
 
+        public static CirculoResizeService CreateCirculoResize(SelectionService selection, ISceneQueryService sceneQueries, MoverElementoUseCase moverElemento, VisualUpdateService visualUpdates)
+        {
+            return new CirculoResizeService(selection, sceneQueries, moverElemento, visualUpdates.AtualizarElementoMovido);
+        }
+
         public static SafeDeleteService CreateSafeDelete(SelectionService selection, CableVertexEditService cableVertexEdit, ExcluirElementoUseCase excluirElemento, HoverService hover, TerminalSnapState terminalSnap, ISceneQueryService sceneQueries)
         {
             return new SafeDeleteService(selection, cableVertexEdit, excluirElemento, hover, terminalSnap, sceneQueries);
@@ -61,17 +60,7 @@ namespace Araci.Services.Composition
             return new ClipboardService(copiarElementos, colarElementos, selection, viewportProvider, sceneQueries, cableVertexEdit);
         }
 
-        public static MoveServices CreateMoveServices(
-            Func<ViewportService?> viewportProvider,
-            Func<IEnumerable<ElementoViewModel>> sceneElementsProvider,
-            EditorSettings settings,
-            ConnectivityService connectivity,
-            TerminalLayoutService terminalLayout,
-            ISceneQueryService sceneQueries,
-            VisualUpdateService visualUpdates,
-            SelectionService selection,
-            ElementGeometryUpdateService geometryUpdates,
-            CommandManager commands)
+        public static MoveServices CreateMoveServices(Func<ViewportService?> viewportProvider, Func<IEnumerable<ElementoViewModel>> sceneElementsProvider, EditorSettings settings, ConnectivityService connectivity, TerminalLayoutService terminalLayout, ISceneQueryService sceneQueries, VisualUpdateService visualUpdates, SelectionService selection, ElementGeometryUpdateService geometryUpdates, CommandManager commands)
         {
             var moveHud = new MoveHudService(viewportProvider);
             var alignmentGuides = new AlignmentGuideService(sceneElementsProvider);
@@ -92,14 +81,5 @@ namespace Araci.Services.Composition
         }
     }
 
-    internal sealed record MoveServices(
-        MoveHudService MoveHud,
-        AlignmentGuideService AlignmentGuides,
-        MoveConstraintService MoveConstraints,
-        MoverElementoUseCase MoverElemento,
-        RotacionarElementoUseCase RotacionarElemento,
-        RedimensionarBarraUseCase RedimensionarBarra,
-        MoveService Move,
-        BarraResizeService BarraResize,
-        RotationService Rotation);
+    internal sealed record MoveServices(MoveHudService MoveHud, AlignmentGuideService AlignmentGuides, MoveConstraintService MoveConstraints, MoverElementoUseCase MoverElemento, RotacionarElementoUseCase RotacionarElemento, RedimensionarBarraUseCase RedimensionarBarra, MoveService Move, BarraResizeService BarraResize, RotationService Rotation);
 }

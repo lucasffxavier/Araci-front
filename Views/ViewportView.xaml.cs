@@ -40,6 +40,7 @@ namespace Araci.Views
             AlignmentGuideLayer.RenderTransform = _cameraTransform;
             SelectionLayer.RenderTransform = _cameraTransform;
             CableVertexHandleLayer.RenderTransform = _cameraTransform;
+            CirculoResizeHandleLayer.RenderTransform = _cameraTransform;
             RetanguloResizeHandleLayer.RenderTransform = _cameraTransform;
             LinhaEndpointInsertionSnapLayer.RenderTransform = _cameraTransform;
             LinhaEndpointHandleLayer.RenderTransform = _cameraTransform;

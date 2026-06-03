@@ -23,6 +23,7 @@ namespace Araci.Services.Composition
             CableVertexEditService cableVertexEdit,
             LinhaEndpointEditService linhaEndpointEdit,
             RetanguloResizeService retanguloResize,
+            CirculoResizeService circuloResize,
             MoveHudService moveHud,
             AlignmentGuideService alignmentGuides,
             ElementoFactory elementoFactory,
@@ -49,6 +50,7 @@ namespace Araci.Services.Composition
                 cableVertexEdit,
                 linhaEndpointEdit,
                 retanguloResize,
+                circuloResize,
                 moveHud,
                 alignmentGuides,
                 documentSceneSync);
