@@ -10,9 +10,7 @@ namespace Araci.Applications.Factories
         private readonly IElementModelFactory _modelFactory;
         private readonly IElementViewModelFactory _viewModelFactory;
 
-        public ElementoFactory(
-            IElementModelFactory modelFactory,
-            IElementViewModelFactory viewModelFactory)
+        public ElementoFactory(IElementModelFactory modelFactory, IElementViewModelFactory viewModelFactory)
         {
             _modelFactory = modelFactory ?? throw new ArgumentNullException(nameof(modelFactory));
             _viewModelFactory = viewModelFactory ?? throw new ArgumentNullException(nameof(viewModelFactory));
@@ -122,6 +120,16 @@ namespace Araci.Applications.Factories
         public RetanguloAnotativoViewModel CriarRetanguloAnotativoVM()
         {
             return CriarViewModel<RetanguloAnotativoViewModel>(ElementKinds.RetanguloAnotativo);
+        }
+
+        public CirculoAnotativo CriarCirculoAnotativo()
+        {
+            return CriarModelo<CirculoAnotativo>(ElementKinds.CirculoAnotativo);
+        }
+
+        public CirculoAnotativoViewModel CriarCirculoAnotativoVM()
+        {
+            return CriarViewModel<CirculoAnotativoViewModel>(ElementKinds.CirculoAnotativo);
         }
     }
 }

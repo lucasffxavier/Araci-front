@@ -16,6 +16,7 @@ namespace Araci.Applications.Editor
         private readonly Func<ElementDefinition, ITool> _criarInserirElementoTool;
         private readonly Func<ITool> _criarInserirLinhaAnotativaTool;
         private readonly Func<ITool> _criarInserirRetanguloAnotativoTool;
+        private readonly Func<ITool> _criarInserirCirculoAnotativoTool;
         private ITool _ferramentaAtual;
 
         public ToolService(
@@ -27,7 +28,8 @@ namespace Araci.Applications.Editor
             Func<ITool> criarInserirCaboTool,
             Func<ElementDefinition, ITool> criarInserirElementoTool,
             Func<ITool> criarInserirLinhaAnotativaTool,
-            Func<ITool> criarInserirRetanguloAnotativoTool)
+            Func<ITool> criarInserirRetanguloAnotativoTool,
+            Func<ITool> criarInserirCirculoAnotativoTool)
         {
             _elements = elements ?? throw new ArgumentNullException(nameof(elements));
             _criarSelecionarTool = criarSelecionarTool ?? throw new ArgumentNullException(nameof(criarSelecionarTool));
@@ -38,6 +40,7 @@ namespace Araci.Applications.Editor
             _criarInserirElementoTool = criarInserirElementoTool ?? throw new ArgumentNullException(nameof(criarInserirElementoTool));
             _criarInserirLinhaAnotativaTool = criarInserirLinhaAnotativaTool ?? throw new ArgumentNullException(nameof(criarInserirLinhaAnotativaTool));
             _criarInserirRetanguloAnotativoTool = criarInserirRetanguloAnotativoTool ?? throw new ArgumentNullException(nameof(criarInserirRetanguloAnotativoTool));
+            _criarInserirCirculoAnotativoTool = criarInserirCirculoAnotativoTool ?? throw new ArgumentNullException(nameof(criarInserirCirculoAnotativoTool));
             _ferramentaAtual = _criarSelecionarTool();
             _ferramentaAtual.Ativar();
         }
@@ -93,6 +96,11 @@ namespace Araci.Applications.Editor
         public void AtivarInserirRetanguloAnotativo()
         {
             FerramentaAtual = _criarInserirRetanguloAnotativoTool();
+        }
+
+        public void AtivarInserirCirculoAnotativo()
+        {
+            FerramentaAtual = _criarInserirCirculoAnotativoTool();
         }
 
         public bool AtivarInsercaoElemento(string kind)

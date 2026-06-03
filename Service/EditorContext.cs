@@ -10,6 +10,7 @@ using Araci.Core.SceneQueries;
 using Araci.Core.Transactions;
 using Araci.Applications.Desenhar.InserirLinha;
 using Araci.Applications.Desenhar.InserirRetangulo;
+using Araci.Applications.Desenhar.InserirCirculo;
 using Araci.Applications.Diagrama.InserirCabo;
 using Araci.Applications.Diagrama.InserirElemento;
 using Araci.Applications.Editar.Alinhar;
@@ -121,7 +122,8 @@ namespace Araci.Services
                 CriarInserirCaboTool,
                 CriarInserirElementoGenericoTool,
                 CriarInserirLinhaAnotativaTool,
-                CriarInserirRetanguloAnotativoTool);
+                CriarInserirRetanguloAnotativoTool,
+                CriarInserirCirculoAnotativoTool);
 
             Input = EditingComposition.CreateInput(Tools, Commands, SafeDelete, Selection, Elements, Hover, Clipboard.CopiarSelecionados, Clipboard.Colar);
             AlterarUnidadesProjeto = new AlterarUnidadesProjetoUseCase(Settings, RefreshProperties);
@@ -259,6 +261,11 @@ namespace Araci.Services
         private InserirRetanguloAnotativoTool CriarInserirRetanguloAnotativoTool()
         {
             return new InserirRetanguloAnotativoTool(Commands, Document, Names, ElementoFactory, Scene, SceneQueries, () => Tools.VoltarParaSelecao());
+        }
+
+        private InserirCirculoAnotativoTool CriarInserirCirculoAnotativoTool()
+        {
+            return new InserirCirculoAnotativoTool(Commands, Document, Names, ElementoFactory, Scene, SceneQueries, () => Tools.VoltarParaSelecao());
         }
 
         private Point ObterDestinoColagem(IReadOnlyList<Elemento> copiados)

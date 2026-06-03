@@ -127,6 +127,18 @@ namespace Araci.Applications.Factories
             };
         }
 
+        public IReadOnlyList<InstancePropertyDescriptor> CirculoAnotativo()
+        {
+            return new[]
+            {
+                Prop<CirculoAnotativoViewModel>("Nome", "Nome", 10, false),
+                Prop<CirculoAnotativoViewModel>("Raio", "Raio", 20, unit: UnitKind.LengthMeter),
+                Prop<CirculoAnotativoViewModel>("Diametro", "Diâmetro", 30, false, unit: UnitKind.LengthMeter),
+                Prop<CirculoAnotativoViewModel>("CorLinha", "Cor da borda", 40, isColor: true),
+                Prop<CirculoAnotativoViewModel>("EspessuraLinha", "Espessura da borda", 50)
+            };
+        }
+
         private static InstancePropertyDescriptor Prop<T>(
             string propertyName,
             string displayName,

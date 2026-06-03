@@ -13,13 +13,7 @@ namespace Araci.ViewModels
         public double Rotacao { get; }
         public List<Point> Vertices { get; }
 
-        public ElementoEstado(
-            double x,
-            double y,
-            double x2 = 0,
-            double y2 = 0,
-            double rotacao = 0,
-            IEnumerable<Point>? vertices = null)
+        public ElementoEstado(double x, double y, double x2 = 0, double y2 = 0, double rotacao = 0, IEnumerable<Point>? vertices = null)
         {
             X = x;
             Y = y;
@@ -52,6 +46,9 @@ namespace Araci.ViewModels
                 retangulo.Largura = X2;
                 retangulo.Altura = Y2;
             }
+
+            if (elemento is CirculoAnotativo circulo)
+                circulo.Raio = X2;
 
             if (elemento is not Cabo cabo)
                 return;

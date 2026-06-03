@@ -16,9 +16,7 @@ namespace Araci.Applications.Factories
         private readonly TypeLibraryService _types;
         private readonly ElementInstancePropertyProvider _properties;
 
-        public ElementDefinitionsProvider(
-            TypeLibraryService types,
-            ElementInstancePropertyProvider properties)
+        public ElementDefinitionsProvider(TypeLibraryService types, ElementInstancePropertyProvider properties)
         {
             _types = types ?? throw new ArgumentNullException(nameof(types));
             _properties = properties ?? throw new ArgumentNullException(nameof(properties));
@@ -34,6 +32,7 @@ namespace Araci.Applications.Factories
             yield return new ElementDefinition(ElementKinds.Barra, "Barra", "BARRA", typeof(Barra), typeof(BarraViewModel), typeof(TipoBarra), CriarBarra, (m, c) => new BarraViewModel((Barra)m, _types, c.Names, c.TypePropertiesDialogs, c.TerminalLayout), () => _types.TipoBarraPadrao, () => _types.TiposBarras, e => new Size(ElementGeometryDefaults.BarraLargura, ((Barra)e).Altura), e => ((Barra)e).AtualizarTerminais(ElementGeometryDefaults.BarraLargura), Ribbon("Barra", "barra.svg", 60, "BA"), false, _properties.Barra());
             yield return new ElementDefinition(ElementKinds.LinhaAnotativa, "Linha", "LINHA", typeof(LinhaAnotativa), typeof(LinhaAnotativaViewModel), typeof(TipoLinhaAnotativa), CriarLinhaAnotativa, (m, c) => new LinhaAnotativaViewModel((LinhaAnotativa)m, _types, c.Names, c.TypePropertiesDialogs), () => _types.TipoLinhaAnotativaPadrao, () => _types.TiposLinhasAnotativas, _ => Size.Empty, _ => { }, new ElementRibbonMetadata("Linha", "Desenhar", "linha.svg", 0, false, null), false, _properties.LinhaAnotativa());
             yield return new ElementDefinition(ElementKinds.RetanguloAnotativo, "Retângulo", "RETANGULO", typeof(RetanguloAnotativo), typeof(RetanguloAnotativoViewModel), typeof(TipoLinhaAnotativa), CriarRetanguloAnotativo, (m, c) => new RetanguloAnotativoViewModel((RetanguloAnotativo)m, _types, c.Names, c.TypePropertiesDialogs), () => _types.TipoLinhaAnotativaPadrao, () => _types.TiposLinhasAnotativas, e => new Size(((RetanguloAnotativo)e).Largura, ((RetanguloAnotativo)e).Altura), _ => { }, new ElementRibbonMetadata("Retângulo", "Desenhar", "retângulo.svg", 1, false, null), false, _properties.RetanguloAnotativo());
+            yield return new ElementDefinition(ElementKinds.CirculoAnotativo, "Círculo", "CIRCULO", typeof(CirculoAnotativo), typeof(CirculoAnotativoViewModel), typeof(TipoLinhaAnotativa), CriarCirculoAnotativo, (m, c) => new CirculoAnotativoViewModel((CirculoAnotativo)m, _types, c.Names, c.TypePropertiesDialogs), () => _types.TipoLinhaAnotativaPadrao, () => _types.TiposLinhasAnotativas, e => new Size(((CirculoAnotativo)e).Diametro, ((CirculoAnotativo)e).Diametro), _ => { }, new ElementRibbonMetadata("Círculo", "Desenhar", "círculo.svg", 2, false, null), false, _properties.CirculoAnotativo());
         }
 
         private Barra CriarBarra()
@@ -74,6 +73,11 @@ namespace Araci.Applications.Factories
         private RetanguloAnotativo CriarRetanguloAnotativo()
         {
             return new RetanguloAnotativo { Tipo = _types.TipoLinhaAnotativaPadrao ?? throw new InvalidOperationException("Nenhum tipo de retângulo anotativo cadastrado.") };
+        }
+
+        private CirculoAnotativo CriarCirculoAnotativo()
+        {
+            return new CirculoAnotativo { Tipo = _types.TipoLinhaAnotativaPadrao ?? throw new InvalidOperationException("Nenhum tipo de círculo anotativo cadastrado.") };
         }
 
         private static ElementRibbonMetadata Ribbon(string nome, string icone, int ordem, string atalho)
