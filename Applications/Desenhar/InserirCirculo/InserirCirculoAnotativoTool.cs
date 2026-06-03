@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Linq;
 using System.Windows;
 using System.Windows.Input;
 using Araci.Applications.Abstractions;
@@ -18,6 +19,7 @@ namespace Araci.Applications.Desenhar.InserirCirculo
     public class InserirCirculoAnotativoTool : ITool
     {
         private const double RaioMinimo = 1.0;
+        private const double SnapTolerance = 10.0;
 
         private readonly CommandHistoryManager _commands;
         private readonly AraciDocument _document;
@@ -29,14 +31,7 @@ namespace Araci.Applications.Desenhar.InserirCirculo
         private Point? _centro;
         private CirculoAnotativoViewModel? _preview;
 
-        public InserirCirculoAnotativoTool(
-            CommandHistoryManager commands,
-            AraciDocument document,
-            NameService names,
-            ElementoFactory factory,
-            CoreScene scene,
-            ISceneQueryService sceneQueries,
-            Action voltarParaSelecao)
+        public InserirCirculoAnotativoTool(CommandHistoryManager commands, AraciDocument document, NameService names, ElementoFactory factory, CoreScene scene, ISceneQueryService sceneQueries, Action voltarParaSelecao)
         {
             _commands = commands ?? throw new ArgumentNullException(nameof(commands));
             _document = document ?? throw new ArgumentNullException(nameof(document));
@@ -68,13 +63,15 @@ namespace Araci.Applications.Desenhar.InserirCirculo
 
         public void OnMouseDown(ElementoViewModel? vm, Point position, ToolInputState inputState)
         {
+            Point ponto = AplicarSnapQuadrante(position);
+
             if (!_centro.HasValue)
             {
-                Iniciar(position);
+                Iniciar(ponto);
                 return;
             }
 
-            Finalizar(position);
+            Finalizar(ponto);
         }
 
         public void OnMouseMove(Point position, ToolInputState inputState)
@@ -82,7 +79,7 @@ namespace Araci.Applications.Desenhar.InserirCirculo
             if (!_centro.HasValue)
                 return;
 
-            AtualizarPreview(position);
+            AtualizarPreview(AplicarSnapQuadrante(position));
         }
 
         public void OnMouseUp(Point position, ToolInputState inputState)
@@ -168,6 +165,55 @@ namespace Araci.Applications.Desenhar.InserirCirculo
             _scene.Elementos.Remove(_preview);
             _preview = null;
             _sceneQueries.Invalidate();
+        }
+
+        private Point AplicarSnapQuadrante(Point ponto)
+        {
+            return TrySnapQuadrante(ponto, out Point snap) ? snap : ponto;
+        }
+
+        private bool TrySnapQuadrante(Point ponto, out Point snap)
+        {
+            double melhor = SnapTolerance * SnapTolerance;
+            snap = ponto;
+            bool encontrou = false;
+
+            foreach (CirculoAnotativoViewModel circulo in _scene.Elementos.OfType<CirculoAnotativoViewModel>())
+            {
+                if (circulo.IsPreview)
+                    continue;
+
+                Point centro = new(circulo.Circulo.PosicaoX, circulo.Circulo.PosicaoY);
+                double raio = circulo.Circulo.Raio;
+
+                if (TestarQuadrante(ponto, new Point(centro.X, centro.Y - raio), ref snap, ref melhor))
+                    encontrou = true;
+
+                if (TestarQuadrante(ponto, new Point(centro.X + raio, centro.Y), ref snap, ref melhor))
+                    encontrou = true;
+
+                if (TestarQuadrante(ponto, new Point(centro.X, centro.Y + raio), ref snap, ref melhor))
+                    encontrou = true;
+
+                if (TestarQuadrante(ponto, new Point(centro.X - raio, centro.Y), ref snap, ref melhor))
+                    encontrou = true;
+            }
+
+            return encontrou;
+        }
+
+        private static bool TestarQuadrante(Point ponto, Point candidato, ref Point snap, ref double melhor)
+        {
+            double dx = ponto.X - candidato.X;
+            double dy = ponto.Y - candidato.Y;
+            double distancia = dx * dx + dy * dy;
+
+            if (distancia > melhor)
+                return false;
+
+            melhor = distancia;
+            snap = candidato;
+            return true;
         }
 
         private static double CalcularRaio(Point centro, Point ponto)

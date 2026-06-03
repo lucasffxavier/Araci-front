@@ -14,7 +14,6 @@ namespace Araci.Applications.Editar.Selecionar
     {
         private const double HitTolerance = 10.0;
         private const double MinRadius = 1.0;
-
         private readonly ISelectionService _selection;
         private readonly ISceneQueryService _sceneQueries;
         private readonly MoverElementoUseCase _moverElemento;
@@ -84,6 +83,7 @@ namespace Araci.Applications.Editar.Selecionar
                 });
             }
 
+            _onStateApplied(circulo.Modelo);
             _sceneQueries.Invalidate();
             RebuildHandles();
         }
