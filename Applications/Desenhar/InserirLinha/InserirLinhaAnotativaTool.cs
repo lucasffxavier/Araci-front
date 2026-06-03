@@ -1,6 +1,7 @@
 using System;
 using System.Windows;
 using System.Windows.Input;
+using Araci.Applications.Abstractions;
 using Araci.Applications.Editar.Base;
 using Araci.Applications.Factories;
 using Araci.Core.Commands;
@@ -73,7 +74,10 @@ namespace Araci.Applications.Desenhar.InserirLinha
                 return;
             }
 
-            FinalizarSegmento(position, inputState.IsShiftPressed);
+            FinalizarSegmento(
+                position,
+                inputState.IsShiftPressed,
+                inputState.IsControlPressed);
         }
 
         public void OnMouseMove(Point position, ToolInputState inputState)
@@ -105,10 +109,10 @@ namespace Araci.Applications.Desenhar.InserirLinha
             AtualizarPreview(ponto);
         }
 
-        private void FinalizarSegmento(Point pontoFinal, bool manterAtiva)
+        private void FinalizarSegmento(Point pontoFinal, bool ortogonalizar, bool manterAtiva)
         {
             Point pontoInicial = _pontoInicial!.Value;
-            Point pontoFinalAjustado = manterAtiva
+            Point pontoFinalAjustado = ortogonalizar
                 ? AplicarOrtogonalizacao(pontoFinal, pontoInicial)
                 : pontoFinal;
 
@@ -118,13 +122,12 @@ namespace Araci.Applications.Desenhar.InserirLinha
                 return;
             }
 
-            var linha = new LinhaAnotativa
-            {
-                PosicaoX = pontoInicial.X,
-                PosicaoY = pontoInicial.Y,
-                X2 = pontoFinalAjustado.X - pontoInicial.X,
-                Y2 = pontoFinalAjustado.Y - pontoInicial.Y
-            };
+            LinhaAnotativa linha = _factory.CriarModelo<LinhaAnotativa>(ElementKinds.LinhaAnotativa);
+
+            linha.PosicaoX = pontoInicial.X;
+            linha.PosicaoY = pontoInicial.Y;
+            linha.X2 = pontoFinalAjustado.X - pontoInicial.X;
+            linha.Y2 = pontoFinalAjustado.Y - pontoInicial.Y;
 
             _commands.Execute(new AddElementoCommand(linha, _document, _names));
             _sceneQueries.Invalidate();
@@ -170,7 +173,7 @@ namespace Araci.Applications.Desenhar.InserirLinha
             if (_preview != null)
                 return _preview;
 
-            var linha = new LinhaAnotativa();
+            LinhaAnotativa linha = _factory.CriarModelo<LinhaAnotativa>(ElementKinds.LinhaAnotativa);
 
             if (_factory.CriarViewModel(linha) is not LinhaAnotativaViewModel preview)
                 throw new InvalidOperationException("Nao foi possivel criar preview de LinhaAnotativa.");

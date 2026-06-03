@@ -111,8 +111,7 @@ namespace Araci.Applications.Factories
                 Prop<LinhaAnotativaViewModel>("Nome", "Nome", 10, false),
                 Prop<LinhaAnotativaViewModel>("Comprimento", "Comprimento", 20, false, unit: UnitKind.LengthMeter),
                 Prop<LinhaAnotativaViewModel>("CorLinha", "Cor da linha", 30),
-                Prop<LinhaAnotativaViewModel>("EspessuraLinha", "Espessura da linha", 40),
-                Prop<LinhaAnotativaViewModel>("EstiloLinha", "Estilo da linha", 50)
+                Prop<LinhaAnotativaViewModel>("EspessuraLinha", "Espessura da linha", 40)
             };
         }
 

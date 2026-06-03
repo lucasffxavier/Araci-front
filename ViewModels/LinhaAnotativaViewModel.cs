@@ -22,13 +22,32 @@ namespace Araci.ViewModels
             TypePropertiesDialogService typePropertiesDialogs)
             : base(modelo, new LinhaAnotativaNode(modelo), types, names, typePropertiesDialogs)
         {
+            SelecionarPrimeiroTipoDisponivel();
         }
 
         public LinhaAnotativa Linha => (LinhaAnotativa)Modelo;
 
-        public override IEnumerable TiposDisponiveis => Array.Empty<TipoElemento>();
+        public override IEnumerable TiposDisponiveis => Types.TiposLinhasAnotativas;
 
-        public override TipoElementoViewModel? TipoViewModel => null;
+        public override TipoElementoViewModel? TipoViewModel => TipoElementoViewModelFactory.Criar(Tipo);
+
+        public TipoLinhaAnotativa? TipoLinha => Linha.TipoLinha;
+
+        public override TipoElemento Tipo
+        {
+            get => base.Tipo;
+            set
+            {
+                if (ReferenceEquals(Linha.Tipo, value))
+                    return;
+
+                base.Tipo = value;
+                OnPropertyChanged(nameof(TipoLinha));
+                OnPropertyChanged(nameof(EstiloLinha));
+                OnPropertyChanged(nameof(StrokeDashArray));
+                OnPropertyChanged(nameof(RenderData));
+            }
+        }
 
         public override double WorldX => Bounds.X;
 
@@ -161,21 +180,7 @@ namespace Araci.ViewModels
             }
         }
 
-        public string EstiloLinha
-        {
-            get => Linha.EstiloLinha;
-            set
-            {
-                if (Linha.EstiloLinha == value)
-                    return;
-
-                Linha.EstiloLinha = value;
-                OnPropertyChanged();
-                OnPropertyChanged(nameof(StrokeDashArray));
-                OnPropertyChanged(nameof(RenderData));
-                NotificarParametros();
-            }
-        }
+        public string EstiloLinha => TipoLinha?.EstiloLinha ?? "Contínuo";
 
         public override void Mover(Vector delta)
         {

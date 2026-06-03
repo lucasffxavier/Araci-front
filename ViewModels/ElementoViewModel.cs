@@ -47,7 +47,7 @@ namespace Araci.ViewModels
             _names.Renomear(Modelo, novoNome);
         }
 
-        public TipoElemento Tipo
+        public virtual TipoElemento Tipo
         {
             get => Modelo.Tipo!;
             set

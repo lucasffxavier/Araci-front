@@ -134,11 +134,11 @@ namespace Araci.Applications.Factories
                 "LINHA",
                 typeof(LinhaAnotativa),
                 typeof(LinhaAnotativaViewModel),
-                null,
-                () => new LinhaAnotativa(),
+                typeof(TipoLinhaAnotativa),
+                CriarLinhaAnotativa,
                 (m, c) => new LinhaAnotativaViewModel((LinhaAnotativa)m, _types, c.Names, c.TypePropertiesDialogs),
-                () => null,
-                () => Array.Empty<TipoElemento>(),
+                () => _types.TipoLinhaAnotativaPadrao,
+                () => _types.TiposLinhasAnotativas,
                 _ => Size.Empty,
                 _ => { },
                 new ElementRibbonMetadata("Linha", "Desenhar", "linha.svg", 0, false, null),
@@ -174,6 +174,11 @@ namespace Araci.Applications.Factories
         private Cabo CriarCabo()
         {
             return new Cabo { Tipo = _types.TipoCaboPadrao ?? throw new InvalidOperationException("Nenhum tipo de cabo cadastrado.") };
+        }
+
+        private LinhaAnotativa CriarLinhaAnotativa()
+        {
+            return new LinhaAnotativa { Tipo = _types.TipoLinhaAnotativaPadrao ?? throw new InvalidOperationException("Nenhum tipo de linha anotativa cadastrado.") };
         }
 
         private static ElementRibbonMetadata Ribbon(string nome, string icone, int ordem, string atalho)

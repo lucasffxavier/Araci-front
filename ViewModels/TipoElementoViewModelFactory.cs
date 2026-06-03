@@ -41,6 +41,7 @@ namespace Araci.ViewModels
                 TipoCabo cabo => new TipoCaboViewModel(cabo),
                 TipoCarga carga => new TipoCargaViewModel(carga),
                 TipoGerador gerador => new TipoGeradorViewModel(gerador),
+                TipoLinhaAnotativa linha => new TipoLinhaAnotativaViewModel(linha),
                 TipoSin sin => new TipoSinViewModel(sin),
                 TipoTransformador transformador => new TipoTransformadorViewModel(transformador),
                 _ => null

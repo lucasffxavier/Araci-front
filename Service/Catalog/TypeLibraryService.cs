@@ -14,6 +14,7 @@ namespace Araci.Services.Catalog
             InicializarSin();
             InicializarTransformadores();
             InicializarBarras();
+            InicializarLinhasAnotativas();
         }
 
         public ObservableCollection<TipoCabo> TiposCabos { get; } = new();
@@ -22,6 +23,7 @@ namespace Araci.Services.Catalog
         public ObservableCollection<TipoSin> TiposSin { get; } = new();
         public ObservableCollection<TipoTransformador> TiposTransformadores { get; } = new();
         public ObservableCollection<TipoBarra> TiposBarras { get; } = new();
+        public ObservableCollection<TipoLinhaAnotativa> TiposLinhasAnotativas { get; } = new();
 
         public TipoCabo? TipoCaboPadrao => TiposCabos.FirstOrDefault();
         public TipoCarga? TipoCargaPadrao => TiposCargas.FirstOrDefault();
@@ -29,6 +31,7 @@ namespace Araci.Services.Catalog
         public TipoSin? TipoSinPadrao => TiposSin.FirstOrDefault();
         public TipoTransformador? TipoTransformadorPadrao => TiposTransformadores.FirstOrDefault();
         public TipoBarra? TipoBarraPadrao => TiposBarras.FirstOrDefault();
+        public TipoLinhaAnotativa? TipoLinhaAnotativaPadrao => TiposLinhasAnotativas.FirstOrDefault();
 
         private void InicializarCabos()
         {
@@ -124,6 +127,25 @@ namespace Araci.Services.Catalog
                     AlturaPadrao = 120,
                     NumeroConexoes = 6
                 });
+        }
+
+        private void InicializarLinhasAnotativas()
+        {
+            TiposLinhasAnotativas.Add(CriarTipoLinha("Linha contínua", "Contínuo"));
+            TiposLinhasAnotativas.Add(CriarTipoLinha("Linha tracejada", "Tracejado"));
+            TiposLinhasAnotativas.Add(CriarTipoLinha("Linha traço ponto", "Traço ponto"));
+            TiposLinhasAnotativas.Add(CriarTipoLinha("Linha traço dois pontos", "Traço dois pontos"));
+        }
+
+        private static TipoLinhaAnotativa CriarTipoLinha(string nome, string estilo)
+        {
+            return new TipoLinhaAnotativa
+            {
+                NomeTipo = nome,
+                Familia = "Anotações",
+                Categoria = "Linhas",
+                EstiloLinha = estilo
+            };
         }
     }
 }
