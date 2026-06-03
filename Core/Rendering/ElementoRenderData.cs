@@ -11,7 +11,8 @@ namespace Araci.Core.Rendering
             Point pontoLocalInicial,
             Point pontoLocalFinal,
             Brush stroke,
-            double strokeThickness)
+            double strokeThickness,
+            DoubleCollection? strokeDashArray = null)
         {
             Largura = largura;
             Altura = altura;
@@ -19,6 +20,7 @@ namespace Araci.Core.Rendering
             PontoLocalFinal = pontoLocalFinal;
             Stroke = stroke;
             StrokeThickness = strokeThickness;
+            StrokeDashArray = strokeDashArray;
         }
 
         public double Largura
@@ -37,6 +39,9 @@ namespace Araci.Core.Rendering
         { get; }
 
         public double StrokeThickness
+        { get; }
+
+        public DoubleCollection? StrokeDashArray
         { get; }
     }
 }

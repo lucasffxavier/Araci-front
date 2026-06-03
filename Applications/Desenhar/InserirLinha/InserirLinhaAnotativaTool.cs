@@ -81,7 +81,7 @@ namespace Araci.Applications.Desenhar.InserirLinha
             if (!_pontoInicial.HasValue)
                 return;
 
-            AtualizarPreview(position);
+            AtualizarPreview(position, inputState.IsShiftPressed);
         }
 
         public void OnMouseUp(Point position, ToolInputState inputState)
@@ -108,10 +108,13 @@ namespace Araci.Applications.Desenhar.InserirLinha
         private void FinalizarSegmento(Point pontoFinal, bool manterAtiva)
         {
             Point pontoInicial = _pontoInicial!.Value;
+            Point pontoFinalAjustado = manterAtiva
+                ? AplicarOrtogonalizacao(pontoFinal, pontoInicial)
+                : pontoFinal;
 
-            if (DistanciaQuadrada(pontoInicial, pontoFinal) < ToleranciaDistanciaQuadrada)
+            if (DistanciaQuadrada(pontoInicial, pontoFinalAjustado) < ToleranciaDistanciaQuadrada)
             {
-                AtualizarPreview(pontoFinal);
+                AtualizarPreview(pontoFinalAjustado);
                 return;
             }
 
@@ -119,8 +122,8 @@ namespace Araci.Applications.Desenhar.InserirLinha
             {
                 PosicaoX = pontoInicial.X,
                 PosicaoY = pontoInicial.Y,
-                X2 = pontoFinal.X - pontoInicial.X,
-                Y2 = pontoFinal.Y - pontoInicial.Y
+                X2 = pontoFinalAjustado.X - pontoInicial.X,
+                Y2 = pontoFinalAjustado.Y - pontoInicial.Y
             };
 
             _commands.Execute(new AddElementoCommand(linha, _document, _names));
@@ -128,8 +131,8 @@ namespace Araci.Applications.Desenhar.InserirLinha
 
             if (manterAtiva)
             {
-                _pontoInicial = pontoFinal;
-                AtualizarPreview(pontoFinal);
+                _pontoInicial = pontoFinalAjustado;
+                AtualizarPreview(pontoFinalAjustado);
                 return;
             }
 
@@ -140,16 +143,24 @@ namespace Araci.Applications.Desenhar.InserirLinha
 
         private void AtualizarPreview(Point pontoFinal)
         {
+            AtualizarPreview(pontoFinal, false);
+        }
+
+        private void AtualizarPreview(Point pontoFinal, bool ortogonalizar)
+        {
             if (!_pontoInicial.HasValue)
                 return;
 
             LinhaAnotativaViewModel preview = ObterPreview();
             Point pontoInicial = _pontoInicial.Value;
+            Point pontoFinalAjustado = ortogonalizar
+                ? AplicarOrtogonalizacao(pontoFinal, pontoInicial)
+                : pontoFinal;
 
             preview.Linha.PosicaoX = pontoInicial.X;
             preview.Linha.PosicaoY = pontoInicial.Y;
-            preview.Linha.X2 = pontoFinal.X - pontoInicial.X;
-            preview.Linha.Y2 = pontoFinal.Y - pontoInicial.Y;
+            preview.Linha.X2 = pontoFinalAjustado.X - pontoInicial.X;
+            preview.Linha.Y2 = pontoFinalAjustado.Y - pontoInicial.Y;
             preview.AtualizarAposModeloAlterado();
             _sceneQueries.Invalidate();
         }
@@ -187,6 +198,18 @@ namespace Araci.Applications.Desenhar.InserirLinha
             double dx = a.X - b.X;
             double dy = a.Y - b.Y;
             return dx * dx + dy * dy;
+        }
+
+        private static Point AplicarOrtogonalizacao(Point ponto, Point origem)
+        {
+            Vector delta = ponto - origem;
+
+            if (Math.Abs(delta.X) < 0.0001 && Math.Abs(delta.Y) < 0.0001)
+                return origem;
+
+            return Math.Abs(delta.X) >= Math.Abs(delta.Y)
+                ? new Point(ponto.X, origem.Y)
+                : new Point(origem.X, ponto.Y);
         }
     }
 }

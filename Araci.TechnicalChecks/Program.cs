@@ -116,6 +116,7 @@ namespace Araci.TechnicalChecks
                 ("Modelo real recebe rotacao do preview", ModeloRealRecebeRotacaoDoPreview),
                 ("InputRouter envia Space para insercao sem preview", InputRouterEnviaSpaceParaInsercaoSemPreview),
                 ("Ferramenta LinhaAnotativa cria preview segmentos e undo redo", FerramentaLinhaAnotativaCriaPreviewSegmentosEUndoRedo),
+                ("LinhaAnotativa inclinada move preservando ancoras", LinhaAnotativaInclinadaMovePreservandoAncoras),
                 ("Botoes da Ribbon nao capturam foco", BotoesDaRibbonNaoCapturamFoco),
                 ("Viewport continua focavel", ViewportContinuaFocavel),
                 ("Catalogo preserva Ribbon ordem e atalhos", CatalogoPreservaRibbonOrdemEAtalhos),
@@ -431,9 +432,11 @@ namespace Araci.TechnicalChecks
             Assert(linha.PossuiParametro(ElementoAnotativo.PARAM_VISIVEL), "LinhaAnotativa deve possuir parametro Visivel.");
             Assert(linha.PossuiParametro(LinhaAnotativa.PARAM_X2), "LinhaAnotativa deve possuir parametro X2.");
             Assert(linha.PossuiParametro(LinhaAnotativa.PARAM_Y2), "LinhaAnotativa deve possuir parametro Y2.");
+            Assert(linha.PossuiParametro(LinhaAnotativa.PARAM_ESTILO_LINHA), "LinhaAnotativa deve possuir parametro EstiloLinha.");
             AssertEqual(100.0, linha.X2, "LinhaAnotativa.X2 default");
             AssertEqual(0.0, linha.Y2, "LinhaAnotativa.Y2 default");
             AssertEqual("#FF000000", linha.CorLinha, "LinhaAnotativa.CorLinha default");
+            AssertEqual("Contínuo", linha.EstiloLinha, "LinhaAnotativa.EstiloLinha default");
 
             linha.Nome = "Linha teste";
             linha.CorLinha = "#FF102030";
@@ -441,9 +444,11 @@ namespace Araci.TechnicalChecks
             linha.Visivel = false;
             linha.X2 = 250.0;
             linha.Y2 = 75.0;
+            linha.EstiloLinha = "Tracejado";
 
             AssertEqual(250.0, linha.Obter<double>(LinhaAnotativa.PARAM_X2), "LinhaAnotativa.X2 alterado");
             AssertEqual(75.0, linha.Obter<double>(LinhaAnotativa.PARAM_Y2), "LinhaAnotativa.Y2 alterado");
+            AssertEqual("Tracejado", linha.Obter<string>(LinhaAnotativa.PARAM_ESTILO_LINHA), "LinhaAnotativa.EstiloLinha alterado");
 
             Elemento cloneElemento = linha.Clonar();
             var clone = cloneElemento as LinhaAnotativa;
@@ -458,6 +463,7 @@ namespace Araci.TechnicalChecks
             AssertEqual(linha.Visivel, clone.Visivel, "Clone.Visivel");
             AssertEqual(linha.X2, clone.X2, "Clone.X2");
             AssertEqual(linha.Y2, clone.Y2, "Clone.Y2");
+            AssertEqual(linha.EstiloLinha, clone.EstiloLinha, "Clone.EstiloLinha");
             Assert(!carga.PossuiParametro(LinhaAnotativa.PARAM_X2), "Carga nao deve possuir parametro X2.");
             Assert(!carga.PossuiParametro(LinhaAnotativa.PARAM_Y2), "Carga nao deve possuir parametro Y2.");
             AssertEqual("LinhaAnotativa", ElementKinds.LinhaAnotativa, "ElementKinds.LinhaAnotativa");
@@ -1821,14 +1827,23 @@ namespace Araci.TechnicalChecks
                 EditorContext continuo = CreateContextWithViewport();
                 continuo.Tools.AtivarInserirLinhaAnotativa();
                 continuo.Input.MouseDown(null, new Point(0, 0), semModificador);
-                continuo.Input.MouseDown(null, new Point(50, 0), comShift);
+                continuo.Input.MouseMove(new Point(50, 20), comShift);
+
+                LinhaAnotativaViewModel previewOrtogonal = continuo.Scene.Elementos
+                    .OfType<LinhaAnotativaViewModel>()
+                    .Single(vm => vm.IsPreview);
+
+                AssertEqual(50, previewOrtogonal.Linha.X2, "Preview ortogonal.X2");
+                AssertEqual(0, previewOrtogonal.Linha.Y2, "Preview ortogonal.Y2");
+
+                continuo.Input.MouseDown(null, new Point(50, 20), comShift);
 
                 AssertEqual("Linha", continuo.Tools.FerramentaAtual.Nome, "Ferramenta deve permanecer ativa com Shift.");
                 AssertEqual(1, continuo.Document.Elementos.OfType<LinhaAnotativa>().Count(), "Primeiro segmento com Shift");
                 Assert(continuo.Scene.Elementos.OfType<LinhaAnotativaViewModel>().Any(vm => vm.IsPreview), "Preview deve continuar apos Shift.");
 
-                continuo.Input.MouseMove(new Point(50, 40), semModificador);
-                continuo.Input.MouseDown(null, new Point(50, 40), comShift);
+                continuo.Input.MouseMove(new Point(70, 60), comShift);
+                continuo.Input.MouseDown(null, new Point(70, 60), comShift);
 
                 LinhaAnotativa[] linhas = continuo.Document.Elementos.OfType<LinhaAnotativa>().ToArray();
                 AssertEqual(2, linhas.Length, "Quantidade de segmentos com Shift");
@@ -1839,13 +1854,64 @@ namespace Araci.TechnicalChecks
                 AssertEqual(50, linhas[1].PosicaoX, "Segundo segmento.PosicaoX");
                 AssertEqual(0, linhas[1].PosicaoY, "Segundo segmento.PosicaoY");
                 AssertEqual(0, linhas[1].X2, "Segundo segmento.X2");
-                AssertEqual(40, linhas[1].Y2, "Segundo segmento.Y2");
+                AssertEqual(60, linhas[1].Y2, "Segundo segmento.Y2");
 
                 continuo.Input.KeyDown(Key.Escape);
 
                 AssertEqual("Selecionar", continuo.Tools.FerramentaAtual.Nome, "Esc deve voltar para selecao.");
                 Assert(!continuo.Scene.Elementos.OfType<LinhaAnotativaViewModel>().Any(vm => vm.IsPreview), "Esc deve remover preview.");
                 AssertEqual(2, continuo.Document.Elementos.OfType<LinhaAnotativa>().Count(), "Esc nao deve remover linhas definitivas.");
+            });
+        }
+
+        private static void LinhaAnotativaInclinadaMovePreservandoAncoras()
+        {
+            RunSta(() =>
+            {
+                EditorContext context = CreateContextWithViewport();
+                var linha = new LinhaAnotativa
+                {
+                    Nome = "Linha SW NE",
+                    PosicaoX = 100,
+                    PosicaoY = 100,
+                    X2 = -50,
+                    Y2 = -50,
+                    Rotacao = 0
+                };
+
+                context.Document.AdicionarElemento(linha);
+
+                if (GetVm(context, linha) is not LinhaAnotativaViewModel vm)
+                    throw new InvalidOperationException("ViewModel de LinhaAnotativa nao encontrada.");
+
+                context.Move.BeginMove(new[] { vm });
+                context.Move.MoverVisual(vm, new Vector(20, 30));
+                context.Move.EndMove(new[] { vm });
+
+                AssertEqual(120, linha.PosicaoX, "Linha inclinada.PosicaoX apos move");
+                AssertEqual(130, linha.PosicaoY, "Linha inclinada.PosicaoY apos move");
+                AssertEqual(-50, linha.X2, "Linha inclinada.X2 apos move");
+                AssertEqual(-50, linha.Y2, "Linha inclinada.Y2 apos move");
+                AssertEqual(70, vm.WorldX, "Linha inclinada.WorldX apos move");
+                AssertEqual(80, vm.WorldY, "Linha inclinada.WorldY apos move");
+
+                context.Commands.Undo();
+
+                AssertEqual(100, linha.PosicaoX, "Linha inclinada.PosicaoX apos undo");
+                AssertEqual(100, linha.PosicaoY, "Linha inclinada.PosicaoY apos undo");
+                AssertEqual(-50, linha.X2, "Linha inclinada.X2 apos undo");
+                AssertEqual(-50, linha.Y2, "Linha inclinada.Y2 apos undo");
+                AssertEqual(50, vm.WorldX, "Linha inclinada.WorldX apos undo");
+                AssertEqual(50, vm.WorldY, "Linha inclinada.WorldY apos undo");
+
+                context.Commands.Redo();
+
+                AssertEqual(120, linha.PosicaoX, "Linha inclinada.PosicaoX apos redo");
+                AssertEqual(130, linha.PosicaoY, "Linha inclinada.PosicaoY apos redo");
+                AssertEqual(-50, linha.X2, "Linha inclinada.X2 apos redo");
+                AssertEqual(-50, linha.Y2, "Linha inclinada.Y2 apos redo");
+                AssertEqual(70, vm.WorldX, "Linha inclinada.WorldX apos redo");
+                AssertEqual(80, vm.WorldY, "Linha inclinada.WorldY apos redo");
             });
         }
 
@@ -1918,6 +1984,7 @@ namespace Araci.TechnicalChecks
             Assert(linha.PossuiParametro(ElementoAnotativo.PARAM_VISIVEL), "LinhaAnotativa criada deve possuir Visivel.");
             Assert(linha.PossuiParametro(LinhaAnotativa.PARAM_X2), "LinhaAnotativa criada deve possuir X2.");
             Assert(linha.PossuiParametro(LinhaAnotativa.PARAM_Y2), "LinhaAnotativa criada deve possuir Y2.");
+            Assert(linha.PossuiParametro(LinhaAnotativa.PARAM_ESTILO_LINHA), "LinhaAnotativa criada deve possuir EstiloLinha.");
             Assert(!linha.ParticipaDoGrafoEletrico, "LinhaAnotativa criada deve continuar fora do grafo eletrico.");
 
             if (context.ElementoFactory.CriarViewModel(linha) is not LinhaAnotativaViewModel vm)
@@ -1931,6 +1998,7 @@ namespace Araci.TechnicalChecks
             AssertEqual(0.0, vm.RenderData.PontoLocalInicial.Y, "Linha direita.RenderData.Inicial.Y");
             AssertEqual(100.0, vm.RenderData.PontoLocalFinal.X, "Linha direita.RenderData.Final.X");
             AssertEqual(0.0, vm.RenderData.PontoLocalFinal.Y, "Linha direita.RenderData.Final.Y");
+            AssertEqual(100.0, vm.Comprimento, "Linha direita.Comprimento");
 
             vm.X2 = -100.0;
             vm.Y2 = 50.0;
@@ -1941,16 +2009,20 @@ namespace Araci.TechnicalChecks
             AssertEqual(0.0, vm.RenderData.PontoLocalInicial.Y, "Linha negativa.RenderData.Inicial.Y");
             AssertEqual(0.0, vm.RenderData.PontoLocalFinal.X, "Linha negativa.RenderData.Final.X");
             AssertEqual(50.0, vm.RenderData.PontoLocalFinal.Y, "Linha negativa.RenderData.Final.Y");
+            AssertEqual(Math.Sqrt(12500.0), vm.Comprimento, "Linha negativa.Comprimento");
             AssertEqual(vm.Bounds.X, vm.WorldX, "Linha negativa.WorldX");
             AssertEqual(vm.Bounds.Y, vm.WorldY, "Linha negativa.WorldY");
 
             vm.CorLinha = "#FF112233";
             vm.EspessuraLinha = 4.5;
             vm.Visivel = false;
+            vm.EstiloLinha = "Tracejado";
 
             AssertEqual("#FF112233", linha.CorLinha, "LinhaAnotativaViewModel.CorLinha atualiza modelo");
             AssertEqual(4.5, linha.EspessuraLinha, "LinhaAnotativaViewModel.EspessuraLinha atualiza modelo");
             AssertEqual(false, linha.Visivel, "LinhaAnotativaViewModel.Visivel atualiza modelo");
+            AssertEqual("Tracejado", linha.EstiloLinha, "LinhaAnotativaViewModel.EstiloLinha atualiza modelo");
+            AssertEqual(2, vm.RenderData.StrokeDashArray?.Count ?? 0, "LinhaAnotativaViewModel.StrokeDashArray tracejado");
 
             context.Document.AdicionarElemento(linha);
 
@@ -1977,6 +2049,7 @@ namespace Araci.TechnicalChecks
             AssertContains(xaml, "Y2=\"{Binding RenderData.PontoLocalFinal.Y}\"", "LinhaAnotativa.Template.Y2");
             AssertContains(xaml, "Stroke=\"{Binding RenderData.Stroke}\"", "LinhaAnotativa.Template.Stroke");
             AssertContains(xaml, "StrokeThickness=\"{Binding RenderData.StrokeThickness}\"", "LinhaAnotativa.Template.StrokeThickness");
+            AssertContains(xaml, "StrokeDashArray=\"{Binding RenderData.StrokeDashArray}\"", "LinhaAnotativa.Template.StrokeDashArray");
         }
 
         private static void LinhaAnotativaExpoePropriedadesCorEHitTest()
@@ -1985,13 +2058,13 @@ namespace Araci.TechnicalChecks
             var provider = new ElementInstancePropertyProvider();
             IReadOnlyList<InstancePropertyDescriptor> descriptors = provider.LinhaAnotativa();
 
-            AssertEqual(6, descriptors.Count, "LinhaAnotativa descriptors.Count");
+            AssertEqual(5, descriptors.Count, "LinhaAnotativa descriptors.Count");
             AssertDescriptor(descriptors[0], "Nome", "Nome", 10, false);
-            AssertDescriptor(descriptors[1], "X2", "X2", 20, true);
-            AssertDescriptor(descriptors[2], "Y2", "Y2", 30, true);
-            AssertDescriptor(descriptors[3], "CorLinha", "Cor da linha", 40, true);
-            AssertDescriptor(descriptors[4], "EspessuraLinha", "Espessura da linha", 50, true);
-            AssertDescriptor(descriptors[5], "Visivel", "Visível", 60, true);
+            AssertDescriptor(descriptors[1], "Comprimento", "Comprimento", 20, false);
+            AssertEqual(UnitKind.LengthMeter, descriptors[1].Unit, "Comprimento.Unit");
+            AssertDescriptor(descriptors[2], "CorLinha", "Cor da linha", 30, true);
+            AssertDescriptor(descriptors[3], "EspessuraLinha", "Espessura da linha", 40, true);
+            AssertDescriptor(descriptors[4], "EstiloLinha", "Estilo da linha", 50, true);
 
             ElementDefinition? definition = context.Elements.FindByKind(ElementKinds.LinhaAnotativa);
 
@@ -2001,7 +2074,7 @@ namespace Araci.TechnicalChecks
             Assert(definition.PropriedadesInstancia.Count > 0, "LinhaAnotativa deve registrar propriedades de instancia.");
 
             IReadOnlyList<InstancePropertyDescriptor> catalogProperties = context.Elements.GetInstanceProperties(typeof(LinhaAnotativaViewModel));
-            AssertEqual(6, catalogProperties.Count, "LinhaAnotativa catalog properties.Count");
+            AssertEqual(5, catalogProperties.Count, "LinhaAnotativa catalog properties.Count");
 
             var linha = new LinhaAnotativa
             {
@@ -2017,20 +2090,26 @@ namespace Araci.TechnicalChecks
                 throw new InvalidOperationException("LinhaAnotativa deve criar LinhaAnotativaViewModel.");
 
             AssertBrushColor("#FF000000", vm.RenderData.Stroke, "LinhaAnotativa.RenderData.Stroke default");
+            Assert(vm.RenderData.StrokeDashArray == null, "LinhaAnotativa.RenderData.StrokeDashArray default continuo");
+            AssertEqual(100, vm.Comprimento, "LinhaAnotativa.Comprimento inicial");
 
             PropertiesViewModel properties = new(new[] { vm }, context.EditarPropriedades, context.Settings);
             AssertPropertyRow(properties, "Nome", "Nome", true);
-            AssertPropertyRow(properties, "X2", "X2", false);
-            AssertPropertyRow(properties, "Y2", "Y2", false);
+            AssertPropertyRow(properties, "Comprimento", "Comprimento", true);
             AssertPropertyRow(properties, "CorLinha", "Cor da linha", false);
             AssertPropertyRow(properties, "EspessuraLinha", "Espessura da linha", false);
-            AssertPropertyRow(properties, "Visivel", "Visível", false);
+            AssertPropertyRow(properties, "EstiloLinha", "Estilo da linha", false);
+            Assert(!properties.Propriedades.Any(p => p.PropertyName == "X2"), "Painel da LinhaAnotativa nao deve exibir X2.");
+            Assert(!properties.Propriedades.Any(p => p.PropertyName == "Y2"), "Painel da LinhaAnotativa nao deve exibir Y2.");
+            Assert(!properties.Propriedades.Any(p => p.PropertyName == "Visivel"), "Painel da LinhaAnotativa nao deve exibir Visivel.");
 
             ElementoRenderData antes = vm.RenderData;
-            GetPropertyRow(properties, "X2").Value = "160";
+            vm.X2 = 160;
+            vm.Y2 = 120;
 
             AssertEqual(160, vm.X2, "LinhaAnotativa.Properties.X2");
             AssertEqual(160, vm.RenderData.PontoLocalFinal.X, "LinhaAnotativa.RenderData.X2 editado");
+            AssertEqual(200, vm.Comprimento, "LinhaAnotativa.Comprimento editado");
             Assert(!ReferenceEquals(antes, vm.RenderData), "RenderData deve ser recalculado apos X2.");
 
             vm.CorLinha = "#FF00AAFF";
@@ -2042,8 +2121,17 @@ namespace Araci.TechnicalChecks
             vm.Visivel = false;
             AssertEqual(false, vm.Visivel, "LinhaAnotativa.Visivel editado");
 
+            GetPropertyRow(properties, "EstiloLinha").Value = "Traço ponto";
+
+            AssertEqual("Traço ponto", vm.EstiloLinha, "LinhaAnotativa.EstiloLinha editado");
+            AssertEqual(4, vm.RenderData.StrokeDashArray?.Count ?? 0, "LinhaAnotativa.StrokeDashArray.Count");
+            AssertEqual(8.0, vm.RenderData.StrokeDashArray![0], "LinhaAnotativa.StrokeDashArray[0]");
+            AssertEqual(3.0, vm.RenderData.StrokeDashArray![1], "LinhaAnotativa.StrokeDashArray[1]");
+            AssertEqual(2.0, vm.RenderData.StrokeDashArray![2], "LinhaAnotativa.StrokeDashArray[2]");
+            AssertEqual(3.0, vm.RenderData.StrokeDashArray![3], "LinhaAnotativa.StrokeDashArray[3]");
+
             context.Document.AdicionarElemento(linha);
-            SceneHitResult? hit = context.SceneQueries.HitTest(new Point(80, 23), 6);
+            SceneHitResult? hit = context.SceneQueries.HitTest(new Point(90, 80), 6);
 
             Assert(hit?.Elemento is LinhaAnotativaViewModel, "HitTest deve encontrar LinhaAnotativa proxima ao segmento.");
 
@@ -2550,11 +2638,13 @@ namespace Araci.TechnicalChecks
 
             AssertContains(properties.Titulo, "LinhaAnotativa", "LinhaAnotativa PropertiesViewModel.Titulo");
             AssertPropertyRow(properties, "Nome", "Nome", true);
-            AssertPropertyRow(properties, "X2", "X2", false);
-            AssertPropertyRow(properties, "Y2", "Y2", false);
+            AssertPropertyRow(properties, "Comprimento", "Comprimento", true);
             AssertPropertyRow(properties, "CorLinha", "Cor da linha", false);
             AssertPropertyRow(properties, "EspessuraLinha", "Espessura da linha", false);
-            AssertPropertyRow(properties, "Visivel", "Visível", false);
+            AssertPropertyRow(properties, "EstiloLinha", "Estilo da linha", false);
+            Assert(!properties.Propriedades.Any(p => p.PropertyName == "X2"), "LinhaAnotativa painel generico nao deve exibir X2.");
+            Assert(!properties.Propriedades.Any(p => p.PropertyName == "Y2"), "LinhaAnotativa painel generico nao deve exibir Y2.");
+            Assert(!properties.Propriedades.Any(p => p.PropertyName == "Visivel"), "LinhaAnotativa painel generico nao deve exibir Visivel.");
         }
 
         private static void SelecionarElementosUseCaseLimpaSelecao()
@@ -2813,7 +2903,8 @@ namespace Araci.TechnicalChecks
                 EspessuraLinha = 2.75,
                 Visivel = false,
                 X2 = -120,
-                Y2 = 45
+                Y2 = 45,
+                EstiloLinha = "Traço dois pontos"
             };
 
             document.AdicionarElemento(linha);
@@ -2844,6 +2935,7 @@ namespace Araci.TechnicalChecks
             AssertParametroSerializado(elementDto, ElementoAnotativo.PARAM_VISIVEL);
             AssertParametroSerializado(elementDto, LinhaAnotativa.PARAM_X2);
             AssertParametroSerializado(elementDto, LinhaAnotativa.PARAM_Y2);
+            AssertParametroSerializado(elementDto, LinhaAnotativa.PARAM_ESTILO_LINHA);
             AssertContains(json, "\"Kind\": \"LinhaAnotativa\"", "LinhaAnotativa JSON.Kind");
             AssertContains(json, "\"DomainRole\": \"Anotacao\"", "LinhaAnotativa JSON.DomainRole");
             AssertContains(json, "\"Name\": \"X2\"", "LinhaAnotativa JSON.X2");
@@ -2851,6 +2943,7 @@ namespace Araci.TechnicalChecks
             AssertContains(json, "\"Name\": \"CorLinha\"", "LinhaAnotativa JSON.CorLinha");
             AssertContains(json, "\"Name\": \"EspessuraLinha\"", "LinhaAnotativa JSON.EspessuraLinha");
             AssertContains(json, "\"Name\": \"Visivel\"", "LinhaAnotativa JSON.Visivel");
+            AssertContains(json, "\"Name\": \"EstiloLinha\"", "LinhaAnotativa JSON.EstiloLinha");
 
             ProjectFileDto reloadedDto = serializer.Deserialize(json);
             LinhaAnotativa reloaded = serializer.CreateElements(reloadedDto).OfType<LinhaAnotativa>().Single();
@@ -2866,6 +2959,7 @@ namespace Araci.TechnicalChecks
             AssertEqual(false, reloaded.Visivel, "LinhaAnotativa.Visivel apos reload");
             AssertEqual(-120, reloaded.X2, "LinhaAnotativa.X2 apos reload");
             AssertEqual(45, reloaded.Y2, "LinhaAnotativa.Y2 apos reload");
+            AssertEqual("Traço dois pontos", reloaded.EstiloLinha, "LinhaAnotativa.EstiloLinha apos reload");
             AssertEqual(ElementoDomainRole.Anotacao, reloaded.DomainRole, "LinhaAnotativa.DomainRole apos reload");
             Assert(!reloaded.ParticipaDoGrafoEletrico, "LinhaAnotativa apos reload nao deve participar do grafo eletrico.");
             Assert(reloaded.Tipo == null, "LinhaAnotativa.Tipo apos reload deve ser null.");

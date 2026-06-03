@@ -44,6 +44,12 @@ namespace Araci.ViewModels
                 linear.PosicaoY2 = Y2;
             }
 
+            if (elemento is LinhaAnotativa linha)
+            {
+                linha.X2 = X2;
+                linha.Y2 = Y2;
+            }
+
             if (elemento is not Cabo cabo)
                 return;
 

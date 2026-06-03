@@ -34,13 +34,44 @@ namespace Araci.ViewModels
 
         public override double WorldY => Bounds.Y;
 
+        public override double X
+        {
+            get => Linha.PosicaoX;
+            set
+            {
+                if (Math.Abs(Linha.PosicaoX - value) < 0.0001)
+                    return;
+
+                Linha.PosicaoX = value;
+                AtualizarNode();
+            }
+        }
+
+        public override double Y
+        {
+            get => Linha.PosicaoY;
+            set
+            {
+                if (Math.Abs(Linha.PosicaoY - value) < 0.0001)
+                    return;
+
+                Linha.PosicaoY = value;
+                AtualizarNode();
+            }
+        }
+
         public override ElementoRenderData RenderData => new(
             Largura,
             Altura,
             PontoLocalInicial,
             PontoLocalFinal,
             CriarBrush(CorLinha),
-            EspessuraLinha);
+            EspessuraLinha,
+            StrokeDashArray);
+
+        public double Comprimento => Math.Sqrt(X2 * X2 + Y2 * Y2);
+
+        public DoubleCollection? StrokeDashArray => CriarStrokeDashArray(EstiloLinha);
 
         public string Nome
         {
@@ -130,6 +161,55 @@ namespace Araci.ViewModels
             }
         }
 
+        public string EstiloLinha
+        {
+            get => Linha.EstiloLinha;
+            set
+            {
+                if (Linha.EstiloLinha == value)
+                    return;
+
+                Linha.EstiloLinha = value;
+                OnPropertyChanged();
+                OnPropertyChanged(nameof(StrokeDashArray));
+                OnPropertyChanged(nameof(RenderData));
+                NotificarParametros();
+            }
+        }
+
+        public override void Mover(Vector delta)
+        {
+            Linha.PosicaoX += delta.X;
+            Linha.PosicaoY += delta.Y;
+            AtualizarNode();
+        }
+
+        public override ElementoEstado CapturarEstado()
+        {
+            return new ElementoEstado(
+                Linha.PosicaoX,
+                Linha.PosicaoY,
+                Linha.X2,
+                Linha.Y2,
+                Linha.Rotacao);
+        }
+
+        public override void AplicarEstado(ElementoEstado estado)
+        {
+            Linha.PosicaoX = estado.X;
+            Linha.PosicaoY = estado.Y;
+            Linha.X2 = estado.X2;
+            Linha.Y2 = estado.Y2;
+            Linha.Rotacao = estado.Rotacao;
+            AtualizarNode();
+        }
+
+        protected override void NotificarGeometria()
+        {
+            base.NotificarGeometria();
+            OnPropertyChanged(nameof(Comprimento));
+        }
+
         protected override Point PontoLocalInicial
         {
             get
@@ -166,6 +246,34 @@ namespace Araci.ViewModels
             }
 
             return Brushes.Black;
+        }
+
+        private static DoubleCollection? CriarStrokeDashArray(string estilo)
+        {
+            string normalizado = NormalizarEstilo(estilo);
+
+            return normalizado switch
+            {
+                "tracejado" => new DoubleCollection { 6, 4 },
+                "tracoponto" => new DoubleCollection { 8, 3, 2, 3 },
+                "tracodoispontos" => new DoubleCollection { 8, 3, 2, 3, 2, 3 },
+                _ => null
+            };
+        }
+
+        private static string NormalizarEstilo(string valor)
+        {
+            return valor
+                .Replace(" ", string.Empty)
+                .Replace("-", string.Empty)
+                .Replace("ç", "c")
+                .Replace("Ç", "c")
+                .Replace("ã", "a")
+                .Replace("Ã", "a")
+                .Replace("í", "i")
+                .Replace("Í", "i")
+                .ToLowerInvariant()
+                .Trim();
         }
     }
 }

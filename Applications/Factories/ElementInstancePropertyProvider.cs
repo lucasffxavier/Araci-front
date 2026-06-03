@@ -109,11 +109,10 @@ namespace Araci.Applications.Factories
             return new[]
             {
                 Prop<LinhaAnotativaViewModel>("Nome", "Nome", 10, false),
-                Prop<LinhaAnotativaViewModel>("X2", "X2", 20),
-                Prop<LinhaAnotativaViewModel>("Y2", "Y2", 30),
-                Prop<LinhaAnotativaViewModel>("CorLinha", "Cor da linha", 40),
-                Prop<LinhaAnotativaViewModel>("EspessuraLinha", "Espessura da linha", 50),
-                Prop<LinhaAnotativaViewModel>("Visivel", "Visível", 60)
+                Prop<LinhaAnotativaViewModel>("Comprimento", "Comprimento", 20, false, unit: UnitKind.LengthMeter),
+                Prop<LinhaAnotativaViewModel>("CorLinha", "Cor da linha", 30),
+                Prop<LinhaAnotativaViewModel>("EspessuraLinha", "Espessura da linha", 40),
+                Prop<LinhaAnotativaViewModel>("EstiloLinha", "Estilo da linha", 50)
             };
         }
 
