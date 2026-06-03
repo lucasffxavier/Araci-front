@@ -12,6 +12,7 @@ using Araci.Applications.Abstractions;
 using Araci.Applications.Analisar.FluxoDeCorrente;
 using Araci.Applications.Diagrama;
 using Araci.Applications.Editar.Base;
+using Araci.Applications.Factories;
 using Araci.Applications.UseCases.Analise;
 using Araci.Applications.UseCases.Editar;
 using Araci.Applications.UseCases.Projeto;
@@ -160,6 +161,7 @@ namespace Araci.TechnicalChecks
                 ("Arquivo antigo sem Units abre defaults", ArquivoAntigoSemUnitsAbreDefaults),
                 ("Arquivo com Units invalido usa fallback", ArquivoComUnitsInvalidoUsaFallback),
                 ("Units persistidas nao alteram DTO eletrico", UnitsPersistidasNaoAlteramDtoEletrico),
+                ("Persistencia preserva LinhaAnotativa", PersistenciaPreservaLinhaAnotativa),
                 ("DocumentSceneSync cria ViewModel ao adicionar elemento", DocumentSceneSyncCriaViewModelAoAdicionarElemento),
                 ("DocumentSceneSync remove ViewModel ao remover elemento", DocumentSceneSyncRemoveViewModelAoRemoverElemento),
                 ("DocumentSceneSync limpa Scene ao limpar Document", DocumentSceneSyncLimpaSceneAoLimparDocument),
@@ -2557,6 +2559,93 @@ namespace Araci.TechnicalChecks
             {
                 DeleteIfExists(path);
             }
+        }
+
+        private static void PersistenciaPreservaLinhaAnotativa()
+        {
+            var document = new AraciDocument();
+            var linha = new LinhaAnotativa
+            {
+                Nome = "Linha Teste",
+                PosicaoX = 12.5,
+                PosicaoY = -8.25,
+                Rotacao = 15,
+                Escala = 1.5,
+                CorLinha = "#FF00AAFF",
+                EspessuraLinha = 2.75,
+                Visivel = false,
+                X2 = -120,
+                Y2 = 45
+            };
+
+            document.AdicionarElemento(linha);
+
+            EditorContext source = new();
+            var serializer = new ProjectSerializer(
+                source.Elements,
+                new ElementoModelFactory(source.Elements),
+                source.TerminalLayout,
+                source.Geometry);
+
+            ProjectFileDto dto = serializer.CreateFileDto(
+                document,
+                ProjectMetadataDto.CreateNew("Linha Anotativa"),
+                source.Settings.Units);
+
+            ElementDto elementDto = dto.Elements.Single();
+            string json = serializer.Serialize(dto);
+
+            AssertEqual(ElementKinds.LinhaAnotativa, elementDto.Kind, "LinhaAnotativa DTO.Kind");
+            AssertEqual(ElementoDomainRole.Anotacao.ToString(), elementDto.DomainRole, "LinhaAnotativa DTO.DomainRole");
+            Assert(elementDto.Type == null, "LinhaAnotativa DTO.Type deve ser null.");
+            AssertEqual(0, elementDto.Terminals.Count, "LinhaAnotativa DTO.Terminals.Count");
+            AssertEqual(0, elementDto.Vertices.Count, "LinhaAnotativa DTO.Vertices.Count");
+            AssertParametroSerializado(elementDto, Elemento.PARAM_NOME);
+            AssertParametroSerializado(elementDto, ElementoAnotativo.PARAM_COR_LINHA);
+            AssertParametroSerializado(elementDto, ElementoAnotativo.PARAM_ESPESSURA_LINHA);
+            AssertParametroSerializado(elementDto, ElementoAnotativo.PARAM_VISIVEL);
+            AssertParametroSerializado(elementDto, LinhaAnotativa.PARAM_X2);
+            AssertParametroSerializado(elementDto, LinhaAnotativa.PARAM_Y2);
+            AssertContains(json, "\"Kind\": \"LinhaAnotativa\"", "LinhaAnotativa JSON.Kind");
+            AssertContains(json, "\"DomainRole\": \"Anotacao\"", "LinhaAnotativa JSON.DomainRole");
+            AssertContains(json, "\"Name\": \"X2\"", "LinhaAnotativa JSON.X2");
+            AssertContains(json, "\"Name\": \"Y2\"", "LinhaAnotativa JSON.Y2");
+            AssertContains(json, "\"Name\": \"CorLinha\"", "LinhaAnotativa JSON.CorLinha");
+            AssertContains(json, "\"Name\": \"EspessuraLinha\"", "LinhaAnotativa JSON.EspessuraLinha");
+            AssertContains(json, "\"Name\": \"Visivel\"", "LinhaAnotativa JSON.Visivel");
+
+            ProjectFileDto reloadedDto = serializer.Deserialize(json);
+            LinhaAnotativa reloaded = serializer.CreateElements(reloadedDto).OfType<LinhaAnotativa>().Single();
+
+            AssertEqual(linha.Id, reloaded.Id, "LinhaAnotativa.Id apos reload");
+            AssertEqual(12.5, reloaded.PosicaoX, "LinhaAnotativa.PosicaoX apos reload");
+            AssertEqual(-8.25, reloaded.PosicaoY, "LinhaAnotativa.PosicaoY apos reload");
+            AssertEqual(15, reloaded.Rotacao, "LinhaAnotativa.Rotacao apos reload");
+            AssertEqual(1.5, reloaded.Escala, "LinhaAnotativa.Escala apos reload");
+            AssertEqual("Linha Teste", reloaded.Nome, "LinhaAnotativa.Nome apos reload");
+            AssertEqual("#FF00AAFF", reloaded.CorLinha, "LinhaAnotativa.CorLinha apos reload");
+            AssertEqual(2.75, reloaded.EspessuraLinha, "LinhaAnotativa.EspessuraLinha apos reload");
+            AssertEqual(false, reloaded.Visivel, "LinhaAnotativa.Visivel apos reload");
+            AssertEqual(-120, reloaded.X2, "LinhaAnotativa.X2 apos reload");
+            AssertEqual(45, reloaded.Y2, "LinhaAnotativa.Y2 apos reload");
+            AssertEqual(ElementoDomainRole.Anotacao, reloaded.DomainRole, "LinhaAnotativa.DomainRole apos reload");
+            Assert(!reloaded.ParticipaDoGrafoEletrico, "LinhaAnotativa apos reload nao deve participar do grafo eletrico.");
+            Assert(reloaded.Tipo == null, "LinhaAnotativa.Tipo apos reload deve ser null.");
+            Assert(reloaded is not ITerminalOwner, "LinhaAnotativa nao deve possuir terminais.");
+
+            EditorContext target = CreateContextWithViewport();
+
+            Assert(target.ElementoFactory.CriarViewModel(reloaded) is LinhaAnotativaViewModel, "LinhaAnotativa apos reload deve criar ViewModel.");
+
+            target.Document.AdicionarElemento(reloaded);
+
+            Assert(target.Viewport?.ObterViewModel(reloaded) is LinhaAnotativaViewModel, "DocumentSceneSync deve criar ViewModel da LinhaAnotativa apos reload.");
+            AssertEqual(1, target.Scene.Elementos.Count, "Scene deve receber LinhaAnotativa apos reload.");
+        }
+
+        private static void AssertParametroSerializado(ElementDto dto, string nome)
+        {
+            Assert(dto.Parameters.Any(p => p.Name == nome), $"Parametro '{nome}' deve ser serializado.");
         }
 
         private static void DocumentSceneSyncCriaViewModelAoAdicionarElemento()
