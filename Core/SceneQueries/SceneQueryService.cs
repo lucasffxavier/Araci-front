@@ -23,7 +23,6 @@ namespace Araci.Core.SceneQueries
         {
             _scene = scene ?? throw new ArgumentNullException(nameof(scene));
             _index = new SpatialHashGrid();
-
             _scene.Elementos.CollectionChanged += OnElementosChanged;
 
             foreach (ElementoViewModel elemento in _scene.Elementos)
@@ -136,6 +135,9 @@ namespace Araci.Core.SceneQueries
             if (vm is LinhaAnotativaViewModel linha)
                 return CriarCandidatoLinhaAnotativa(linha, point, tolerance, order);
 
+            if (vm is RetanguloAnotativoViewModel retangulo)
+                return CriarCandidatoRetanguloAnotativo(retangulo, point, tolerance, order);
+
             return ContemPontoElemento(vm, point)
                 ? new HitCandidate(vm, 0, 0, order)
                 : null;
@@ -188,6 +190,7 @@ namespace Araci.Core.SceneQueries
         {
             return Math.Abs(vm.Rotacao) > 0.000001 ||
                 vm is LinhaAnotativaViewModel ||
+                vm is RetanguloAnotativoViewModel ||
                 vm.Modelo is ITerminalOwner;
         }
 
@@ -231,6 +234,29 @@ namespace Araci.Core.SceneQueries
 
             return distancia <= tolerance
                 ? new HitCandidate(linha, distancia, 2, order)
+                : null;
+        }
+
+        private static HitCandidate? CriarCandidatoRetanguloAnotativo(RetanguloAnotativoViewModel retangulo, Point point, double tolerance, int order)
+        {
+            Rect b = retangulo.Bounds;
+
+            if (!b.Contains(point))
+                return null;
+
+            double menor = double.MaxValue;
+            Point topLeft = new(b.Left, b.Top);
+            Point topRight = new(b.Right, b.Top);
+            Point bottomRight = new(b.Right, b.Bottom);
+            Point bottomLeft = new(b.Left, b.Bottom);
+
+            menor = Math.Min(menor, DistanciaPontoSegmento(point, topLeft, topRight));
+            menor = Math.Min(menor, DistanciaPontoSegmento(point, topRight, bottomRight));
+            menor = Math.Min(menor, DistanciaPontoSegmento(point, bottomRight, bottomLeft));
+            menor = Math.Min(menor, DistanciaPontoSegmento(point, bottomLeft, topLeft));
+
+            return menor <= tolerance
+                ? new HitCandidate(retangulo, menor, 2, order)
                 : null;
         }
 

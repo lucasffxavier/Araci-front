@@ -142,8 +142,8 @@ namespace Araci.Views
 
             Focus();
             Keyboard.Focus(this);
-            var vm = EncontrarElemento(e.OriginalSource as DependencyObject);
             Point worldPosition = GetWorldPos(e);
+            ElementoViewModel? vm = ResolverElementoClicado(e.OriginalSource as DependencyObject, worldPosition);
             ToolInputState inputState = CriarInputState(e, e.ChangedButton, e.ClickCount);
             _context.Input.MouseDown(vm, worldPosition, inputState);
             AtualizarCursorInteracao(worldPosition);
@@ -303,6 +303,16 @@ namespace Araci.Views
             Point screenPosition = e.GetPosition(this);
             Point worldPosition = _context?.Viewport?.ScreenToWorld(screenPosition) ?? screenPosition;
             return new ToolInputState(Keyboard.Modifiers, button, clickCount, worldPosition, screenPosition);
+        }
+
+        private ElementoViewModel? ResolverElementoClicado(DependencyObject? origem, Point worldPosition)
+        {
+            ElementoViewModel? visual = EncontrarElemento(origem);
+
+            if (visual is not RetanguloAnotativoViewModel)
+                return visual;
+
+            return _context?.SceneQueries.HitTest(worldPosition)?.Elemento;
         }
 
         private static ElementoViewModel? EncontrarElemento(DependencyObject? origem)
