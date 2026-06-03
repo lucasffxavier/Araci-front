@@ -113,6 +113,7 @@ namespace Araci.TechnicalChecks
                 ("Update do preview nao reseta rotacao", UpdateDoPreviewNaoResetaRotacao),
                 ("Modelo real recebe rotacao do preview", ModeloRealRecebeRotacaoDoPreview),
                 ("InputRouter envia Space para insercao sem preview", InputRouterEnviaSpaceParaInsercaoSemPreview),
+                ("Ferramenta LinhaAnotativa cria preview segmentos e undo redo", FerramentaLinhaAnotativaCriaPreviewSegmentosEUndoRedo),
                 ("Botoes da Ribbon nao capturam foco", BotoesDaRibbonNaoCapturamFoco),
                 ("Viewport continua focavel", ViewportContinuaFocavel),
                 ("Catalogo preserva Ribbon ordem e atalhos", CatalogoPreservaRibbonOrdemEAtalhos),
@@ -1763,6 +1764,83 @@ namespace Araci.TechnicalChecks
                     "Ferramenta de insercao de Carga deve ser ativada pelo ToolService.");
 
                 Assert(context.Input.KeyDown(Key.Space), "InputRouter deve consumir Space na ferramenta de insercao sem preview.");
+            });
+        }
+
+        private static void FerramentaLinhaAnotativaCriaPreviewSegmentosEUndoRedo()
+        {
+            RunSta(() =>
+            {
+                EditorContext context = CreateContextWithViewport();
+                var semModificador = new ToolInputState(ModifierKeys.None, MouseButton.Left);
+                var comShift = new ToolInputState(ModifierKeys.Shift, MouseButton.Left);
+
+                context.Tools.AtivarInserirLinhaAnotativa();
+                AssertEqual("Linha", context.Tools.FerramentaAtual.Nome, "Ferramenta Linha.Nome");
+                Assert(context.Tools.FerramentaAtual.MantemBotaoAtivado, "Ferramenta Linha deve manter botao ativo.");
+
+                context.Input.MouseDown(null, new Point(10, 20), semModificador);
+                context.Input.MouseMove(new Point(110, 80), semModificador);
+
+                LinhaAnotativaViewModel preview = context.Scene.Elementos
+                    .OfType<LinhaAnotativaViewModel>()
+                    .Single(vm => vm.IsPreview);
+
+                AssertEqual(0, context.Document.Elementos.Count, "Preview nao deve entrar no Document.");
+                AssertEqual(10, preview.Linha.PosicaoX, "Preview.PosicaoX");
+                AssertEqual(20, preview.Linha.PosicaoY, "Preview.PosicaoY");
+                AssertEqual(100, preview.Linha.X2, "Preview.X2");
+                AssertEqual(60, preview.Linha.Y2, "Preview.Y2");
+
+                context.Input.MouseDown(null, new Point(110, 80), semModificador);
+
+                LinhaAnotativa linha = context.Document.Elementos.OfType<LinhaAnotativa>().Single();
+                AssertEqual(10, linha.PosicaoX, "Linha.PosicaoX");
+                AssertEqual(20, linha.PosicaoY, "Linha.PosicaoY");
+                AssertEqual(100, linha.X2, "Linha.X2");
+                AssertEqual(60, linha.Y2, "Linha.Y2");
+                AssertEqual(ElementoDomainRole.Anotacao, linha.DomainRole, "Linha.DomainRole");
+                Assert(!linha.ParticipaDoGrafoEletrico, "Linha nao deve participar do grafo eletrico.");
+                Assert(!context.Scene.Elementos.OfType<LinhaAnotativaViewModel>().Any(vm => vm.IsPreview), "Preview deve ser removido sem Shift.");
+                Assert(context.Scene.Elementos.OfType<LinhaAnotativaViewModel>().Any(vm => ReferenceEquals(vm.Modelo, linha)), "Linha definitiva deve entrar na Scene.");
+                AssertEqual("Selecionar", context.Tools.FerramentaAtual.Nome, "Ferramenta apos finalizar sem Shift");
+
+                context.Commands.Undo();
+                AssertEqual(0, context.Document.Elementos.OfType<LinhaAnotativa>().Count(), "Undo deve remover LinhaAnotativa.");
+                AssertEqual(0, context.Scene.Elementos.OfType<LinhaAnotativaViewModel>().Count(), "Undo deve remover ViewModel da linha.");
+
+                context.Commands.Redo();
+                AssertEqual(1, context.Document.Elementos.OfType<LinhaAnotativa>().Count(), "Redo deve recriar LinhaAnotativa.");
+                AssertEqual(1, context.Scene.Elementos.OfType<LinhaAnotativaViewModel>().Count(), "Redo deve recriar ViewModel da linha.");
+
+                EditorContext continuo = CreateContextWithViewport();
+                continuo.Tools.AtivarInserirLinhaAnotativa();
+                continuo.Input.MouseDown(null, new Point(0, 0), semModificador);
+                continuo.Input.MouseDown(null, new Point(50, 0), comShift);
+
+                AssertEqual("Linha", continuo.Tools.FerramentaAtual.Nome, "Ferramenta deve permanecer ativa com Shift.");
+                AssertEqual(1, continuo.Document.Elementos.OfType<LinhaAnotativa>().Count(), "Primeiro segmento com Shift");
+                Assert(continuo.Scene.Elementos.OfType<LinhaAnotativaViewModel>().Any(vm => vm.IsPreview), "Preview deve continuar apos Shift.");
+
+                continuo.Input.MouseMove(new Point(50, 40), semModificador);
+                continuo.Input.MouseDown(null, new Point(50, 40), comShift);
+
+                LinhaAnotativa[] linhas = continuo.Document.Elementos.OfType<LinhaAnotativa>().ToArray();
+                AssertEqual(2, linhas.Length, "Quantidade de segmentos com Shift");
+                AssertEqual(0, linhas[0].PosicaoX, "Primeiro segmento.PosicaoX");
+                AssertEqual(0, linhas[0].PosicaoY, "Primeiro segmento.PosicaoY");
+                AssertEqual(50, linhas[0].X2, "Primeiro segmento.X2");
+                AssertEqual(0, linhas[0].Y2, "Primeiro segmento.Y2");
+                AssertEqual(50, linhas[1].PosicaoX, "Segundo segmento.PosicaoX");
+                AssertEqual(0, linhas[1].PosicaoY, "Segundo segmento.PosicaoY");
+                AssertEqual(0, linhas[1].X2, "Segundo segmento.X2");
+                AssertEqual(40, linhas[1].Y2, "Segundo segmento.Y2");
+
+                continuo.Input.KeyDown(Key.Escape);
+
+                AssertEqual("Selecionar", continuo.Tools.FerramentaAtual.Nome, "Esc deve voltar para selecao.");
+                Assert(!continuo.Scene.Elementos.OfType<LinhaAnotativaViewModel>().Any(vm => vm.IsPreview), "Esc deve remover preview.");
+                AssertEqual(2, continuo.Document.Elementos.OfType<LinhaAnotativa>().Count(), "Esc nao deve remover linhas definitivas.");
             });
         }
 

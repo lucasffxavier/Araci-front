@@ -8,6 +8,7 @@ using Araci.Core.Documents;
 using Araci.Core.Events;
 using Araci.Core.SceneQueries;
 using Araci.Core.Transactions;
+using Araci.Applications.Desenhar.InserirLinha;
 using Araci.Applications.Diagrama.InserirCabo;
 using Araci.Applications.Diagrama.InserirElemento;
 using Araci.Applications.Editar.Alinhar;
@@ -160,7 +161,8 @@ namespace Araci.Services
                 CriarAlinharTool,
                 () => new DeletarTool(SafeDelete),
                 CriarInserirCaboTool,
-                CriarInserirElementoGenericoTool);
+                CriarInserirElementoGenericoTool,
+                CriarInserirLinhaAnotativaTool);
             Input = EditingComposition.CreateInput(
                 Tools,
                 Commands,
@@ -351,6 +353,18 @@ namespace Araci.Services
                 Geometry,
                 TerminalLayout,
                 AlignmentGuides,
+                Scene,
+                SceneQueries,
+                () => Tools.VoltarParaSelecao());
+        }
+
+        private InserirLinhaAnotativaTool CriarInserirLinhaAnotativaTool()
+        {
+            return new InserirLinhaAnotativaTool(
+                Commands,
+                Document,
+                Names,
+                ElementoFactory,
                 Scene,
                 SceneQueries,
                 () => Tools.VoltarParaSelecao());

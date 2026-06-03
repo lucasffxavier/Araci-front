@@ -14,6 +14,7 @@ namespace Araci.Applications.Editor
         private readonly Func<ITool> _criarDeletarTool;
         private readonly Func<ITool> _criarInserirCaboTool;
         private readonly Func<ElementDefinition, ITool> _criarInserirElementoTool;
+        private readonly Func<ITool> _criarInserirLinhaAnotativaTool;
         private ITool _ferramentaAtual;
 
         public ToolService(
@@ -23,7 +24,8 @@ namespace Araci.Applications.Editor
             Func<ITool> criarAlinharTool,
             Func<ITool> criarDeletarTool,
             Func<ITool> criarInserirCaboTool,
-            Func<ElementDefinition, ITool> criarInserirElementoTool)
+            Func<ElementDefinition, ITool> criarInserirElementoTool,
+            Func<ITool> criarInserirLinhaAnotativaTool)
         {
             _elements = elements ?? throw new ArgumentNullException(nameof(elements));
             _criarSelecionarTool = criarSelecionarTool ?? throw new ArgumentNullException(nameof(criarSelecionarTool));
@@ -32,6 +34,7 @@ namespace Araci.Applications.Editor
             _criarDeletarTool = criarDeletarTool ?? throw new ArgumentNullException(nameof(criarDeletarTool));
             _criarInserirCaboTool = criarInserirCaboTool ?? throw new ArgumentNullException(nameof(criarInserirCaboTool));
             _criarInserirElementoTool = criarInserirElementoTool ?? throw new ArgumentNullException(nameof(criarInserirElementoTool));
+            _criarInserirLinhaAnotativaTool = criarInserirLinhaAnotativaTool ?? throw new ArgumentNullException(nameof(criarInserirLinhaAnotativaTool));
             _ferramentaAtual = _criarSelecionarTool();
             _ferramentaAtual.Ativar();
         }
@@ -77,6 +80,11 @@ namespace Araci.Applications.Editor
         public void AtivarDeletar()
         {
             FerramentaAtual = _criarDeletarTool();
+        }
+
+        public void AtivarInserirLinhaAnotativa()
+        {
+            FerramentaAtual = _criarInserirLinhaAnotativaTool();
         }
 
         public bool AtivarInsercaoElemento(string kind)
