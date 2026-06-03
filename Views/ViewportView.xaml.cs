@@ -309,7 +309,7 @@ namespace Araci.Views
         {
             ElementoViewModel? visual = EncontrarElemento(origem);
 
-            if (visual is not RetanguloAnotativoViewModel)
+            if (visual is not RetanguloAnotativoViewModel && visual is not CirculoAnotativoViewModel)
                 return visual;
 
             return _context?.SceneQueries.HitTest(worldPosition)?.Elemento;

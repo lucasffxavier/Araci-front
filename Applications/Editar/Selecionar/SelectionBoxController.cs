@@ -13,6 +13,7 @@ namespace Araci.Applications.Editar.Selecionar
     {
         private const double ToleranciaBarra = 6;
         private const double ToleranciaRetangulo = 6;
+        private const double ToleranciaCirculo = 6;
         private readonly SelectionBoxViewModel _selectionBox;
         private readonly ISceneQueryService _queries;
         private readonly SelectionService _selection;
@@ -82,6 +83,9 @@ namespace Araci.Applications.Editar.Selecionar
             if (vm is RetanguloAnotativoViewModel retangulo)
                 return IntersectaRetangulo(retangulo, area);
 
+            if (vm is CirculoAnotativoViewModel circulo)
+                return IntersectaCirculo(circulo, area);
+
             if (vm.Modelo is Barra barra)
                 return IntersectaBarra(barra, area);
 
@@ -97,7 +101,6 @@ namespace Araci.Applications.Editar.Selecionar
         {
             Rect b = retangulo.Bounds;
             Rect areaComTolerancia = Expandir(area, ToleranciaRetangulo);
-
             Point topLeft = new(b.Left, b.Top);
             Point topRight = new(b.Right, b.Top);
             Point bottomRight = new(b.Right, b.Bottom);
@@ -107,6 +110,32 @@ namespace Araci.Applications.Editar.Selecionar
                 SegmentoIntersectaRect(topRight, bottomRight, areaComTolerancia) ||
                 SegmentoIntersectaRect(bottomRight, bottomLeft, areaComTolerancia) ||
                 SegmentoIntersectaRect(bottomLeft, topLeft, areaComTolerancia);
+        }
+
+        private static bool IntersectaCirculo(CirculoAnotativoViewModel circulo, Rect area)
+        {
+            Rect areaComTolerancia = Expandir(area, ToleranciaCirculo);
+            Point centro = new(circulo.Circulo.PosicaoX, circulo.Circulo.PosicaoY);
+            double raio = Math.Max(1, circulo.Circulo.Raio);
+
+            if (areaComTolerancia.Contains(new Point(centro.X + raio, centro.Y)) ||
+                areaComTolerancia.Contains(new Point(centro.X - raio, centro.Y)) ||
+                areaComTolerancia.Contains(new Point(centro.X, centro.Y + raio)) ||
+                areaComTolerancia.Contains(new Point(centro.X, centro.Y - raio)))
+            {
+                return true;
+            }
+
+            double closestX = Math.Max(areaComTolerancia.Left, Math.Min(centro.X, areaComTolerancia.Right));
+            double closestY = Math.Max(areaComTolerancia.Top, Math.Min(centro.Y, areaComTolerancia.Bottom));
+            double distanciaMinima = Distancia(centro, new Point(closestX, closestY));
+
+            Point farthest = new(
+                Math.Abs(areaComTolerancia.Left - centro.X) > Math.Abs(areaComTolerancia.Right - centro.X) ? areaComTolerancia.Left : areaComTolerancia.Right,
+                Math.Abs(areaComTolerancia.Top - centro.Y) > Math.Abs(areaComTolerancia.Bottom - centro.Y) ? areaComTolerancia.Top : areaComTolerancia.Bottom);
+            double distanciaMaxima = Distancia(centro, farthest);
+
+            return distanciaMinima <= raio && distanciaMaxima >= raio;
         }
 
         private static bool IntersectaBarra(Barra barra, Rect area)
@@ -175,11 +204,7 @@ namespace Araci.Applications.Editar.Selecionar
 
         private static Rect Expandir(Rect rect, double margem)
         {
-            return new Rect(
-                rect.Left - margem,
-                rect.Top - margem,
-                rect.Width + margem * 2,
-                rect.Height + margem * 2);
+            return new Rect(rect.Left - margem, rect.Top - margem, rect.Width + margem * 2, rect.Height + margem * 2);
         }
 
         private static double DistanciaQuadrada(Point a, Point b)
@@ -187,6 +212,11 @@ namespace Araci.Applications.Editar.Selecionar
             double dx = a.X - b.X;
             double dy = a.Y - b.Y;
             return dx * dx + dy * dy;
+        }
+
+        private static double Distancia(Point a, Point b)
+        {
+            return Math.Sqrt(DistanciaQuadrada(a, b));
         }
 
         private static bool SegmentoIntersectaRect(Point a, Point b, Rect rect)
@@ -223,8 +253,7 @@ namespace Araci.Applications.Editar.Selecionar
 
         private static double Orientacao(Point a, Point b, Point c)
         {
-            return (b.X - a.X) * (c.Y - a.Y) -
-                (b.Y - a.Y) * (c.X - a.X);
+            return (b.X - a.X) * (c.Y - a.Y) - (b.Y - a.Y) * (c.X - a.X);
         }
 
         private static bool SinaisOpostos(double a, double b)

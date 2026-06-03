@@ -46,9 +46,7 @@ namespace Araci.Core.SceneQueries
             GarantirIndex();
 
             double effectiveTolerance = Math.Max(6, tolerance);
-            var candidatos = Nearby(point, Math.Max(10, effectiveTolerance))
-                .Where(e => !e.IsPreview)
-                .ToList();
+            var candidatos = Nearby(point, Math.Max(10, effectiveTolerance)).Where(e => !e.IsPreview).ToList();
             HitCandidate? melhor = null;
 
             for (int i = 0; i < candidatos.Count; i++)
@@ -59,27 +57,19 @@ namespace Araci.Core.SceneQueries
                     melhor = candidato.Value;
             }
 
-            return melhor.HasValue
-                ? new SceneHitResult(melhor.Value.Elemento, point)
-                : null;
+            return melhor.HasValue ? new SceneHitResult(melhor.Value.Elemento, point) : null;
         }
 
         public IEnumerable<ElementoViewModel> Query(Rect area)
         {
             GarantirIndex();
 
-            var result = _index.Query(area)
-                .Where(e => !e.IsPreview)
-                .ToList();
+            var result = _index.Query(area).Where(e => !e.IsPreview).ToList();
 
             foreach (ElementoViewModel vm in _scene.Elementos)
             {
-                if (vm.IsPreview ||
-                    result.Contains(vm) ||
-                    !UsaGeometriaExpandida(vm))
-                {
+                if (vm.IsPreview || result.Contains(vm) || !UsaGeometriaExpandida(vm))
                     continue;
-                }
 
                 if (IntersectsWith(vm, area))
                     result.Add(vm);
@@ -92,24 +82,13 @@ namespace Araci.Core.SceneQueries
         {
             GarantirIndex();
 
-            var result = _index.Nearby(point, radius)
-                .Where(e => !e.IsPreview)
-                .ToList();
-
-            var area = new Rect(
-                point.X - radius,
-                point.Y - radius,
-                radius * 2,
-                radius * 2);
+            var result = _index.Nearby(point, radius).Where(e => !e.IsPreview).ToList();
+            var area = new Rect(point.X - radius, point.Y - radius, radius * 2, radius * 2);
 
             foreach (ElementoViewModel vm in _scene.Elementos)
             {
-                if (vm.IsPreview ||
-                    result.Contains(vm) ||
-                    !UsaGeometriaExpandida(vm))
-                {
+                if (vm.IsPreview || result.Contains(vm) || !UsaGeometriaExpandida(vm))
                     continue;
-                }
 
                 if (IntersectsWith(vm, area))
                     result.Add(vm);
@@ -138,9 +117,10 @@ namespace Araci.Core.SceneQueries
             if (vm is RetanguloAnotativoViewModel retangulo)
                 return CriarCandidatoRetanguloAnotativo(retangulo, point, tolerance, order);
 
-            return ContemPontoElemento(vm, point)
-                ? new HitCandidate(vm, 0, 0, order)
-                : null;
+            if (vm is CirculoAnotativoViewModel circulo)
+                return CriarCandidatoCirculoAnotativo(circulo, point, tolerance, order);
+
+            return ContemPontoElemento(vm, point) ? new HitCandidate(vm, 0, 0, order) : null;
         }
 
         private static bool ContemPontoElemento(ElementoViewModel vm, Point point)
@@ -191,6 +171,7 @@ namespace Araci.Core.SceneQueries
             return Math.Abs(vm.Rotacao) > 0.000001 ||
                 vm is LinhaAnotativaViewModel ||
                 vm is RetanguloAnotativoViewModel ||
+                vm is CirculoAnotativoViewModel ||
                 vm.Modelo is ITerminalOwner;
         }
 
@@ -202,9 +183,7 @@ namespace Araci.Core.SceneQueries
             double x = point.X - center.X;
             double y = point.Y - center.Y;
 
-            return new Point(
-                center.X + x * cos - y * sin,
-                center.Y + x * sin + y * cos);
+            return new Point(center.X + x * cos - y * sin, center.Y + x * sin + y * cos);
         }
 
         private static HitCandidate? CriarCandidatoCabo(CaboViewModel cabo, Point point, double tolerance, int order)
@@ -212,17 +191,10 @@ namespace Araci.Core.SceneQueries
             var vertices = cabo.Cabo.Vertices;
 
             if (vertices.Count < 2)
-            {
-                return cabo.Bounds.Contains(point)
-                    ? new HitCandidate(cabo, 0, 3, order)
-                    : null;
-            }
+                return cabo.Bounds.Contains(point) ? new HitCandidate(cabo, 0, 3, order) : null;
 
             double distancia = MenorDistanciaCabo(cabo, point);
-
-            return distancia <= tolerance
-                ? new HitCandidate(cabo, distancia, 2, order)
-                : null;
+            return distancia <= tolerance ? new HitCandidate(cabo, distancia, 2, order) : null;
         }
 
         private static HitCandidate? CriarCandidatoLinhaAnotativa(LinhaAnotativaViewModel linha, Point point, double tolerance, int order)
@@ -231,10 +203,7 @@ namespace Araci.Core.SceneQueries
                 return null;
 
             double distancia = DistanciaPontoSegmento(point, node.PontoInicial, node.PontoFinal);
-
-            return distancia <= tolerance
-                ? new HitCandidate(linha, distancia, 2, order)
-                : null;
+            return distancia <= tolerance ? new HitCandidate(linha, distancia, 2, order) : null;
         }
 
         private static HitCandidate? CriarCandidatoRetanguloAnotativo(RetanguloAnotativoViewModel retangulo, Point point, double tolerance, int order)
@@ -255,9 +224,15 @@ namespace Araci.Core.SceneQueries
             menor = Math.Min(menor, DistanciaPontoSegmento(point, bottomRight, bottomLeft));
             menor = Math.Min(menor, DistanciaPontoSegmento(point, bottomLeft, topLeft));
 
-            return menor <= tolerance
-                ? new HitCandidate(retangulo, menor, 2, order)
-                : null;
+            return menor <= tolerance ? new HitCandidate(retangulo, menor, 2, order) : null;
+        }
+
+        private static HitCandidate? CriarCandidatoCirculoAnotativo(CirculoAnotativoViewModel circulo, Point point, double tolerance, int order)
+        {
+            double distanciaCentro = Distancia(point, new Point(circulo.Circulo.PosicaoX, circulo.Circulo.PosicaoY));
+            double distanciaCircunferencia = Math.Abs(distanciaCentro - circulo.Circulo.Raio);
+
+            return distanciaCircunferencia <= tolerance ? new HitCandidate(circulo, distanciaCircunferencia, 2, order) : null;
         }
 
         private static bool EhMelhor(HitCandidate candidato, HitCandidate? atual)
@@ -298,10 +273,7 @@ namespace Araci.Core.SceneQueries
 
             double t = ((p.X - a.X) * dx + (p.Y - a.Y) * dy) / lengthSquared;
             t = Math.Max(0, Math.Min(1, t));
-
-            var projection = new Point(
-                a.X + t * dx,
-                a.Y + t * dy);
+            var projection = new Point(a.X + t * dx, a.Y + t * dy);
 
             return Distancia(p, projection);
         }
@@ -310,7 +282,6 @@ namespace Araci.Core.SceneQueries
         {
             double dx = a.X - b.X;
             double dy = a.Y - b.Y;
-
             return Math.Sqrt(dx * dx + dy * dy);
         }
 
@@ -325,11 +296,8 @@ namespace Araci.Core.SceneQueries
             }
 
             public ElementoViewModel Elemento { get; }
-
             public double Distance { get; }
-
             public int Priority { get; }
-
             public int Order { get; }
         }
 
