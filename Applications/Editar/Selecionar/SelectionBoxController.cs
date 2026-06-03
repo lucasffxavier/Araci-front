@@ -12,6 +12,7 @@ namespace Araci.Applications.Editar.Selecionar
     public class SelectionBoxController
     {
         private const double ToleranciaBarra = 6;
+        private const double ToleranciaRetangulo = 6;
         private readonly SelectionBoxViewModel _selectionBox;
         private readonly ISceneQueryService _queries;
         private readonly SelectionService _selection;
@@ -30,8 +31,10 @@ namespace Araci.Applications.Editar.Selecionar
         public void Begin(Point position, bool adicionarAoExistente)
         {
             _adicionarAoExistente = adicionarAoExistente;
+
             if (!_adicionarAoExistente)
                 _selection.Limpar();
+
             _inicio = position;
             IsActive = true;
             _selectionBox.Visivel = true;
@@ -42,6 +45,7 @@ namespace Araci.Applications.Editar.Selecionar
         {
             if (!IsActive)
                 return;
+
             _selectionBox.Atualizar(_inicio, position);
         }
 
@@ -51,6 +55,7 @@ namespace Araci.Applications.Editar.Selecionar
                 return;
 
             Rect area = _selectionBox.Bounds;
+
             foreach (ElementoViewModel item in _queries.Query(area))
             {
                 if (IntersectaSelecao(item, area))
@@ -71,19 +76,48 @@ namespace Araci.Applications.Editar.Selecionar
             if (vm is CaboViewModel cabo)
                 return IntersectaCabo(cabo, area);
 
+            if (vm is LinhaAnotativaViewModel linha)
+                return IntersectaLinha(linha, area);
+
+            if (vm is RetanguloAnotativoViewModel retangulo)
+                return IntersectaRetangulo(retangulo, area);
+
             if (vm.Modelo is Barra barra)
                 return IntersectaBarra(barra, area);
 
             return vm.Bounds.IntersectsWith(area);
         }
 
+        private static bool IntersectaLinha(LinhaAnotativaViewModel linha, Rect area)
+        {
+            return SegmentoIntersectaRect(linha.PontoInicial, linha.PontoFinal, area);
+        }
+
+        private static bool IntersectaRetangulo(RetanguloAnotativoViewModel retangulo, Rect area)
+        {
+            Rect b = retangulo.Bounds;
+            Rect areaComTolerancia = Expandir(area, ToleranciaRetangulo);
+
+            Point topLeft = new(b.Left, b.Top);
+            Point topRight = new(b.Right, b.Top);
+            Point bottomRight = new(b.Right, b.Bottom);
+            Point bottomLeft = new(b.Left, b.Bottom);
+
+            return SegmentoIntersectaRect(topLeft, topRight, areaComTolerancia) ||
+                SegmentoIntersectaRect(topRight, bottomRight, areaComTolerancia) ||
+                SegmentoIntersectaRect(bottomRight, bottomLeft, areaComTolerancia) ||
+                SegmentoIntersectaRect(bottomLeft, topLeft, areaComTolerancia);
+        }
+
         private static bool IntersectaBarra(Barra barra, Rect area)
         {
             Terminal[] terminais = barra.Terminais.ToArray();
+
             if (terminais.Length == 0)
                 return false;
 
             Rect areaComTolerancia = Expandir(area, ToleranciaBarra);
+
             foreach (Terminal terminal in terminais)
             {
                 if (areaComTolerancia.Contains(terminal.Posicao))
@@ -104,6 +138,7 @@ namespace Araci.Applications.Editar.Selecionar
                     Point p1 = terminais[i].Posicao;
                     Point p2 = terminais[j].Posicao;
                     double distancia = DistanciaQuadrada(p1, p2);
+
                     if (distancia > maiorDistancia)
                     {
                         maiorDistancia = distancia;
@@ -119,6 +154,7 @@ namespace Araci.Applications.Editar.Selecionar
         private static bool IntersectaCabo(CaboViewModel cabo, Rect area)
         {
             var vertices = cabo.Cabo.Vertices;
+
             if (vertices.Count < 2)
                 return cabo.Bounds.IntersectsWith(area);
 
@@ -164,9 +200,9 @@ namespace Araci.Applications.Editar.Selecionar
             Point bottomLeft = new(rect.Left, rect.Bottom);
 
             return SegmentosIntersectam(a, b, topLeft, topRight) ||
-                   SegmentosIntersectam(a, b, topRight, bottomRight) ||
-                   SegmentosIntersectam(a, b, bottomRight, bottomLeft) ||
-                   SegmentosIntersectam(a, b, bottomLeft, topLeft);
+                SegmentosIntersectam(a, b, topRight, bottomRight) ||
+                SegmentosIntersectam(a, b, bottomRight, bottomLeft) ||
+                SegmentosIntersectam(a, b, bottomLeft, topLeft);
         }
 
         private static bool SegmentosIntersectam(Point a, Point b, Point c, Point d)
@@ -180,15 +216,15 @@ namespace Araci.Applications.Editar.Selecionar
                 return true;
 
             return EhZero(o1) && EstaNoSegmento(a, c, b) ||
-                   EhZero(o2) && EstaNoSegmento(a, d, b) ||
-                   EhZero(o3) && EstaNoSegmento(c, a, d) ||
-                   EhZero(o4) && EstaNoSegmento(c, b, d);
+                EhZero(o2) && EstaNoSegmento(a, d, b) ||
+                EhZero(o3) && EstaNoSegmento(c, a, d) ||
+                EhZero(o4) && EstaNoSegmento(c, b, d);
         }
 
         private static double Orientacao(Point a, Point b, Point c)
         {
             return (b.X - a.X) * (c.Y - a.Y) -
-                   (b.Y - a.Y) * (c.X - a.X);
+                (b.Y - a.Y) * (c.X - a.X);
         }
 
         private static bool SinaisOpostos(double a, double b)
@@ -204,9 +240,9 @@ namespace Araci.Applications.Editar.Selecionar
         private static bool EstaNoSegmento(Point a, Point p, Point b)
         {
             return p.X >= Math.Min(a.X, b.X) - 0.000001 &&
-                   p.X <= Math.Max(a.X, b.X) + 0.000001 &&
-                   p.Y >= Math.Min(a.Y, b.Y) - 0.000001 &&
-                   p.Y <= Math.Max(a.Y, b.Y) + 0.000001;
+                p.X <= Math.Max(a.X, b.X) + 0.000001 &&
+                p.Y >= Math.Min(a.Y, b.Y) - 0.000001 &&
+                p.Y <= Math.Max(a.Y, b.Y) + 0.000001;
         }
     }
 }
