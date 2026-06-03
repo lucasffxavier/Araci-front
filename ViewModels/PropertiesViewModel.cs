@@ -398,6 +398,7 @@ namespace Araci.ViewModels
             IsColor = descriptor.IsColor;
             _varia = varia;
             _valor = varia ? "<varia>" : PropertiesViewModel.FormatarValor(ObterValorAtual(), BaseUnit, DisplayUnit);
+            AssinarAlteracoesDosElementos();
         }
 
         public string Nome { get; }
@@ -506,6 +507,24 @@ namespace Araci.ViewModels
             AtualizarEstadoValido();
         }
 
+        private void AtualizarValorDoModelo()
+        {
+            if (_elementos.Count == 0)
+                return;
+
+            var valores = _elementos.Select(e => PropertiesViewModel.ObterValor(e, _descriptor.PropertyName)).ToList();
+            object? primeiro = valores[0];
+            bool varia = valores.Skip(1).Any(v => !PropertiesViewModel.ValoresIguais(primeiro, v));
+            string valorAtualizado = varia ? "<varia>" : FormatarValorLocal(primeiro);
+
+            if (_varia == varia && string.Equals(_valor, valorAtualizado, StringComparison.Ordinal))
+                return;
+
+            _varia = varia;
+            _valor = valorAtualizado;
+            AtualizarEstadoValido();
+        }
+
         private string FormatarValorLocal(object? convertido)
         {
             if (IsColor && convertido is string cor && ColorPickerWindow.TryNormalizeHexColor(cor, out string corNormalizada))
@@ -545,6 +564,20 @@ namespace Araci.ViewModels
                 Valor = window.SelectedColorHex;
         }
 
+        private void AssinarAlteracoesDosElementos()
+        {
+            foreach (ElementoViewModel elemento in _elementos)
+                elemento.PropertyChanged += OnElementoPropertyChanged;
+        }
+
+        private void OnElementoPropertyChanged(object? sender, PropertyChangedEventArgs e)
+        {
+            if (!string.IsNullOrEmpty(e.PropertyName) && e.PropertyName != _descriptor.PropertyName)
+                return;
+
+            AtualizarValorDoModelo();
+        }
+
         private static Brush CriarColorBrush(string value)
         {
             try
@@ -561,6 +594,7 @@ namespace Araci.ViewModels
 
             return Brushes.Black;
         }
+
         private object? ObterValorAtual()
         {
             if (_elementos.Count == 0)
@@ -597,6 +631,7 @@ namespace Araci.ViewModels
                 remove { }
             }
         }
+
         public event PropertyChangedEventHandler? PropertyChanged;
 
         protected virtual void OnPropertyChanged([CallerMemberName] string? nome = null)
@@ -613,10 +648,3 @@ namespace Araci.ViewModels
         }
     }
 }
-
-
-
-
-
-
-
