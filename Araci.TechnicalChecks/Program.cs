@@ -45,6 +45,7 @@ namespace Araci.TechnicalChecks
                 ("Cabo duplicado gera erro topologico", CaboDuplicadoGeraErro),
                 ("Elementos existentes permanecem eletricos", ElementosExistentesPermanecemEletricos),
                 ("ElementoAnotativo nao participa do grafo eletrico", ElementoAnotativoNaoParticipaDoGrafoEletrico),
+                ("ElementoAnotativoRetangular preserva base anotativa", ElementoAnotativoRetangularPreservaBaseAnotativa),
                 ("ElectricGraph Build nao altera Document", ElectricGraphBuildNaoAlteraDocument),
                 ("ElectricGraph inclui eletricos e ignora anotativo", ElectricGraphIncluiEletricosEIgnoraAnotativo),
                 ("DTO permanece identico com anotativo no Document", DtoPermaneceIdenticoComAnotativoNoDocument),
@@ -355,10 +356,56 @@ namespace Araci.TechnicalChecks
 
         private static void ElementoAnotativoNaoParticipaDoGrafoEletrico()
         {
-            Elemento annotation = new FakeAnnotationElement();
+            ElementoAnotativo annotation = new FakeAnnotationElement();
+            var carga = new Carga();
 
             AssertEqual(ElementoDomainRole.Anotacao, annotation.DomainRole, "ElementoAnotativo.DomainRole");
             Assert(!annotation.ParticipaDoGrafoEletrico, "ElementoAnotativo nao deve participar do grafo eletrico.");
+            Assert(annotation.PossuiParametro(Elemento.PARAM_NOME), "ElementoAnotativo deve possuir parametro Nome.");
+            Assert(annotation.PossuiParametro(ElementoAnotativo.PARAM_COR_LINHA), "ElementoAnotativo deve possuir parametro CorLinha.");
+            Assert(annotation.PossuiParametro(ElementoAnotativo.PARAM_ESPESSURA_LINHA), "ElementoAnotativo deve possuir parametro EspessuraLinha.");
+            Assert(annotation.PossuiParametro(ElementoAnotativo.PARAM_VISIVEL), "ElementoAnotativo deve possuir parametro Visivel.");
+            AssertEqual("#FFFFFFFF", annotation.CorLinha, "ElementoAnotativo.CorLinha default");
+            AssertEqual(1.0, annotation.EspessuraLinha, "ElementoAnotativo.EspessuraLinha default");
+            AssertEqual(true, annotation.Visivel, "ElementoAnotativo.Visivel default");
+
+            annotation.CorLinha = "#FF112233";
+            annotation.EspessuraLinha = 2.5;
+            annotation.Visivel = false;
+
+            AssertEqual("#FF112233", annotation.Obter<string>(ElementoAnotativo.PARAM_COR_LINHA), "ElementoAnotativo.CorLinha alterada");
+            AssertEqual(2.5, annotation.Obter<double>(ElementoAnotativo.PARAM_ESPESSURA_LINHA), "ElementoAnotativo.EspessuraLinha alterada");
+            AssertEqual(false, annotation.Obter<bool>(ElementoAnotativo.PARAM_VISIVEL), "ElementoAnotativo.Visivel alterada");
+            Assert(!carga.PossuiParametro(ElementoAnotativo.PARAM_COR_LINHA), "Carga nao deve possuir parametro CorLinha.");
+            Assert(!carga.PossuiParametro(ElementoAnotativo.PARAM_ESPESSURA_LINHA), "Carga nao deve possuir parametro EspessuraLinha.");
+            Assert(!carga.PossuiParametro(ElementoAnotativo.PARAM_VISIVEL), "Carga nao deve possuir parametro Visivel.");
+        }
+
+        private static void ElementoAnotativoRetangularPreservaBaseAnotativa()
+        {
+            ElementoAnotativoRetangular annotation = new FakeRectangularAnnotationElement();
+            var carga = new Carga();
+
+            Assert(typeof(ElementoAnotativoRetangular).IsAbstract, "ElementoAnotativoRetangular deve ser abstrata.");
+            Assert(annotation is ElementoAnotativo, "ElementoAnotativoRetangular deve herdar de ElementoAnotativo.");
+            AssertEqual(ElementoDomainRole.Anotacao, annotation.DomainRole, "ElementoAnotativoRetangular.DomainRole");
+            Assert(!annotation.ParticipaDoGrafoEletrico, "ElementoAnotativoRetangular nao deve participar do grafo eletrico.");
+            Assert(annotation.PossuiParametro(Elemento.PARAM_NOME), "ElementoAnotativoRetangular deve possuir parametro Nome.");
+            Assert(annotation.PossuiParametro(ElementoAnotativo.PARAM_COR_LINHA), "ElementoAnotativoRetangular deve possuir parametro CorLinha.");
+            Assert(annotation.PossuiParametro(ElementoAnotativo.PARAM_ESPESSURA_LINHA), "ElementoAnotativoRetangular deve possuir parametro EspessuraLinha.");
+            Assert(annotation.PossuiParametro(ElementoAnotativo.PARAM_VISIVEL), "ElementoAnotativoRetangular deve possuir parametro Visivel.");
+            Assert(annotation.PossuiParametro(ElementoAnotativoRetangular.PARAM_LARGURA), "ElementoAnotativoRetangular deve possuir parametro Largura.");
+            Assert(annotation.PossuiParametro(ElementoAnotativoRetangular.PARAM_ALTURA), "ElementoAnotativoRetangular deve possuir parametro Altura.");
+            AssertEqual(100.0, annotation.Largura, "ElementoAnotativoRetangular.Largura default");
+            AssertEqual(50.0, annotation.Altura, "ElementoAnotativoRetangular.Altura default");
+
+            annotation.Largura = 220.0;
+            annotation.Altura = 90.0;
+
+            AssertEqual(220.0, annotation.Obter<double>(ElementoAnotativoRetangular.PARAM_LARGURA), "ElementoAnotativoRetangular.Largura alterada");
+            AssertEqual(90.0, annotation.Obter<double>(ElementoAnotativoRetangular.PARAM_ALTURA), "ElementoAnotativoRetangular.Altura alterada");
+            Assert(!carga.PossuiParametro(ElementoAnotativoRetangular.PARAM_LARGURA), "Carga nao deve possuir parametro Largura.");
+            Assert(!carga.PossuiParametro(ElementoAnotativoRetangular.PARAM_ALTURA), "Carga nao deve possuir parametro Altura.");
         }
 
         private static void ElectricGraphBuildNaoAlteraDocument()
@@ -4498,6 +4545,16 @@ namespace Araci.TechnicalChecks
             public override Elemento Clonar()
             {
                 var clone = new FakeAnnotationElement();
+                CopiarBasePara(clone);
+                return clone;
+            }
+        }
+
+        private sealed class FakeRectangularAnnotationElement : ElementoAnotativoRetangular
+        {
+            public override Elemento Clonar()
+            {
+                var clone = new FakeRectangularAnnotationElement();
                 CopiarBasePara(clone);
                 return clone;
             }
