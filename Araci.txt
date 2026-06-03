@@ -75,6 +75,8 @@ Araci Engine
 │   │       ├── SelectionBoxController.cs
 │   │       └── SelectionController.cs
 │   ├── Editor
+│   │   ├── Selecionar
+│   │   │   └── RetanguloResizeService.cs
 │   │   ├── InputRouter.cs
 │   │   └── ToolService.cs
 │   ├── Factories
@@ -415,6 +417,7 @@ Araci Engine
 │   ├── ParameterViewModel.cs
 │   ├── PropertiesViewModel.cs
 │   ├── RetanguloAnotativoViewModel.cs
+│   ├── RetanguloResizeHandleViewModel.cs
 │   ├── SelectionBoxViewModel.cs
 │   ├── SinViewModel.cs
 │   ├── TerminalSnapState.cs
@@ -455,1552 +458,306 @@ Araci Engine
 
 
 ====================================================================================================
-ARQUIVO: C:\Araci-Engine-Front\Araci Engine\Applications\Editar\Mover\MoverTool.cs
-====================================================================================================
-
-using System.Windows;
-using System.Windows.Input;
-using Araci.Applications.Editar.Base;
-using Araci.Applications.Editar.Selecionar;
-using Araci.Core.SceneQueries;
-using Araci.Services;
-using Araci.ViewModels;
-using Araci.Services.Editing;
-
-namespace Araci.Applications.Editar.Mover
-{
-    public class MoverTool : ITool
-    {
-        private readonly SelecionarTool _selecionarTool;
-
-        public MoverTool(
-            ISceneQueryService queries,
-            SelectionService selection,
-            SelectionBoxViewModel selectionBox,
-            CableVertexEditService cableVertexEdit,
-            LinhaEndpointEditService linhaEndpointEdit,
-            BarraResizeService barraResize,
-            MoveService move,
-            MoveHudService moveHud,
-            AlignmentGuideService alignmentGuides,
-            MoveConstraintService moveConstraints,
-            RotationService rotation)
-        {
-            _selecionarTool = new SelecionarTool(
-                queries,
-                selection,
-                selectionBox,
-                cableVertexEdit,
-                linhaEndpointEdit,
-                barraResize,
-                move,
-                moveHud,
-                alignmentGuides,
-                moveConstraints,
-                rotation,
-                modoSoMover: true,
-                mostrarHud: true);
-        }
-
-        public string Nome => "Mover";
-        public bool MantemBotaoAtivado => true;
-        public bool IsBusy => _selecionarTool.IsBusy;
-
-        public void Ativar()
-        {
-            _selecionarTool.Ativar();
-        }
-
-        public void Desativar()
-        {
-            _selecionarTool.Desativar();
-        }
-
-        public void Cancelar()
-        {
-            _selecionarTool.Cancelar();
-        }
-
-        public void OnMouseDown(ElementoViewModel? vm, Point position, ToolInputState inputState)
-        {
-            _selecionarTool.OnMouseDown(vm, position, inputState);
-        }
-
-        public void OnMouseMove(Point position, ToolInputState inputState)
-        {
-            _selecionarTool.OnMouseMove(position, inputState);
-        }
-
-        public void OnMouseUp(Point position, ToolInputState inputState)
-        {
-            _selecionarTool.OnMouseUp(position, inputState);
-        }
-
-        public void OnKeyDown(Key key)
-        {
-            _selecionarTool.OnKeyDown(key);
-        }
-    }
-}
-
-
-====================================================================================================
-ARQUIVO: C:\Araci-Engine-Front\Araci Engine\Applications\Editar\Selecionar\SelecionarTool.cs
-====================================================================================================
-
-using System;
-using System.Windows;
-using System.Windows.Input;
-using Araci.Applications.Editar.Base;
-using Araci.Core.SceneQueries;
-using Araci.Services;
-using Araci.ViewModels;
-using Araci.Services.Editing;
-
-namespace Araci.Applications.Editar.Selecionar
-{
-    public class SelecionarTool : ITool
-    {
-        private readonly ISceneQueryService _queries;
-        private readonly SelectionController _selection;
-        private readonly SelectionBoxController _selectionBox;
-        private readonly DragMoveController _dragMove;
-        private readonly CableVertexEditService _cableVertexEdit;
-        private readonly LinhaEndpointEditService _linhaEndpointEdit;
-        private readonly BarraResizeService _barraResize;
-        private readonly AlignmentGuideService _alignmentGuides;
-        private readonly RotationService _rotation;
-        private readonly bool _modoSoMover;
-
-        public SelecionarTool(
-            ISceneQueryService queries,
-            SelectionService selection,
-            SelectionBoxViewModel selectionBox,
-            CableVertexEditService cableVertexEdit,
-            LinhaEndpointEditService linhaEndpointEdit,
-            BarraResizeService barraResize,
-            MoveService move,
-            MoveHudService moveHud,
-            AlignmentGuideService alignmentGuides,
-            MoveConstraintService moveConstraints,
-            RotationService rotation,
-            bool modoSoMover = false,
-            bool mostrarHud = false)
-        {
-            _queries = queries ?? throw new ArgumentNullException(nameof(queries));
-            _selection = new SelectionController(selection ?? throw new ArgumentNullException(nameof(selection)));
-            _selectionBox = new SelectionBoxController(
-                selectionBox ?? throw new ArgumentNullException(nameof(selectionBox)),
-                _queries,
-                selection);
-            _cableVertexEdit = cableVertexEdit ?? throw new ArgumentNullException(nameof(cableVertexEdit));
-            _linhaEndpointEdit = linhaEndpointEdit ?? throw new ArgumentNullException(nameof(linhaEndpointEdit));
-            _barraResize = barraResize ?? throw new ArgumentNullException(nameof(barraResize));
-            _alignmentGuides = alignmentGuides ?? throw new ArgumentNullException(nameof(alignmentGuides));
-            _rotation = rotation ?? throw new ArgumentNullException(nameof(rotation));
-            _dragMove = new DragMoveController(
-                selection,
-                move ?? throw new ArgumentNullException(nameof(move)),
-                moveHud ?? throw new ArgumentNullException(nameof(moveHud)),
-                _alignmentGuides,
-                moveConstraints ?? throw new ArgumentNullException(nameof(moveConstraints)),
-                mostrarHud);
-            _modoSoMover = modoSoMover;
-        }
-
-        public string Nome => "Selecionar";
-        public bool MantemBotaoAtivado => true;
-
-        public bool IsBusy =>
-            _barraResize.IsResizing ||
-            _linhaEndpointEdit.IsEditing ||
-            _dragMove.IsActive ||
-            _selectionBox.IsActive ||
-            _cableVertexEdit.IsEditing;
-
-        public void Ativar()
-        {
-            _linhaEndpointEdit.Refresh();
-
-            if (!_modoSoMover)
-                _cableVertexEdit.Refresh();
-        }
-
-        public void Desativar()
-        {
-            Cancelar();
-            _linhaEndpointEdit.Clear();
-            _cableVertexEdit.Clear();
-        }
-
-        public void Cancelar()
-        {
-            _barraResize.Cancel();
-            _linhaEndpointEdit.Cancel();
-            _dragMove.Cancel();
-            _selectionBox.Cancel();
-            _cableVertexEdit.Cancel();
-            _linhaEndpointEdit.Refresh();
-            _cableVertexEdit.Refresh();
-            _alignmentGuides.Limpar();
-        }
-
-        public void OnMouseDown(ElementoViewModel? vm, Point position, ToolInputState inputState)
-        {
-            bool ctrl = inputState.IsControlPressed;
-            bool shift = inputState.IsShiftPressed;
-
-            if (!_modoSoMover && _barraResize.TryBegin(position))
-                return;
-
-            if (_linhaEndpointEdit.TryBegin(position))
-            {
-                _cableVertexEdit.Clear();
-                return;
-            }
-
-            if (!_modoSoMover && inputState.IsAltPressed && _cableVertexEdit.TryRemoveHandle(position))
-                return;
-
-            if (!_modoSoMover && ctrl && _cableVertexEdit.TryInsertVertex(position))
-                return;
-
-            if (!_modoSoMover && _cableVertexEdit.TryBegin(position))
-                return;
-
-            var hit = vm ?? _queries.HitTest(position)?.Elemento;
-
-            if (hit != null)
-            {
-                if (!_modoSoMover)
-                {
-                    bool podeMover = _selection.Select(hit, ctrl, shift);
-                    _cableVertexEdit.Clear();
-
-                    if (!podeMover)
-                    {
-                        _linhaEndpointEdit.Refresh();
-                        return;
-                    }
-                }
-
-                _linhaEndpointEdit.Clear();
-                _dragMove.Begin(position);
-                return;
-            }
-
-            if (_modoSoMover)
-                return;
-
-            _selectionBox.Begin(position, ctrl);
-        }
-
-        public void OnMouseMove(Point position, ToolInputState inputState)
-        {
-            if (_barraResize.IsResizing)
-            {
-                _barraResize.Update(position);
-                return;
-            }
-
-            if (_linhaEndpointEdit.IsEditing)
-            {
-                _linhaEndpointEdit.Update(position, inputState);
-                return;
-            }
-
-            if (_cableVertexEdit.IsEditing)
-            {
-                _cableVertexEdit.Update(position, inputState);
-                return;
-            }
-
-            if (_dragMove.IsActive)
-            {
-                _dragMove.Update(position, inputState);
-                return;
-            }
-
-            if (_selectionBox.IsActive)
-                _selectionBox.Update(position);
-        }
-
-        public void OnMouseUp(Point position, ToolInputState inputState)
-        {
-            if (_barraResize.IsResizing)
-            {
-                _barraResize.End();
-                _linhaEndpointEdit.Refresh();
-                _cableVertexEdit.Refresh();
-                return;
-            }
-
-            if (_linhaEndpointEdit.IsEditing)
-            {
-                _linhaEndpointEdit.End();
-                _cableVertexEdit.Refresh();
-                return;
-            }
-
-            if (_cableVertexEdit.IsEditing)
-            {
-                _cableVertexEdit.End();
-                return;
-            }
-
-            if (_dragMove.IsActive)
-            {
-                _dragMove.End();
-                _linhaEndpointEdit.Refresh();
-                _cableVertexEdit.Refresh();
-            }
-
-            if (_selectionBox.IsActive)
-            {
-                _selectionBox.End();
-                _linhaEndpointEdit.Refresh();
-                _cableVertexEdit.Refresh();
-            }
-        }
-
-        public void OnKeyDown(Key key)
-        {
-            if (!_modoSoMover && key == Key.Space)
-            {
-                _rotation.RotateSelectionClockwise();
-                _linhaEndpointEdit.Refresh();
-                return;
-            }
-
-            if (!_modoSoMover && key == Key.Delete)
-                _cableVertexEdit.TryRemoveActive();
-        }
-    }
-}
-
-
-====================================================================================================
-ARQUIVO: C:\Araci-Engine-Front\Araci Engine\Core\SceneNodes\RetanguloAnotativoNode.cs
+ARQUIVO: C:\Araci-Engine-Front\Araci Engine\Applications\Editor\Selecionar\RetanguloResizeService.cs
 ====================================================================================================
 
 ﻿using System;
-using System.Windows;
-using Araci.Models;
-
-namespace Araci.Core.SceneNodes
-{
-    public class RetanguloAnotativoNode : ElementoNode
-    {
-        private readonly RetanguloAnotativo _retangulo;
-
-        public RetanguloAnotativoNode(RetanguloAnotativo retangulo)
-            : base(retangulo)
-        {
-            _retangulo = retangulo ?? throw new ArgumentNullException(nameof(retangulo));
-            AtualizarGeometria();
-        }
-
-        public override double X
-        {
-            get => _retangulo.PosicaoX;
-            set
-            {
-                _retangulo.PosicaoX = value;
-                AtualizarGeometria();
-            }
-        }
-
-        public override double Y
-        {
-            get => _retangulo.PosicaoY;
-            set
-            {
-                _retangulo.PosicaoY = value;
-                AtualizarGeometria();
-            }
-        }
-
-        public override void AtualizarGeometria()
-        {
-            double largura = Math.Max(1, Math.Abs(_retangulo.Largura));
-            double altura = Math.Max(1, Math.Abs(_retangulo.Altura));
-            double x = _retangulo.Largura >= 0 ? _retangulo.PosicaoX : _retangulo.PosicaoX + _retangulo.Largura;
-            double y = _retangulo.Altura >= 0 ? _retangulo.PosicaoY : _retangulo.PosicaoY + _retangulo.Altura;
-
-            Bounds = new Rect(x, y, largura, altura);
-        }
-    }
-}
-
-
-====================================================================================================
-ARQUIVO: C:\Araci-Engine-Front\Araci Engine\Models\RetanguloAnotativo.cs
-====================================================================================================
-
-﻿using Araci.Models.Tipos;
-
-namespace Araci.Models
-{
-    public class RetanguloAnotativo : ElementoAnotativoRetangular
-    {
-        public TipoLinhaAnotativa? TipoLinha => Tipo as TipoLinhaAnotativa;
-
-        public override Elemento Clonar()
-        {
-            var clone = new RetanguloAnotativo();
-
-            CopiarBasePara(clone);
-
-            return clone;
-        }
-    }
-}
-
-
-====================================================================================================
-ARQUIVO: C:\Araci-Engine-Front\Araci Engine\Service\Composition\EditingComposition.cs
-====================================================================================================
-
-using System;
-using System.Collections.Generic;
-using Araci.Applications.Abstractions;
-using Araci.Applications.Editor;
-using Araci.Applications.Editar.Selecionar;
-using Araci.Applications.UseCases.Editar;
-using Araci.Core.Commands;
-using Araci.Core.Documents;
-using Araci.Core.Events;
-using Araci.Core.SceneQueries;
-using Araci.Models;
-using Araci.ViewModels;
-using Araci.Services.Geometry;
-using Araci.Services.Topology;
-using Araci.Services.Editing;
-using Araci.Services.Viewport;
-using Araci.Services.Settings;
-using Araci.Services.Interaction;
-
-namespace Araci.Services.Composition
-{
-    internal static class EditingComposition
-    {
-        public static VisualUpdateService CreateVisualUpdates(
-            Func<ViewportService?> viewportProvider,
-            TerminalLayoutService terminalLayout,
-            ConnectivityService connectivity,
-            ISceneQueryService sceneQueries,
-            TerminalSnapState terminalSnap,
-            Action refreshCableVertexEdit)
-        {
-            return new VisualUpdateService(
-                viewportProvider,
-                terminalLayout,
-                connectivity,
-                sceneQueries,
-                terminalSnap,
-                refreshCableVertexEdit);
-        }
-
-        public static SelectionService CreateSelection(
-            EditorState editor,
-            IEventBus events,
-            EditarPropriedadesUseCase editarPropriedades,
-            EditorSettings settings)
-        {
-            return new SelectionService(editor, events, editarPropriedades, settings);
-        }
-
-        public static CableVertexEditService CreateCableVertexEdit(
-            SelectionService selection,
-            ISceneQueryService sceneQueries,
-            VisualUpdateService visualUpdates,
-            EditarVerticesCaboUseCase editarVerticesCabo)
-        {
-            return new CableVertexEditService(selection, sceneQueries, visualUpdates, editarVerticesCabo);
-        }
-
-        public static LinhaEndpointEditService CreateLinhaEndpointEdit(
-            SelectionService selection,
-            ISceneQueryService sceneQueries,
-            MoverElementoUseCase moverElemento,
-            VisualUpdateService visualUpdates)
-        {
-            return new LinhaEndpointEditService(selection, sceneQueries, moverElemento, visualUpdates.AtualizarElementoMovido);
-        }
-
-        public static SafeDeleteService CreateSafeDelete(
-            SelectionService selection,
-            CableVertexEditService cableVertexEdit,
-            ExcluirElementoUseCase excluirElemento,
-            HoverService hover,
-            TerminalSnapState terminalSnap,
-            ISceneQueryService sceneQueries)
-        {
-            return new SafeDeleteService(selection, cableVertexEdit, excluirElemento, hover, terminalSnap, sceneQueries);
-        }
-
-        public static ClipboardService CreateClipboard(
-            CopiarElementosUseCase copiarElementos,
-            ColarElementosUseCase colarElementos,
-            SelectionService selection,
-            Func<ViewportService?> viewportProvider,
-            ISceneQueryService sceneQueries,
-            CableVertexEditService cableVertexEdit)
-        {
-            return new ClipboardService(
-                copiarElementos,
-                colarElementos,
-                selection,
-                viewportProvider,
-                sceneQueries,
-                cableVertexEdit);
-        }
-
-        public static MoveServices CreateMoveServices(
-            Func<ViewportService?> viewportProvider,
-            Func<IEnumerable<ElementoViewModel>> sceneElementsProvider,
-            EditorSettings settings,
-            ConnectivityService connectivity,
-            TerminalLayoutService terminalLayout,
-            ISceneQueryService sceneQueries,
-            VisualUpdateService visualUpdates,
-            SelectionService selection,
-            ElementGeometryUpdateService geometryUpdates,
-            CommandManager commands)
-        {
-            var moveHud = new MoveHudService(viewportProvider);
-            var alignmentGuides = new AlignmentGuideService(sceneElementsProvider);
-            var moveConstraints = new MoveConstraintService(settings);
-            var moverElemento = new MoverElementoUseCase(commands, visualUpdates.AtualizarElementoMovido);
-            var rotacionarElemento = new RotacionarElementoUseCase(commands);
-            var redimensionarBarra = new RedimensionarBarraUseCase(commands, geometryUpdates);
-            var move = new MoveService(connectivity, terminalLayout, viewportProvider, sceneQueries, moverElemento);
-            var barraResize = new BarraResizeService(selection, geometryUpdates, redimensionarBarra);
-            var rotation = new RotationService(selection, connectivity, viewportProvider, visualUpdates, rotacionarElemento);
-
-            return new MoveServices(
-                moveHud,
-                alignmentGuides,
-                moveConstraints,
-                moverElemento,
-                rotacionarElemento,
-                redimensionarBarra,
-                move,
-                barraResize,
-                rotation);
-        }
-
-        public static InputRouter CreateInput(
-            ToolService tools,
-            CommandManager commands,
-            ISafeDeleteService safeDelete,
-            ISelectionService selection,
-            IElementCatalog elements,
-            IHoverService hover,
-            Action copySelected,
-            Action paste)
-        {
-            return new InputRouter(tools, commands, safeDelete, selection, elements, hover, copySelected, paste);
-        }
-    }
-
-    internal sealed record MoveServices(
-        MoveHudService MoveHud,
-        AlignmentGuideService AlignmentGuides,
-        MoveConstraintService MoveConstraints,
-        MoverElementoUseCase MoverElemento,
-        RotacionarElementoUseCase RotacionarElemento,
-        RedimensionarBarraUseCase RedimensionarBarra,
-        MoveService Move,
-        BarraResizeService BarraResize,
-        RotationService Rotation);
-}
-
-
-
-====================================================================================================
-ARQUIVO: C:\Araci-Engine-Front\Araci Engine\Service\Editing\VisualUpdateService.cs
-====================================================================================================
-
-using System;
-using System.Collections.Generic;
-using Araci.Core.SceneQueries;
-using Araci.Models;
-using Araci.ViewModels;
-using Araci.Services.Geometry;
-using Araci.Services.Topology;
-using Araci.Services;
-using Araci.Services.Viewport;
-
-namespace Araci.Services.Editing
-{
-    public class VisualUpdateService
-    {
-        private readonly Func<ViewportService?> _viewportProvider;
-        private readonly TerminalLayoutService _terminalLayout;
-        private readonly ConnectivityService _connectivity;
-        private readonly ISceneQueryService _sceneQueries;
-        private readonly TerminalSnapState _terminalSnap;
-        private readonly Action _refreshEditingHandles;
-
-        public VisualUpdateService(
-            Func<ViewportService?> viewportProvider,
-            TerminalLayoutService terminalLayout,
-            ConnectivityService connectivity,
-            ISceneQueryService sceneQueries,
-            TerminalSnapState terminalSnap,
-            Action refreshEditingHandles)
-        {
-            _viewportProvider = viewportProvider ?? throw new ArgumentNullException(nameof(viewportProvider));
-            _terminalLayout = terminalLayout ?? throw new ArgumentNullException(nameof(terminalLayout));
-            _connectivity = connectivity ?? throw new ArgumentNullException(nameof(connectivity));
-            _sceneQueries = sceneQueries ?? throw new ArgumentNullException(nameof(sceneQueries));
-            _terminalSnap = terminalSnap ?? throw new ArgumentNullException(nameof(terminalSnap));
-            _refreshEditingHandles = refreshEditingHandles ?? throw new ArgumentNullException(nameof(refreshEditingHandles));
-        }
-
-        public void AtualizarElementoMovido(Elemento elemento)
-        {
-            _viewportProvider()?.AtualizarViewModel(elemento);
-            _terminalLayout.AtualizarTerminais(elemento);
-            _sceneQueries.Invalidate();
-            _refreshEditingHandles();
-        }
-
-        public void AtualizarElementoRotacionado(Elemento elemento)
-        {
-            if (elemento is Cabo cabo)
-            {
-                AtualizarCabo(cabo);
-                AtualizarEstadoRotacao();
-                return;
-            }
-
-            _terminalLayout.AtualizarTerminais(elemento);
-
-            IReadOnlyList<Cabo> cabosReancorados =
-                _connectivity.ReancorarCabosConectados(elemento);
-
-            _viewportProvider()?.AtualizarViewModel(elemento);
-
-            foreach (Cabo caboReancorado in cabosReancorados)
-                AtualizarCabo(caboReancorado);
-
-            AtualizarEstadoRotacao();
-        }
-
-        public void AtualizarCaboEditado(Elemento elemento)
-        {
-            _viewportProvider()?.AtualizarViewModel(elemento);
-            _sceneQueries.Invalidate();
-        }
-
-        public void AtualizarGeometriaElementoECabos(Elemento elemento, IEnumerable<Cabo> cabos)
-        {
-            ViewportService? viewport = _viewportProvider();
-            viewport?.AtualizarViewModel(elemento);
-
-            foreach (Cabo cabo in cabos)
-                viewport?.AtualizarViewModel(cabo);
-
-            _sceneQueries.Invalidate();
-            _terminalSnap.Limpar();
-            _refreshEditingHandles();
-        }
-
-        private void AtualizarCabo(Cabo cabo)
-        {
-            _terminalLayout.AtualizarTerminais(cabo);
-            _viewportProvider()?.AtualizarViewModel(cabo);
-        }
-
-        private void AtualizarEstadoRotacao()
-        {
-            _sceneQueries.Invalidate();
-            _terminalSnap.Limpar();
-            _refreshEditingHandles();
-        }
-    }
-}
-
-
-
-====================================================================================================
-ARQUIVO: C:\Araci-Engine-Front\Araci Engine\Service\EditorContext.cs
-====================================================================================================
-
-using System.Collections.Generic;
-using System.Windows;
-using Araci.Applications.Abstractions;
-using Araci.Applications.Editor;
-using Araci.Applications.Factories;
-using Araci.Core.Commands;
-using Araci.Core.Documents;
-using Araci.Core.Events;
-using Araci.Core.SceneQueries;
-using Araci.Core.Transactions;
-using Araci.Applications.Desenhar.InserirLinha;
-using Araci.Applications.Desenhar.InserirRetangulo;
-using Araci.Applications.Diagrama.InserirCabo;
-using Araci.Applications.Diagrama.InserirElemento;
-using Araci.Applications.Editar.Alinhar;
-using Araci.Applications.Editar.Deletar;
-using Araci.Applications.Editar.Mover;
-using Araci.Applications.Editar.Selecionar;
-using Araci.Applications.Projects;
-using Araci.Applications.Simulation;
-using Araci.Applications.UseCases.Analise;
-using Araci.Applications.UseCases.Editar;
-using Araci.Applications.UseCases.Diagrama;
-using Araci.Applications.UseCases.Projeto;
-using Araci.Models;
-using Araci.Services.Composition;
-using Araci.ViewModels;
-using CoreScene = Araci.Core.Scenes.Scene;
-using Araci.Services.Geometry;
-using Araci.Services.Topology;
-using Araci.Services.Editing;
-using Araci.Services.Viewport;
-using Araci.Services.Simulation;
-using Araci.Services.UI;
-using Araci.Services.Settings;
-using Araci.Services.Catalog;
-using Araci.Services.Naming;
-using Araci.Services.Interaction;
-
-namespace Araci.Services
-{
-    public class EditorContext : IEditorSession
-    {
-        public EditorContext()
-            : this(new EventBus())
-        {
-        }
-
-        public EditorContext(IEventBus eventBus)
-        {
-            Events = eventBus;
-
-            var core = EditorCoreComposition.Create(Document, Settings, Types);
-            Scene = core.Scene;
-            SceneQueries = core.SceneQueries;
-            Hover = core.Hover;
-            Snap = core.Snap;
-            TypePropertiesDialogs = core.TypePropertiesDialogs;
-            Dialogs = core.Dialogs;
-            Elements = core.Elements;
-            Connectivity = core.Connectivity;
-            ElectricGraph = core.ElectricGraph;
-            OperationalState = core.OperationalState;
-            Topology = core.Topology;
-            Geometry = core.Geometry;
-            TerminalLayout = core.TerminalLayout;
-
-            var simulation = SimulationComposition.Create(Document, NotifySimulationResultViewModels, Dialogs);
-            SimulationResults = simulation.Results;
-            Simulation = simulation.Pipeline;
-            SimulationExport = simulation.Export;
-            SimulationMessages = simulation.Messages;
-            ExecutarSimulacao = simulation.ExecutarSimulacao;
-
-            VisualUpdates = EditingComposition.CreateVisualUpdates(() => Viewport, TerminalLayout, Connectivity, SceneQueries, TerminalSnap, RefreshEditingHandles);
-            Names = new NameService(Document, Elements);
-            GeometryUpdates = new ElementGeometryUpdateService(TerminalLayout, Connectivity, VisualUpdates);
-            var elementoModelFactory = new ElementoModelFactory(Elements);
-            var elementoViewModelFactory = new ElementoViewModelFactory(Elements, elementoModelFactory, Names, TypePropertiesDialogs, TerminalLayout, GeometryUpdates);
-            ElementoFactory = new ElementoFactory(elementoModelFactory, elementoViewModelFactory);
-            InserirElemento = new InserirElementoUseCase(ElementoFactory, TerminalLayout, Commands, Document, Names);
-            InserirCabo = new InserirCaboUseCase(ElementoFactory, Commands, Document, Names, cabo => Viewport?.ObterViewModel(cabo) as CaboViewModel);
-            CopiarElementos = new CopiarElementosUseCase();
-            ColarElementos = new ColarElementosUseCase(CopiarElementos, Document, Names, Commands, ObterDestinoColagem);
-            ExcluirElemento = new ExcluirElementoUseCase(Document, Connectivity, Commands);
-            EditarPropriedades = new EditarPropriedadesUseCase(Commands);
-            Selection = EditingComposition.CreateSelection(Editor, Events, EditarPropriedades, Settings);
-            SelecionarElementos = new SelecionarElementosUseCase(Selection);
-            AtualizarPropriedadesSelecionadas = new AtualizarPropriedadesSelecionadasUseCase(Selection);
-            EditarVerticesCabo = new EditarVerticesCaboUseCase(Commands);
-            CableVertexEdit = EditingComposition.CreateCableVertexEdit(Selection, SceneQueries, VisualUpdates, EditarVerticesCabo);
-            Selection.SelectionChanged += CableVertexEdit.Refresh;
-            SafeDelete = EditingComposition.CreateSafeDelete(Selection, CableVertexEdit, ExcluirElemento, Hover, TerminalSnap, SceneQueries);
-            Clipboard = EditingComposition.CreateClipboard(CopiarElementos, ColarElementos, Selection, () => Viewport, SceneQueries, CableVertexEdit);
-            Projects = PersistenceComposition.CreateProjects(Document, Commands, Elements, elementoModelFactory, TerminalLayout, Geometry, Dialogs, Settings, LimparEstadoTransitorioProjeto);
-            NovoProjeto = new NovoProjetoUseCase(Projects);
-            AbrirProjeto = new AbrirProjetoUseCase(Projects);
-            SalvarProjeto = new SalvarProjetoUseCase(Projects);
-
-            var moveServices = EditingComposition.CreateMoveServices(() => Viewport, () => Scene.Elementos, Settings, Connectivity, TerminalLayout, SceneQueries, VisualUpdates, Selection, GeometryUpdates, Commands);
-            MoveHud = moveServices.MoveHud;
-            AlignmentGuides = moveServices.AlignmentGuides;
-            MoveConstraints = moveServices.MoveConstraints;
-            MoverElemento = moveServices.MoverElemento;
-            RotacionarElemento = moveServices.RotacionarElemento;
-            RedimensionarBarra = moveServices.RedimensionarBarra;
-            Move = moveServices.Move;
-            BarraResize = moveServices.BarraResize;
-            Rotation = moveServices.Rotation;
-            LinhaEndpointEdit = EditingComposition.CreateLinhaEndpointEdit(Selection, SceneQueries, MoverElemento, VisualUpdates);
-            Selection.SelectionChanged += LinhaEndpointEdit.Refresh;
-
-            Tools = new ToolService(
-                Elements,
-                CriarSelecionarTool,
-                CriarMoverTool,
-                CriarAlinharTool,
-                () => new DeletarTool(SafeDelete),
-                CriarInserirCaboTool,
-                CriarInserirElementoGenericoTool,
-                CriarInserirLinhaAnotativaTool,
-                CriarInserirRetanguloAnotativoTool);
-
-            Input = EditingComposition.CreateInput(Tools, Commands, SafeDelete, Selection, Elements, Hover, Clipboard.CopiarSelecionados, Clipboard.Colar);
-            AlterarUnidadesProjeto = new AlterarUnidadesProjetoUseCase(Settings, RefreshProperties);
-            Navigation = ViewportComposition.CreateNavigation(() => Viewport);
-        }
-
-        public IEventBus Events { get; }
-        public AraciDocument Document { get; } = new AraciDocument();
-        public CoreScene Scene { get; }
-        public ISceneQueryService SceneQueries { get; }
-        public HoverService Hover { get; }
-        public ToolService Tools { get; }
-        public InputRouter Input { get; }
-        public ViewportNavigationService Navigation { get; }
-        public ViewportService? Viewport { get; private set; }
-
-        public ViewportViewModel CriarViewportViewModel()
-        {
-            return ViewportComposition.CreateViewModel(Document, Scene, SelectionBox, TerminalSnap, CableVertexEdit, LinhaEndpointEdit, MoveHud, AlignmentGuides, ElementoFactory, Selection, Hover, SceneQueries);
-        }
-
-        public void InicializarViewport(ViewportViewModel viewportViewModel)
-        {
-            Viewport = new ViewportService(viewportViewModel);
-        }
-
-        public void RefreshProperties()
-        {
-            AtualizarPropriedadesSelecionadas.Executar();
-        }
-
-        public EditorState Editor { get; } = new EditorState();
-        public EditorSettings Settings { get; } = new EditorSettings();
-        public MoveHudService MoveHud { get; }
-        public AlignmentGuideService AlignmentGuides { get; }
-        public MoveConstraintService MoveConstraints { get; }
-        public SelectionBoxViewModel SelectionBox { get; } = new SelectionBoxViewModel();
-        public TerminalSnapState TerminalSnap { get; } = new TerminalSnapState();
-        public CableVertexEditService CableVertexEdit { get; }
-        public LinhaEndpointEditService LinhaEndpointEdit { get; }
-        public CommandManager Commands { get; } = new CommandManager();
-        ICommandHistory IEditorSession.Commands => Commands;
-        public SafeDeleteService SafeDelete { get; }
-        public ClipboardService Clipboard { get; }
-        public ProjectPersistenceService Projects { get; }
-        public NovoProjetoUseCase NovoProjeto { get; }
-        public AbrirProjetoUseCase AbrirProjeto { get; }
-        public SalvarProjetoUseCase SalvarProjeto { get; }
-        public VisualUpdateService VisualUpdates { get; }
-        public SelectionService Selection { get; }
-        public SelecionarElementosUseCase SelecionarElementos { get; }
-        public AtualizarPropriedadesSelecionadasUseCase AtualizarPropriedadesSelecionadas { get; }
-        public MoveService Move { get; }
-        public BarraResizeService BarraResize { get; }
-        public RotationService Rotation { get; }
-        public SnapService Snap { get; }
-        public NameService Names { get; }
-        public ConnectivityService Connectivity { get; }
-        public ElectricGraphBuilder ElectricGraph { get; }
-        public OperationalGraphStateBuilder OperationalState { get; }
-        public TopologyValidator Topology { get; }
-        public SimulationResultApplier SimulationResults { get; }
-        public SimulationPipeline Simulation { get; }
-        public SimulationExportService SimulationExport { get; }
-        public SimulationMessageBuilder SimulationMessages { get; }
-        public ExecutarSimulacaoUseCase ExecutarSimulacao { get; }
-        public TypePropertiesDialogService TypePropertiesDialogs { get; }
-        public DialogService Dialogs { get; }
-        public ElementGeometryService Geometry { get; }
-        public TerminalLayoutService TerminalLayout { get; }
-        public ElementGeometryUpdateService GeometryUpdates { get; }
-        public ElementRegistryService Elements { get; }
-        public TypeLibraryService Types { get; } = new TypeLibraryService();
-        public ElementoFactory ElementoFactory { get; }
-        public InserirElementoUseCase InserirElemento { get; }
-        public InserirCaboUseCase InserirCabo { get; }
-        public CopiarElementosUseCase CopiarElementos { get; }
-        public ColarElementosUseCase ColarElementos { get; }
-        public ExcluirElementoUseCase ExcluirElemento { get; }
-        public EditarPropriedadesUseCase EditarPropriedades { get; }
-        public MoverElementoUseCase MoverElemento { get; }
-        public RotacionarElementoUseCase RotacionarElemento { get; }
-        public RedimensionarBarraUseCase RedimensionarBarra { get; }
-        public EditarVerticesCaboUseCase EditarVerticesCabo { get; }
-        public AlterarUnidadesProjetoUseCase AlterarUnidadesProjeto { get; }
-
-        public TransactionScope BeginTransaction()
-        {
-            return Commands.BeginTransaction();
-        }
-
-        private void NotifySimulationResultViewModels()
-        {
-            if (Viewport == null)
-                return;
-
-            foreach (ElementoViewModel vm in Viewport.Elementos)
-            {
-                if (vm.Modelo is Cabo or Carga)
-                    vm.NotificarPropriedades("CorrenteLinha", "CorrenteFaseA", "CorrenteFaseB", "CorrenteFaseC");
-            }
-        }
-
-        private SelecionarTool CriarSelecionarTool()
-        {
-            return new SelecionarTool(SceneQueries, Selection, SelectionBox, CableVertexEdit, LinhaEndpointEdit, BarraResize, Move, MoveHud, AlignmentGuides, MoveConstraints, Rotation);
-        }
-
-        private MoverTool CriarMoverTool()
-        {
-            return new MoverTool(SceneQueries, Selection, SelectionBox, CableVertexEdit, LinhaEndpointEdit, BarraResize, Move, MoveHud, AlignmentGuides, MoveConstraints, Rotation);
-        }
-
-        private AlinharTool CriarAlinharTool()
-        {
-            return new AlinharTool(Hover, AlignmentGuides, Commands, SceneQueries);
-        }
-
-        private InserirCaboTool CriarInserirCaboTool()
-        {
-            return new InserirCaboTool(Commands, ElementoFactory, InserirCabo, Snap, Connectivity, AlignmentGuides, Scene, SceneQueries, TerminalSnap, () => Tools.VoltarParaSelecao());
-        }
-
-        private InserirElementoGenericoTool CriarInserirElementoGenericoTool(ElementDefinition definition)
-        {
-            return new InserirElementoGenericoTool(definition, ElementoFactory, InserirElemento, Snap, Geometry, TerminalLayout, AlignmentGuides, Scene, SceneQueries, () => Tools.VoltarParaSelecao());
-        }
-
-        private InserirLinhaAnotativaTool CriarInserirLinhaAnotativaTool()
-        {
-            return new InserirLinhaAnotativaTool(Commands, Document, Names, ElementoFactory, Scene, SceneQueries, LinhaEndpointEdit, () => Tools.VoltarParaSelecao());
-        }
-
-        private InserirRetanguloAnotativoTool CriarInserirRetanguloAnotativoTool()
-        {
-            return new InserirRetanguloAnotativoTool(Commands, Document, Names, ElementoFactory, Scene, SceneQueries, () => Tools.VoltarParaSelecao());
-        }
-
-        private Point ObterDestinoColagem(IReadOnlyList<Elemento> copiados)
-        {
-            if (Input.PossuiUltimaPosicaoMouseMundo)
-                return Input.UltimaPosicaoMouseMundo;
-
-            if (Viewport != null)
-                return Viewport.ScreenToWorld(Viewport.CentroTela);
-
-            Point centro = ColarElementosUseCase.CalcularCentro(copiados);
-            return new Point(centro.X + ColarElementosUseCase.OffsetPadrao, centro.Y + ColarElementosUseCase.OffsetPadrao);
-        }
-
-        private void RefreshEditingHandles()
-        {
-            CableVertexEdit?.Refresh();
-            LinhaEndpointEdit?.Refresh();
-        }
-
-        private void LimparEstadoTransitorioProjeto()
-        {
-            Selection.Limpar();
-            Hover.Clear();
-            CableVertexEdit.Clear();
-            LinhaEndpointEdit.Clear();
-            TerminalSnap.Limpar();
-            SelectionBox.Visivel = false;
-            MoveHud.Visivel = false;
-            MoveHud.Reset();
-            SceneQueries.Invalidate();
-            Tools.VoltarParaSelecao();
-        }
-    }
-}
-
-
-====================================================================================================
-ARQUIVO: C:\Araci-Engine-Front\Araci Engine\ViewModels\ElementoViewModel.cs
-====================================================================================================
-
-using System;
-using System.Collections;
 using System.Collections.ObjectModel;
 using System.Linq;
 using System.Windows;
-using System.Windows.Input;
-using System.Windows.Media;
-using Araci.Core.Rendering;
-using Araci.Core.SceneNodes;
+using Araci.Applications.Abstractions;
+using Araci.Applications.Editar.Base;
+using Araci.Applications.UseCases.Editar;
+using Araci.Core.SceneQueries;
 using Araci.Models;
-using Araci.Models.Tipos;
-using Araci.Services;
-using Araci.ViewModels.Base;
-using Araci.ViewModels.VisualStates;
-using Araci.Services.UI;
-using Araci.Services.Catalog;
-using Araci.Services.Naming;
+using Araci.ViewModels;
 
-namespace Araci.ViewModels
+namespace Araci.Applications.Editar.Selecionar
 {
-    public abstract class ElementoViewModel : ViewModelBase
+    public class RetanguloResizeService
     {
-        private readonly ElementoNode _node;
-        private readonly NameService _names;
-        private readonly TypePropertiesDialogService _typePropertiesDialogs;
-        private ICommand? _abrirPropriedadesTipoCommand;
-        private ObservableCollection<ParameterViewModel>? _parametros;
-        private bool _isPreview;
+        private const double HitTolerance = 10.0;
+        private const double MinSize = 1.0;
 
-        protected ElementoViewModel(Elemento modelo, ElementoNode node, TypeLibraryService types, NameService names, TypePropertiesDialogService typePropertiesDialogs)
+        private readonly ISelectionService _selection;
+        private readonly ISceneQueryService _sceneQueries;
+        private readonly MoverElementoUseCase _moverElemento;
+        private readonly Action<Elemento> _onStateApplied;
+
+        private RetanguloAnotativoViewModel? _retanguloAtivo;
+        private RetanguloResizeHandleKind? _handleAtivo;
+        private ElementoEstado? _estadoInicial;
+        private Rect _boundsInicial;
+
+        public RetanguloResizeService(ISelectionService selection, ISceneQueryService sceneQueries, MoverElementoUseCase moverElemento, Action<Elemento> onStateApplied)
         {
-            Modelo = modelo ?? throw new ArgumentNullException(nameof(modelo));
-            _node = node ?? throw new ArgumentNullException(nameof(node));
-            Types = types ?? throw new ArgumentNullException(nameof(types));
-            _names = names ?? throw new ArgumentNullException(nameof(names));
-            _typePropertiesDialogs = typePropertiesDialogs ?? throw new ArgumentNullException(nameof(typePropertiesDialogs));
-            VisualState = new ElementoVisualState();
-            _node.AtualizarGeometria();
+            _selection = selection ?? throw new ArgumentNullException(nameof(selection));
+            _sceneQueries = sceneQueries ?? throw new ArgumentNullException(nameof(sceneQueries));
+            _moverElemento = moverElemento ?? throw new ArgumentNullException(nameof(moverElemento));
+            _onStateApplied = onStateApplied ?? throw new ArgumentNullException(nameof(onStateApplied));
         }
 
-        public Elemento Modelo { get; }
-        public ElementoNode Node => _node;
-        protected TypeLibraryService Types { get; }
+        public ObservableCollection<RetanguloResizeHandleViewModel> Handles { get; } = new();
+        public bool IsResizing => _retanguloAtivo != null && _handleAtivo.HasValue;
 
-        protected void RenomearModelo(string novoNome)
+        public void Refresh()
         {
-            _names.Renomear(Modelo, novoNome);
-        }
-
-        public virtual TipoElemento Tipo
-        {
-            get => Modelo.Tipo!;
-            set
-            {
-                if (ReferenceEquals(Modelo.Tipo, value))
-                    return;
-
-                Modelo.Tipo = value;
-                OnPropertyChanged();
-                OnPropertyChanged(nameof(TipoViewModel));
-            }
-        }
-
-        public abstract IEnumerable TiposDisponiveis { get; }
-
-        public virtual TipoElementoViewModel? TipoViewModel => TipoElementoViewModelFactory.Criar(Tipo);
-
-        public ICommand AbrirPropriedadesTipoCommand => _abrirPropriedadesTipoCommand ??= new RelayCommand(AbrirPropriedadesTipo);
-
-        public ElementoVisualState VisualState { get; }
-
-        public bool IsSelecionado
-        {
-            get => VisualState.IsSelecionado;
-            set
-            {
-                if (VisualState.IsSelecionado == value)
-                    return;
-
-                VisualState.AtualizarSelecao(value);
-                OnPropertyChanged();
-                OnPropertyChanged(nameof(Stroke));
-                OnPropertyChanged(nameof(StrokeThickness));
-                OnPropertyChanged(nameof(RenderData));
-            }
-        }
-
-        public bool IsHover
-        {
-            get => VisualState.IsHover;
-            set
-            {
-                if (VisualState.IsHover == value)
-                    return;
-
-                VisualState.AtualizarHover(value);
-                OnPropertyChanged();
-                OnPropertyChanged(nameof(Stroke));
-                OnPropertyChanged(nameof(StrokeThickness));
-                OnPropertyChanged(nameof(RenderData));
-            }
-        }
-
-        public bool IsPreview
-        {
-            get => _isPreview;
-            set
-            {
-                if (_isPreview == value)
-                    return;
-
-                _isPreview = value;
-                OnPropertyChanged();
-                OnPropertyChanged(nameof(RenderData));
-            }
-        }
-
-        public Brush Stroke => VisualState.Stroke;
-        public double StrokeThickness => VisualState.StrokeThickness;
-
-        public virtual ElementoRenderData RenderData => new(Largura, Altura, PontoLocalInicial, PontoLocalFinal, Stroke, StrokeThickness);
-
-        public double Rotacao
-        {
-            get => Modelo.Rotacao;
-            set
-            {
-                if (Math.Abs(Modelo.Rotacao - value) < 0.0001)
-                    return;
-
-                Modelo.Rotacao = value;
-                AtualizarAposModeloAlterado();
-            }
-        }
-
-        public virtual double X
-        {
-            get => Node.X;
-            set
-            {
-                if (Math.Abs(Node.X - value) < 0.0001)
-                    return;
-
-                Node.X = value;
-                AtualizarNode();
-            }
-        }
-
-        public virtual double Y
-        {
-            get => Node.Y;
-            set
-            {
-                if (Math.Abs(Node.Y - value) < 0.0001)
-                    return;
-
-                Node.Y = value;
-                AtualizarNode();
-            }
-        }
-
-        public virtual double WorldX => Node.X;
-        public virtual double WorldY => Node.Y;
-        public virtual double Largura => Node.Largura;
-
-        public virtual double Altura
-        {
-            get => Node.Altura;
-            set { }
-        }
-
-        public virtual Rect Bounds => Node.Bounds;
-        public virtual Rect BoundsAlinhamento => ObterBoundsRotacionado(Node.BoundsAlinhamento);
-        public virtual Point Centro => Node.Centro;
-
-        public ObservableCollection<ParameterViewModel> Parametros =>
-            _parametros ??= new ObservableCollection<ParameterViewModel>(Modelo.Parametros.Values.Select(p => new ParameterViewModel(p)));
-
-        protected virtual Point PontoLocalInicial => new(0, 0);
-        protected virtual Point PontoLocalFinal => new(Largura, Altura);
-
-        protected void SelecionarPrimeiroTipoDisponivel()
-        {
-            TipoElemento? primeiroTipo = null;
-            bool tipoAtualExiste = false;
-
-            foreach (object? item in TiposDisponiveis)
-            {
-                if (item is not TipoElemento tipo)
-                    continue;
-
-                primeiroTipo ??= tipo;
-
-                if (ReferenceEquals(tipo, Modelo.Tipo))
-                {
-                    tipoAtualExiste = true;
-                    break;
-                }
-            }
-
-            if (tipoAtualExiste || primeiroTipo == null)
+            if (IsResizing)
                 return;
 
-            Tipo = primeiroTipo;
+            RebuildHandles();
         }
 
-        public virtual void Mover(Vector delta)
+        public bool TryBegin(Point position)
         {
-            Node.Mover(delta);
-            NotificarGeometria();
+            RetanguloResizeHandleViewModel? handle = HitTest(position);
+
+            if (handle == null)
+                return false;
+
+            _retanguloAtivo = handle.Retangulo;
+            _handleAtivo = handle.Kind;
+            _estadoInicial = handle.Retangulo.CapturarEstado();
+            _boundsInicial = handle.Retangulo.Bounds;
+            RebuildHandles();
+            return true;
         }
 
-        public virtual ElementoEstado CapturarEstado()
+        public void Update(Point position, ToolInputState inputState)
         {
-            return new ElementoEstado(X, Y, rotacao: Modelo.Rotacao);
+            if (_retanguloAtivo == null || !_handleAtivo.HasValue)
+                return;
+
+            Rect novoBounds = CalcularNovoBounds(_boundsInicial, _handleAtivo.Value, position, inputState.IsShiftPressed);
+            AplicarBounds(_retanguloAtivo, novoBounds);
+            _sceneQueries.Invalidate();
+            RebuildHandles();
         }
 
-        public virtual void AplicarEstado(ElementoEstado estado)
+        public void End()
         {
-            Node.X = estado.X;
-            Node.Y = estado.Y;
-            AtualizarNode();
+            if (_retanguloAtivo == null)
+                return;
+
+            RetanguloAnotativoViewModel retangulo = _retanguloAtivo;
+            ElementoEstado? antes = _estadoInicial;
+            ElementoEstado depois = retangulo.CapturarEstado();
+
+            ClearResize();
+
+            if (antes != null && Mudou(antes, depois))
+            {
+                _moverElemento.Executar(new[]
+                {
+                    new MoverElementoItem(retangulo.Modelo, antes, depois)
+                });
+            }
+
+            _sceneQueries.Invalidate();
+            RebuildHandles();
         }
 
-        public virtual void AtualizarAposModeloAlterado()
+        public void Cancel()
         {
-            AtualizarNode();
+            if (_retanguloAtivo != null && _estadoInicial != null)
+            {
+                _retanguloAtivo.AplicarEstado(_estadoInicial);
+                _onStateApplied(_retanguloAtivo.Modelo);
+            }
+
+            ClearResize();
+            _sceneQueries.Invalidate();
+            RebuildHandles();
         }
 
-        public virtual void NotificarParametros()
+        public void Clear()
         {
-            foreach (var parametro in Parametros)
-                parametro.Atualizar();
-
-            OnPropertyChanged(nameof(Parametros));
+            ClearResize();
+            Handles.Clear();
         }
 
-        public void NotificarPropriedades(params string[] nomes)
+        private RetanguloResizeHandleViewModel? HitTest(Point position)
         {
-            foreach (string nome in nomes)
-                OnPropertyChanged(nome);
+            double melhor = HitTolerance * HitTolerance;
+            RetanguloResizeHandleViewModel? encontrado = null;
 
-            NotificarParametros();
+            foreach (RetanguloResizeHandleViewModel handle in Handles)
+            {
+                double dx = handle.X - position.X;
+                double dy = handle.Y - position.Y;
+                double d = dx * dx + dy * dy;
+
+                if (d > melhor)
+                    continue;
+
+                melhor = d;
+                encontrado = handle;
+            }
+
+            return encontrado;
         }
 
-        protected virtual void AtualizarNode()
+        private void RebuildHandles()
         {
-            Node.AtualizarGeometria();
-            NotificarGeometria();
+            Handles.Clear();
+
+            foreach (RetanguloAnotativoViewModel retangulo in _selection.Selecionados.OfType<RetanguloAnotativoViewModel>())
+            {
+                if (retangulo.IsPreview)
+                    continue;
+
+                Rect b = retangulo.Bounds;
+                Add(retangulo, RetanguloResizeHandleKind.TopLeft, b.Left, b.Top);
+                Add(retangulo, RetanguloResizeHandleKind.Top, b.Left + b.Width / 2, b.Top);
+                Add(retangulo, RetanguloResizeHandleKind.TopRight, b.Right, b.Top);
+                Add(retangulo, RetanguloResizeHandleKind.Right, b.Right, b.Top + b.Height / 2);
+                Add(retangulo, RetanguloResizeHandleKind.BottomRight, b.Right, b.Bottom);
+                Add(retangulo, RetanguloResizeHandleKind.Bottom, b.Left + b.Width / 2, b.Bottom);
+                Add(retangulo, RetanguloResizeHandleKind.BottomLeft, b.Left, b.Bottom);
+                Add(retangulo, RetanguloResizeHandleKind.Left, b.Left, b.Top + b.Height / 2);
+            }
         }
 
-        protected virtual void NotificarGeometria()
+        private void Add(RetanguloAnotativoViewModel retangulo, RetanguloResizeHandleKind kind, double x, double y)
         {
-            OnPropertyChanged(nameof(X));
-            OnPropertyChanged(nameof(Y));
-            OnPropertyChanged(nameof(WorldX));
-            OnPropertyChanged(nameof(WorldY));
-            OnPropertyChanged(nameof(Largura));
-            OnPropertyChanged(nameof(Altura));
-            OnPropertyChanged(nameof(Bounds));
-            OnPropertyChanged(nameof(BoundsAlinhamento));
-            OnPropertyChanged(nameof(Centro));
-            OnPropertyChanged(nameof(Rotacao));
-            OnPropertyChanged(nameof(RenderData));
+            Handles.Add(new RetanguloResizeHandleViewModel(
+                retangulo,
+                kind,
+                x,
+                y,
+                ReferenceEquals(retangulo, _retanguloAtivo) && _handleAtivo == kind));
         }
 
-        private Rect ObterBoundsRotacionado(Rect bounds)
+        private static Rect CalcularNovoBounds(Rect inicial, RetanguloResizeHandleKind kind, Point p, bool manterQuadrado)
         {
-            if (Math.Abs(Rotacao) <= 0.000001)
-                return bounds;
+            double left = inicial.Left;
+            double top = inicial.Top;
+            double right = inicial.Right;
+            double bottom = inicial.Bottom;
 
-            Point center = Centro;
-            Point p1 = RotateAround(new Point(bounds.Left, bounds.Top), center, Rotacao);
-            Point p2 = RotateAround(new Point(bounds.Right, bounds.Top), center, Rotacao);
-            Point p3 = RotateAround(new Point(bounds.Right, bounds.Bottom), center, Rotacao);
-            Point p4 = RotateAround(new Point(bounds.Left, bounds.Bottom), center, Rotacao);
-            double minX = Math.Min(Math.Min(p1.X, p2.X), Math.Min(p3.X, p4.X));
-            double minY = Math.Min(Math.Min(p1.Y, p2.Y), Math.Min(p3.Y, p4.Y));
-            double maxX = Math.Max(Math.Max(p1.X, p2.X), Math.Max(p3.X, p4.X));
-            double maxY = Math.Max(Math.Max(p1.Y, p2.Y), Math.Max(p3.Y, p4.Y));
-            return new Rect(new Point(minX, minY), new Point(maxX, maxY));
+            if (kind is RetanguloResizeHandleKind.TopLeft or RetanguloResizeHandleKind.Left or RetanguloResizeHandleKind.BottomLeft)
+                left = Math.Min(p.X, right - MinSize);
+
+            if (kind is RetanguloResizeHandleKind.TopRight or RetanguloResizeHandleKind.Right or RetanguloResizeHandleKind.BottomRight)
+                right = Math.Max(p.X, left + MinSize);
+
+            if (kind is RetanguloResizeHandleKind.TopLeft or RetanguloResizeHandleKind.Top or RetanguloResizeHandleKind.TopRight)
+                top = Math.Min(p.Y, bottom - MinSize);
+
+            if (kind is RetanguloResizeHandleKind.BottomLeft or RetanguloResizeHandleKind.Bottom or RetanguloResizeHandleKind.BottomRight)
+                bottom = Math.Max(p.Y, top + MinSize);
+
+            if (manterQuadrado)
+                AplicarQuadrado(kind, ref left, ref top, ref right, ref bottom, inicial);
+
+            return new Rect(new Point(left, top), new Point(right, bottom));
         }
 
-        private static Point RotateAround(Point point, Point center, double angle)
+        private static void AplicarQuadrado(RetanguloResizeHandleKind kind, ref double left, ref double top, ref double right, ref double bottom, Rect inicial)
         {
-            double radians = angle * Math.PI / 180.0;
-            double cos = Math.Cos(radians);
-            double sin = Math.Sin(radians);
-            double x = point.X - center.X;
-            double y = point.Y - center.Y;
-            return new Point(center.X + x * cos - y * sin, center.Y + x * sin + y * cos);
+            double largura = Math.Max(MinSize, right - left);
+            double altura = Math.Max(MinSize, bottom - top);
+            double lado = Math.Max(largura, altura);
+
+            switch (kind)
+            {
+                case RetanguloResizeHandleKind.TopLeft:
+                    left = right - lado;
+                    top = bottom - lado;
+                    break;
+                case RetanguloResizeHandleKind.TopRight:
+                    right = left + lado;
+                    top = bottom - lado;
+                    break;
+                case RetanguloResizeHandleKind.BottomRight:
+                    right = left + lado;
+                    bottom = top + lado;
+                    break;
+                case RetanguloResizeHandleKind.BottomLeft:
+                    left = right - lado;
+                    bottom = top + lado;
+                    break;
+                case RetanguloResizeHandleKind.Left:
+                    left = right - largura;
+                    bottom = top + largura;
+                    break;
+                case RetanguloResizeHandleKind.Right:
+                    right = left + largura;
+                    bottom = top + largura;
+                    break;
+                case RetanguloResizeHandleKind.Top:
+                    top = bottom - altura;
+                    right = left + altura;
+                    break;
+                case RetanguloResizeHandleKind.Bottom:
+                    bottom = top + altura;
+                    right = left + altura;
+                    break;
+            }
         }
 
-        private void AbrirPropriedadesTipo()
+        private static void AplicarBounds(RetanguloAnotativoViewModel vm, Rect bounds)
         {
-            _typePropertiesDialogs.Show(TipoViewModel);
+            vm.X = bounds.X;
+            vm.Y = bounds.Y;
+            vm.LarguraRetangulo = bounds.Width;
+            vm.AlturaRetangulo = bounds.Height;
+        }
+
+        private void ClearResize()
+        {
+            _retanguloAtivo = null;
+            _handleAtivo = null;
+            _estadoInicial = null;
+            _boundsInicial = Rect.Empty;
+        }
+
+        private static bool Mudou(ElementoEstado antes, ElementoEstado depois)
+        {
+            return Math.Abs(antes.X - depois.X) > 0.000001 ||
+                Math.Abs(antes.Y - depois.Y) > 0.000001 ||
+                Math.Abs(antes.X2 - depois.X2) > 0.000001 ||
+                Math.Abs(antes.Y2 - depois.Y2) > 0.000001 ||
+                Math.Abs(antes.Rotacao - depois.Rotacao) > 0.000001;
         }
     }
 }
 
 
-
 ====================================================================================================
-ARQUIVO: C:\Araci-Engine-Front\Araci Engine\ViewModels\RetanguloAnotativoViewModel.cs
+ARQUIVO: C:\Araci-Engine-Front\Araci Engine\ViewModels\RetanguloResizeHandleViewModel.cs
 ====================================================================================================
 
-﻿using System;
-using System.Collections;
-using System.Windows;
-using System.Windows.Media;
-using Araci.Core.Rendering;
-using Araci.Core.SceneNodes;
-using Araci.Models;
-using Araci.Models.Tipos;
-using Araci.Services;
-using Araci.Services.Catalog;
-using Araci.Services.Naming;
-using Araci.Services.UI;
-
-namespace Araci.ViewModels
+﻿namespace Araci.ViewModels
 {
-    public class RetanguloAnotativoViewModel : ElementoViewModel
+    public enum RetanguloResizeHandleKind
     {
-        public RetanguloAnotativoViewModel(
-            RetanguloAnotativo modelo,
-            TypeLibraryService types,
-            NameService names,
-            TypePropertiesDialogService typePropertiesDialogs)
-            : base(modelo, new RetanguloAnotativoNode(modelo), types, names, typePropertiesDialogs)
+        TopLeft,
+        Top,
+        TopRight,
+        Right,
+        BottomRight,
+        Bottom,
+        BottomLeft,
+        Left
+    }
+
+    public class RetanguloResizeHandleViewModel
+    {
+        public RetanguloResizeHandleViewModel(RetanguloAnotativoViewModel retangulo, RetanguloResizeHandleKind kind, double x, double y, bool isActive)
         {
-            SelecionarPrimeiroTipoDisponivel();
+            Retangulo = retangulo;
+            Kind = kind;
+            X = x;
+            Y = y;
+            IsActive = isActive;
         }
 
-        public RetanguloAnotativo Retangulo => (RetanguloAnotativo)Modelo;
-
-        public override IEnumerable TiposDisponiveis => Types.TiposLinhasAnotativas;
-
-        public override TipoElementoViewModel? TipoViewModel => TipoElementoViewModelFactory.Criar(Tipo);
-
-        public TipoLinhaAnotativa? TipoLinha => Retangulo.TipoLinha;
-
-        public override TipoElemento Tipo
-        {
-            get => base.Tipo;
-            set
-            {
-                if (ReferenceEquals(Retangulo.Tipo, value))
-                    return;
-
-                base.Tipo = value;
-                OnPropertyChanged(nameof(TipoLinha));
-                OnPropertyChanged(nameof(EstiloLinha));
-                OnPropertyChanged(nameof(StrokeDashArray));
-                OnPropertyChanged(nameof(RenderData));
-            }
-        }
-
-        public override double WorldX => Bounds.X;
-
-        public override double WorldY => Bounds.Y;
-
-        public override double X
-        {
-            get => Retangulo.PosicaoX;
-            set
-            {
-                if (Math.Abs(Retangulo.PosicaoX - value) < 0.0001)
-                    return;
-
-                Retangulo.PosicaoX = value;
-                AtualizarNode();
-            }
-        }
-
-        public override double Y
-        {
-            get => Retangulo.PosicaoY;
-            set
-            {
-                if (Math.Abs(Retangulo.PosicaoY - value) < 0.0001)
-                    return;
-
-                Retangulo.PosicaoY = value;
-                AtualizarNode();
-            }
-        }
-
-        public override double Largura => Bounds.Width;
-
-        public override double Altura => Bounds.Height;
-
-        public override ElementoRenderData RenderData => new(
-            Largura,
-            Altura,
-            new Point(0, 0),
-            new Point(Largura, Altura),
-            CriarBrush(CorLinha),
-            EspessuraLinha,
-            StrokeDashArray);
-
-        public string Nome
-        {
-            get => Retangulo.Nome;
-            set
-            {
-                if (Retangulo.Nome == value)
-                    return;
-
-                RenomearModelo(value);
-                OnPropertyChanged();
-                NotificarParametros();
-            }
-        }
-
-        public double LarguraRetangulo
-        {
-            get => Retangulo.Largura;
-            set
-            {
-                if (Math.Abs(Retangulo.Largura - value) < 0.0001)
-                    return;
-
-                Retangulo.Largura = value;
-                OnPropertyChanged();
-                AtualizarNode();
-                NotificarParametros();
-            }
-        }
-
-        public double AlturaRetangulo
-        {
-            get => Retangulo.Altura;
-            set
-            {
-                if (Math.Abs(Retangulo.Altura - value) < 0.0001)
-                    return;
-
-                Retangulo.Altura = value;
-                OnPropertyChanged();
-                AtualizarNode();
-                NotificarParametros();
-            }
-        }
-
-        public string CorLinha
-        {
-            get => Retangulo.CorLinha;
-            set
-            {
-                if (Retangulo.CorLinha == value)
-                    return;
-
-                Retangulo.CorLinha = value;
-                OnPropertyChanged();
-                OnPropertyChanged(nameof(StrokeBrush));
-                OnPropertyChanged(nameof(RenderData));
-                NotificarParametros();
-            }
-        }
-
-        public double EspessuraLinha
-        {
-            get => Retangulo.EspessuraLinha;
-            set
-            {
-                if (Math.Abs(Retangulo.EspessuraLinha - value) < 0.0001)
-                    return;
-
-                Retangulo.EspessuraLinha = value;
-                OnPropertyChanged();
-                OnPropertyChanged(nameof(RenderData));
-                NotificarParametros();
-            }
-        }
-
-        public bool Visivel
-        {
-            get => Retangulo.Visivel;
-            set
-            {
-                if (Retangulo.Visivel == value)
-                    return;
-
-                Retangulo.Visivel = value;
-                OnPropertyChanged();
-                NotificarParametros();
-            }
-        }
-
-        public string EstiloLinha => TipoLinha?.EstiloLinha ?? "Contínuo";
-
-        public Brush StrokeBrush => CriarBrush(CorLinha);
-
-        public DoubleCollection? StrokeDashArray => CriarStrokeDashArray(EstiloLinha);
-
-        public override void Mover(Vector delta)
-        {
-            Retangulo.PosicaoX += delta.X;
-            Retangulo.PosicaoY += delta.Y;
-            AtualizarNode();
-        }
-
-        public override ElementoEstado CapturarEstado()
-        {
-            return new ElementoEstado(
-                Retangulo.PosicaoX,
-                Retangulo.PosicaoY,
-                Retangulo.Largura,
-                Retangulo.Altura,
-                Retangulo.Rotacao);
-        }
-
-        public override void AplicarEstado(ElementoEstado estado)
-        {
-            Retangulo.PosicaoX = estado.X;
-            Retangulo.PosicaoY = estado.Y;
-            Retangulo.Largura = estado.X2;
-            Retangulo.Altura = estado.Y2;
-            Retangulo.Rotacao = estado.Rotacao;
-            AtualizarNode();
-        }
-
-        protected override void NotificarGeometria()
-        {
-            base.NotificarGeometria();
-            OnPropertyChanged(nameof(LarguraRetangulo));
-            OnPropertyChanged(nameof(AlturaRetangulo));
-            OnPropertyChanged(nameof(RenderData));
-        }
-
-        private static Brush CriarBrush(string cor)
-        {
-            try
-            {
-                object? valor = ColorConverter.ConvertFromString(cor);
-
-                if (valor is Color color)
-                    return new SolidColorBrush(color);
-            }
-            catch (FormatException)
-            {
-            }
-
-            return Brushes.Black;
-        }
-
-        private static DoubleCollection? CriarStrokeDashArray(string estilo)
-        {
-            string normalizado = NormalizarEstilo(estilo);
-
-            return normalizado switch
-            {
-                "tracejado" => new DoubleCollection { 6, 4 },
-                "tracoponto" => new DoubleCollection { 8, 3, 2, 3 },
-                "tracodoispontos" => new DoubleCollection { 8, 3, 2, 3, 2, 3 },
-                _ => null
-            };
-        }
-
-        private static string NormalizarEstilo(string valor)
-        {
-            return valor
-                .Replace(" ", string.Empty)
-                .Replace("-", string.Empty)
-                .Replace("ç", "c")
-                .Replace("Ç", "c")
-                .Replace("ã", "a")
-                .Replace("Ã", "a")
-                .Replace("í", "i")
-                .Replace("Í", "i")
-                .ToLowerInvariant()
-                .Trim();
-        }
+        public RetanguloAnotativoViewModel Retangulo { get; }
+        public RetanguloResizeHandleKind Kind { get; }
+        public double X { get; }
+        public double Y { get; }
+        public bool IsActive { get; }
     }
 }
 
@@ -2036,6 +793,7 @@ namespace Araci.ViewModels
             TerminalSnapState terminalSnap,
             CableVertexEditService cableVertexEdit,
             LinhaEndpointEditService linhaEndpointEdit,
+            RetanguloResizeService retanguloResize,
             MoveHudService moveHud,
             AlignmentGuideService alignmentGuides,
             DocumentSceneSyncService documentSceneSync)
@@ -2046,6 +804,7 @@ namespace Araci.ViewModels
             TerminalSnap = terminalSnap ?? throw new ArgumentNullException(nameof(terminalSnap));
             CableVertexEdit = cableVertexEdit ?? throw new ArgumentNullException(nameof(cableVertexEdit));
             LinhaEndpointEdit = linhaEndpointEdit ?? throw new ArgumentNullException(nameof(linhaEndpointEdit));
+            RetanguloResize = retanguloResize ?? throw new ArgumentNullException(nameof(retanguloResize));
             MoveHud = moveHud ?? throw new ArgumentNullException(nameof(moveHud));
             ArgumentNullException.ThrowIfNull(alignmentGuides);
             AlignmentGuides = alignmentGuides.Linhas;
@@ -2058,6 +817,7 @@ namespace Araci.ViewModels
         public TerminalSnapState TerminalSnap { get; }
         public CableVertexEditService CableVertexEdit { get; }
         public LinhaEndpointEditService LinhaEndpointEdit { get; }
+        public RetanguloResizeService RetanguloResize { get; }
         public MoveHudService MoveHud { get; }
         public ObservableCollection<AlignmentGuideLineViewModel> AlignmentGuides { get; }
         public ObservableCollection<ElementoViewModel> Elementos => Scene.Elementos;
@@ -2066,6 +826,9 @@ namespace Araci.ViewModels
         public double LinhaHandleVisualSize => 10 * _inverseZoom;
         public double LinhaHandleVisualOffset => -5 * _inverseZoom;
         public double LinhaHandleStrokeThickness => 1.5 * _inverseZoom;
+        public double RetanguloHandleVisualSize => 10 * _inverseZoom;
+        public double RetanguloHandleVisualOffset => -5 * _inverseZoom;
+        public double RetanguloHandleStrokeThickness => 1.5 * _inverseZoom;
         public double TerminalMarkerVisualSize => 20 * _inverseZoom;
         public double TerminalMarkerVisualOffset => -10 * _inverseZoom;
         public double TerminalMarkerStrokeThickness => 2 * _inverseZoom;
@@ -2088,6 +851,9 @@ namespace Araci.ViewModels
             OnPropertyChanged(nameof(LinhaHandleVisualSize));
             OnPropertyChanged(nameof(LinhaHandleVisualOffset));
             OnPropertyChanged(nameof(LinhaHandleStrokeThickness));
+            OnPropertyChanged(nameof(RetanguloHandleVisualSize));
+            OnPropertyChanged(nameof(RetanguloHandleVisualOffset));
+            OnPropertyChanged(nameof(RetanguloHandleStrokeThickness));
             OnPropertyChanged(nameof(TerminalMarkerVisualSize));
             OnPropertyChanged(nameof(TerminalMarkerVisualOffset));
             OnPropertyChanged(nameof(TerminalMarkerStrokeThickness));
@@ -2121,7 +887,6 @@ namespace Araci.ViewModels
         }
     }
 }
-
 
 
 ====================================================================================================
@@ -2254,6 +1019,46 @@ ARQUIVO: C:\Araci-Engine-Front\Araci Engine\Views\ViewportView.xaml
 
             <Canvas x:Name="CableVertexHandleLayer" IsHitTestVisible="False"/>
 
+            <ItemsControl x:Name="RetanguloResizeHandleLayer"
+                          ItemsSource="{Binding RetanguloResize.Handles}"
+                          IsHitTestVisible="False"
+                          ClipToBounds="False">
+                <ItemsControl.ItemsPanel>
+                    <ItemsPanelTemplate>
+                        <Canvas ClipToBounds="False"/>
+                    </ItemsPanelTemplate>
+                </ItemsControl.ItemsPanel>
+                <ItemsControl.ItemContainerStyle>
+                    <Style TargetType="ContentPresenter">
+                        <Setter Property="Canvas.Left" Value="{Binding X}"/>
+                        <Setter Property="Canvas.Top" Value="{Binding Y}"/>
+                    </Style>
+                </ItemsControl.ItemContainerStyle>
+                <ItemsControl.ItemTemplate>
+                    <DataTemplate>
+                        <Rectangle Width="{Binding DataContext.RetanguloHandleVisualSize, RelativeSource={RelativeSource AncestorType=ItemsControl}}"
+                                   Height="{Binding DataContext.RetanguloHandleVisualSize, RelativeSource={RelativeSource AncestorType=ItemsControl}}"
+                                   Stroke="#007ACC"
+                                   StrokeThickness="{Binding DataContext.RetanguloHandleStrokeThickness, RelativeSource={RelativeSource AncestorType=ItemsControl}}">
+                            <Rectangle.Style>
+                                <Style TargetType="Rectangle">
+                                    <Setter Property="Fill" Value="White"/>
+                                    <Style.Triggers>
+                                        <DataTrigger Binding="{Binding IsActive}" Value="True">
+                                            <Setter Property="Fill" Value="#99CFE8FF"/>
+                                        </DataTrigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </Rectangle.Style>
+                            <Rectangle.RenderTransform>
+                                <TranslateTransform X="{Binding DataContext.RetanguloHandleVisualOffset, RelativeSource={RelativeSource AncestorType=ItemsControl}}"
+                                                    Y="{Binding DataContext.RetanguloHandleVisualOffset, RelativeSource={RelativeSource AncestorType=ItemsControl}}"/>
+                            </Rectangle.RenderTransform>
+                        </Rectangle>
+                    </DataTemplate>
+                </ItemsControl.ItemTemplate>
+            </ItemsControl>
+
             <ItemsControl x:Name="LinhaEndpointInsertionSnapLayer"
                           ItemsSource="{Binding LinhaEndpointEdit.InsertionSnapHandles}"
                           IsHitTestVisible="False"
@@ -2383,5 +1188,331 @@ ARQUIVO: C:\Araci-Engine-Front\Araci Engine\Views\ViewportView.xaml
         </Grid>
     </Border>
 </UserControl>
+
+
+====================================================================================================
+ARQUIVO: C:\Araci-Engine-Front\Araci Engine\Views\ViewportView.xaml.cs
+====================================================================================================
+
+using System;
+using System.ComponentModel;
+using System.Windows;
+using System.Windows.Controls;
+using System.Windows.Input;
+using System.Windows.Media;
+using Araci.Applications.Editar.Base;
+using Araci.Services;
+using Araci.ViewModels;
+
+namespace Araci.Views
+{
+    public partial class ViewportView : UserControl
+    {
+        private readonly MatrixTransform _cameraTransform = new();
+        private ViewportViewModel? _viewportViewModel;
+        private EditorContext? _context;
+
+        public ViewportView()
+        {
+            InitializeComponent();
+        }
+
+        public void Inicializar(EditorContext context)
+        {
+            _context = context ?? throw new ArgumentNullException(nameof(context));
+            _viewportViewModel = _context.CriarViewportViewModel();
+            DataContext = _viewportViewModel;
+            _context.InicializarViewport(_viewportViewModel);
+            ConfigurarCamera();
+            Unloaded += OnUnloaded;
+        }
+
+        private void ConfigurarCamera()
+        {
+            if (_context?.Viewport == null)
+                return;
+
+            WorldLayer.RenderTransform = _cameraTransform;
+            AlignmentGuideLayer.RenderTransform = _cameraTransform;
+            SelectionLayer.RenderTransform = _cameraTransform;
+            CableVertexHandleLayer.RenderTransform = _cameraTransform;
+            LinhaEndpointInsertionSnapLayer.RenderTransform = _cameraTransform;
+            LinhaEndpointHandleLayer.RenderTransform = _cameraTransform;
+            TerminalSnapLayer.RenderTransform = _cameraTransform;
+            _context.Viewport.Camera.PropertyChanged += OnCameraChanged;
+            AtualizarCameraTransform();
+        }
+
+        private void OnCameraChanged(object? sender, PropertyChangedEventArgs e)
+        {
+            AtualizarCameraTransform();
+        }
+
+        private void AtualizarCameraTransform()
+        {
+            if (_context?.Viewport == null)
+                return;
+
+            var camera = _context.Viewport.Camera;
+            _cameraTransform.Matrix = new Matrix(camera.Zoom, 0, 0, camera.Zoom, camera.Offset.X, camera.Offset.Y);
+            _viewportViewModel?.AtualizarZoomVisual(camera.Zoom);
+        }
+
+        private void OnLoaded(object sender, RoutedEventArgs e)
+        {
+            Focus();
+            Keyboard.Focus(this);
+            AtualizarViewport();
+            SizeChanged += (_, _) => AtualizarViewport();
+        }
+
+        private void AtualizarViewport()
+        {
+            if (_context?.Viewport == null)
+                return;
+
+            double largura = ActualWidth;
+            double altura = ActualHeight;
+
+            if (RootBorder != null)
+            {
+                largura -= RootBorder.BorderThickness.Left + RootBorder.BorderThickness.Right;
+                altura -= RootBorder.BorderThickness.Top + RootBorder.BorderThickness.Bottom;
+            }
+
+            largura = Math.Max(0, largura);
+            altura = Math.Max(0, altura);
+            _context.Viewport.AtualizarTamanho(new Size(largura, altura));
+        }
+
+        private Point GetWorldPos(MouseEventArgs e)
+        {
+            Point screen = e.GetPosition(this);
+            return _context?.Viewport?.ScreenToWorld(screen) ?? screen;
+        }
+
+        private void OnPreviewMouseDown(object sender, MouseButtonEventArgs e)
+        {
+            if (_context == null)
+                return;
+
+            if (_context.Navigation.TryHandleMiddleDoubleClick(e))
+            {
+                AtualizarCursorNavegacao();
+                LiberarCapturaMouse();
+                e.Handled = true;
+                return;
+            }
+
+            if (_context.Navigation.TryBeginMiddlePan(e, this))
+            {
+                Focus();
+                Keyboard.Focus(this);
+                AtualizarCursorNavegacao();
+                CaptureMouse();
+                e.Handled = true;
+            }
+        }
+
+        private void OnPreviewMouseLeftButtonDown(object sender, MouseButtonEventArgs e)
+        {
+            if (_context == null)
+                return;
+
+            if (_context.Navigation.TryBeginSpaceLeftPan(e, this))
+            {
+                Focus();
+                Keyboard.Focus(this);
+                AtualizarCursorNavegacao();
+                CaptureMouse();
+                e.Handled = true;
+                return;
+            }
+
+            if (_context.Navigation.IsPanning)
+            {
+                e.Handled = true;
+                return;
+            }
+
+            Focus();
+            Keyboard.Focus(this);
+            var vm = EncontrarElemento(e.OriginalSource as DependencyObject);
+            Point worldPosition = GetWorldPos(e);
+            ToolInputState inputState = CriarInputState(e, e.ChangedButton, e.ClickCount);
+            _context.Input.MouseDown(vm, worldPosition, inputState);
+            AtualizarCursorInteracao(worldPosition);
+            CaptureMouse();
+        }
+
+        private void OnPreviewMouseMove(object sender, MouseEventArgs e)
+        {
+            if (_context?.Navigation.TryUpdatePan(e, this) == true)
+            {
+                AtualizarCursorNavegacao();
+                e.Handled = true;
+                return;
+            }
+
+            if (_context == null)
+                return;
+
+            Point worldPosition = GetWorldPos(e);
+            _context.Input.MouseMove(worldPosition, CriarInputState(e));
+            AtualizarCursorInteracao(worldPosition);
+        }
+
+        private void OnPreviewMouseUp(object sender, MouseButtonEventArgs e)
+        {
+            if (_context?.Navigation.TryEndMiddlePan(e) != true)
+                return;
+
+            AtualizarCursorNavegacao();
+            LiberarCapturaMouse();
+            e.Handled = true;
+        }
+
+        private void OnPreviewMouseLeftButtonUp(object sender, MouseButtonEventArgs e)
+        {
+            if (_context?.Navigation.TryEndSpaceLeftPan(e) == true)
+            {
+                AtualizarCursorNavegacao();
+                LiberarCapturaMouse();
+                e.Handled = true;
+                return;
+            }
+
+            if (_context?.Navigation.ConsumeSuppressNextLeftButtonUp() == true)
+            {
+                e.Handled = true;
+                return;
+            }
+
+            if (_context?.Navigation.IsPanning == true)
+            {
+                e.Handled = true;
+                return;
+            }
+
+            if (_context != null)
+            {
+                Point worldPosition = GetWorldPos(e);
+                _context.Input.MouseUp(worldPosition, CriarInputState(e, e.ChangedButton, e.ClickCount));
+                AtualizarCursorInteracao(worldPosition);
+            }
+
+            LiberarCapturaMouse();
+        }
+
+        private void OnPreviewMouseWheel(object sender, MouseWheelEventArgs e)
+        {
+            if (_context?.Navigation.TryHandleMouseWheel(e, this) != true)
+                return;
+
+            e.Handled = true;
+        }
+
+        private void OnPreviewKeyDown(object sender, KeyEventArgs e)
+        {
+            if (_context != null && e.Key == Key.Space && _context.Input.KeyDown(e.Key))
+            {
+                e.Handled = true;
+                return;
+            }
+
+            if (_context?.Navigation.TryHandleKeyDown(e) == true)
+            {
+                AtualizarCursorNavegacao();
+                e.Handled = true;
+                return;
+            }
+
+            if (_context == null)
+                return;
+
+            e.Handled = _context.Input.KeyDown(e.Key);
+
+            if (e.Handled && e.Key == Key.Escape)
+                LiberarCapturaMouse();
+        }
+
+        private void OnPreviewKeyUp(object sender, KeyEventArgs e)
+        {
+            if (_context?.Navigation.TryHandleKeyUp(e) != true)
+                return;
+
+            AtualizarCursorNavegacao();
+            LiberarCapturaMouse();
+            e.Handled = true;
+        }
+
+        private void OnMouseLeave(object sender, MouseEventArgs e)
+        {
+            _context?.Hover.Clear();
+            _context?.TerminalSnap.Limpar();
+            _context?.AlignmentGuides.Limpar();
+            _context?.LinhaEndpointEdit.LimparSnapInsercao();
+            _context?.Navigation.CancelPan();
+            AtualizarCursorNavegacao();
+        }
+
+        private void OnUnloaded(object sender, RoutedEventArgs e)
+        {
+            _context?.Navigation.Reset();
+            _context?.AlignmentGuides.Limpar();
+            _context?.LinhaEndpointEdit.LimparSnapInsercao();
+            LiberarCapturaMouse();
+            Cursor = Cursors.Arrow;
+
+            if (_context?.Viewport != null)
+                _context.Viewport.Camera.PropertyChanged -= OnCameraChanged;
+        }
+
+        private void AtualizarCursorInteracao(Point worldPosition)
+        {
+            if (_context?.Navigation.IsPanning == true || _context?.Navigation.IsSpacePressed == true)
+            {
+                Cursor = Cursors.ScrollAll;
+                return;
+            }
+
+            Cursor = _context?.BarraResize.GetCursor(worldPosition) ?? Cursors.Arrow;
+        }
+
+        private void AtualizarCursorNavegacao()
+        {
+            if (_context?.Navigation.IsPanning == true || _context?.Navigation.IsSpacePressed == true)
+                Cursor = Cursors.ScrollAll;
+            else
+                Cursor = Cursors.Arrow;
+        }
+
+        private void LiberarCapturaMouse()
+        {
+            if (IsMouseCaptured)
+                ReleaseMouseCapture();
+        }
+
+        private ToolInputState CriarInputState(MouseEventArgs e, MouseButton? button = null, int clickCount = 0)
+        {
+            Point screenPosition = e.GetPosition(this);
+            Point worldPosition = _context?.Viewport?.ScreenToWorld(screenPosition) ?? screenPosition;
+            return new ToolInputState(Keyboard.Modifiers, button, clickCount, worldPosition, screenPosition);
+        }
+
+        private static ElementoViewModel? EncontrarElemento(DependencyObject? origem)
+        {
+            while (origem != null)
+            {
+                if (origem is FrameworkElement fe && fe.DataContext is ElementoViewModel vm)
+                    return vm;
+
+                origem = VisualTreeHelper.GetParent(origem);
+            }
+
+            return null;
+        }
+    }
+}
 
 
