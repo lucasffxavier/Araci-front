@@ -498,6 +498,11 @@ namespace Araci.TechnicalChecks
             tipoVm.EstiloLinha = "Traço ponto";
 
             AssertEqual("Traço ponto", types.TiposLinhasAnotativas[1].EstiloLinha, "TipoLinhaAnotativaViewModel.EstiloLinha altera tipo");
+
+            string xaml = File.ReadAllText(FindProjectFile("Properties/Types/TipoLinhaAnotativaPropertiesView.xaml"));
+            Assert(!xaml.Contains("<ComboBox", StringComparison.OrdinalIgnoreCase), "TipoLinhaAnotativaPropertiesView nao deve conter ComboBox.");
+            AssertContains(xaml, "Text=\"{Binding EstiloLinha}\"", "TipoLinhaAnotativaPropertiesView.EstiloLinha.Binding");
+            AssertContains(xaml, "PropertyReadOnlyTextBoxStyle", "TipoLinhaAnotativaPropertiesView.EstiloLinha.ReadOnly");
         }
 
         private static void ElectricGraphBuildNaoAlteraDocument()
@@ -2684,6 +2689,10 @@ namespace Araci.TechnicalChecks
             AssertEqual(1, context.Selection.Selecionados.Count, "Selecionados.Count");
             Assert(ReferenceEquals(vm, context.Editor.ElementoSelecionado), "Editor.ElementoSelecionado deve receber o VM.");
             Assert(vm.IsSelecionado, "VM deve ficar selecionado.");
+
+            var properties = new PropertiesViewModel(new[] { vm }, context.EditarPropriedades, context.Settings);
+            AssertContains(properties.Titulo, "Carga", "Carga PropertiesViewModel.Titulo");
+            Assert(!properties.Titulo.Contains("Linha", StringComparison.OrdinalIgnoreCase), "Titulo da Carga nao deve ser afetado pela LinhaAnotativa.");
         }
 
         private static void SelecionarLinhaAnotativaUsaPainelGenerico()
@@ -2711,7 +2720,8 @@ namespace Araci.TechnicalChecks
 
             var properties = (PropertiesViewModel)context.Editor.ElementoSelecionado!;
 
-            AssertContains(properties.Titulo, "LinhaAnotativa", "LinhaAnotativa PropertiesViewModel.Titulo");
+            AssertContains(properties.Titulo, "1 Linha selecionada", "LinhaAnotativa PropertiesViewModel.Titulo singular");
+            Assert(!properties.Titulo.Contains("LinhaAnotativa", StringComparison.OrdinalIgnoreCase), "Titulo da LinhaAnotativa nao deve exibir nome tecnico.");
             AssertPropertyRow(properties, "Nome", "Nome", true);
             AssertPropertyRow(properties, "Comprimento", "Comprimento", true);
             AssertPropertyRow(properties, "CorLinha", "Cor da linha", false);
@@ -2723,6 +2733,26 @@ namespace Araci.TechnicalChecks
             Assert(!properties.Propriedades.Any(p => p.PropertyName == "Y2"), "LinhaAnotativa painel generico nao deve exibir Y2.");
             Assert(!properties.Propriedades.Any(p => p.PropertyName == "Visivel"), "LinhaAnotativa painel generico nao deve exibir Visivel.");
             Assert(!properties.Propriedades.Any(p => p.PropertyName == "EstiloLinha"), "LinhaAnotativa painel generico nao deve exibir EstiloLinha.");
+
+            var linha2 = new LinhaAnotativa
+            {
+                Nome = "Linha Painel 2",
+                PosicaoX = 10,
+                PosicaoY = 10,
+                X2 = 40,
+                Y2 = 0
+            };
+
+            context.Document.AdicionarElemento(linha2);
+
+            if (GetVm(context, linha2) is not LinhaAnotativaViewModel vm2)
+                throw new InvalidOperationException("Segunda ViewModel de LinhaAnotativa nao encontrada.");
+
+            var multiplas = new PropertiesViewModel(new[] { vm, vm2 }, context.EditarPropriedades, context.Settings);
+
+            AssertContains(multiplas.Titulo, "2 Linhas selecionadas", "LinhaAnotativa PropertiesViewModel.Titulo plural");
+            Assert(!multiplas.Titulo.Contains("LinhaAnotativas", StringComparison.OrdinalIgnoreCase), "Titulo plural da LinhaAnotativa nao deve exibir plural tecnico.");
+            Assert(!multiplas.Titulo.Contains("LinhaAnotativa", StringComparison.OrdinalIgnoreCase), "Titulo plural da LinhaAnotativa nao deve exibir nome tecnico.");
         }
 
         private static void SelecionarElementosUseCaseLimpaSelecao()

@@ -101,12 +101,18 @@ namespace Araci.ViewModels
             if (itens.Count == 0)
                 return "Nenhum elemento selecionado";
 
-            string tipo = ObterNomeTipoAmigavel(itens[0]);
-
             if (itens.All(i => i.GetType() == itens[0].GetType()))
-                return $"{itens.Count} {tipo}{(itens.Count > 1 ? "s" : "")} selecionados";
+                return CriarTituloMesmoTipo(itens[0], itens.Count);
 
             return $"{itens.Count} elementos selecionados";
+        }
+
+        private static string CriarTituloMesmoTipo(ElementoViewModel item, int quantidade)
+        {
+            string tipo = ObterNomeTipoAmigavel(item, quantidade > 1);
+            string selecionado = ObterParticipioSelecionado(item, quantidade > 1);
+
+            return $"{quantidade} {tipo} {selecionado}";
         }
 
         private static IEnumerable<PropertyDescriptorViewModel> CriarDescritores(IReadOnlyList<ElementoViewModel> itens, EditarPropriedadesUseCase? editarPropriedades, EditorSettings settings)
@@ -300,9 +306,20 @@ namespace Araci.ViewModels
             return t == typeof(string) || t == typeof(int) || t == typeof(double) || t == typeof(float) || t == typeof(decimal) || t == typeof(bool) || t.IsEnum;
         }
 
-        private static string ObterNomeTipoAmigavel(ElementoViewModel vm)
+        private static string ObterNomeTipoAmigavel(ElementoViewModel vm, bool plural)
         {
+            if (vm is LinhaAnotativaViewModel)
+                return plural ? "Linhas" : "Linha";
+
             return vm.GetType().Name.Replace("ViewModel", string.Empty);
+        }
+
+        private static string ObterParticipioSelecionado(ElementoViewModel vm, bool plural)
+        {
+            if (vm is LinhaAnotativaViewModel)
+                return plural ? "selecionadas" : "selecionada";
+
+            return "selecionados";
         }
 
         public event PropertyChangedEventHandler? PropertyChanged;
@@ -509,3 +526,4 @@ namespace Araci.ViewModels
         }
     }
 }
+
