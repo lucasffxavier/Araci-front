@@ -6,7 +6,7 @@ using Araci.Services;
 
 namespace Araci.Ribbon.Tabs
 {
-    public partial class DesenharTab : UserControl
+    public partial class AnotarTab : UserControl
     {
         private readonly Brush _brushNormal = Brushes.Transparent;
         private readonly Brush _brushAtivo = new SolidColorBrush(Color.FromRgb(210, 230, 255));
@@ -14,7 +14,7 @@ namespace Araci.Ribbon.Tabs
         private readonly Brush _bordaAtiva = new SolidColorBrush(Color.FromRgb(80, 140, 220));
         private EditorContext? _contextAssinado;
 
-        public DesenharTab()
+        public AnotarTab()
         {
             InitializeComponent();
             Loaded += OnLoaded;

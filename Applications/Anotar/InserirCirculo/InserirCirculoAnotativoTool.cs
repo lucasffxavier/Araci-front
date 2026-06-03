@@ -14,7 +14,7 @@ using Araci.ViewModels;
 using CoreScene = Araci.Core.Scenes.Scene;
 using CommandHistoryManager = Araci.Core.Commands.CommandManager;
 
-namespace Araci.Applications.Desenhar.InserirCirculo
+namespace Araci.Applications.Anotar.InserirCirculo
 {
     public class InserirCirculoAnotativoTool : ITool
     {

@@ -14,7 +14,7 @@ using Araci.ViewModels;
 using CoreScene = Araci.Core.Scenes.Scene;
 using CommandHistoryManager = Araci.Core.Commands.CommandManager;
 
-namespace Araci.Applications.Desenhar.InserirLinha
+namespace Araci.Applications.Anotar.InserirLinha
 {
     public class InserirLinhaAnotativaTool : ITool
     {

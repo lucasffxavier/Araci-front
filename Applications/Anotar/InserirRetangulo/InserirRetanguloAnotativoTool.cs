@@ -13,7 +13,7 @@ using Araci.ViewModels;
 using CoreScene = Araci.Core.Scenes.Scene;
 using CommandHistoryManager = Araci.Core.Commands.CommandManager;
 
-namespace Araci.Applications.Desenhar.InserirRetangulo
+namespace Araci.Applications.Anotar.InserirRetangulo
 {
     public class InserirRetanguloAnotativoTool : ITool
     {

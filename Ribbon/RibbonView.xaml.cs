@@ -36,7 +36,7 @@ namespace Araci.Ribbon
                 return;
 
             TabDiagrama.Visibility = Visibility.Collapsed;
-            TabDesenhar.Visibility = Visibility.Collapsed;
+            TabAnotar.Visibility = Visibility.Collapsed;
             TabEditar.Visibility = Visibility.Collapsed;
             TabAnalise.Visibility = Visibility.Collapsed;
             TabGerenciar.Visibility = Visibility.Collapsed;
@@ -44,7 +44,7 @@ namespace Araci.Ribbon
             switch (MainTabs.SelectedIndex)
             {
                 case 0: TabDiagrama.Visibility = Visibility.Visible; break;
-                case 1: TabDesenhar.Visibility = Visibility.Visible; break;
+                case 1: TabAnotar.Visibility = Visibility.Visible; break;
                 case 2: TabEditar.Visibility = Visibility.Visible; break;
                 case 3: TabAnalise.Visibility = Visibility.Visible; break;
                 case 4: TabGerenciar.Visibility = Visibility.Visible; break;

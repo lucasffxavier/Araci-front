@@ -31,7 +31,7 @@ A motivação também é arquitetural. Uma plataforma CAD/BIM elétrica precisa 
 
 Em termos corporativos, o Araci responde à demanda por uma ferramenta capaz de consolidar conhecimento técnico dentro de um ambiente próprio. Projetos elétricos são ativos de informação. Quando representados de forma estruturada, eles podem se tornar insumos para documentação, auditoria, revisão, simulação, planejamento e integração com outros sistemas. Ainda que o escopo atual seja concentrado na modelagem 2D e na simulação por OpenDSS, a visão mais ampla considera o Araci como base para um ecossistema técnico.
 
-Em termos acadêmicos, o projeto também é relevante por tratar da convergência entre CAD, BIM, modelagem de sistemas elétricos e simulação computacional. O desafio não está apenas em desenhar, mas em representar conceitos de engenharia de modo que possam ser compreendidos por usuários e por algoritmos. Esse equilíbrio entre expressividade visual e estrutura de dados é um dos fundamentos da motivação do produto.
+Em termos acadêmicos, o projeto também é relevante por tratar da convergência entre CAD, BIM, modelagem de sistemas elétricos e simulação computacional. O desafio não está apenas em Anotar, mas em representar conceitos de engenharia de modo que possam ser compreendidos por usuários e por algoritmos. Esse equilíbrio entre expressividade visual e estrutura de dados é um dos fundamentos da motivação do produto.
 
 # 3. Problemas que o Araci Resolve
 
