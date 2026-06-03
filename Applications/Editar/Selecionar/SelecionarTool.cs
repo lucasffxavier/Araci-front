@@ -125,13 +125,16 @@ namespace Araci.Applications.Editar.Selecionar
                 if (!_modoSoMover)
                 {
                     bool podeMover = _selection.Select(hit, ctrl, shift);
-                    _linhaEndpointEdit.Refresh();
                     _cableVertexEdit.Clear();
 
                     if (!podeMover)
+                    {
+                        _linhaEndpointEdit.Refresh();
                         return;
+                    }
                 }
 
+                _linhaEndpointEdit.Clear();
                 _dragMove.Begin(position);
                 return;
             }

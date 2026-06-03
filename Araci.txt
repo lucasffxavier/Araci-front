@@ -450,236 +450,235 @@ Araci Engine
 
 
 ====================================================================================================
-ARQUIVO: C:\Araci-Engine-Front\Araci Engine\Applications\Desenhar\InserirLinha\InserirLinhaAnotativaTool.cs
+ARQUIVO: C:\Araci-Engine-Front\Araci Engine\Applications\Editar\Mover\MoverTool.cs
 ====================================================================================================
 
-using System;
 using System.Windows;
 using System.Windows.Input;
-using Araci.Applications.Abstractions;
 using Araci.Applications.Editar.Base;
 using Araci.Applications.Editar.Selecionar;
-using Araci.Applications.Factories;
-using Araci.Core.Commands;
-using Araci.Core.Documents;
 using Araci.Core.SceneQueries;
-using Araci.Models;
-using Araci.Services.Naming;
+using Araci.Services;
 using Araci.ViewModels;
-using CoreScene = Araci.Core.Scenes.Scene;
-using CommandHistoryManager = Araci.Core.Commands.CommandManager;
+using Araci.Services.Editing;
 
-namespace Araci.Applications.Desenhar.InserirLinha
+namespace Araci.Applications.Editar.Mover
 {
-    public class InserirLinhaAnotativaTool : ITool
+    public class MoverTool : ITool
     {
-        private const double ToleranciaDistanciaQuadrada = 0.0001;
+        private readonly SelecionarTool _selecionarTool;
 
-        private readonly CommandHistoryManager _commands;
-        private readonly AraciDocument _document;
-        private readonly NameService _names;
-        private readonly ElementoFactory _factory;
-        private readonly CoreScene _scene;
-        private readonly ISceneQueryService _sceneQueries;
-        private readonly LinhaEndpointEditService _linhaEndpointEdit;
-        private readonly Action _voltarParaSelecao;
-        private Point? _pontoInicial;
-        private LinhaAnotativaViewModel? _preview;
-
-        public InserirLinhaAnotativaTool(
-            CommandHistoryManager commands,
-            AraciDocument document,
-            NameService names,
-            ElementoFactory factory,
-            CoreScene scene,
-            ISceneQueryService sceneQueries,
+        public MoverTool(
+            ISceneQueryService queries,
+            SelectionService selection,
+            SelectionBoxViewModel selectionBox,
+            CableVertexEditService cableVertexEdit,
             LinhaEndpointEditService linhaEndpointEdit,
-            Action voltarParaSelecao)
+            BarraResizeService barraResize,
+            MoveService move,
+            MoveHudService moveHud,
+            AlignmentGuideService alignmentGuides,
+            MoveConstraintService moveConstraints,
+            RotationService rotation)
         {
-            _commands = commands ?? throw new ArgumentNullException(nameof(commands));
-            _document = document ?? throw new ArgumentNullException(nameof(document));
-            _names = names ?? throw new ArgumentNullException(nameof(names));
-            _factory = factory ?? throw new ArgumentNullException(nameof(factory));
-            _scene = scene ?? throw new ArgumentNullException(nameof(scene));
-            _sceneQueries = sceneQueries ?? throw new ArgumentNullException(nameof(sceneQueries));
-            _linhaEndpointEdit = linhaEndpointEdit ?? throw new ArgumentNullException(nameof(linhaEndpointEdit));
-            _voltarParaSelecao = voltarParaSelecao ?? throw new ArgumentNullException(nameof(voltarParaSelecao));
+            _selecionarTool = new SelecionarTool(
+                queries,
+                selection,
+                selectionBox,
+                cableVertexEdit,
+                linhaEndpointEdit,
+                barraResize,
+                move,
+                moveHud,
+                alignmentGuides,
+                moveConstraints,
+                rotation,
+                modoSoMover: true,
+                mostrarHud: true);
         }
 
-        public string Nome => "Linha";
+        public string Nome => "Mover";
         public bool MantemBotaoAtivado => true;
-        public bool IsBusy => _pontoInicial.HasValue || _preview != null;
+        public bool IsBusy => _selecionarTool.IsBusy;
 
         public void Ativar()
         {
+            _selecionarTool.Ativar();
         }
 
         public void Desativar()
         {
-            Cancelar();
+            _selecionarTool.Desativar();
         }
 
         public void Cancelar()
         {
-            LimparPreview();
-            _linhaEndpointEdit.LimparSnapInsercao();
-            _pontoInicial = null;
+            _selecionarTool.Cancelar();
         }
 
         public void OnMouseDown(ElementoViewModel? vm, Point position, ToolInputState inputState)
         {
-            Point? snap = _linhaEndpointEdit.AtualizarSnapInsercao(_scene.Elementos, position);
-            Point ponto = snap ?? position;
-
-            if (!_pontoInicial.HasValue)
-            {
-                Iniciar(ponto);
-                return;
-            }
-
-            FinalizarSegmento(
-                ponto,
-                inputState.IsShiftPressed && !snap.HasValue,
-                inputState.IsControlPressed);
+            _selecionarTool.OnMouseDown(vm, position, inputState);
         }
 
         public void OnMouseMove(Point position, ToolInputState inputState)
         {
-            Point? snap = _linhaEndpointEdit.AtualizarSnapInsercao(_scene.Elementos, position);
-            Point ponto = snap ?? position;
-
-            if (!_pontoInicial.HasValue)
-                return;
-
-            AtualizarPreview(ponto, inputState.IsShiftPressed && !snap.HasValue);
+            _selecionarTool.OnMouseMove(position, inputState);
         }
 
         public void OnMouseUp(Point position, ToolInputState inputState)
         {
-        }
-
-        public bool HandlesKey(Key key)
-        {
-            return key == Key.Escape;
+            _selecionarTool.OnMouseUp(position, inputState);
         }
 
         public void OnKeyDown(Key key)
         {
-            if (key == Key.Escape)
-                Cancelar();
+            _selecionarTool.OnKeyDown(key);
+        }
+    }
+}
+
+
+====================================================================================================
+ARQUIVO: C:\Araci-Engine-Front\Araci Engine\Applications\Editar\Selecionar\DragMoveController.cs
+====================================================================================================
+
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Windows;
+using Araci.Applications.Editar.Base;
+using Araci.Services;
+using Araci.ViewModels;
+using Araci.Services.Editing;
+
+namespace Araci.Applications.Editar.Selecionar
+{
+    public class DragMoveController
+    {
+        private readonly SelectionService _selection;
+        private readonly MoveService _move;
+        private readonly MoveHudService _moveHud;
+        private readonly AlignmentGuideService _alignmentGuides;
+        private readonly MoveConstraintService _constraints;
+        private readonly bool _mostrarHud;
+        private readonly List<ElementoViewModel> _elementos = new();
+        private Point _start;
+        private Vector _deltaAplicado;
+
+        public DragMoveController(SelectionService selection, MoveService move, MoveHudService moveHud, AlignmentGuideService alignmentGuides, MoveConstraintService constraints, bool mostrarHud)
+        {
+            _selection = selection ?? throw new ArgumentNullException(nameof(selection));
+            _move = move ?? throw new ArgumentNullException(nameof(move));
+            _moveHud = moveHud ?? throw new ArgumentNullException(nameof(moveHud));
+            _alignmentGuides = alignmentGuides ?? throw new ArgumentNullException(nameof(alignmentGuides));
+            _constraints = constraints ?? throw new ArgumentNullException(nameof(constraints));
+            _mostrarHud = mostrarHud;
         }
 
-        private void Iniciar(Point ponto)
-        {
-            _pontoInicial = ponto;
-            AtualizarPreview(ponto);
-        }
+        public bool IsActive { get; private set; }
 
-        private void FinalizarSegmento(Point pontoFinal, bool ortogonalizar, bool manterAtiva)
+        public void Begin(Point position)
         {
-            Point pontoInicial = _pontoInicial!.Value;
-            Point pontoFinalAjustado = ortogonalizar
-                ? AplicarOrtogonalizacao(pontoFinal, pontoInicial)
-                : pontoFinal;
+            _elementos.Clear();
+            _elementos.AddRange(_selection.Selecionados.Distinct().Where(e => !e.IsPreview));
 
-            if (DistanciaQuadrada(pontoInicial, pontoFinalAjustado) < ToleranciaDistanciaQuadrada)
+            if (_elementos.Count == 0)
+                return;
+
+            _start = position;
+            _deltaAplicado = default;
+            IsActive = true;
+            _constraints.Begin(position);
+            _move.BeginMove(_elementos);
+            _alignmentGuides.Limpar();
+
+            if (_mostrarHud)
             {
-                AtualizarPreview(pontoFinalAjustado);
+                _moveHud.Reset();
+                _moveHud.Visivel = true;
+                AtualizarHud();
+            }
+        }
+
+        public void Update(Point position, ToolInputState inputState)
+        {
+            if (!IsActive)
+                return;
+
+            Point constrained = _constraints.Apply(position, inputState);
+            Vector deltaPretendido = constrained - _start;
+            Vector incrementoPretendido = deltaPretendido - _deltaAplicado;
+            Vector incremento = _alignmentGuides.AplicarSnap(_elementos, incrementoPretendido);
+
+            if (Math.Abs(incremento.X) < 0.000001 && Math.Abs(incremento.Y) < 0.000001)
+            {
+                AtualizarHud();
                 return;
             }
 
-            LinhaAnotativa linha = _factory.CriarModelo<LinhaAnotativa>(ElementKinds.LinhaAnotativa);
+            foreach (ElementoViewModel vm in _elementos)
+                _move.MoverVisual(vm, incremento);
 
-            linha.PosicaoX = pontoInicial.X;
-            linha.PosicaoY = pontoInicial.Y;
-            linha.X2 = pontoFinalAjustado.X - pontoInicial.X;
-            linha.Y2 = pontoFinalAjustado.Y - pontoInicial.Y;
-
-            _commands.Execute(new AddElementoCommand(linha, _document, _names));
-            _sceneQueries.Invalidate();
-
-            if (manterAtiva)
-            {
-                _pontoInicial = pontoFinalAjustado;
-                AtualizarPreview(pontoFinalAjustado);
-                return;
-            }
-
-            LimparPreview();
-            _linhaEndpointEdit.LimparSnapInsercao();
-            _pontoInicial = null;
-            _voltarParaSelecao();
+            _deltaAplicado += incremento;
+            AtualizarHud();
         }
 
-        private void AtualizarPreview(Point pontoFinal)
+        public void End()
         {
-            AtualizarPreview(pontoFinal, false);
-        }
-
-        private void AtualizarPreview(Point pontoFinal, bool ortogonalizar)
-        {
-            if (!_pontoInicial.HasValue)
+            if (!IsActive)
                 return;
 
-            LinhaAnotativaViewModel preview = ObterPreview();
-            Point pontoInicial = _pontoInicial.Value;
-            Point pontoFinalAjustado = ortogonalizar
-                ? AplicarOrtogonalizacao(pontoFinal, pontoInicial)
-                : pontoFinal;
-
-            preview.Linha.PosicaoX = pontoInicial.X;
-            preview.Linha.PosicaoY = pontoInicial.Y;
-            preview.Linha.X2 = pontoFinalAjustado.X - pontoInicial.X;
-            preview.Linha.Y2 = pontoFinalAjustado.Y - pontoInicial.Y;
-            preview.AtualizarAposModeloAlterado();
-            _sceneQueries.Invalidate();
+            _move.EndMove(_elementos);
+            _constraints.End();
+            _alignmentGuides.Limpar();
+            OcultarHud();
+            _elementos.Clear();
+            _deltaAplicado = default;
+            IsActive = false;
         }
 
-        private LinhaAnotativaViewModel ObterPreview()
+        public void Cancel()
         {
-            if (_preview != null)
-                return _preview;
-
-            LinhaAnotativa linha = _factory.CriarModelo<LinhaAnotativa>(ElementKinds.LinhaAnotativa);
-
-            if (_factory.CriarViewModel(linha) is not LinhaAnotativaViewModel preview)
-                throw new InvalidOperationException("Nao foi possivel criar preview de LinhaAnotativa.");
-
-            preview.IsPreview = true;
-            _preview = preview;
-            _scene.Elementos.Add(preview);
-            _sceneQueries.Invalidate();
-            return preview;
-        }
-
-        private void LimparPreview()
-        {
-            if (_preview == null)
+            if (!IsActive)
                 return;
 
-            _preview.IsPreview = false;
-            _scene.Elementos.Remove(_preview);
-            _preview = null;
-            _sceneQueries.Invalidate();
+            _move.AbortMove();
+            _constraints.Cancel();
+            _alignmentGuides.Limpar();
+            OcultarHud();
+            _elementos.Clear();
+            _deltaAplicado = default;
+            IsActive = false;
         }
 
-        private static double DistanciaQuadrada(Point a, Point b)
+        private void AtualizarHud()
         {
-            double dx = a.X - b.X;
-            double dy = a.Y - b.Y;
-            return dx * dx + dy * dy;
+            if (!_mostrarHud || _elementos.Count == 0)
+                return;
+
+            _moveHud.DeltaX = _deltaAplicado.X;
+            _moveHud.DeltaY = _deltaAplicado.Y;
+            _moveHud.AtualizarPosicao(CalcularBounds(_elementos));
         }
 
-        private static Point AplicarOrtogonalizacao(Point ponto, Point origem)
+        private void OcultarHud()
         {
-            Vector delta = ponto - origem;
+            if (!_mostrarHud)
+                return;
 
-            if (Math.Abs(delta.X) < 0.0001 && Math.Abs(delta.Y) < 0.0001)
-                return origem;
+            _moveHud.Reset();
+            _moveHud.Visivel = false;
+        }
 
-            return Math.Abs(delta.X) >= Math.Abs(delta.Y)
-                ? new Point(ponto.X, origem.Y)
-                : new Point(origem.X, ponto.Y);
+        private static Rect CalcularBounds(IReadOnlyList<ElementoViewModel> elementos)
+        {
+            Rect total = elementos[0].Bounds;
+
+            for (int i = 1; i < elementos.Count; i++)
+                total.Union(elementos[i].Bounds);
+
+            return total;
         }
     }
 }
@@ -939,6 +938,313 @@ namespace Araci.Applications.Editar.Selecionar
                 Math.Abs(antes.X2 - depois.X2) > 0.000001 ||
                 Math.Abs(antes.Y2 - depois.Y2) > 0.000001 ||
                 Math.Abs(antes.Rotacao - depois.Rotacao) > 0.000001;
+        }
+    }
+}
+
+
+====================================================================================================
+ARQUIVO: C:\Araci-Engine-Front\Araci Engine\Applications\Editar\Selecionar\LinhaEndpointInteractionController.cs
+====================================================================================================
+
+using System;
+using System.Collections.Generic;
+using System.Windows;
+using Araci.Applications.Editar.Base;
+using Araci.ViewModels;
+
+namespace Araci.Applications.Editar.Selecionar
+{
+    public class LinhaEndpointInteractionController
+    {
+        private const double HandleTolerance = 8.0;
+        private const double HandleToleranceSquared = HandleTolerance * HandleTolerance;
+
+        public LinhaAnotativaViewModel? LinhaAtiva { get; private set; }
+        public LinhaEndpointKind? PontaAtiva { get; private set; }
+        public bool IsDragging => LinhaAtiva != null && PontaAtiva.HasValue;
+
+        public LinhaEndpointHandleViewModel? HitTest(IEnumerable<LinhaEndpointHandleViewModel> handles, Point position)
+        {
+            LinhaEndpointHandleViewModel? melhor = null;
+            double melhorDistancia = HandleToleranceSquared;
+
+            foreach (LinhaEndpointHandleViewModel handle in handles)
+            {
+                double dx = handle.X - position.X;
+                double dy = handle.Y - position.Y;
+                double distancia = dx * dx + dy * dy;
+
+                if (distancia <= melhorDistancia)
+                {
+                    melhorDistancia = distancia;
+                    melhor = handle;
+                }
+            }
+
+            return melhor;
+        }
+
+        public void BeginDrag(LinhaEndpointHandleViewModel handle)
+        {
+            LinhaAtiva = handle.Linha;
+            PontaAtiva = handle.Kind;
+        }
+
+        public Point AplicarRestricaoOrtogonal(Point position, ToolInputState inputState)
+        {
+            if (!inputState.IsShiftPressed || LinhaAtiva == null || !PontaAtiva.HasValue)
+                return position;
+
+            Point referencia = PontaAtiva.Value == LinhaEndpointKind.Fim
+                ? LinhaAtiva.PontoInicial
+                : LinhaAtiva.PontoFinal;
+
+            Vector delta = position - referencia;
+
+            if (Math.Abs(delta.X) >= Math.Abs(delta.Y))
+                return new Point(position.X, referencia.Y);
+
+            return new Point(referencia.X, position.Y);
+        }
+
+        public void ClearDrag()
+        {
+            LinhaAtiva = null;
+            PontaAtiva = null;
+        }
+    }
+}
+
+
+
+====================================================================================================
+ARQUIVO: C:\Araci-Engine-Front\Araci Engine\Applications\Editar\Selecionar\SelecionarTool.cs
+====================================================================================================
+
+using System;
+using System.Windows;
+using System.Windows.Input;
+using Araci.Applications.Editar.Base;
+using Araci.Core.SceneQueries;
+using Araci.Services;
+using Araci.ViewModels;
+using Araci.Services.Editing;
+
+namespace Araci.Applications.Editar.Selecionar
+{
+    public class SelecionarTool : ITool
+    {
+        private readonly ISceneQueryService _queries;
+        private readonly SelectionController _selection;
+        private readonly SelectionBoxController _selectionBox;
+        private readonly DragMoveController _dragMove;
+        private readonly CableVertexEditService _cableVertexEdit;
+        private readonly LinhaEndpointEditService _linhaEndpointEdit;
+        private readonly BarraResizeService _barraResize;
+        private readonly AlignmentGuideService _alignmentGuides;
+        private readonly RotationService _rotation;
+        private readonly bool _modoSoMover;
+
+        public SelecionarTool(
+            ISceneQueryService queries,
+            SelectionService selection,
+            SelectionBoxViewModel selectionBox,
+            CableVertexEditService cableVertexEdit,
+            LinhaEndpointEditService linhaEndpointEdit,
+            BarraResizeService barraResize,
+            MoveService move,
+            MoveHudService moveHud,
+            AlignmentGuideService alignmentGuides,
+            MoveConstraintService moveConstraints,
+            RotationService rotation,
+            bool modoSoMover = false,
+            bool mostrarHud = false)
+        {
+            _queries = queries ?? throw new ArgumentNullException(nameof(queries));
+            _selection = new SelectionController(selection ?? throw new ArgumentNullException(nameof(selection)));
+            _selectionBox = new SelectionBoxController(
+                selectionBox ?? throw new ArgumentNullException(nameof(selectionBox)),
+                _queries,
+                selection);
+            _cableVertexEdit = cableVertexEdit ?? throw new ArgumentNullException(nameof(cableVertexEdit));
+            _linhaEndpointEdit = linhaEndpointEdit ?? throw new ArgumentNullException(nameof(linhaEndpointEdit));
+            _barraResize = barraResize ?? throw new ArgumentNullException(nameof(barraResize));
+            _alignmentGuides = alignmentGuides ?? throw new ArgumentNullException(nameof(alignmentGuides));
+            _rotation = rotation ?? throw new ArgumentNullException(nameof(rotation));
+            _dragMove = new DragMoveController(
+                selection,
+                move ?? throw new ArgumentNullException(nameof(move)),
+                moveHud ?? throw new ArgumentNullException(nameof(moveHud)),
+                _alignmentGuides,
+                moveConstraints ?? throw new ArgumentNullException(nameof(moveConstraints)),
+                mostrarHud);
+            _modoSoMover = modoSoMover;
+        }
+
+        public string Nome => "Selecionar";
+        public bool MantemBotaoAtivado => true;
+
+        public bool IsBusy =>
+            _barraResize.IsResizing ||
+            _linhaEndpointEdit.IsEditing ||
+            _dragMove.IsActive ||
+            _selectionBox.IsActive ||
+            _cableVertexEdit.IsEditing;
+
+        public void Ativar()
+        {
+            _linhaEndpointEdit.Refresh();
+
+            if (!_modoSoMover)
+                _cableVertexEdit.Refresh();
+        }
+
+        public void Desativar()
+        {
+            Cancelar();
+            _linhaEndpointEdit.Clear();
+            _cableVertexEdit.Clear();
+        }
+
+        public void Cancelar()
+        {
+            _barraResize.Cancel();
+            _linhaEndpointEdit.Cancel();
+            _dragMove.Cancel();
+            _selectionBox.Cancel();
+            _cableVertexEdit.Cancel();
+            _linhaEndpointEdit.Refresh();
+            _cableVertexEdit.Refresh();
+            _alignmentGuides.Limpar();
+        }
+
+        public void OnMouseDown(ElementoViewModel? vm, Point position, ToolInputState inputState)
+        {
+            bool ctrl = inputState.IsControlPressed;
+            bool shift = inputState.IsShiftPressed;
+
+            if (!_modoSoMover && _barraResize.TryBegin(position))
+                return;
+
+            if (_linhaEndpointEdit.TryBegin(position))
+            {
+                _cableVertexEdit.Clear();
+                return;
+            }
+
+            if (!_modoSoMover && inputState.IsAltPressed && _cableVertexEdit.TryRemoveHandle(position))
+                return;
+
+            if (!_modoSoMover && ctrl && _cableVertexEdit.TryInsertVertex(position))
+                return;
+
+            if (!_modoSoMover && _cableVertexEdit.TryBegin(position))
+                return;
+
+            var hit = vm ?? _queries.HitTest(position)?.Elemento;
+
+            if (hit != null)
+            {
+                if (!_modoSoMover)
+                {
+                    bool podeMover = _selection.Select(hit, ctrl, shift);
+                    _linhaEndpointEdit.Refresh();
+                    _cableVertexEdit.Clear();
+
+                    if (!podeMover)
+                        return;
+                }
+
+                _dragMove.Begin(position);
+                return;
+            }
+
+            if (_modoSoMover)
+                return;
+
+            _selectionBox.Begin(position, ctrl);
+        }
+
+        public void OnMouseMove(Point position, ToolInputState inputState)
+        {
+            if (_barraResize.IsResizing)
+            {
+                _barraResize.Update(position);
+                return;
+            }
+
+            if (_linhaEndpointEdit.IsEditing)
+            {
+                _linhaEndpointEdit.Update(position, inputState);
+                return;
+            }
+
+            if (_cableVertexEdit.IsEditing)
+            {
+                _cableVertexEdit.Update(position, inputState);
+                return;
+            }
+
+            if (_dragMove.IsActive)
+            {
+                _dragMove.Update(position, inputState);
+                return;
+            }
+
+            if (_selectionBox.IsActive)
+                _selectionBox.Update(position);
+        }
+
+        public void OnMouseUp(Point position, ToolInputState inputState)
+        {
+            if (_barraResize.IsResizing)
+            {
+                _barraResize.End();
+                _linhaEndpointEdit.Refresh();
+                _cableVertexEdit.Refresh();
+                return;
+            }
+
+            if (_linhaEndpointEdit.IsEditing)
+            {
+                _linhaEndpointEdit.End();
+                _cableVertexEdit.Refresh();
+                return;
+            }
+
+            if (_cableVertexEdit.IsEditing)
+            {
+                _cableVertexEdit.End();
+                return;
+            }
+
+            if (_dragMove.IsActive)
+            {
+                _dragMove.End();
+                _linhaEndpointEdit.Refresh();
+                _cableVertexEdit.Refresh();
+            }
+
+            if (_selectionBox.IsActive)
+            {
+                _selectionBox.End();
+                _linhaEndpointEdit.Refresh();
+                _cableVertexEdit.Refresh();
+            }
+        }
+
+        public void OnKeyDown(Key key)
+        {
+            if (!_modoSoMover && key == Key.Space)
+            {
+                _rotation.RotateSelectionClockwise();
+                _linhaEndpointEdit.Refresh();
+                return;
+            }
+
+            if (!_modoSoMover && key == Key.Delete)
+                _cableVertexEdit.TryRemoveActive();
         }
     }
 }
@@ -1332,329 +1638,5 @@ ARQUIVO: C:\Araci-Engine-Front\Araci Engine\Views\ViewportView.xaml
         </Grid>
     </Border>
 </UserControl>
-
-
-====================================================================================================
-ARQUIVO: C:\Araci-Engine-Front\Araci Engine\Views\ViewportView.xaml.cs
-====================================================================================================
-
-using System;
-using System.ComponentModel;
-using System.Windows;
-using System.Windows.Controls;
-using System.Windows.Input;
-using System.Windows.Media;
-using Araci.Applications.Editar.Base;
-using Araci.Services;
-using Araci.ViewModels;
-
-namespace Araci.Views
-{
-    public partial class ViewportView : UserControl
-    {
-        private readonly MatrixTransform _cameraTransform = new();
-        private ViewportViewModel? _viewportViewModel;
-        private EditorContext? _context;
-
-        public ViewportView()
-        {
-            InitializeComponent();
-        }
-
-        public void Inicializar(EditorContext context)
-        {
-            _context = context ?? throw new ArgumentNullException(nameof(context));
-            _viewportViewModel = _context.CriarViewportViewModel();
-            DataContext = _viewportViewModel;
-            _context.InicializarViewport(_viewportViewModel);
-            ConfigurarCamera();
-            Unloaded += OnUnloaded;
-        }
-
-        private void ConfigurarCamera()
-        {
-            if (_context?.Viewport == null)
-                return;
-
-            WorldLayer.RenderTransform = _cameraTransform;
-            AlignmentGuideLayer.RenderTransform = _cameraTransform;
-            SelectionLayer.RenderTransform = _cameraTransform;
-            CableVertexHandleLayer.RenderTransform = _cameraTransform;
-            LinhaEndpointHandleLayer.RenderTransform = _cameraTransform;
-            TerminalSnapLayer.RenderTransform = _cameraTransform;
-            _context.Viewport.Camera.PropertyChanged += OnCameraChanged;
-            AtualizarCameraTransform();
-        }
-
-        private void OnCameraChanged(object? sender, PropertyChangedEventArgs e)
-        {
-            AtualizarCameraTransform();
-        }
-
-        private void AtualizarCameraTransform()
-        {
-            if (_context?.Viewport == null)
-                return;
-
-            var camera = _context.Viewport.Camera;
-            _cameraTransform.Matrix = new Matrix(camera.Zoom, 0, 0, camera.Zoom, camera.Offset.X, camera.Offset.Y);
-            _viewportViewModel?.AtualizarZoomVisual(camera.Zoom);
-        }
-
-        private void OnLoaded(object sender, RoutedEventArgs e)
-        {
-            Focus();
-            Keyboard.Focus(this);
-            AtualizarViewport();
-            SizeChanged += (_, _) => AtualizarViewport();
-        }
-
-        private void AtualizarViewport()
-        {
-            if (_context?.Viewport == null)
-                return;
-
-            double largura = ActualWidth;
-            double altura = ActualHeight;
-
-            if (RootBorder != null)
-            {
-                largura -= RootBorder.BorderThickness.Left + RootBorder.BorderThickness.Right;
-                altura -= RootBorder.BorderThickness.Top + RootBorder.BorderThickness.Bottom;
-            }
-
-            largura = Math.Max(0, largura);
-            altura = Math.Max(0, altura);
-            _context.Viewport.AtualizarTamanho(new Size(largura, altura));
-        }
-
-        private Point GetWorldPos(MouseEventArgs e)
-        {
-            Point screen = e.GetPosition(this);
-            return _context?.Viewport?.ScreenToWorld(screen) ?? screen;
-        }
-
-        private void OnPreviewMouseDown(object sender, MouseButtonEventArgs e)
-        {
-            if (_context == null)
-                return;
-
-            if (_context.Navigation.TryHandleMiddleDoubleClick(e))
-            {
-                AtualizarCursorNavegacao();
-                LiberarCapturaMouse();
-                e.Handled = true;
-                return;
-            }
-
-            if (_context.Navigation.TryBeginMiddlePan(e, this))
-            {
-                Focus();
-                Keyboard.Focus(this);
-                AtualizarCursorNavegacao();
-                CaptureMouse();
-                e.Handled = true;
-            }
-        }
-
-        private void OnPreviewMouseLeftButtonDown(object sender, MouseButtonEventArgs e)
-        {
-            if (_context == null)
-                return;
-
-            if (_context.Navigation.TryBeginSpaceLeftPan(e, this))
-            {
-                Focus();
-                Keyboard.Focus(this);
-                AtualizarCursorNavegacao();
-                CaptureMouse();
-                e.Handled = true;
-                return;
-            }
-
-            if (_context.Navigation.IsPanning)
-            {
-                e.Handled = true;
-                return;
-            }
-
-            Focus();
-            Keyboard.Focus(this);
-            var vm = EncontrarElemento(e.OriginalSource as DependencyObject);
-            Point worldPosition = GetWorldPos(e);
-            ToolInputState inputState = CriarInputState(e, e.ChangedButton, e.ClickCount);
-            _context.Input.MouseDown(vm, worldPosition, inputState);
-            AtualizarCursorInteracao(worldPosition);
-            CaptureMouse();
-        }
-
-        private void OnPreviewMouseMove(object sender, MouseEventArgs e)
-        {
-            if (_context?.Navigation.TryUpdatePan(e, this) == true)
-            {
-                AtualizarCursorNavegacao();
-                e.Handled = true;
-                return;
-            }
-
-            if (_context == null)
-                return;
-
-            Point worldPosition = GetWorldPos(e);
-            _context.Input.MouseMove(worldPosition, CriarInputState(e));
-            AtualizarCursorInteracao(worldPosition);
-        }
-
-        private void OnPreviewMouseUp(object sender, MouseButtonEventArgs e)
-        {
-            if (_context?.Navigation.TryEndMiddlePan(e) != true)
-                return;
-
-            AtualizarCursorNavegacao();
-            LiberarCapturaMouse();
-            e.Handled = true;
-        }
-
-        private void OnPreviewMouseLeftButtonUp(object sender, MouseButtonEventArgs e)
-        {
-            if (_context?.Navigation.TryEndSpaceLeftPan(e) == true)
-            {
-                AtualizarCursorNavegacao();
-                LiberarCapturaMouse();
-                e.Handled = true;
-                return;
-            }
-
-            if (_context?.Navigation.ConsumeSuppressNextLeftButtonUp() == true)
-            {
-                e.Handled = true;
-                return;
-            }
-
-            if (_context?.Navigation.IsPanning == true)
-            {
-                e.Handled = true;
-                return;
-            }
-
-            if (_context != null)
-            {
-                Point worldPosition = GetWorldPos(e);
-                _context.Input.MouseUp(worldPosition, CriarInputState(e, e.ChangedButton, e.ClickCount));
-                AtualizarCursorInteracao(worldPosition);
-            }
-
-            LiberarCapturaMouse();
-        }
-
-        private void OnPreviewMouseWheel(object sender, MouseWheelEventArgs e)
-        {
-            if (_context?.Navigation.TryHandleMouseWheel(e, this) != true)
-                return;
-
-            e.Handled = true;
-        }
-
-        private void OnPreviewKeyDown(object sender, KeyEventArgs e)
-        {
-            if (_context != null && e.Key == Key.Space && _context.Input.KeyDown(e.Key))
-            {
-                e.Handled = true;
-                return;
-            }
-
-            if (_context?.Navigation.TryHandleKeyDown(e) == true)
-            {
-                AtualizarCursorNavegacao();
-                e.Handled = true;
-                return;
-            }
-
-            if (_context == null)
-                return;
-
-            e.Handled = _context.Input.KeyDown(e.Key);
-
-            if (e.Handled && e.Key == Key.Escape)
-                LiberarCapturaMouse();
-        }
-
-        private void OnPreviewKeyUp(object sender, KeyEventArgs e)
-        {
-            if (_context?.Navigation.TryHandleKeyUp(e) != true)
-                return;
-
-            AtualizarCursorNavegacao();
-            LiberarCapturaMouse();
-            e.Handled = true;
-        }
-
-        private void OnMouseLeave(object sender, MouseEventArgs e)
-        {
-            _context?.Hover.Clear();
-            _context?.TerminalSnap.Limpar();
-            _context?.AlignmentGuides.Limpar();
-            _context?.Navigation.CancelPan();
-            AtualizarCursorNavegacao();
-        }
-
-        private void OnUnloaded(object sender, RoutedEventArgs e)
-        {
-            _context?.Navigation.Reset();
-            _context?.AlignmentGuides.Limpar();
-            LiberarCapturaMouse();
-            Cursor = Cursors.Arrow;
-
-            if (_context?.Viewport != null)
-                _context.Viewport.Camera.PropertyChanged -= OnCameraChanged;
-        }
-
-        private void AtualizarCursorInteracao(Point worldPosition)
-        {
-            if (_context?.Navigation.IsPanning == true || _context?.Navigation.IsSpacePressed == true)
-            {
-                Cursor = Cursors.ScrollAll;
-                return;
-            }
-
-            Cursor = _context?.BarraResize.GetCursor(worldPosition) ?? Cursors.Arrow;
-        }
-
-        private void AtualizarCursorNavegacao()
-        {
-            if (_context?.Navigation.IsPanning == true || _context?.Navigation.IsSpacePressed == true)
-                Cursor = Cursors.ScrollAll;
-            else
-                Cursor = Cursors.Arrow;
-        }
-
-        private void LiberarCapturaMouse()
-        {
-            if (IsMouseCaptured)
-                ReleaseMouseCapture();
-        }
-
-        private ToolInputState CriarInputState(MouseEventArgs e, MouseButton? button = null, int clickCount = 0)
-        {
-            Point screenPosition = e.GetPosition(this);
-            Point worldPosition = _context?.Viewport?.ScreenToWorld(screenPosition) ?? screenPosition;
-            return new ToolInputState(Keyboard.Modifiers, button, clickCount, worldPosition, screenPosition);
-        }
-
-        private static ElementoViewModel? EncontrarElemento(DependencyObject? origem)
-        {
-            while (origem != null)
-            {
-                if (origem is FrameworkElement fe && fe.DataContext is ElementoViewModel vm)
-                    return vm;
-
-                origem = VisualTreeHelper.GetParent(origem);
-            }
-
-            return null;
-        }
-    }
-}
-
 
 
