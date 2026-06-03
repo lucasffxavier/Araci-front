@@ -72,12 +72,18 @@ namespace Araci.Ribbon.Tabs
         private void AtualizarBotoes(ITool? tool)
         {
             ResetarBotao(LinhaButton);
+            ResetarBotao(RetanguloButton);
+            ResetarBotao(CirculoButton);
+            ResetarBotao(TextoButton);
 
             if (tool == null || !tool.MantemBotaoAtivado)
                 return;
 
             if (FerramentaCorresponde(tool, "Linha"))
                 AtivarBotao(LinhaButton);
+
+            if (FerramentaCorresponde(tool, "Retângulo") || FerramentaCorresponde(tool, "Retangulo"))
+                AtivarBotao(RetanguloButton);
         }
 
         private void AtivarBotao(Button button)
@@ -103,7 +109,17 @@ namespace Araci.Ribbon.Tabs
 
         private static string Normalizar(string valor)
         {
-            return valor.Replace(" ", "").Replace("_", "").Replace("-", "").Trim();
+            return valor
+                .Replace(" ", "")
+                .Replace("_", "")
+                .Replace("-", "")
+                .Replace("â", "a")
+                .Replace("Â", "A")
+                .Replace("ã", "a")
+                .Replace("Ã", "A")
+                .Replace("é", "e")
+                .Replace("É", "E")
+                .Trim();
         }
 
         private void LinhaButton_Click(object sender, RoutedEventArgs e)
@@ -114,6 +130,7 @@ namespace Araci.Ribbon.Tabs
 
         private void RetanguloButton_Click(object sender, RoutedEventArgs e)
         {
+            Context?.Tools.AtivarInserirRetanguloAnotativo();
             FocarViewport();
         }
 

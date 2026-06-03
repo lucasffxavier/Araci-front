@@ -15,6 +15,7 @@ namespace Araci.Applications.Editor
         private readonly Func<ITool> _criarInserirCaboTool;
         private readonly Func<ElementDefinition, ITool> _criarInserirElementoTool;
         private readonly Func<ITool> _criarInserirLinhaAnotativaTool;
+        private readonly Func<ITool> _criarInserirRetanguloAnotativoTool;
         private ITool _ferramentaAtual;
 
         public ToolService(
@@ -25,7 +26,8 @@ namespace Araci.Applications.Editor
             Func<ITool> criarDeletarTool,
             Func<ITool> criarInserirCaboTool,
             Func<ElementDefinition, ITool> criarInserirElementoTool,
-            Func<ITool> criarInserirLinhaAnotativaTool)
+            Func<ITool> criarInserirLinhaAnotativaTool,
+            Func<ITool> criarInserirRetanguloAnotativoTool)
         {
             _elements = elements ?? throw new ArgumentNullException(nameof(elements));
             _criarSelecionarTool = criarSelecionarTool ?? throw new ArgumentNullException(nameof(criarSelecionarTool));
@@ -35,6 +37,7 @@ namespace Araci.Applications.Editor
             _criarInserirCaboTool = criarInserirCaboTool ?? throw new ArgumentNullException(nameof(criarInserirCaboTool));
             _criarInserirElementoTool = criarInserirElementoTool ?? throw new ArgumentNullException(nameof(criarInserirElementoTool));
             _criarInserirLinhaAnotativaTool = criarInserirLinhaAnotativaTool ?? throw new ArgumentNullException(nameof(criarInserirLinhaAnotativaTool));
+            _criarInserirRetanguloAnotativoTool = criarInserirRetanguloAnotativoTool ?? throw new ArgumentNullException(nameof(criarInserirRetanguloAnotativoTool));
             _ferramentaAtual = _criarSelecionarTool();
             _ferramentaAtual.Ativar();
         }
@@ -85,6 +88,11 @@ namespace Araci.Applications.Editor
         public void AtivarInserirLinhaAnotativa()
         {
             FerramentaAtual = _criarInserirLinhaAnotativaTool();
+        }
+
+        public void AtivarInserirRetanguloAnotativo()
+        {
+            FerramentaAtual = _criarInserirRetanguloAnotativoTool();
         }
 
         public bool AtivarInsercaoElemento(string kind)

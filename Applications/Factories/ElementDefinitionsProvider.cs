@@ -26,124 +26,14 @@ namespace Araci.Applications.Factories
 
         public IEnumerable<ElementDefinition> CreateDefaults()
         {
-            yield return new ElementDefinition(
-                ElementKinds.Cabo,
-                "Cabo",
-                "CABO",
-                typeof(Cabo),
-                typeof(CaboViewModel),
-                typeof(TipoCabo),
-                CriarCabo,
-                (m, c) => new CaboViewModel((Cabo)m, _types, c.Names, c.TypePropertiesDialogs),
-                () => _types.TipoCaboPadrao,
-                () => _types.TiposCabos,
-                _ => Size.Empty,
-                e => AtualizarTerminaisCabo((Cabo)e),
-                Ribbon("Cabo", "cabo.svg", 10, "CB"),
-                true,
-                _properties.Cabo());
-
-            yield return new ElementDefinition(
-                ElementKinds.Carga,
-                "Carga",
-                "CARGA",
-                typeof(Carga),
-                typeof(CargaViewModel),
-                typeof(TipoCarga),
-                CriarCarga,
-                (m, c) => new CargaViewModel((Carga)m, _types, c.Names, c.TypePropertiesDialogs, c.TerminalLayout),
-                () => _types.TipoCargaPadrao,
-                () => _types.TiposCargas,
-                _ => EquipamentoSize(),
-                e => ((Carga)e).AtualizarTerminais(ElementGeometryDefaults.EquipamentoLargura, ElementGeometryDefaults.EquipamentoAltura),
-                Ribbon("Carga", "carga.svg", 20, "CG"),
-                false,
-                _properties.Carga());
-
-            yield return new ElementDefinition(
-                ElementKinds.Gerador,
-                "Gerador",
-                "GERADOR",
-                typeof(Gerador),
-                typeof(GeradorViewModel),
-                typeof(TipoGerador),
-                CriarGerador,
-                (m, c) => new GeradorViewModel((Gerador)m, _types, c.Names, c.TypePropertiesDialogs, c.TerminalLayout),
-                () => _types.TipoGeradorPadrao,
-                () => _types.TiposGeradores,
-                _ => EquipamentoSize(),
-                e => ((Gerador)e).AtualizarTerminais(ElementGeometryDefaults.EquipamentoLargura, ElementGeometryDefaults.EquipamentoAltura),
-                Ribbon("Gerador", "gerador.svg", 30, "GE"),
-                false,
-                _properties.Gerador());
-
-            yield return new ElementDefinition(
-                ElementKinds.Sin,
-                "SIN",
-                "SIN",
-                typeof(Sin),
-                typeof(SinViewModel),
-                typeof(TipoSin),
-                CriarSin,
-                (m, c) => new SinViewModel((Sin)m, _types, c.Names, c.TypePropertiesDialogs, c.TerminalLayout),
-                () => _types.TipoSinPadrao,
-                () => _types.TiposSin,
-                _ => EquipamentoSize(),
-                e => ((Sin)e).AtualizarTerminais(ElementGeometryDefaults.EquipamentoLargura, ElementGeometryDefaults.EquipamentoAltura),
-                Ribbon("SIN", "sin.svg", 40, "SI"),
-                false,
-                _properties.Sin());
-
-            yield return new ElementDefinition(
-                ElementKinds.Transformador,
-                "Transformador",
-                "TR",
-                typeof(Transformador),
-                typeof(TransformadorViewModel),
-                typeof(TipoTransformador),
-                CriarTransformador,
-                (m, c) => new TransformadorViewModel((Transformador)m, _types, c.Names, c.TypePropertiesDialogs, c.TerminalLayout),
-                () => _types.TipoTransformadorPadrao,
-                () => _types.TiposTransformadores,
-                _ => TransformadorSize(),
-                e => ((Transformador)e).AtualizarTerminais(ElementGeometryDefaults.TransformadorLargura, ElementGeometryDefaults.TransformadorAltura),
-                Ribbon("Trafo", "transformador.svg", 50, "TR"),
-                false,
-                _properties.Transformador());
-
-            yield return new ElementDefinition(
-                ElementKinds.Barra,
-                "Barra",
-                "BARRA",
-                typeof(Barra),
-                typeof(BarraViewModel),
-                typeof(TipoBarra),
-                CriarBarra,
-                (m, c) => new BarraViewModel((Barra)m, _types, c.Names, c.TypePropertiesDialogs, c.TerminalLayout),
-                () => _types.TipoBarraPadrao,
-                () => _types.TiposBarras,
-                e => new Size(ElementGeometryDefaults.BarraLargura, ((Barra)e).Altura),
-                e => ((Barra)e).AtualizarTerminais(ElementGeometryDefaults.BarraLargura),
-                Ribbon("Barra", "barra.svg", 60, "BA"),
-                false,
-                _properties.Barra());
-
-            yield return new ElementDefinition(
-                ElementKinds.LinhaAnotativa,
-                "Linha",
-                "LINHA",
-                typeof(LinhaAnotativa),
-                typeof(LinhaAnotativaViewModel),
-                typeof(TipoLinhaAnotativa),
-                CriarLinhaAnotativa,
-                (m, c) => new LinhaAnotativaViewModel((LinhaAnotativa)m, _types, c.Names, c.TypePropertiesDialogs),
-                () => _types.TipoLinhaAnotativaPadrao,
-                () => _types.TiposLinhasAnotativas,
-                _ => Size.Empty,
-                _ => { },
-                new ElementRibbonMetadata("Linha", "Desenhar", "linha.svg", 0, false, null),
-                false,
-                _properties.LinhaAnotativa());
+            yield return new ElementDefinition(ElementKinds.Cabo, "Cabo", "CABO", typeof(Cabo), typeof(CaboViewModel), typeof(TipoCabo), CriarCabo, (m, c) => new CaboViewModel((Cabo)m, _types, c.Names, c.TypePropertiesDialogs), () => _types.TipoCaboPadrao, () => _types.TiposCabos, _ => Size.Empty, e => AtualizarTerminaisCabo((Cabo)e), Ribbon("Cabo", "cabo.svg", 10, "CB"), true, _properties.Cabo());
+            yield return new ElementDefinition(ElementKinds.Carga, "Carga", "CARGA", typeof(Carga), typeof(CargaViewModel), typeof(TipoCarga), CriarCarga, (m, c) => new CargaViewModel((Carga)m, _types, c.Names, c.TypePropertiesDialogs, c.TerminalLayout), () => _types.TipoCargaPadrao, () => _types.TiposCargas, _ => EquipamentoSize(), e => ((Carga)e).AtualizarTerminais(ElementGeometryDefaults.EquipamentoLargura, ElementGeometryDefaults.EquipamentoAltura), Ribbon("Carga", "carga.svg", 20, "CG"), false, _properties.Carga());
+            yield return new ElementDefinition(ElementKinds.Gerador, "Gerador", "GERADOR", typeof(Gerador), typeof(GeradorViewModel), typeof(TipoGerador), CriarGerador, (m, c) => new GeradorViewModel((Gerador)m, _types, c.Names, c.TypePropertiesDialogs, c.TerminalLayout), () => _types.TipoGeradorPadrao, () => _types.TiposGeradores, _ => EquipamentoSize(), e => ((Gerador)e).AtualizarTerminais(ElementGeometryDefaults.EquipamentoLargura, ElementGeometryDefaults.EquipamentoAltura), Ribbon("Gerador", "gerador.svg", 30, "GE"), false, _properties.Gerador());
+            yield return new ElementDefinition(ElementKinds.Sin, "SIN", "SIN", typeof(Sin), typeof(SinViewModel), typeof(TipoSin), CriarSin, (m, c) => new SinViewModel((Sin)m, _types, c.Names, c.TypePropertiesDialogs, c.TerminalLayout), () => _types.TipoSinPadrao, () => _types.TiposSin, _ => EquipamentoSize(), e => ((Sin)e).AtualizarTerminais(ElementGeometryDefaults.EquipamentoLargura, ElementGeometryDefaults.EquipamentoAltura), Ribbon("SIN", "sin.svg", 40, "SI"), false, _properties.Sin());
+            yield return new ElementDefinition(ElementKinds.Transformador, "Transformador", "TR", typeof(Transformador), typeof(TransformadorViewModel), typeof(TipoTransformador), CriarTransformador, (m, c) => new TransformadorViewModel((Transformador)m, _types, c.Names, c.TypePropertiesDialogs, c.TerminalLayout), () => _types.TipoTransformadorPadrao, () => _types.TiposTransformadores, _ => TransformadorSize(), e => ((Transformador)e).AtualizarTerminais(ElementGeometryDefaults.TransformadorLargura, ElementGeometryDefaults.TransformadorAltura), Ribbon("Trafo", "transformador.svg", 50, "TR"), false, _properties.Transformador());
+            yield return new ElementDefinition(ElementKinds.Barra, "Barra", "BARRA", typeof(Barra), typeof(BarraViewModel), typeof(TipoBarra), CriarBarra, (m, c) => new BarraViewModel((Barra)m, _types, c.Names, c.TypePropertiesDialogs, c.TerminalLayout), () => _types.TipoBarraPadrao, () => _types.TiposBarras, e => new Size(ElementGeometryDefaults.BarraLargura, ((Barra)e).Altura), e => ((Barra)e).AtualizarTerminais(ElementGeometryDefaults.BarraLargura), Ribbon("Barra", "barra.svg", 60, "BA"), false, _properties.Barra());
+            yield return new ElementDefinition(ElementKinds.LinhaAnotativa, "Linha", "LINHA", typeof(LinhaAnotativa), typeof(LinhaAnotativaViewModel), typeof(TipoLinhaAnotativa), CriarLinhaAnotativa, (m, c) => new LinhaAnotativaViewModel((LinhaAnotativa)m, _types, c.Names, c.TypePropertiesDialogs), () => _types.TipoLinhaAnotativaPadrao, () => _types.TiposLinhasAnotativas, _ => Size.Empty, _ => { }, new ElementRibbonMetadata("Linha", "Desenhar", "linha.svg", 0, false, null), false, _properties.LinhaAnotativa());
+            yield return new ElementDefinition(ElementKinds.RetanguloAnotativo, "Retângulo", "RETANGULO", typeof(RetanguloAnotativo), typeof(RetanguloAnotativoViewModel), typeof(TipoLinhaAnotativa), CriarRetanguloAnotativo, (m, c) => new RetanguloAnotativoViewModel((RetanguloAnotativo)m, _types, c.Names, c.TypePropertiesDialogs), () => _types.TipoLinhaAnotativaPadrao, () => _types.TiposLinhasAnotativas, e => new Size(((RetanguloAnotativo)e).Largura, ((RetanguloAnotativo)e).Altura), _ => { }, new ElementRibbonMetadata("Retângulo", "Desenhar", "retângulo.svg", 1, false, null), false, _properties.RetanguloAnotativo());
         }
 
         private Barra CriarBarra()
@@ -179,6 +69,11 @@ namespace Araci.Applications.Factories
         private LinhaAnotativa CriarLinhaAnotativa()
         {
             return new LinhaAnotativa { Tipo = _types.TipoLinhaAnotativaPadrao ?? throw new InvalidOperationException("Nenhum tipo de linha anotativa cadastrado.") };
+        }
+
+        private RetanguloAnotativo CriarRetanguloAnotativo()
+        {
+            return new RetanguloAnotativo { Tipo = _types.TipoLinhaAnotativaPadrao ?? throw new InvalidOperationException("Nenhum tipo de retângulo anotativo cadastrado.") };
         }
 
         private static ElementRibbonMetadata Ribbon(string nome, string icone, int ordem, string atalho)

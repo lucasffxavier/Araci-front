@@ -103,5 +103,25 @@ namespace Araci.Applications.Factories
         {
             return CriarViewModel<BarraViewModel>(ElementKinds.Barra);
         }
+
+        public LinhaAnotativa CriarLinhaAnotativa()
+        {
+            return CriarModelo<LinhaAnotativa>(ElementKinds.LinhaAnotativa);
+        }
+
+        public LinhaAnotativaViewModel CriarLinhaAnotativaVM()
+        {
+            return CriarViewModel<LinhaAnotativaViewModel>(ElementKinds.LinhaAnotativa);
+        }
+
+        public RetanguloAnotativo CriarRetanguloAnotativo()
+        {
+            return CriarModelo<RetanguloAnotativo>(ElementKinds.RetanguloAnotativo);
+        }
+
+        public RetanguloAnotativoViewModel CriarRetanguloAnotativoVM()
+        {
+            return CriarViewModel<RetanguloAnotativoViewModel>(ElementKinds.RetanguloAnotativo);
+        }
     }
 }

@@ -115,6 +115,18 @@ namespace Araci.Applications.Factories
             };
         }
 
+        public IReadOnlyList<InstancePropertyDescriptor> RetanguloAnotativo()
+        {
+            return new[]
+            {
+                Prop<RetanguloAnotativoViewModel>("Nome", "Nome", 10, false),
+                Prop<RetanguloAnotativoViewModel>("LarguraRetangulo", "Largura", 20, unit: UnitKind.LengthMeter),
+                Prop<RetanguloAnotativoViewModel>("AlturaRetangulo", "Altura", 30, unit: UnitKind.LengthMeter),
+                Prop<RetanguloAnotativoViewModel>("CorLinha", "Cor da borda", 40, isColor: true),
+                Prop<RetanguloAnotativoViewModel>("EspessuraLinha", "Espessura da borda", 50)
+            };
+        }
+
         private static InstancePropertyDescriptor Prop<T>(
             string propertyName,
             string displayName,

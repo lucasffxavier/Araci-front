@@ -9,6 +9,7 @@ using Araci.Core.Events;
 using Araci.Core.SceneQueries;
 using Araci.Core.Transactions;
 using Araci.Applications.Desenhar.InserirLinha;
+using Araci.Applications.Desenhar.InserirRetangulo;
 using Araci.Applications.Diagrama.InserirCabo;
 using Araci.Applications.Diagrama.InserirElemento;
 using Araci.Applications.Editar.Alinhar;
@@ -71,23 +72,11 @@ namespace Araci.Services
             SimulationMessages = simulation.Messages;
             ExecutarSimulacao = simulation.ExecutarSimulacao;
 
-            VisualUpdates = EditingComposition.CreateVisualUpdates(
-                () => Viewport,
-                TerminalLayout,
-                Connectivity,
-                SceneQueries,
-                TerminalSnap,
-                RefreshEditingHandles);
+            VisualUpdates = EditingComposition.CreateVisualUpdates(() => Viewport, TerminalLayout, Connectivity, SceneQueries, TerminalSnap, RefreshEditingHandles);
             Names = new NameService(Document, Elements);
             GeometryUpdates = new ElementGeometryUpdateService(TerminalLayout, Connectivity, VisualUpdates);
             var elementoModelFactory = new ElementoModelFactory(Elements);
-            var elementoViewModelFactory = new ElementoViewModelFactory(
-                Elements,
-                elementoModelFactory,
-                Names,
-                TypePropertiesDialogs,
-                TerminalLayout,
-                GeometryUpdates);
+            var elementoViewModelFactory = new ElementoViewModelFactory(Elements, elementoModelFactory, Names, TypePropertiesDialogs, TerminalLayout, GeometryUpdates);
             ElementoFactory = new ElementoFactory(elementoModelFactory, elementoViewModelFactory);
             InserirElemento = new InserirElementoUseCase(ElementoFactory, TerminalLayout, Commands, Document, Names);
             InserirCabo = new InserirCaboUseCase(ElementoFactory, Commands, Document, Names, cabo => Viewport?.ObterViewModel(cabo) as CaboViewModel);
@@ -99,51 +88,16 @@ namespace Araci.Services
             SelecionarElementos = new SelecionarElementosUseCase(Selection);
             AtualizarPropriedadesSelecionadas = new AtualizarPropriedadesSelecionadasUseCase(Selection);
             EditarVerticesCabo = new EditarVerticesCaboUseCase(Commands);
-            CableVertexEdit = EditingComposition.CreateCableVertexEdit(
-                Selection,
-                SceneQueries,
-                VisualUpdates,
-                EditarVerticesCabo);
+            CableVertexEdit = EditingComposition.CreateCableVertexEdit(Selection, SceneQueries, VisualUpdates, EditarVerticesCabo);
             Selection.SelectionChanged += CableVertexEdit.Refresh;
-            SafeDelete = EditingComposition.CreateSafeDelete(
-                Selection,
-                CableVertexEdit,
-                ExcluirElemento,
-                Hover,
-                TerminalSnap,
-                SceneQueries);
-            Clipboard = EditingComposition.CreateClipboard(
-                CopiarElementos,
-                ColarElementos,
-                Selection,
-                () => Viewport,
-                SceneQueries,
-                CableVertexEdit);
-            Projects = PersistenceComposition.CreateProjects(
-                Document,
-                Commands,
-                Elements,
-                elementoModelFactory,
-                TerminalLayout,
-                Geometry,
-                Dialogs,
-                Settings,
-                LimparEstadoTransitorioProjeto);
+            SafeDelete = EditingComposition.CreateSafeDelete(Selection, CableVertexEdit, ExcluirElemento, Hover, TerminalSnap, SceneQueries);
+            Clipboard = EditingComposition.CreateClipboard(CopiarElementos, ColarElementos, Selection, () => Viewport, SceneQueries, CableVertexEdit);
+            Projects = PersistenceComposition.CreateProjects(Document, Commands, Elements, elementoModelFactory, TerminalLayout, Geometry, Dialogs, Settings, LimparEstadoTransitorioProjeto);
             NovoProjeto = new NovoProjetoUseCase(Projects);
             AbrirProjeto = new AbrirProjetoUseCase(Projects);
             SalvarProjeto = new SalvarProjetoUseCase(Projects);
 
-            var moveServices = EditingComposition.CreateMoveServices(
-                () => Viewport,
-                () => Scene.Elementos,
-                Settings,
-                Connectivity,
-                TerminalLayout,
-                SceneQueries,
-                VisualUpdates,
-                Selection,
-                GeometryUpdates,
-                Commands);
+            var moveServices = EditingComposition.CreateMoveServices(() => Viewport, () => Scene.Elementos, Settings, Connectivity, TerminalLayout, SceneQueries, VisualUpdates, Selection, GeometryUpdates, Commands);
             MoveHud = moveServices.MoveHud;
             AlignmentGuides = moveServices.AlignmentGuides;
             MoveConstraints = moveServices.MoveConstraints;
@@ -153,11 +107,7 @@ namespace Araci.Services
             Move = moveServices.Move;
             BarraResize = moveServices.BarraResize;
             Rotation = moveServices.Rotation;
-            LinhaEndpointEdit = EditingComposition.CreateLinhaEndpointEdit(
-                Selection,
-                SceneQueries,
-                MoverElemento,
-                VisualUpdates);
+            LinhaEndpointEdit = EditingComposition.CreateLinhaEndpointEdit(Selection, SceneQueries, MoverElemento, VisualUpdates);
             Selection.SelectionChanged += LinhaEndpointEdit.Refresh;
 
             Tools = new ToolService(
@@ -168,16 +118,10 @@ namespace Araci.Services
                 () => new DeletarTool(SafeDelete),
                 CriarInserirCaboTool,
                 CriarInserirElementoGenericoTool,
-                CriarInserirLinhaAnotativaTool);
-            Input = EditingComposition.CreateInput(
-                Tools,
-                Commands,
-                SafeDelete,
-                Selection,
-                Elements,
-                Hover,
-                Clipboard.CopiarSelecionados,
-                Clipboard.Colar);
+                CriarInserirLinhaAnotativaTool,
+                CriarInserirRetanguloAnotativoTool);
+
+            Input = EditingComposition.CreateInput(Tools, Commands, SafeDelete, Selection, Elements, Hover, Clipboard.CopiarSelecionados, Clipboard.Colar);
             AlterarUnidadesProjeto = new AlterarUnidadesProjetoUseCase(Settings, RefreshProperties);
             Navigation = ViewportComposition.CreateNavigation(() => Viewport);
         }
@@ -194,19 +138,7 @@ namespace Araci.Services
 
         public ViewportViewModel CriarViewportViewModel()
         {
-            return ViewportComposition.CreateViewModel(
-                Document,
-                Scene,
-                SelectionBox,
-                TerminalSnap,
-                CableVertexEdit,
-                LinhaEndpointEdit,
-                MoveHud,
-                AlignmentGuides,
-                ElementoFactory,
-                Selection,
-                Hover,
-                SceneQueries);
+            return ViewportComposition.CreateViewModel(Document, Scene, SelectionBox, TerminalSnap, CableVertexEdit, LinhaEndpointEdit, MoveHud, AlignmentGuides, ElementoFactory, Selection, Hover, SceneQueries);
         }
 
         public void InicializarViewport(ViewportViewModel viewportViewModel)
@@ -287,98 +219,43 @@ namespace Araci.Services
             foreach (ElementoViewModel vm in Viewport.Elementos)
             {
                 if (vm.Modelo is Cabo or Carga)
-                {
-                    vm.NotificarPropriedades(
-                        "CorrenteLinha",
-                        "CorrenteFaseA",
-                        "CorrenteFaseB",
-                        "CorrenteFaseC");
-                }
+                    vm.NotificarPropriedades("CorrenteLinha", "CorrenteFaseA", "CorrenteFaseB", "CorrenteFaseC");
             }
         }
 
         private SelecionarTool CriarSelecionarTool()
         {
-            return new SelecionarTool(
-                SceneQueries,
-                Selection,
-                SelectionBox,
-                CableVertexEdit,
-                LinhaEndpointEdit,
-                BarraResize,
-                Move,
-                MoveHud,
-                AlignmentGuides,
-                MoveConstraints,
-                Rotation);
+            return new SelecionarTool(SceneQueries, Selection, SelectionBox, CableVertexEdit, LinhaEndpointEdit, BarraResize, Move, MoveHud, AlignmentGuides, MoveConstraints, Rotation);
         }
 
         private MoverTool CriarMoverTool()
         {
-            return new MoverTool(
-                SceneQueries,
-                Selection,
-                SelectionBox,
-                CableVertexEdit,
-                LinhaEndpointEdit,
-                BarraResize,
-                Move,
-                MoveHud,
-                AlignmentGuides,
-                MoveConstraints,
-                Rotation);
+            return new MoverTool(SceneQueries, Selection, SelectionBox, CableVertexEdit, LinhaEndpointEdit, BarraResize, Move, MoveHud, AlignmentGuides, MoveConstraints, Rotation);
         }
 
         private AlinharTool CriarAlinharTool()
         {
-            return new AlinharTool(
-                Hover,
-                AlignmentGuides,
-                Commands,
-                SceneQueries);
+            return new AlinharTool(Hover, AlignmentGuides, Commands, SceneQueries);
         }
 
         private InserirCaboTool CriarInserirCaboTool()
         {
-            return new InserirCaboTool(
-                Commands,
-                ElementoFactory,
-                InserirCabo,
-                Snap,
-                Connectivity,
-                AlignmentGuides,
-                Scene,
-                SceneQueries,
-                TerminalSnap,
-                () => Tools.VoltarParaSelecao());
+            return new InserirCaboTool(Commands, ElementoFactory, InserirCabo, Snap, Connectivity, AlignmentGuides, Scene, SceneQueries, TerminalSnap, () => Tools.VoltarParaSelecao());
         }
 
         private InserirElementoGenericoTool CriarInserirElementoGenericoTool(ElementDefinition definition)
         {
-            return new InserirElementoGenericoTool(
-                definition,
-                ElementoFactory,
-                InserirElemento,
-                Snap,
-                Geometry,
-                TerminalLayout,
-                AlignmentGuides,
-                Scene,
-                SceneQueries,
-                () => Tools.VoltarParaSelecao());
+            return new InserirElementoGenericoTool(definition, ElementoFactory, InserirElemento, Snap, Geometry, TerminalLayout, AlignmentGuides, Scene, SceneQueries, () => Tools.VoltarParaSelecao());
         }
 
         private InserirLinhaAnotativaTool CriarInserirLinhaAnotativaTool()
         {
-            return new InserirLinhaAnotativaTool(
-                Commands,
-                Document,
-                Names,
-                ElementoFactory,
-                Scene,
-                SceneQueries,
-                LinhaEndpointEdit,
-                () => Tools.VoltarParaSelecao());
+            return new InserirLinhaAnotativaTool(Commands, Document, Names, ElementoFactory, Scene, SceneQueries, LinhaEndpointEdit, () => Tools.VoltarParaSelecao());
+        }
+
+        private InserirRetanguloAnotativoTool CriarInserirRetanguloAnotativoTool()
+        {
+            return new InserirRetanguloAnotativoTool(Commands, Document, Names, ElementoFactory, Scene, SceneQueries, () => Tools.VoltarParaSelecao());
         }
 
         private Point ObterDestinoColagem(IReadOnlyList<Elemento> copiados)
@@ -390,9 +267,7 @@ namespace Araci.Services
                 return Viewport.ScreenToWorld(Viewport.CentroTela);
 
             Point centro = ColarElementosUseCase.CalcularCentro(copiados);
-            return new Point(
-                centro.X + ColarElementosUseCase.OffsetPadrao,
-                centro.Y + ColarElementosUseCase.OffsetPadrao);
+            return new Point(centro.X + ColarElementosUseCase.OffsetPadrao, centro.Y + ColarElementosUseCase.OffsetPadrao);
         }
 
         private void RefreshEditingHandles()
