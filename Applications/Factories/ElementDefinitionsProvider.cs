@@ -127,6 +127,22 @@ namespace Araci.Applications.Factories
                 Ribbon("Barra", "barra.svg", 60, "BA"),
                 false,
                 _properties.Barra());
+
+            yield return new ElementDefinition(
+                ElementKinds.LinhaAnotativa,
+                "Linha",
+                "LINHA",
+                typeof(LinhaAnotativa),
+                typeof(LinhaAnotativaViewModel),
+                null,
+                () => new LinhaAnotativa(),
+                (m, c) => new LinhaAnotativaViewModel((LinhaAnotativa)m, _types, c.Names, c.TypePropertiesDialogs),
+                () => null,
+                () => Array.Empty<TipoElemento>(),
+                _ => Size.Empty,
+                _ => { },
+                new ElementRibbonMetadata("Linha", "Desenhar", "linha.svg", 0, false, null),
+                false);
         }
 
         private Barra CriarBarra()

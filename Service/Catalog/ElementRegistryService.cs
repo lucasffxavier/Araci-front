@@ -82,6 +82,9 @@ namespace Araci.Services.Catalog
 
         public ElementDefinition? FindByViewModelType(Type viewModelType)
         {
+            if (viewModelType == null)
+                return null;
+
             return _definitions.FirstOrDefault(d => d.ViewModelType == viewModelType);
         }
 

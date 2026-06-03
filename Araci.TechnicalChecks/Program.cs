@@ -115,6 +115,7 @@ namespace Araci.TechnicalChecks
                 ("Botoes da Ribbon nao capturam foco", BotoesDaRibbonNaoCapturamFoco),
                 ("Viewport continua focavel", ViewportContinuaFocavel),
                 ("Catalogo preserva Ribbon ordem e atalhos", CatalogoPreservaRibbonOrdemEAtalhos),
+                ("Catalogo registra LinhaAnotativa com ViewModel minima", CatalogoRegistraLinhaAnotativaComViewModelMinima),
                 ("Catalogo preserva propriedades nao editaveis", CatalogoPreservaPropriedadesNaoEditaveis),
                 ("Catalogo preserva edicao mista", CatalogoPreservaEdicaoMista),
                 ("UnitFormatter converte kV e V", UnitFormatterConverteKvEVolt),
@@ -1798,6 +1799,99 @@ namespace Araci.TechnicalChecks
                 AssertEqual(expected[i].Item1, definitions[i].Kind, $"Ribbon[{i}].Kind");
                 AssertEqual(expected[i].Item2, definitions[i].Atalho, $"Ribbon[{i}].Atalho");
             }
+        }
+
+        private static void CatalogoRegistraLinhaAnotativaComViewModelMinima()
+        {
+            EditorContext context = CreateContextWithViewport();
+
+            ElementDefinition? definition = context.Elements.FindByKind(ElementKinds.LinhaAnotativa);
+
+            if (definition == null)
+                throw new InvalidOperationException("LinhaAnotativa deve estar registrada no catalogo.");
+
+            AssertEqual(ElementKinds.LinhaAnotativa, definition.Kind, "LinhaAnotativa.Kind");
+            AssertEqual("Linha", definition.NomeAmigavel, "LinhaAnotativa.NomeAmigavel");
+            AssertEqual("LINHA", definition.PrefixoNome, "LinhaAnotativa.PrefixoNome");
+            AssertEqual(typeof(LinhaAnotativa), definition.ModelType, "LinhaAnotativa.ModelType");
+            AssertEqual(typeof(LinhaAnotativaViewModel), definition.ViewModelType, "LinhaAnotativa.ViewModelType");
+            Assert(definition.TypeModelType == null, "LinhaAnotativa nao deve possuir TypeModelType.");
+            Assert(!definition.ExibirNoRibbon, "LinhaAnotativa nao deve aparecer na Ribbon.");
+            Assert(!definition.UsaFerramentaEspecial, "LinhaAnotativa nao deve usar ferramenta especial.");
+            Assert(!context.Elements.RibbonDefinitions.Any(d => d.Kind == ElementKinds.LinhaAnotativa), "RibbonDefinitions nao deve conter LinhaAnotativa.");
+            AssertLinhaAnotativaTemplateRegistrado();
+
+            Elemento modelo = context.ElementoFactory.CriarModelo(ElementKinds.LinhaAnotativa);
+
+            if (modelo is not LinhaAnotativa linha)
+                throw new InvalidOperationException("ElementoModelFactory deve criar LinhaAnotativa.");
+
+            AssertEqual(ElementoDomainRole.Anotacao, linha.DomainRole, "LinhaAnotativa criada.DomainRole");
+            Assert(!linha.ParticipaDoGrafoEletrico, "LinhaAnotativa criada nao deve participar do grafo eletrico.");
+            Assert(linha.PossuiParametro(ElementoAnotativo.PARAM_COR_LINHA), "LinhaAnotativa criada deve possuir CorLinha.");
+            Assert(linha.PossuiParametro(ElementoAnotativo.PARAM_ESPESSURA_LINHA), "LinhaAnotativa criada deve possuir EspessuraLinha.");
+            Assert(linha.PossuiParametro(ElementoAnotativo.PARAM_VISIVEL), "LinhaAnotativa criada deve possuir Visivel.");
+            Assert(linha.PossuiParametro(LinhaAnotativa.PARAM_X2), "LinhaAnotativa criada deve possuir X2.");
+            Assert(linha.PossuiParametro(LinhaAnotativa.PARAM_Y2), "LinhaAnotativa criada deve possuir Y2.");
+            Assert(!linha.ParticipaDoGrafoEletrico, "LinhaAnotativa criada deve continuar fora do grafo eletrico.");
+
+            if (context.ElementoFactory.CriarViewModel(linha) is not LinhaAnotativaViewModel vm)
+                throw new InvalidOperationException("LinhaAnotativa deve criar LinhaAnotativaViewModel.");
+
+            Assert(ReferenceEquals(linha, vm.Modelo), "LinhaAnotativaViewModel deve referenciar a linha original.");
+            Assert(vm.Node.GetType().Name == "LinhaAnotativaNode", "LinhaAnotativaViewModel deve usar LinhaAnotativaNode.");
+            AssertEqual(vm.Bounds.X, vm.WorldX, "LinhaAnotativaViewModel.WorldX");
+            AssertEqual(vm.Bounds.Y, vm.WorldY, "LinhaAnotativaViewModel.WorldY");
+            AssertEqual(0.0, vm.RenderData.PontoLocalInicial.X, "Linha direita.RenderData.Inicial.X");
+            AssertEqual(0.0, vm.RenderData.PontoLocalInicial.Y, "Linha direita.RenderData.Inicial.Y");
+            AssertEqual(100.0, vm.RenderData.PontoLocalFinal.X, "Linha direita.RenderData.Final.X");
+            AssertEqual(0.0, vm.RenderData.PontoLocalFinal.Y, "Linha direita.RenderData.Final.Y");
+
+            vm.X2 = -100.0;
+            vm.Y2 = 50.0;
+
+            AssertEqual(-100.0, linha.X2, "LinhaAnotativaViewModel.X2 atualiza modelo");
+            AssertEqual(50.0, linha.Y2, "LinhaAnotativaViewModel.Y2 atualiza modelo");
+            AssertEqual(100.0, vm.RenderData.PontoLocalInicial.X, "Linha negativa.RenderData.Inicial.X");
+            AssertEqual(0.0, vm.RenderData.PontoLocalInicial.Y, "Linha negativa.RenderData.Inicial.Y");
+            AssertEqual(0.0, vm.RenderData.PontoLocalFinal.X, "Linha negativa.RenderData.Final.X");
+            AssertEqual(50.0, vm.RenderData.PontoLocalFinal.Y, "Linha negativa.RenderData.Final.Y");
+            AssertEqual(vm.Bounds.X, vm.WorldX, "Linha negativa.WorldX");
+            AssertEqual(vm.Bounds.Y, vm.WorldY, "Linha negativa.WorldY");
+
+            vm.CorLinha = "#FF112233";
+            vm.EspessuraLinha = 4.5;
+            vm.Visivel = false;
+
+            AssertEqual("#FF112233", linha.CorLinha, "LinhaAnotativaViewModel.CorLinha atualiza modelo");
+            AssertEqual(4.5, linha.EspessuraLinha, "LinhaAnotativaViewModel.EspessuraLinha atualiza modelo");
+            AssertEqual(false, linha.Visivel, "LinhaAnotativaViewModel.Visivel atualiza modelo");
+
+            context.Document.AdicionarElemento(linha);
+
+            Assert(context.Viewport?.ObterViewModel(linha) is LinhaAnotativaViewModel, "DocumentSceneSync deve criar ViewModel para LinhaAnotativa.");
+            AssertEqual(1, context.Scene.Elementos.Count, "Scene deve receber ViewModel para LinhaAnotativa.");
+
+            Assert(context.Elements.FindByKind(ElementKinds.Cabo) != null, "Cabo deve continuar registrado.");
+            Assert(context.Elements.FindByKind(ElementKinds.Carga) != null, "Carga deve continuar registrada.");
+            Assert(context.Elements.FindByKind(ElementKinds.Gerador) != null, "Gerador deve continuar registrado.");
+            Assert(context.Elements.FindByKind(ElementKinds.Sin) != null, "SIN deve continuar registrado.");
+            Assert(context.Elements.FindByKind(ElementKinds.Transformador) != null, "Transformador deve continuar registrado.");
+            Assert(context.Elements.FindByKind(ElementKinds.Barra) != null, "Barra deve continuar registrada.");
+        }
+
+        private static void AssertLinhaAnotativaTemplateRegistrado()
+        {
+            string xaml = File.ReadAllText(FindProjectFile("Views/ViewportView.xaml"));
+
+            AssertContains(xaml, "DataType=\"{x:Type viewModels:LinhaAnotativaViewModel}\"", "LinhaAnotativa.Template.DataType");
+            AssertContains(xaml, "<Line", "LinhaAnotativa.Template.Line");
+            AssertContains(xaml, "X1=\"{Binding RenderData.PontoLocalInicial.X}\"", "LinhaAnotativa.Template.X1");
+            AssertContains(xaml, "Y1=\"{Binding RenderData.PontoLocalInicial.Y}\"", "LinhaAnotativa.Template.Y1");
+            AssertContains(xaml, "X2=\"{Binding RenderData.PontoLocalFinal.X}\"", "LinhaAnotativa.Template.X2");
+            AssertContains(xaml, "Y2=\"{Binding RenderData.PontoLocalFinal.Y}\"", "LinhaAnotativa.Template.Y2");
+            AssertContains(xaml, "Stroke=\"{Binding RenderData.Stroke}\"", "LinhaAnotativa.Template.Stroke");
+            AssertContains(xaml, "StrokeThickness=\"{Binding RenderData.StrokeThickness}\"", "LinhaAnotativa.Template.StrokeThickness");
         }
 
         private static void CatalogoPreservaPropriedadesNaoEditaveis()

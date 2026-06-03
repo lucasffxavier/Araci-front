@@ -16,8 +16,8 @@ namespace Araci.Applications.Abstractions
             string nomeAmigavel,
             string prefixoNome,
             Type modelType,
-            Type viewModelType,
-            Type typeModelType,
+            Type? viewModelType,
+            Type? typeModelType,
             Func<Elemento> criarModelo,
             Func<Elemento, ElementViewModelFactoryContext, ElementoViewModel?> criarViewModel,
             Func<TipoElemento?> obterTipoPadrao,
@@ -32,8 +32,8 @@ namespace Araci.Applications.Abstractions
             NomeAmigavel = nomeAmigavel ?? throw new ArgumentNullException(nameof(nomeAmigavel));
             PrefixoNome = prefixoNome ?? throw new ArgumentNullException(nameof(prefixoNome));
             ModelType = modelType ?? throw new ArgumentNullException(nameof(modelType));
-            ViewModelType = viewModelType ?? throw new ArgumentNullException(nameof(viewModelType));
-            TypeModelType = typeModelType ?? throw new ArgumentNullException(nameof(typeModelType));
+            ViewModelType = viewModelType;
+            TypeModelType = typeModelType;
             CriarModelo = criarModelo ?? throw new ArgumentNullException(nameof(criarModelo));
             CriarViewModel = criarViewModel ?? throw new ArgumentNullException(nameof(criarViewModel));
             ObterTipoPadrao = obterTipoPadrao ?? throw new ArgumentNullException(nameof(obterTipoPadrao));
@@ -51,8 +51,8 @@ namespace Araci.Applications.Abstractions
         public string NomeAmigavel { get; }
         public string PrefixoNome { get; }
         public Type ModelType { get; }
-        public Type ViewModelType { get; }
-        public Type TypeModelType { get; }
+        public Type? ViewModelType { get; }
+        public Type? TypeModelType { get; }
         public ElementRibbonMetadata Ribbon { get; }
         public string NomeRibbon => Ribbon.Nome;
         public string CategoriaRibbon => Ribbon.Categoria;
@@ -76,7 +76,7 @@ namespace Araci.Applications.Abstractions
 
         public bool AceitaViewModel(ElementoViewModel viewModel)
         {
-            return ViewModelType.IsInstanceOfType(viewModel);
+            return ViewModelType != null && ViewModelType.IsInstanceOfType(viewModel);
         }
     }
 }
