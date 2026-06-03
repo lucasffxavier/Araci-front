@@ -46,6 +46,7 @@ namespace Araci.TechnicalChecks
                 ("Elementos existentes permanecem eletricos", ElementosExistentesPermanecemEletricos),
                 ("ElementoAnotativo nao participa do grafo eletrico", ElementoAnotativoNaoParticipaDoGrafoEletrico),
                 ("ElementoAnotativoRetangular preserva base anotativa", ElementoAnotativoRetangularPreservaBaseAnotativa),
+                ("LinhaAnotativa preserva dominio anotativo", LinhaAnotativaPreservaDominioAnotativo),
                 ("ElectricGraph Build nao altera Document", ElectricGraphBuildNaoAlteraDocument),
                 ("ElectricGraph inclui eletricos e ignora anotativo", ElectricGraphIncluiEletricosEIgnoraAnotativo),
                 ("DTO permanece identico com anotativo no Document", DtoPermaneceIdenticoComAnotativoNoDocument),
@@ -406,6 +407,51 @@ namespace Araci.TechnicalChecks
             AssertEqual(90.0, annotation.Obter<double>(ElementoAnotativoRetangular.PARAM_ALTURA), "ElementoAnotativoRetangular.Altura alterada");
             Assert(!carga.PossuiParametro(ElementoAnotativoRetangular.PARAM_LARGURA), "Carga nao deve possuir parametro Largura.");
             Assert(!carga.PossuiParametro(ElementoAnotativoRetangular.PARAM_ALTURA), "Carga nao deve possuir parametro Altura.");
+        }
+
+        private static void LinhaAnotativaPreservaDominioAnotativo()
+        {
+            var linha = new LinhaAnotativa();
+            var carga = new Carga();
+
+            Assert(linha is ElementoAnotativo, "LinhaAnotativa deve herdar de ElementoAnotativo.");
+            AssertEqual(ElementoDomainRole.Anotacao, linha.DomainRole, "LinhaAnotativa.DomainRole");
+            Assert(!linha.ParticipaDoGrafoEletrico, "LinhaAnotativa nao deve participar do grafo eletrico.");
+            Assert(linha.PossuiParametro(Elemento.PARAM_NOME), "LinhaAnotativa deve possuir parametro Nome.");
+            Assert(linha.PossuiParametro(ElementoAnotativo.PARAM_COR_LINHA), "LinhaAnotativa deve possuir parametro CorLinha.");
+            Assert(linha.PossuiParametro(ElementoAnotativo.PARAM_ESPESSURA_LINHA), "LinhaAnotativa deve possuir parametro EspessuraLinha.");
+            Assert(linha.PossuiParametro(ElementoAnotativo.PARAM_VISIVEL), "LinhaAnotativa deve possuir parametro Visivel.");
+            Assert(linha.PossuiParametro(LinhaAnotativa.PARAM_X2), "LinhaAnotativa deve possuir parametro X2.");
+            Assert(linha.PossuiParametro(LinhaAnotativa.PARAM_Y2), "LinhaAnotativa deve possuir parametro Y2.");
+            AssertEqual(100.0, linha.X2, "LinhaAnotativa.X2 default");
+            AssertEqual(0.0, linha.Y2, "LinhaAnotativa.Y2 default");
+
+            linha.Nome = "Linha teste";
+            linha.CorLinha = "#FF102030";
+            linha.EspessuraLinha = 3.5;
+            linha.Visivel = false;
+            linha.X2 = 250.0;
+            linha.Y2 = 75.0;
+
+            AssertEqual(250.0, linha.Obter<double>(LinhaAnotativa.PARAM_X2), "LinhaAnotativa.X2 alterado");
+            AssertEqual(75.0, linha.Obter<double>(LinhaAnotativa.PARAM_Y2), "LinhaAnotativa.Y2 alterado");
+
+            Elemento cloneElemento = linha.Clonar();
+            var clone = cloneElemento as LinhaAnotativa;
+
+            if (clone == null)
+                throw new InvalidOperationException("Clonar deve criar LinhaAnotativa.");
+
+            Assert(linha.Id != clone.Id, "Clone deve receber novo Id.");
+            AssertEqual(linha.Nome, clone.Nome, "Clone.Nome");
+            AssertEqual(linha.CorLinha, clone.CorLinha, "Clone.CorLinha");
+            AssertEqual(linha.EspessuraLinha, clone.EspessuraLinha, "Clone.EspessuraLinha");
+            AssertEqual(linha.Visivel, clone.Visivel, "Clone.Visivel");
+            AssertEqual(linha.X2, clone.X2, "Clone.X2");
+            AssertEqual(linha.Y2, clone.Y2, "Clone.Y2");
+            Assert(!carga.PossuiParametro(LinhaAnotativa.PARAM_X2), "Carga nao deve possuir parametro X2.");
+            Assert(!carga.PossuiParametro(LinhaAnotativa.PARAM_Y2), "Carga nao deve possuir parametro Y2.");
+            AssertEqual("LinhaAnotativa", ElementKinds.LinhaAnotativa, "ElementKinds.LinhaAnotativa");
         }
 
         private static void ElectricGraphBuildNaoAlteraDocument()

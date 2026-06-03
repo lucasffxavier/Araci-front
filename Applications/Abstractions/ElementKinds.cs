@@ -8,5 +8,6 @@ namespace Araci.Applications.Abstractions
         public const string Sin = "Sin";
         public const string Transformador = "Transformador";
         public const string Cabo = "Cabo";
+        public const string LinhaAnotativa = "LinhaAnotativa";
     }
 }
