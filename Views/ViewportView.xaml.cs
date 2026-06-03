@@ -40,6 +40,7 @@ namespace Araci.Views
             AlignmentGuideLayer.RenderTransform = _cameraTransform;
             SelectionLayer.RenderTransform = _cameraTransform;
             CableVertexHandleLayer.RenderTransform = _cameraTransform;
+            LinhaEndpointInsertionSnapLayer.RenderTransform = _cameraTransform;
             LinhaEndpointHandleLayer.RenderTransform = _cameraTransform;
             TerminalSnapLayer.RenderTransform = _cameraTransform;
             _context.Viewport.Camera.PropertyChanged += OnCameraChanged;
@@ -254,6 +255,7 @@ namespace Araci.Views
             _context?.Hover.Clear();
             _context?.TerminalSnap.Limpar();
             _context?.AlignmentGuides.Limpar();
+            _context?.LinhaEndpointEdit.LimparSnapInsercao();
             _context?.Navigation.CancelPan();
             AtualizarCursorNavegacao();
         }
@@ -262,6 +264,7 @@ namespace Araci.Views
         {
             _context?.Navigation.Reset();
             _context?.AlignmentGuides.Limpar();
+            _context?.LinhaEndpointEdit.LimparSnapInsercao();
             LiberarCapturaMouse();
             Cursor = Cursors.Arrow;
 
