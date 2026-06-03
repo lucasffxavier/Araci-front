@@ -26,10 +26,7 @@ namespace Araci.ViewModels
             X2 = x2;
             Y2 = y2;
             Rotacao = rotacao;
-
-            Vertices = vertices != null
-                ? new List<Point>(vertices)
-                : new List<Point>();
+            Vertices = vertices != null ? new List<Point>(vertices) : new List<Point>();
         }
 
         public void AplicarEm(Elemento elemento)
@@ -48,6 +45,12 @@ namespace Araci.ViewModels
             {
                 linha.X2 = X2;
                 linha.Y2 = Y2;
+            }
+
+            if (elemento is RetanguloAnotativo retangulo)
+            {
+                retangulo.Largura = X2;
+                retangulo.Altura = Y2;
             }
 
             if (elemento is not Cabo cabo)
