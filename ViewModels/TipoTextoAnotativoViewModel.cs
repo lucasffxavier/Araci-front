@@ -33,6 +33,19 @@ namespace Araci.ViewModels
             "Direita"
         };
 
+        public string CorTexto
+        {
+            get => TipoTexto.CorTexto;
+            set
+            {
+                if (TipoTexto.CorTexto == value)
+                    return;
+
+                TipoTexto.CorTexto = value;
+                OnPropertyChanged();
+            }
+        }
+
         public string Fonte
         {
             get => TipoTexto.Fonte;

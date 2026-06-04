@@ -22,7 +22,6 @@ namespace Araci.ViewModels
             : base(modelo, new TextoAnotativoNode(modelo), types, names, typePropertiesDialogs)
         {
             SelecionarPrimeiroTipoDisponivel();
-            Texto.AplicarTipoSeNecessario();
             AtualizarAposModeloAlterado();
         }
 
@@ -43,11 +42,15 @@ namespace Araci.ViewModels
                     return;
 
                 base.Tipo = value;
-                Texto.AplicarTipoSeNecessario();
                 OnPropertyChanged(nameof(TipoTexto));
+                OnPropertyChanged(nameof(CorTexto));
                 OnPropertyChanged(nameof(Fonte));
                 OnPropertyChanged(nameof(AlturaTexto));
                 OnPropertyChanged(nameof(AlinhamentoHorizontal));
+                OnPropertyChanged(nameof(ForegroundBrush));
+                OnPropertyChanged(nameof(FontFamily));
+                OnPropertyChanged(nameof(TextAlignment));
+                OnPropertyChanged(nameof(RenderData));
                 AtualizarNode();
                 NotificarParametros();
             }
@@ -89,65 +92,10 @@ namespace Araci.ViewModels
             }
         }
 
-        public string CorTexto
-        {
-            get => Texto.CorTexto;
-            set
-            {
-                if (Texto.CorTexto == value)
-                    return;
-
-                Texto.CorTexto = value;
-                OnPropertyChanged();
-                OnPropertyChanged(nameof(ForegroundBrush));
-                OnPropertyChanged(nameof(RenderData));
-                NotificarParametros();
-            }
-        }
-
-        public double AlturaTexto
-        {
-            get => Texto.AlturaTexto;
-            set
-            {
-                if (Math.Abs(Texto.AlturaTexto - value) < 0.0001)
-                    return;
-
-                Texto.AlturaTexto = value;
-                OnPropertyChanged();
-                AtualizarNode();
-                NotificarParametros();
-            }
-        }
-
-        public string Fonte
-        {
-            get => Texto.Fonte;
-            set
-            {
-                if (Texto.Fonte == value)
-                    return;
-
-                Texto.Fonte = value;
-                OnPropertyChanged();
-                NotificarParametros();
-            }
-        }
-
-        public string AlinhamentoHorizontal
-        {
-            get => Texto.AlinhamentoHorizontal;
-            set
-            {
-                if (Texto.AlinhamentoHorizontal == value)
-                    return;
-
-                Texto.AlinhamentoHorizontal = value;
-                OnPropertyChanged();
-                OnPropertyChanged(nameof(TextAlignment));
-                NotificarParametros();
-            }
-        }
+        public string CorTexto => Texto.CorTexto;
+        public double AlturaTexto => Texto.AlturaTexto;
+        public string Fonte => Texto.Fonte;
+        public string AlinhamentoHorizontal => Texto.AlinhamentoHorizontal;
 
         public bool Visivel
         {
@@ -172,7 +120,7 @@ namespace Araci.ViewModels
             _ => TextAlignment.Left
         };
 
-        public FontFamily FontFamily => new(string.IsNullOrWhiteSpace(Fonte) ? "Segoe UI" : Fonte);
+        public FontFamily FontFamily => new(string.IsNullOrWhiteSpace(Fonte) ? "Arial" : Fonte);
 
         public override void Mover(Vector delta)
         {
@@ -198,10 +146,14 @@ namespace Araci.ViewModels
         {
             base.NotificarGeometria();
             OnPropertyChanged(nameof(Conteudo));
+            OnPropertyChanged(nameof(CorTexto));
             OnPropertyChanged(nameof(AlturaTexto));
+            OnPropertyChanged(nameof(Fonte));
+            OnPropertyChanged(nameof(AlinhamentoHorizontal));
             OnPropertyChanged(nameof(FontFamily));
             OnPropertyChanged(nameof(TextAlignment));
             OnPropertyChanged(nameof(ForegroundBrush));
+            OnPropertyChanged(nameof(RenderData));
         }
 
         private static Brush CriarBrush(string cor)

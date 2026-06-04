@@ -2,6 +2,7 @@
 {
     public class TipoTextoAnotativo : TipoElemento
     {
+        public const string PARAM_COR_TEXTO = "CorTexto";
         public const string PARAM_FONTE = "Fonte";
         public const string PARAM_ALTURA_TEXTO = "AlturaTexto";
         public const string PARAM_ALINHAMENTO_HORIZONTAL = "AlinhamentoHorizontal";
@@ -11,9 +12,16 @@
             NomeTipo = "Texto padrão";
             Familia = "Anotações";
             Categoria = "Textos";
+            DefinirParametro(new Parameter<string>(PARAM_COR_TEXTO, "#FF000000"));
             DefinirParametro(new Parameter<string>(PARAM_FONTE, "Arial"));
             DefinirParametro(new Parameter<double>(PARAM_ALTURA_TEXTO, 14.0));
             DefinirParametro(new Parameter<string>(PARAM_ALINHAMENTO_HORIZONTAL, "Esquerda"));
+        }
+
+        public string CorTexto
+        {
+            get => Obter<string>(PARAM_COR_TEXTO);
+            set => Definir(PARAM_COR_TEXTO, string.IsNullOrWhiteSpace(value) ? "#FF000000" : value.Trim());
         }
 
         public string Fonte

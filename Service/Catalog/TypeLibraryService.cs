@@ -76,9 +76,9 @@ namespace Araci.Services.Catalog
 
         private void InicializarTextosAnotativos()
         {
-            TiposTextosAnotativos.Add(CriarTipoTexto("Texto padrão", "Segoe UI", 14, "Esquerda"));
-            TiposTextosAnotativos.Add(CriarTipoTexto("Texto pequeno", "Segoe UI", 10, "Esquerda"));
-            TiposTextosAnotativos.Add(CriarTipoTexto("Texto título", "Segoe UI", 20, "Centro"));
+            TiposTextosAnotativos.Add(CriarTipoTexto("Texto padrão", "#FF000000", "Arial", 14, "Esquerda"));
+            TiposTextosAnotativos.Add(CriarTipoTexto("Texto pequeno", "#FF000000", "Arial", 10, "Esquerda"));
+            TiposTextosAnotativos.Add(CriarTipoTexto("Texto título", "#FF000000", "Arial", 20, "Centro"));
         }
 
         private static TipoLinhaAnotativa CriarTipoLinha(string nome, string estilo)
@@ -86,9 +86,9 @@ namespace Araci.Services.Catalog
             return new TipoLinhaAnotativa { NomeTipo = nome, Familia = "Anotações", Categoria = "Linhas", EstiloLinha = estilo };
         }
 
-        private static TipoTextoAnotativo CriarTipoTexto(string nome, string fonte, double altura, string alinhamento)
+        private static TipoTextoAnotativo CriarTipoTexto(string nome, string cor, string fonte, double altura, string alinhamento)
         {
-            return new TipoTextoAnotativo { NomeTipo = nome, Familia = "Anotações", Categoria = "Textos", Fonte = fonte, AlturaTexto = altura, AlinhamentoHorizontal = alinhamento };
+            return new TipoTextoAnotativo { NomeTipo = nome, Familia = "Anotações", Categoria = "Textos", CorTexto = cor, Fonte = fonte, AlturaTexto = altura, AlinhamentoHorizontal = alinhamento };
         }
     }
 }

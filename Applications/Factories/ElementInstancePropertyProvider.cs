@@ -142,11 +142,7 @@ namespace Araci.Applications.Factories
             return new[]
             {
                 Prop<TextoAnotativoViewModel>("Nome", "Nome", 10, false),
-                Prop<TextoAnotativoViewModel>("Conteudo", "Texto", 20),
-                Prop<TextoAnotativoViewModel>("CorTexto", "Cor do texto", 30, isColor: true),
-                Prop<TextoAnotativoViewModel>("AlturaTexto", "Altura do texto", 40, unit: UnitKind.LengthMeter),
-                Prop<TextoAnotativoViewModel>("Fonte", "Fonte", 50),
-                Prop<TextoAnotativoViewModel>("AlinhamentoHorizontal", "Alinhamento", 60)
+                Prop<TextoAnotativoViewModel>("Conteudo", "Texto", 20)
             };
         }
 

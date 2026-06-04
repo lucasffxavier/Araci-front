@@ -83,9 +83,7 @@ namespace Araci.Applications.Factories
 
         private TextoAnotativo CriarTextoAnotativo()
         {
-            var texto = new TextoAnotativo { Tipo = _types.TipoTextoAnotativoPadrao ?? throw new InvalidOperationException("Nenhum tipo de texto anotativo cadastrado.") };
-            texto.AplicarTipoSeNecessario();
-            return texto;
+            return new TextoAnotativo { Tipo = _types.TipoTextoAnotativoPadrao ?? throw new InvalidOperationException("Nenhum tipo de texto anotativo cadastrado.") };
         }
 
         private static ElementRibbonMetadata Ribbon(string nome, string icone, int ordem, string atalho)

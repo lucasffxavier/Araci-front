@@ -7,18 +7,10 @@ namespace Araci.Models
     public class TextoAnotativo : ElementoAnotativo
     {
         public const string PARAM_TEXTO = "Texto";
-        public const string PARAM_COR_TEXTO = "CorTexto";
-        public const string PARAM_ALTURA_TEXTO = "AlturaTexto";
-        public const string PARAM_FONTE = "Fonte";
-        public const string PARAM_ALINHAMENTO_HORIZONTAL = "AlinhamentoHorizontal";
 
         public TextoAnotativo()
         {
             DefinirParametro(new Parameter<string>(PARAM_TEXTO, "Texto"));
-            DefinirParametro(new Parameter<string>(PARAM_COR_TEXTO, "#FF000000"));
-            DefinirParametro(new Parameter<double>(PARAM_ALTURA_TEXTO, 14.0));
-            DefinirParametro(new Parameter<string>(PARAM_FONTE, "Segoe UI"));
-            DefinirParametro(new Parameter<string>(PARAM_ALINHAMENTO_HORIZONTAL, "Esquerda"));
         }
 
         public string Texto
@@ -27,31 +19,12 @@ namespace Araci.Models
             set => Definir(PARAM_TEXTO, value ?? string.Empty);
         }
 
-        public string CorTexto
-        {
-            get => Obter<string>(PARAM_COR_TEXTO);
-            set => Definir(PARAM_COR_TEXTO, string.IsNullOrWhiteSpace(value) ? "#FF000000" : value.Trim());
-        }
-
-        public double AlturaTexto
-        {
-            get => Obter<double>(PARAM_ALTURA_TEXTO);
-            set => Definir(PARAM_ALTURA_TEXTO, value <= 0 ? 14.0 : value);
-        }
-
-        public string Fonte
-        {
-            get => Obter<string>(PARAM_FONTE);
-            set => Definir(PARAM_FONTE, string.IsNullOrWhiteSpace(value) ? "Segoe UI" : value.Trim());
-        }
-
-        public string AlinhamentoHorizontal
-        {
-            get => Obter<string>(PARAM_ALINHAMENTO_HORIZONTAL);
-            set => Definir(PARAM_ALINHAMENTO_HORIZONTAL, NormalizarAlinhamento(value));
-        }
-
         public TipoTextoAnotativo? TipoTexto => Tipo as TipoTextoAnotativo;
+
+        public string CorTexto => TipoTexto?.CorTexto ?? "#FF000000";
+        public double AlturaTexto => TipoTexto?.AlturaTexto ?? 14.0;
+        public string Fonte => TipoTexto?.Fonte ?? "Arial";
+        public string AlinhamentoHorizontal => TipoTexto?.AlinhamentoHorizontal ?? "Esquerda";
 
         public double LarguraEstimada
         {
@@ -72,16 +45,6 @@ namespace Araci.Models
             }
         }
 
-        public void AplicarTipoSeNecessario()
-        {
-            if (TipoTexto == null)
-                return;
-
-            Fonte = TipoTexto.Fonte;
-            AlturaTexto = TipoTexto.AlturaTexto;
-            AlinhamentoHorizontal = TipoTexto.AlinhamentoHorizontal;
-        }
-
         public override Elemento Clonar()
         {
             var clone = new TextoAnotativo();
@@ -92,16 +55,6 @@ namespace Araci.Models
         private string[] ObterLinhas()
         {
             return (Texto ?? string.Empty).Replace("\r\n", "\n").Replace('\r', '\n').Split('\n');
-        }
-
-        private static string NormalizarAlinhamento(string? valor)
-        {
-            return valor switch
-            {
-                "Centro" => "Centro",
-                "Direita" => "Direita",
-                _ => "Esquerda"
-            };
         }
     }
 }
