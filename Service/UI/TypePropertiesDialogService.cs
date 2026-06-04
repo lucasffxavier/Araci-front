@@ -20,7 +20,12 @@ namespace Araci.Services.UI
             if (Application.Current?.MainWindow != null)
                 window.Owner = Application.Current.MainWindow;
 
-            window.ShowDialog();
+            bool confirmado = window.ShowDialog() == true;
+
+            if (confirmado)
+                viewModel.CommitChanges();
+            else
+                viewModel.CancelChanges();
         }
     }
 }

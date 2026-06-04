@@ -14,7 +14,9 @@ namespace Araci.ViewModels
 {
     public class TipoTextoAnotativoViewModel : TipoElementoViewModel
     {
-        private readonly ObservableCollection<TipoTextoAnotativo>? _tiposDisponiveis;
+        private readonly ObservableCollection<TipoTextoAnotativo>? _tiposReais;
+        private readonly ObservableCollection<TipoTextoAnotativo>? _tiposTemporarios;
+        private readonly Dictionary<TipoTextoAnotativo, TipoTextoAnotativo?> _mapaTemporarioParaReal = new();
         private readonly Action<TipoTextoAnotativo>? _selecionarTipo;
         private readonly Action? _tipoAlterado;
         private ICommand? _escolherCorCommand;
@@ -34,14 +36,37 @@ namespace Araci.ViewModels
         public TipoTextoAnotativoViewModel(TipoTextoAnotativo tipo, ObservableCollection<TipoTextoAnotativo>? tiposDisponiveis, Action<TipoTextoAnotativo>? selecionarTipo, Action? tipoAlterado)
             : base(tipo)
         {
-            _tiposDisponiveis = tiposDisponiveis;
+            _tiposReais = tiposDisponiveis;
             _selecionarTipo = selecionarTipo;
             _tipoAlterado = tipoAlterado;
+
+            if (_tiposReais != null)
+            {
+                _tiposTemporarios = new ObservableCollection<TipoTextoAnotativo>();
+
+                foreach (TipoTextoAnotativo tipoReal in _tiposReais)
+                {
+                    TipoTextoAnotativo temporario = ClonarTipo(tipoReal);
+                    _tiposTemporarios.Add(temporario);
+                    _mapaTemporarioParaReal[temporario] = tipoReal;
+
+                    if (ReferenceEquals(tipoReal, tipo))
+                        _tipo = temporario;
+                }
+
+                if (!_mapaTemporarioParaReal.ContainsKey((TipoTextoAnotativo)_tipo))
+                {
+                    TipoTextoAnotativo temporarioSelecionado = ClonarTipo(tipo);
+                    _tiposTemporarios.Add(temporarioSelecionado);
+                    _mapaTemporarioParaReal[temporarioSelecionado] = tipo;
+                    _tipo = temporarioSelecionado;
+                }
+            }
         }
 
         protected TipoTextoAnotativo TipoTexto => (TipoTextoAnotativo)_tipo;
 
-        public IEnumerable<TipoTextoAnotativo> TiposDisponiveis => _tiposDisponiveis != null ? _tiposDisponiveis : new[] { TipoTexto };
+        public IEnumerable<TipoTextoAnotativo> TiposDisponiveis => _tiposTemporarios != null ? _tiposTemporarios : new[] { TipoTexto };
 
         public TipoTextoAnotativo TipoSelecionado
         {
@@ -52,9 +77,7 @@ namespace Araci.ViewModels
                     return;
 
                 AtualizarTipoBase(value);
-                _selecionarTipo?.Invoke(value);
                 NotificarTudo();
-                NotificarTipoAlterado();
             }
         }
 
@@ -82,8 +105,8 @@ namespace Araci.ViewModels
         };
 
         public ICommand EscolherCorCommand => _escolherCorCommand ??= new SimpleCommand(EscolherCor);
-        public ICommand NovoTipoCommand => _novoTipoCommand ??= new SimpleCommand(CriarNovoTipo, () => _tiposDisponiveis != null);
-        public ICommand RenomearTipoCommand => _renomearTipoCommand ??= new SimpleCommand(RenomearTipo, () => _tiposDisponiveis != null);
+        public ICommand NovoTipoCommand => _novoTipoCommand ??= new SimpleCommand(CriarNovoTipo, () => _tiposTemporarios != null);
+        public ICommand RenomearTipoCommand => _renomearTipoCommand ??= new SimpleCommand(RenomearTipo, () => _tiposTemporarios != null);
 
         public string CorTexto
         {
@@ -99,7 +122,6 @@ namespace Araci.ViewModels
                 TipoTexto.CorTexto = normalizada;
                 OnPropertyChanged();
                 OnPropertyChanged(nameof(CorTextoBrush));
-                NotificarTipoAlterado();
             }
         }
 
@@ -115,7 +137,6 @@ namespace Araci.ViewModels
 
                 TipoTexto.Fonte = value;
                 OnPropertyChanged();
-                NotificarTipoAlterado();
             }
         }
 
@@ -129,7 +150,6 @@ namespace Araci.ViewModels
 
                 TipoTexto.AlturaTexto = value;
                 OnPropertyChanged();
-                NotificarTipoAlterado();
             }
         }
 
@@ -143,13 +163,52 @@ namespace Araci.ViewModels
 
                 TipoTexto.AlinhamentoHorizontal = value;
                 OnPropertyChanged();
-                NotificarTipoAlterado();
             }
+        }
+
+        public override void CommitChanges()
+        {
+            if (_tiposTemporarios == null || _tiposReais == null)
+            {
+                _tipoAlterado?.Invoke();
+                return;
+            }
+
+            TipoTextoAnotativo selecionadoTemporario = TipoTexto;
+            TipoTextoAnotativo? selecionadoReal = null;
+
+            foreach (TipoTextoAnotativo temporario in _tiposTemporarios)
+            {
+                if (!_mapaTemporarioParaReal.TryGetValue(temporario, out TipoTextoAnotativo? real) || real == null)
+                {
+                    real = ClonarTipo(temporario);
+                    _tiposReais.Add(real);
+                    _mapaTemporarioParaReal[temporario] = real;
+                }
+                else
+                {
+                    CopiarValores(temporario, real);
+                }
+
+                if (ReferenceEquals(temporario, selecionadoTemporario))
+                    selecionadoReal = real;
+            }
+
+            CollectionViewSource.GetDefaultView(_tiposReais)?.Refresh();
+
+            if (selecionadoReal != null)
+                _selecionarTipo?.Invoke(selecionadoReal);
+
+            _tipoAlterado?.Invoke();
+        }
+
+        public override void CancelChanges()
+        {
         }
 
         private void CriarNovoTipo()
         {
-            if (_tiposDisponiveis == null)
+            if (_tiposTemporarios == null)
                 return;
 
             var novo = new TipoTextoAnotativo
@@ -163,14 +222,15 @@ namespace Araci.ViewModels
                 AlinhamentoHorizontal = TipoTexto.AlinhamentoHorizontal
             };
 
-            _tiposDisponiveis.Add(novo);
+            _tiposTemporarios.Add(novo);
+            _mapaTemporarioParaReal[novo] = null;
             AtualizarListaDeTipos();
             TipoSelecionado = novo;
         }
 
         private void RenomearTipo()
         {
-            if (_tiposDisponiveis == null)
+            if (_tiposTemporarios == null)
                 return;
 
             var window = new RenameTypeWindow(TipoTexto.NomeTipo)
@@ -198,23 +258,21 @@ namespace Araci.ViewModels
                 AtualizarListaDeTipos();
                 OnPropertyChanged(nameof(TipoSelecionado));
                 OnPropertyChanged(nameof(TipoSelecionadoNome));
-                NotificarTipoAlterado();
                 return;
             }
         }
 
         private bool ExisteNomeDuplicado(string nome)
         {
-            if (_tiposDisponiveis == null)
-                return false;
-
-            return _tiposDisponiveis.Any(t => !ReferenceEquals(t, TipoTexto) && string.Equals(t.NomeTipo?.Trim(), nome, StringComparison.OrdinalIgnoreCase));
+            IEnumerable<TipoTextoAnotativo> tipos = _tiposTemporarios != null ? _tiposTemporarios : new[] { TipoTexto };
+            return tipos.Any(t => !ReferenceEquals(t, TipoTexto) && string.Equals(t.NomeTipo?.Trim(), nome, StringComparison.OrdinalIgnoreCase));
         }
 
         private string GerarNomeUnico(string nomeBase)
         {
             string baseLimpa = string.IsNullOrWhiteSpace(nomeBase) ? "Texto" : nomeBase.Trim();
-            var existentes = (_tiposDisponiveis ?? new ObservableCollection<TipoTextoAnotativo>())
+            IEnumerable<TipoTextoAnotativo> tipos = _tiposTemporarios != null ? _tiposTemporarios : new[] { TipoTexto };
+            var existentes = tipos
                 .Select(t => t.NomeTipo)
                 .Where(n => !string.IsNullOrWhiteSpace(n))
                 .ToHashSet(StringComparer.OrdinalIgnoreCase);
@@ -234,8 +292,8 @@ namespace Araci.ViewModels
 
         private void AtualizarListaDeTipos()
         {
-            if (_tiposDisponiveis != null)
-                CollectionViewSource.GetDefaultView(_tiposDisponiveis)?.Refresh();
+            if (_tiposTemporarios != null)
+                CollectionViewSource.GetDefaultView(_tiposTemporarios)?.Refresh();
 
             OnPropertyChanged(nameof(TiposDisponiveis));
             OnPropertyChanged(nameof(TipoSelecionadoNome));
@@ -267,9 +325,29 @@ namespace Araci.ViewModels
             OnPropertyChanged(nameof(AlinhamentoHorizontal));
         }
 
-        private void NotificarTipoAlterado()
+        private static TipoTextoAnotativo ClonarTipo(TipoTextoAnotativo origem)
         {
-            _tipoAlterado?.Invoke();
+            return new TipoTextoAnotativo
+            {
+                NomeTipo = origem.NomeTipo,
+                Familia = origem.Familia,
+                Categoria = origem.Categoria,
+                CorTexto = origem.CorTexto,
+                Fonte = origem.Fonte,
+                AlturaTexto = origem.AlturaTexto,
+                AlinhamentoHorizontal = origem.AlinhamentoHorizontal
+            };
+        }
+
+        private static void CopiarValores(TipoTextoAnotativo origem, TipoTextoAnotativo destino)
+        {
+            destino.NomeTipo = origem.NomeTipo;
+            destino.Familia = origem.Familia;
+            destino.Categoria = origem.Categoria;
+            destino.CorTexto = origem.CorTexto;
+            destino.Fonte = origem.Fonte;
+            destino.AlturaTexto = origem.AlturaTexto;
+            destino.AlinhamentoHorizontal = origem.AlinhamentoHorizontal;
         }
 
         private static string NormalizarNome(string? nome)

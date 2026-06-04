@@ -55,6 +55,14 @@ namespace Araci.ViewModels
             }
         }
 
+        public virtual void CommitChanges()
+        {
+        }
+
+        public virtual void CancelChanges()
+        {
+        }
+
         protected void AtualizarTipoBase(TipoElemento tipo)
         {
             if (ReferenceEquals(_tipo, tipo))
