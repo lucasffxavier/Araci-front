@@ -7,7 +7,6 @@ namespace Araci.Models
     public class TextoAnotativo : ElementoAnotativo
     {
         public const string PARAM_TEXTO = "Texto";
-        private const double LARGURA_MINIMA_TEXTO = 180;
 
         public TextoAnotativo()
         {
@@ -32,8 +31,8 @@ namespace Araci.Models
             get
             {
                 string[] linhas = ObterLinhas();
-                int maiorLinha = linhas.Length == 0 ? 1 : linhas.Max(l => l.Length);
-                return Math.Max(LARGURA_MINIMA_TEXTO, maiorLinha * AlturaTexto * 0.58 + 4);
+                int maiorLinha = Math.Max(1, linhas.Length == 0 ? 1 : linhas.Max(l => l.Length));
+                return Math.Max(1, maiorLinha * AlturaTexto * 0.58 + 4);
             }
         }
 

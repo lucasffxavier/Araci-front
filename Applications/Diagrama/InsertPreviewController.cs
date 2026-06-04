@@ -66,11 +66,11 @@ namespace Araci.Applications.Diagrama
             TModel modelo = _obterModelo(preview);
             Point pontoSnap = _snap.SnapFromElemento(elementoSobMouse, position, preview);
             _ultimoCentroPreview = pontoSnap;
-            PosicionarPorCentro(preview, modelo, pontoSnap);
             preview.Rotacao = _currentRotation;
+            PosicionarPorCentroVisual(preview, modelo, pontoSnap);
             _terminalLayout.AtualizarTerminais(modelo);
             preview.AtualizarAposModeloAlterado();
-            PosicionarPorCentro(preview, modelo, pontoSnap);
+            PosicionarPorCentroVisual(preview, modelo, pontoSnap);
             preview.AtualizarAposModeloAlterado();
 
             Vector ajuste = _alignmentGuides.AplicarSnapPreview(preview);
@@ -96,7 +96,7 @@ namespace Araci.Applications.Diagrama
 
             Preview.Rotacao = _currentRotation;
             TModel modelo = _obterModelo(Preview);
-            PosicionarPorCentro(Preview, modelo, _ultimoCentroPreview);
+            PosicionarPorCentroVisual(Preview, modelo, _ultimoCentroPreview);
             _terminalLayout.AtualizarTerminais(modelo);
             Preview.AtualizarAposModeloAlterado();
             _alignmentGuides.AplicarSnapPreview(Preview);
@@ -140,11 +140,12 @@ namespace Araci.Applications.Diagrama
             _terminalLayout.AtualizarTerminais(modelo);
             Preview.IsPreview = true;
             _scene.Elementos.Add(Preview);
+            Preview.AtualizarAposModeloAlterado();
             _sceneQueries.Invalidate();
             return Preview;
         }
 
-        private void PosicionarPorCentro(TViewModel preview, TModel modelo, Point centro)
+        private void PosicionarPorCentroVisual(TViewModel preview, TModel modelo, Point centro)
         {
             Size tamanho = ObterTamanhoAtual(preview, modelo);
             modelo.PosicaoX = centro.X - tamanho.Width / 2;
@@ -163,7 +164,7 @@ namespace Araci.Applications.Diagrama
             if (tamanho.Width > 0 && tamanho.Height > 0)
                 return tamanho;
 
-            return new Size(Math.Max(1, modelo.Escala), Math.Max(1, modelo.Escala));
+            return new Size(1, 1);
         }
     }
 }
