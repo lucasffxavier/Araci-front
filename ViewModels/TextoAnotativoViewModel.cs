@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections;
+using System.ComponentModel;
 using System.Windows;
 using System.Windows.Media;
 using Araci.Core.Rendering;
@@ -14,6 +15,8 @@ namespace Araci.ViewModels
 {
     public class TextoAnotativoViewModel : ElementoViewModel
     {
+        private TipoTextoAnotativoViewModel? _tipoTextoViewModelAssinado;
+
         public TextoAnotativoViewModel(
             TextoAnotativo modelo,
             TypeLibraryService types,
@@ -22,6 +25,7 @@ namespace Araci.ViewModels
             : base(modelo, new TextoAnotativoNode(modelo), types, names, typePropertiesDialogs)
         {
             SelecionarPrimeiroTipoDisponivel();
+            AssinarTipoTextoAtual();
             AtualizarAposModeloAlterado();
         }
 
@@ -41,17 +45,10 @@ namespace Araci.ViewModels
                 if (ReferenceEquals(Texto.Tipo, value))
                     return;
 
+                DesassinarTipoTextoAtual();
                 base.Tipo = value;
-                OnPropertyChanged(nameof(TipoTexto));
-                OnPropertyChanged(nameof(CorTexto));
-                OnPropertyChanged(nameof(Fonte));
-                OnPropertyChanged(nameof(AlturaTexto));
-                OnPropertyChanged(nameof(AlinhamentoHorizontal));
-                OnPropertyChanged(nameof(ForegroundBrush));
-                OnPropertyChanged(nameof(FontFamily));
-                OnPropertyChanged(nameof(TextAlignment));
-                OnPropertyChanged(nameof(RenderData));
-                AtualizarNode();
+                AssinarTipoTextoAtual();
+                NotificarAlteracaoVisualPorTipo();
                 NotificarParametros();
             }
         }
@@ -154,6 +151,50 @@ namespace Araci.ViewModels
             OnPropertyChanged(nameof(TextAlignment));
             OnPropertyChanged(nameof(ForegroundBrush));
             OnPropertyChanged(nameof(RenderData));
+        }
+
+        private void AssinarTipoTextoAtual()
+        {
+            if (TipoViewModel is not TipoTextoAnotativoViewModel tipoTextoViewModel)
+                return;
+
+            _tipoTextoViewModelAssinado = tipoTextoViewModel;
+            _tipoTextoViewModelAssinado.PropertyChanged += OnTipoTextoPropertyChanged;
+        }
+
+        private void DesassinarTipoTextoAtual()
+        {
+            if (_tipoTextoViewModelAssinado == null)
+                return;
+
+            _tipoTextoViewModelAssinado.PropertyChanged -= OnTipoTextoPropertyChanged;
+            _tipoTextoViewModelAssinado = null;
+        }
+
+        private void OnTipoTextoPropertyChanged(object? sender, PropertyChangedEventArgs e)
+        {
+            if (string.IsNullOrEmpty(e.PropertyName) ||
+                e.PropertyName is nameof(TipoTextoAnotativoViewModel.CorTexto) or
+                    nameof(TipoTextoAnotativoViewModel.Fonte) or
+                    nameof(TipoTextoAnotativoViewModel.AlturaTexto) or
+                    nameof(TipoTextoAnotativoViewModel.AlinhamentoHorizontal))
+            {
+                NotificarAlteracaoVisualPorTipo();
+            }
+        }
+
+        private void NotificarAlteracaoVisualPorTipo()
+        {
+            OnPropertyChanged(nameof(TipoTexto));
+            OnPropertyChanged(nameof(CorTexto));
+            OnPropertyChanged(nameof(Fonte));
+            OnPropertyChanged(nameof(AlturaTexto));
+            OnPropertyChanged(nameof(AlinhamentoHorizontal));
+            OnPropertyChanged(nameof(ForegroundBrush));
+            OnPropertyChanged(nameof(FontFamily));
+            OnPropertyChanged(nameof(TextAlignment));
+            OnPropertyChanged(nameof(RenderData));
+            AtualizarNode();
         }
 
         private static Brush CriarBrush(string cor)

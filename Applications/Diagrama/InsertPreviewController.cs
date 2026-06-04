@@ -23,6 +23,7 @@ namespace Araci.Applications.Diagrama
         private readonly AlignmentGuideService _alignmentGuides;
         private readonly CoreScene _scene;
         private readonly ISceneQueryService _sceneQueries;
+        private Point _ultimoCentroPreview;
         private double _currentRotation;
 
         public InsertPreviewController(
@@ -64,11 +65,12 @@ namespace Araci.Applications.Diagrama
             TViewModel preview = ObterPreview();
             TModel modelo = _obterModelo(preview);
             Point pontoSnap = _snap.SnapFromElemento(elementoSobMouse, position, preview);
-            Point posicao = _geometry.CalcularTopoEsquerdoPorCentro(modelo, pontoSnap);
-            modelo.PosicaoX = posicao.X;
-            modelo.PosicaoY = posicao.Y;
+            _ultimoCentroPreview = pontoSnap;
+            PosicionarPorCentro(preview, modelo, pontoSnap);
             preview.Rotacao = _currentRotation;
             _terminalLayout.AtualizarTerminais(modelo);
+            preview.AtualizarAposModeloAlterado();
+            PosicionarPorCentro(preview, modelo, pontoSnap);
             preview.AtualizarAposModeloAlterado();
 
             Vector ajuste = _alignmentGuides.AplicarSnapPreview(preview);
@@ -77,6 +79,7 @@ namespace Araci.Applications.Diagrama
             {
                 modelo.PosicaoX += ajuste.X;
                 modelo.PosicaoY += ajuste.Y;
+                _ultimoCentroPreview = new Point(_ultimoCentroPreview.X + ajuste.X, _ultimoCentroPreview.Y + ajuste.Y);
                 _terminalLayout.AtualizarTerminais(modelo);
                 preview.AtualizarAposModeloAlterado();
             }
@@ -93,7 +96,9 @@ namespace Araci.Applications.Diagrama
 
             Preview.Rotacao = _currentRotation;
             TModel modelo = _obterModelo(Preview);
+            PosicionarPorCentro(Preview, modelo, _ultimoCentroPreview);
             _terminalLayout.AtualizarTerminais(modelo);
+            Preview.AtualizarAposModeloAlterado();
             _alignmentGuides.AplicarSnapPreview(Preview);
             _sceneQueries.Invalidate();
             return true;
@@ -137,6 +142,28 @@ namespace Araci.Applications.Diagrama
             _scene.Elementos.Add(Preview);
             _sceneQueries.Invalidate();
             return Preview;
+        }
+
+        private void PosicionarPorCentro(TViewModel preview, TModel modelo, Point centro)
+        {
+            Size tamanho = ObterTamanhoAtual(preview, modelo);
+            modelo.PosicaoX = centro.X - tamanho.Width / 2;
+            modelo.PosicaoY = centro.Y - tamanho.Height / 2;
+        }
+
+        private Size ObterTamanhoAtual(TViewModel preview, TModel modelo)
+        {
+            Size tamanho = new Size(preview.Largura, preview.Altura);
+
+            if (tamanho.Width > 0 && tamanho.Height > 0)
+                return tamanho;
+
+            tamanho = _geometry.ObterTamanho(modelo);
+
+            if (tamanho.Width > 0 && tamanho.Height > 0)
+                return tamanho;
+
+            return new Size(Math.Max(1, modelo.Escala), Math.Max(1, modelo.Escala));
         }
     }
 }
