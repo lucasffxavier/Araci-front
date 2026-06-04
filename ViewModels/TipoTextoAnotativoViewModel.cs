@@ -1,4 +1,5 @@
-﻿using Araci.Models.Tipos;
+﻿using System.Collections.Generic;
+using Araci.Models.Tipos;
 
 namespace Araci.ViewModels
 {
@@ -10,6 +11,27 @@ namespace Araci.ViewModels
         }
 
         protected TipoTextoAnotativo TipoTexto => (TipoTextoAnotativo)_tipo;
+
+        public IReadOnlyList<string> FontesDisponiveis { get; } = new[]
+        {
+            "Arial",
+            "Arial Narrow",
+            "Calibri",
+            "Segoe UI",
+            "Courier New",
+            "Times New Roman",
+            "ISOCP",
+            "ISOCPEUR",
+            "Romans",
+            "Simplex"
+        };
+
+        public IReadOnlyList<string> AlinhamentosDisponiveis { get; } = new[]
+        {
+            "Esquerda",
+            "Centro",
+            "Direita"
+        };
 
         public string Fonte
         {

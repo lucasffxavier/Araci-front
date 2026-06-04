@@ -33,7 +33,7 @@ namespace Araci.Services.Editing
             if (referencias.Count == 0)
                 return deltaPretendido;
 
-            Rect boundsAtual = CalcularBounds(selecionadosList);
+            Rect boundsAtual = CalcularBoundsAlinhamento(selecionadosList);
             Rect boundsPretendido = Deslocar(boundsAtual, deltaPretendido);
             Vector ajuste = CalcularAjusteETracejado(boundsPretendido, referencias, out _, out _);
             return deltaPretendido + ajuste;
@@ -53,7 +53,7 @@ namespace Araci.Services.Editing
             if (referencias.Count == 0)
                 return default;
 
-            return CalcularAjusteETracejado(preview.Bounds, referencias, out _, out _);
+            return CalcularAjusteETracejado(ObterBoundsAlinhamento(preview), referencias, out _, out _);
         }
 
         public Point AplicarSnapPontoCabo(Point ponto, Point origem, ElementoViewModel? ignorar = null)
@@ -136,7 +136,7 @@ namespace Araci.Services.Editing
             if (referencias.Count == 0)
                 return;
 
-            Rect boundsSelecionados = CalcularBounds(selecionadosList);
+            Rect boundsSelecionados = CalcularBoundsAlinhamento(selecionadosList);
             CalcularAjusteETracejado(boundsSelecionados, referencias, out _, out _);
         }
 
@@ -192,7 +192,7 @@ namespace Araci.Services.Editing
 
             foreach (ElementoViewModel vm in referencias)
             {
-                Rect b = vm.Bounds;
+                Rect b = ObterBoundsAlinhamento(vm);
                 TestarVertical(ref melhor, left, b.Left, b);
                 TestarVertical(ref melhor, left, b.Left + b.Width / 2, b);
                 TestarVertical(ref melhor, left, b.Right, b);
@@ -216,7 +216,7 @@ namespace Araci.Services.Editing
 
             foreach (ElementoViewModel vm in referencias)
             {
-                Rect b = vm.Bounds;
+                Rect b = ObterBoundsAlinhamento(vm);
                 TestarHorizontal(ref melhor, top, b.Top, b);
                 TestarHorizontal(ref melhor, top, b.Top + b.Height / 2, b);
                 TestarHorizontal(ref melhor, top, b.Bottom, b);
@@ -237,7 +237,7 @@ namespace Araci.Services.Editing
 
             foreach (ElementoViewModel vm in referencias)
             {
-                Rect b = vm.Bounds;
+                Rect b = ObterBoundsAlinhamento(vm);
                 TestarVertical(ref melhor, x, b.Left, b);
                 TestarVertical(ref melhor, x, b.Left + b.Width / 2, b);
                 TestarVertical(ref melhor, x, b.Right, b);
@@ -252,7 +252,7 @@ namespace Araci.Services.Editing
 
             foreach (ElementoViewModel vm in referencias)
             {
-                Rect b = vm.Bounds;
+                Rect b = ObterBoundsAlinhamento(vm);
                 TestarHorizontal(ref melhor, y, b.Top, b);
                 TestarHorizontal(ref melhor, y, b.Top + b.Height / 2, b);
                 TestarHorizontal(ref melhor, y, b.Bottom, b);
@@ -309,14 +309,20 @@ namespace Araci.Services.Editing
             Linhas.Add(new AlignmentGuideLineViewModel { X1 = x1, Y1 = y, X2 = x2, Y2 = y });
         }
 
-        private static Rect CalcularBounds(IReadOnlyList<ElementoViewModel> items)
+        private static Rect CalcularBoundsAlinhamento(IReadOnlyList<ElementoViewModel> items)
         {
-            Rect total = items[0].Bounds;
+            Rect total = ObterBoundsAlinhamento(items[0]);
 
             for (int i = 1; i < items.Count; i++)
-                total.Union(items[i].Bounds);
+                total.Union(ObterBoundsAlinhamento(items[i]));
 
             return total;
+        }
+
+        private static Rect ObterBoundsAlinhamento(ElementoViewModel vm)
+        {
+            Rect bounds = vm.Node.BoundsAlinhamento;
+            return bounds.IsEmpty ? vm.Bounds : bounds;
         }
 
         private static Rect Deslocar(Rect rect, Vector delta)

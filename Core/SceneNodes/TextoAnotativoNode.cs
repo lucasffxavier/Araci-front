@@ -15,6 +15,15 @@ namespace Araci.Core.SceneNodes
             AtualizarGeometria();
         }
 
+        public override Rect BoundsAlinhamento
+        {
+            get
+            {
+                double y = Bounds.Top + Bounds.Height / 2;
+                return new Rect(Bounds.Left, y, Bounds.Width, 1);
+            }
+        }
+
         public override double X
         {
             get => _texto.PosicaoX;

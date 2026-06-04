@@ -11,7 +11,7 @@
             NomeTipo = "Texto padrão";
             Familia = "Anotações";
             Categoria = "Textos";
-            DefinirParametro(new Parameter<string>(PARAM_FONTE, "Segoe UI"));
+            DefinirParametro(new Parameter<string>(PARAM_FONTE, "Arial"));
             DefinirParametro(new Parameter<double>(PARAM_ALTURA_TEXTO, 14.0));
             DefinirParametro(new Parameter<string>(PARAM_ALINHAMENTO_HORIZONTAL, "Esquerda"));
         }
@@ -19,7 +19,7 @@
         public string Fonte
         {
             get => Obter<string>(PARAM_FONTE);
-            set => Definir(PARAM_FONTE, string.IsNullOrWhiteSpace(value) ? "Segoe UI" : value.Trim());
+            set => Definir(PARAM_FONTE, NormalizarFonte(value));
         }
 
         public double AlturaTexto
@@ -32,6 +32,24 @@
         {
             get => Obter<string>(PARAM_ALINHAMENTO_HORIZONTAL);
             set => Definir(PARAM_ALINHAMENTO_HORIZONTAL, NormalizarAlinhamento(value));
+        }
+
+        private static string NormalizarFonte(string? valor)
+        {
+            return valor switch
+            {
+                "Arial" => "Arial",
+                "Arial Narrow" => "Arial Narrow",
+                "Calibri" => "Calibri",
+                "Segoe UI" => "Segoe UI",
+                "Courier New" => "Courier New",
+                "Times New Roman" => "Times New Roman",
+                "ISOCP" => "ISOCP",
+                "ISOCPEUR" => "ISOCPEUR",
+                "Romans" => "Romans",
+                "Simplex" => "Simplex",
+                _ => "Arial"
+            };
         }
 
         private static string NormalizarAlinhamento(string? valor)
