@@ -8,5 +8,15 @@ namespace Araci.Properties
         {
             InitializeComponent();
         }
+
+        private void OnOkClick(object sender, RoutedEventArgs e)
+        {
+            DialogResult = true;
+        }
+
+        private void OnCancelarClick(object sender, RoutedEventArgs e)
+        {
+            DialogResult = false;
+        }
     }
 }

@@ -1,6 +1,5 @@
 ﻿using System;
 using System.Collections;
-using System.ComponentModel;
 using System.Windows;
 using System.Windows.Media;
 using Araci.Core.Rendering;
@@ -15,8 +14,6 @@ namespace Araci.ViewModels
 {
     public class TextoAnotativoViewModel : ElementoViewModel
     {
-        private TipoTextoAnotativoViewModel? _tipoTextoViewModelAssinado;
-
         public TextoAnotativoViewModel(
             TextoAnotativo modelo,
             TypeLibraryService types,
@@ -25,7 +22,6 @@ namespace Araci.ViewModels
             : base(modelo, new TextoAnotativoNode(modelo), types, names, typePropertiesDialogs)
         {
             SelecionarPrimeiroTipoDisponivel();
-            AssinarTipoTextoAtual();
             AtualizarAposModeloAlterado();
         }
 
@@ -38,7 +34,7 @@ namespace Araci.ViewModels
             get
             {
                 if (Texto.TipoTexto != null)
-                    return new TipoTextoAnotativoViewModel(Texto.TipoTexto, Types.TiposTextosAnotativos, SelecionarTipoTexto);
+                    return new TipoTextoAnotativoViewModel(Texto.TipoTexto, Types.TiposTextosAnotativos, SelecionarTipoTexto, NotificarAlteracaoVisualPorTipo);
 
                 return null;
             }
@@ -54,9 +50,7 @@ namespace Araci.ViewModels
                 if (ReferenceEquals(Texto.Tipo, value))
                     return;
 
-                DesassinarTipoTextoAtual();
                 base.Tipo = value;
-                AssinarTipoTextoAtual();
                 NotificarAlteracaoVisualPorTipo();
                 NotificarParametros();
             }
@@ -158,36 +152,6 @@ namespace Araci.ViewModels
         private void SelecionarTipoTexto(TipoTextoAnotativo tipo)
         {
             Tipo = tipo;
-        }
-
-        private void AssinarTipoTextoAtual()
-        {
-            if (Texto.TipoTexto == null)
-                return;
-
-            _tipoTextoViewModelAssinado = new TipoTextoAnotativoViewModel(Texto.TipoTexto);
-            _tipoTextoViewModelAssinado.PropertyChanged += OnTipoTextoPropertyChanged;
-        }
-
-        private void DesassinarTipoTextoAtual()
-        {
-            if (_tipoTextoViewModelAssinado == null)
-                return;
-
-            _tipoTextoViewModelAssinado.PropertyChanged -= OnTipoTextoPropertyChanged;
-            _tipoTextoViewModelAssinado = null;
-        }
-
-        private void OnTipoTextoPropertyChanged(object? sender, PropertyChangedEventArgs e)
-        {
-            if (string.IsNullOrEmpty(e.PropertyName) ||
-                e.PropertyName is nameof(TipoTextoAnotativoViewModel.CorTexto) or
-                    nameof(TipoTextoAnotativoViewModel.Fonte) or
-                    nameof(TipoTextoAnotativoViewModel.AlturaTexto) or
-                    nameof(TipoTextoAnotativoViewModel.AlinhamentoHorizontal))
-            {
-                NotificarAlteracaoVisualPorTipo();
-            }
         }
 
         private void NotificarAlteracaoVisualPorTipo()

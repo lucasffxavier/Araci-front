@@ -2,10 +2,13 @@
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Linq;
+using System.Windows;
+using System.Windows.Data;
 using System.Windows.Input;
 using System.Windows.Media;
 using Araci.Models.Tipos;
 using Araci.Properties;
+using Araci.Properties.Types;
 
 namespace Araci.ViewModels
 {
@@ -13,19 +16,27 @@ namespace Araci.ViewModels
     {
         private readonly ObservableCollection<TipoTextoAnotativo>? _tiposDisponiveis;
         private readonly Action<TipoTextoAnotativo>? _selecionarTipo;
+        private readonly Action? _tipoAlterado;
         private ICommand? _escolherCorCommand;
         private ICommand? _novoTipoCommand;
+        private ICommand? _renomearTipoCommand;
 
         public TipoTextoAnotativoViewModel(TipoTextoAnotativo tipo)
-            : this(tipo, null, null)
+            : this(tipo, null, null, null)
         {
         }
 
         public TipoTextoAnotativoViewModel(TipoTextoAnotativo tipo, ObservableCollection<TipoTextoAnotativo>? tiposDisponiveis, Action<TipoTextoAnotativo>? selecionarTipo)
+            : this(tipo, tiposDisponiveis, selecionarTipo, null)
+        {
+        }
+
+        public TipoTextoAnotativoViewModel(TipoTextoAnotativo tipo, ObservableCollection<TipoTextoAnotativo>? tiposDisponiveis, Action<TipoTextoAnotativo>? selecionarTipo, Action? tipoAlterado)
             : base(tipo)
         {
             _tiposDisponiveis = tiposDisponiveis;
             _selecionarTipo = selecionarTipo;
+            _tipoAlterado = tipoAlterado;
         }
 
         protected TipoTextoAnotativo TipoTexto => (TipoTextoAnotativo)_tipo;
@@ -43,8 +54,11 @@ namespace Araci.ViewModels
                 AtualizarTipoBase(value);
                 _selecionarTipo?.Invoke(value);
                 NotificarTudo();
+                NotificarTipoAlterado();
             }
         }
+
+        public string TipoSelecionadoNome => TipoTexto.NomeTipo;
 
         public IReadOnlyList<string> FontesDisponiveis { get; } = new[]
         {
@@ -69,6 +83,7 @@ namespace Araci.ViewModels
 
         public ICommand EscolherCorCommand => _escolherCorCommand ??= new SimpleCommand(EscolherCor);
         public ICommand NovoTipoCommand => _novoTipoCommand ??= new SimpleCommand(CriarNovoTipo, () => _tiposDisponiveis != null);
+        public ICommand RenomearTipoCommand => _renomearTipoCommand ??= new SimpleCommand(RenomearTipo, () => _tiposDisponiveis != null);
 
         public string CorTexto
         {
@@ -84,6 +99,7 @@ namespace Araci.ViewModels
                 TipoTexto.CorTexto = normalizada;
                 OnPropertyChanged();
                 OnPropertyChanged(nameof(CorTextoBrush));
+                NotificarTipoAlterado();
             }
         }
 
@@ -99,6 +115,7 @@ namespace Araci.ViewModels
 
                 TipoTexto.Fonte = value;
                 OnPropertyChanged();
+                NotificarTipoAlterado();
             }
         }
 
@@ -112,6 +129,7 @@ namespace Araci.ViewModels
 
                 TipoTexto.AlturaTexto = value;
                 OnPropertyChanged();
+                NotificarTipoAlterado();
             }
         }
 
@@ -125,6 +143,7 @@ namespace Araci.ViewModels
 
                 TipoTexto.AlinhamentoHorizontal = value;
                 OnPropertyChanged();
+                NotificarTipoAlterado();
             }
         }
 
@@ -145,8 +164,51 @@ namespace Araci.ViewModels
             };
 
             _tiposDisponiveis.Add(novo);
-            OnPropertyChanged(nameof(TiposDisponiveis));
+            AtualizarListaDeTipos();
             TipoSelecionado = novo;
+        }
+
+        private void RenomearTipo()
+        {
+            if (_tiposDisponiveis == null)
+                return;
+
+            var window = new RenameTypeWindow(TipoTexto.NomeTipo)
+            {
+                Owner = Application.Current?.MainWindow
+            };
+
+            while (window.ShowDialog() == true)
+            {
+                string novoNome = NormalizarNome(window.NovoNome);
+
+                if (string.IsNullOrWhiteSpace(novoNome))
+                {
+                    window.DefinirErro("Informe um nome para o tipo.");
+                    continue;
+                }
+
+                if (ExisteNomeDuplicado(novoNome))
+                {
+                    window.DefinirErro("Já existe um tipo com esse nome.");
+                    continue;
+                }
+
+                NomeTipo = novoNome;
+                AtualizarListaDeTipos();
+                OnPropertyChanged(nameof(TipoSelecionado));
+                OnPropertyChanged(nameof(TipoSelecionadoNome));
+                NotificarTipoAlterado();
+                return;
+            }
+        }
+
+        private bool ExisteNomeDuplicado(string nome)
+        {
+            if (_tiposDisponiveis == null)
+                return false;
+
+            return _tiposDisponiveis.Any(t => !ReferenceEquals(t, TipoTexto) && string.Equals(t.NomeTipo?.Trim(), nome, StringComparison.OrdinalIgnoreCase));
         }
 
         private string GerarNomeUnico(string nomeBase)
@@ -170,11 +232,20 @@ namespace Araci.ViewModels
             return candidato;
         }
 
+        private void AtualizarListaDeTipos()
+        {
+            if (_tiposDisponiveis != null)
+                CollectionViewSource.GetDefaultView(_tiposDisponiveis)?.Refresh();
+
+            OnPropertyChanged(nameof(TiposDisponiveis));
+            OnPropertyChanged(nameof(TipoSelecionadoNome));
+        }
+
         private void EscolherCor()
         {
             var window = new ColorPickerWindow(CorTexto)
             {
-                Owner = System.Windows.Application.Current?.MainWindow
+                Owner = Application.Current?.MainWindow
             };
 
             if (window.ShowDialog() == true)
@@ -184,6 +255,7 @@ namespace Araci.ViewModels
         private void NotificarTudo()
         {
             OnPropertyChanged(nameof(TipoSelecionado));
+            OnPropertyChanged(nameof(TipoSelecionadoNome));
             OnPropertyChanged(nameof(TiposDisponiveis));
             OnPropertyChanged(nameof(NomeTipo));
             OnPropertyChanged(nameof(Familia));
@@ -193,6 +265,16 @@ namespace Araci.ViewModels
             OnPropertyChanged(nameof(Fonte));
             OnPropertyChanged(nameof(AlturaTexto));
             OnPropertyChanged(nameof(AlinhamentoHorizontal));
+        }
+
+        private void NotificarTipoAlterado()
+        {
+            _tipoAlterado?.Invoke();
+        }
+
+        private static string NormalizarNome(string? nome)
+        {
+            return string.IsNullOrWhiteSpace(nome) ? string.Empty : nome.Trim();
         }
 
         private static Brush CriarBrush(string cor)

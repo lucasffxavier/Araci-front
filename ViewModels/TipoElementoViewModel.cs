@@ -14,15 +14,17 @@ namespace Araci.ViewModels
 
         public TipoElemento Tipo => _tipo;
 
-        public string NomeTipo
+        public virtual string NomeTipo
         {
             get => _tipo.NomeTipo;
             set
             {
-                if (_tipo.NomeTipo == value)
+                string nomeNormalizado = string.IsNullOrWhiteSpace(value) ? "Tipo sem nome" : value.Trim();
+
+                if (_tipo.NomeTipo == nomeNormalizado)
                     return;
 
-                _tipo.NomeTipo = string.IsNullOrWhiteSpace(value) ? "Tipo sem nome" : value.Trim();
+                _tipo.NomeTipo = nomeNormalizado;
                 OnPropertyChanged();
             }
         }
