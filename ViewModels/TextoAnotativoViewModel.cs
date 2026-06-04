@@ -33,7 +33,16 @@ namespace Araci.ViewModels
 
         public override IEnumerable TiposDisponiveis => Types.TiposTextosAnotativos;
 
-        public override TipoElementoViewModel? TipoViewModel => TipoElementoViewModelFactory.Criar(Tipo);
+        public override TipoElementoViewModel? TipoViewModel
+        {
+            get
+            {
+                if (Texto.TipoTexto != null)
+                    return new TipoTextoAnotativoViewModel(Texto.TipoTexto, Types.TiposTextosAnotativos, SelecionarTipoTexto);
+
+                return null;
+            }
+        }
 
         public TipoTextoAnotativo? TipoTexto => Texto.TipoTexto;
 
@@ -143,22 +152,20 @@ namespace Araci.ViewModels
         {
             base.NotificarGeometria();
             OnPropertyChanged(nameof(Conteudo));
-            OnPropertyChanged(nameof(CorTexto));
-            OnPropertyChanged(nameof(AlturaTexto));
-            OnPropertyChanged(nameof(Fonte));
-            OnPropertyChanged(nameof(AlinhamentoHorizontal));
-            OnPropertyChanged(nameof(FontFamily));
-            OnPropertyChanged(nameof(TextAlignment));
-            OnPropertyChanged(nameof(ForegroundBrush));
-            OnPropertyChanged(nameof(RenderData));
+            NotificarParametrosDeTipo();
+        }
+
+        private void SelecionarTipoTexto(TipoTextoAnotativo tipo)
+        {
+            Tipo = tipo;
         }
 
         private void AssinarTipoTextoAtual()
         {
-            if (TipoViewModel is not TipoTextoAnotativoViewModel tipoTextoViewModel)
+            if (Texto.TipoTexto == null)
                 return;
 
-            _tipoTextoViewModelAssinado = tipoTextoViewModel;
+            _tipoTextoViewModelAssinado = new TipoTextoAnotativoViewModel(Texto.TipoTexto);
             _tipoTextoViewModelAssinado.PropertyChanged += OnTipoTextoPropertyChanged;
         }
 
@@ -186,6 +193,13 @@ namespace Araci.ViewModels
         private void NotificarAlteracaoVisualPorTipo()
         {
             OnPropertyChanged(nameof(TipoTexto));
+            OnPropertyChanged(nameof(TipoViewModel));
+            NotificarParametrosDeTipo();
+            AtualizarNode();
+        }
+
+        private void NotificarParametrosDeTipo()
+        {
             OnPropertyChanged(nameof(CorTexto));
             OnPropertyChanged(nameof(Fonte));
             OnPropertyChanged(nameof(AlturaTexto));
@@ -194,7 +208,6 @@ namespace Araci.ViewModels
             OnPropertyChanged(nameof(FontFamily));
             OnPropertyChanged(nameof(TextAlignment));
             OnPropertyChanged(nameof(RenderData));
-            AtualizarNode();
         }
 
         private static Brush CriarBrush(string cor)

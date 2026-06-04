@@ -5,7 +5,7 @@ namespace Araci.ViewModels
 {
     public abstract class TipoElementoViewModel : ViewModelBase
     {
-        protected readonly TipoElemento _tipo;
+        protected TipoElemento _tipo;
 
         protected TipoElementoViewModel(TipoElemento tipo)
         {
@@ -22,7 +22,7 @@ namespace Araci.ViewModels
                 if (_tipo.NomeTipo == value)
                     return;
 
-                _tipo.NomeTipo = value;
+                _tipo.NomeTipo = string.IsNullOrWhiteSpace(value) ? "Tipo sem nome" : value.Trim();
                 OnPropertyChanged();
             }
         }
@@ -51,6 +51,18 @@ namespace Araci.ViewModels
                 _tipo.Categoria = value;
                 OnPropertyChanged();
             }
+        }
+
+        protected void AtualizarTipoBase(TipoElemento tipo)
+        {
+            if (ReferenceEquals(_tipo, tipo))
+                return;
+
+            _tipo = tipo;
+            OnPropertyChanged(nameof(Tipo));
+            OnPropertyChanged(nameof(NomeTipo));
+            OnPropertyChanged(nameof(Familia));
+            OnPropertyChanged(nameof(Categoria));
         }
     }
 }
