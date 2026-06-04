@@ -131,5 +131,15 @@ namespace Araci.Applications.Factories
         {
             return CriarViewModel<CirculoAnotativoViewModel>(ElementKinds.CirculoAnotativo);
         }
+
+        public TextoAnotativo CriarTextoAnotativo()
+        {
+            return CriarModelo<TextoAnotativo>(ElementKinds.TextoAnotativo);
+        }
+
+        public TextoAnotativoViewModel CriarTextoAnotativoVM()
+        {
+            return CriarViewModel<TextoAnotativoViewModel>(ElementKinds.TextoAnotativo);
+        }
     }
 }

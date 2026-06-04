@@ -1,8 +1,6 @@
 using System.Collections.Generic;
-using Araci.Core.Rendering;
-using Araci.Services;
-using Araci.ViewModels;
 using Araci.Services.Settings;
+using Araci.ViewModels;
 
 namespace Araci.Applications.Factories
 {
@@ -136,6 +134,19 @@ namespace Araci.Applications.Factories
                 Prop<CirculoAnotativoViewModel>("Diametro", "Diâmetro", 30, false, unit: UnitKind.LengthMeter),
                 Prop<CirculoAnotativoViewModel>("CorLinha", "Cor da borda", 40, isColor: true),
                 Prop<CirculoAnotativoViewModel>("EspessuraLinha", "Espessura da borda", 50)
+            };
+        }
+
+        public IReadOnlyList<InstancePropertyDescriptor> TextoAnotativo()
+        {
+            return new[]
+            {
+                Prop<TextoAnotativoViewModel>("Nome", "Nome", 10, false),
+                Prop<TextoAnotativoViewModel>("Conteudo", "Texto", 20),
+                Prop<TextoAnotativoViewModel>("CorTexto", "Cor do texto", 30, isColor: true),
+                Prop<TextoAnotativoViewModel>("AlturaTexto", "Altura do texto", 40, unit: UnitKind.LengthMeter),
+                Prop<TextoAnotativoViewModel>("Fonte", "Fonte", 50),
+                Prop<TextoAnotativoViewModel>("AlinhamentoHorizontal", "Alinhamento", 60)
             };
         }
 

@@ -50,6 +50,12 @@ namespace Araci.ViewModels
             if (elemento is CirculoAnotativo circulo)
                 circulo.Raio = X2;
 
+            if (elemento is TextoAnotativo texto)
+            {
+                texto.PosicaoX = X;
+                texto.PosicaoY = Y;
+            }
+
             if (elemento is not Cabo cabo)
                 return;
 

@@ -11,5 +11,6 @@ namespace Araci.Applications.Abstractions
         public const string LinhaAnotativa = "LinhaAnotativa";
         public const string RetanguloAnotativo = "RetanguloAnotativo";
         public const string CirculoAnotativo = "CirculoAnotativo";
+        public const string TextoAnotativo = "TextoAnotativo";
     }
 }

@@ -1,6 +1,7 @@
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Media;
+using Araci.Applications.Abstractions;
 using Araci.Applications.Editar.Base;
 using Araci.Services;
 
@@ -87,6 +88,9 @@ namespace Araci.Ribbon.Tabs
 
             if (FerramentaCorresponde(tool, "Círculo") || FerramentaCorresponde(tool, "Circulo"))
                 AtivarBotao(CirculoButton);
+
+            if (FerramentaCorresponde(tool, "Texto"))
+                AtivarBotao(TextoButton);
         }
 
         private void AtivarBotao(Button button)
@@ -124,8 +128,6 @@ namespace Araci.Ribbon.Tabs
                 .Replace("É", "E")
                 .Replace("í", "i")
                 .Replace("Í", "I")
-                .Replace("í", "i")
-                .Replace("Í", "I")
                 .Trim();
         }
 
@@ -149,6 +151,7 @@ namespace Araci.Ribbon.Tabs
 
         private void TextoButton_Click(object sender, RoutedEventArgs e)
         {
+            Context?.Tools.AtivarInsercaoElemento(ElementKinds.TextoAnotativo);
             FocarViewport();
         }
 

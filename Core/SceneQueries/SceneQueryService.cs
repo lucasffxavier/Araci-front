@@ -44,7 +44,6 @@ namespace Araci.Core.SceneQueries
         public SceneHitResult? HitTest(Point point, double tolerance)
         {
             GarantirIndex();
-
             double effectiveTolerance = Math.Max(6, tolerance);
             var candidatos = Nearby(point, Math.Max(10, effectiveTolerance)).Where(e => !e.IsPreview).ToList();
             HitCandidate? melhor = null;
@@ -63,7 +62,6 @@ namespace Araci.Core.SceneQueries
         public IEnumerable<ElementoViewModel> Query(Rect area)
         {
             GarantirIndex();
-
             var result = _index.Query(area).Where(e => !e.IsPreview).ToList();
 
             foreach (ElementoViewModel vm in _scene.Elementos)
@@ -81,7 +79,6 @@ namespace Araci.Core.SceneQueries
         public IEnumerable<ElementoViewModel> Nearby(Point point, double radius)
         {
             GarantirIndex();
-
             var result = _index.Nearby(point, radius).Where(e => !e.IsPreview).ToList();
             var area = new Rect(point.X - radius, point.Y - radius, radius * 2, radius * 2);
 
@@ -120,6 +117,9 @@ namespace Araci.Core.SceneQueries
             if (vm is CirculoAnotativoViewModel circulo)
                 return CriarCandidatoCirculoAnotativo(circulo, point, tolerance, order);
 
+            if (vm is TextoAnotativoViewModel texto)
+                return CriarCandidatoTextoAnotativo(texto, point, tolerance, order);
+
             return ContemPontoElemento(vm, point) ? new HitCandidate(vm, 0, 0, order) : null;
         }
 
@@ -157,7 +157,6 @@ namespace Araci.Core.SceneQueries
             Point p2 = RotateAround(new Point(bounds.Right, bounds.Top), center, vm.Rotacao);
             Point p3 = RotateAround(new Point(bounds.Right, bounds.Bottom), center, vm.Rotacao);
             Point p4 = RotateAround(new Point(bounds.Left, bounds.Bottom), center, vm.Rotacao);
-
             double minX = Math.Min(Math.Min(p1.X, p2.X), Math.Min(p3.X, p4.X));
             double minY = Math.Min(Math.Min(p1.Y, p2.Y), Math.Min(p3.Y, p4.Y));
             double maxX = Math.Max(Math.Max(p1.X, p2.X), Math.Max(p3.X, p4.X));
@@ -172,6 +171,7 @@ namespace Araci.Core.SceneQueries
                 vm is LinhaAnotativaViewModel ||
                 vm is RetanguloAnotativoViewModel ||
                 vm is CirculoAnotativoViewModel ||
+                vm is TextoAnotativoViewModel ||
                 vm.Modelo is ITerminalOwner;
         }
 
@@ -182,7 +182,6 @@ namespace Araci.Core.SceneQueries
             double sin = Math.Sin(radians);
             double x = point.X - center.X;
             double y = point.Y - center.Y;
-
             return new Point(center.X + x * cos - y * sin, center.Y + x * sin + y * cos);
         }
 
@@ -218,7 +217,6 @@ namespace Araci.Core.SceneQueries
             Point topRight = new(b.Right, b.Top);
             Point bottomRight = new(b.Right, b.Bottom);
             Point bottomLeft = new(b.Left, b.Bottom);
-
             menor = Math.Min(menor, DistanciaPontoSegmento(point, topLeft, topRight));
             menor = Math.Min(menor, DistanciaPontoSegmento(point, topRight, bottomRight));
             menor = Math.Min(menor, DistanciaPontoSegmento(point, bottomRight, bottomLeft));
@@ -231,8 +229,14 @@ namespace Araci.Core.SceneQueries
         {
             double distanciaCentro = Distancia(point, new Point(circulo.Circulo.PosicaoX, circulo.Circulo.PosicaoY));
             double distanciaCircunferencia = Math.Abs(distanciaCentro - circulo.Circulo.Raio);
-
             return distanciaCircunferencia <= tolerance ? new HitCandidate(circulo, distanciaCircunferencia, 2, order) : null;
+        }
+
+        private static HitCandidate? CriarCandidatoTextoAnotativo(TextoAnotativoViewModel texto, Point point, double tolerance, int order)
+        {
+            Rect bounds = texto.Bounds;
+            Rect area = new(bounds.X - tolerance, bounds.Y - tolerance, bounds.Width + tolerance * 2, bounds.Height + tolerance * 2);
+            return area.Contains(point) ? new HitCandidate(texto, 0, 1, order) : null;
         }
 
         private static bool EhMelhor(HitCandidate candidato, HitCandidate? atual)
@@ -274,7 +278,6 @@ namespace Araci.Core.SceneQueries
             double t = ((p.X - a.X) * dx + (p.Y - a.Y) * dy) / lengthSquared;
             t = Math.Max(0, Math.Min(1, t));
             var projection = new Point(a.X + t * dx, a.Y + t * dy);
-
             return Distancia(p, projection);
         }
 
