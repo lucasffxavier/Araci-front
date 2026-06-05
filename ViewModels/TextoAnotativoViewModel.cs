@@ -14,6 +14,9 @@ namespace Araci.ViewModels
 {
     public class TextoAnotativoViewModel : ElementoViewModel
     {
+        private bool _isEditingInline;
+        private string _conteudoEdicao = string.Empty;
+
         public TextoAnotativoViewModel(
             TextoAnotativo modelo,
             TypeLibraryService types,
@@ -92,6 +95,35 @@ namespace Araci.ViewModels
             }
         }
 
+        public string ConteudoEdicao
+        {
+            get => _conteudoEdicao;
+            set
+            {
+                if (_conteudoEdicao == value)
+                    return;
+
+                _conteudoEdicao = value ?? string.Empty;
+                OnPropertyChanged();
+            }
+        }
+
+        public bool IsEditingInline
+        {
+            get => _isEditingInline;
+            private set
+            {
+                if (_isEditingInline == value)
+                    return;
+
+                _isEditingInline = value;
+                OnPropertyChanged();
+                OnPropertyChanged(nameof(IsNotEditingInline));
+            }
+        }
+
+        public bool IsNotEditingInline => !IsEditingInline;
+
         public string CorTexto => Texto.CorTexto;
         public double AlturaTexto => Texto.AlturaTexto;
         public string Fonte => Texto.Fonte;
@@ -120,7 +152,31 @@ namespace Araci.ViewModels
             _ => TextAlignment.Left
         };
 
+        public HorizontalAlignment TextBoxHorizontalContentAlignment => AlinhamentoHorizontal switch
+        {
+            "Centro" => HorizontalAlignment.Center,
+            "Direita" => HorizontalAlignment.Right,
+            _ => HorizontalAlignment.Left
+        };
+
         public FontFamily FontFamily => new(string.IsNullOrWhiteSpace(Fonte) ? "Arial" : Fonte);
+
+        public void IniciarEdicaoInline()
+        {
+            ConteudoEdicao = Conteudo;
+            IsEditingInline = true;
+        }
+
+        public void CancelarEdicaoInline()
+        {
+            ConteudoEdicao = Conteudo;
+            IsEditingInline = false;
+        }
+
+        public void EncerrarEdicaoInline()
+        {
+            IsEditingInline = false;
+        }
 
         public void AtualizarAposTipoAlterado()
         {
@@ -176,6 +232,7 @@ namespace Araci.ViewModels
             OnPropertyChanged(nameof(ForegroundBrush));
             OnPropertyChanged(nameof(FontFamily));
             OnPropertyChanged(nameof(TextAlignment));
+            OnPropertyChanged(nameof(TextBoxHorizontalContentAlignment));
             OnPropertyChanged(nameof(RenderData));
         }
 
