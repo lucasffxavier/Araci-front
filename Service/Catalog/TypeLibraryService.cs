@@ -88,7 +88,7 @@ namespace Araci.Services.Catalog
 
         private static TipoTextoAnotativo CriarTipoTexto(string nome, string cor, string fonte, double altura, string alinhamento)
         {
-            return new TipoTextoAnotativo { NomeTipo = nome, Familia = "Anotações", Categoria = "Textos", CorTexto = cor, Fonte = fonte, AlturaTexto = altura, AlinhamentoHorizontal = alinhamento };
+            return new TipoTextoAnotativo { NomeTipo = nome, Familia = "Anotações", Categoria = "Textos", CorTexto = cor, Fonte = fonte, AlturaTexto = altura, AlinhamentoHorizontal = alinhamento, LeaderEstiloSeta = "Seta preenchida", LeaderCor = cor, LeaderEspessura = 1.2, LeaderTamanhoSeta = 10.0 };
         }
     }
 }

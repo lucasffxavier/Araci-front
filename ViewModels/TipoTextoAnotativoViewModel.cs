@@ -24,6 +24,7 @@ namespace Araci.ViewModels
         private readonly Action? _tipoAlterado;
         private readonly TipoTextoAnotativo? _tipoRealInicial;
         private SimpleCommand? _escolherCorCommand;
+        private SimpleCommand? _escolherCorLeaderCommand;
         private SimpleCommand? _novoTipoCommand;
         private SimpleCommand? _renomearTipoCommand;
         private SimpleCommand? _excluirTipoCommand;
@@ -112,7 +113,16 @@ namespace Araci.ViewModels
             "Direita"
         };
 
+        public IReadOnlyList<string> EstilosSetaLeaderDisponiveis { get; } = new[]
+        {
+            "Seta preenchida",
+            "Seta aberta",
+            "Ponto",
+            "Sem seta"
+        };
+
         public ICommand EscolherCorCommand => _escolherCorCommand ??= new SimpleCommand(EscolherCor);
+        public ICommand EscolherCorLeaderCommand => _escolherCorLeaderCommand ??= new SimpleCommand(EscolherCorLeader);
         public ICommand NovoTipoCommand => _novoTipoCommand ??= new SimpleCommand(CriarNovoTipo, () => _tiposTemporarios != null);
         public ICommand RenomearTipoCommand => _renomearTipoCommand ??= new SimpleCommand(RenomearTipo, () => _tiposTemporarios != null);
         public ICommand ExcluirTipoCommand => _excluirTipoCommand ??= new SimpleCommand(ExcluirTipo, PodeExcluirTipo);
@@ -171,6 +181,64 @@ namespace Araci.ViewModels
                     return;
 
                 TipoTexto.AlinhamentoHorizontal = value;
+                OnPropertyChanged();
+            }
+        }
+
+        public string LeaderEstiloSeta
+        {
+            get => TipoTexto.LeaderEstiloSeta;
+            set
+            {
+                if (TipoTexto.LeaderEstiloSeta == value)
+                    return;
+
+                TipoTexto.LeaderEstiloSeta = value;
+                OnPropertyChanged();
+            }
+        }
+
+        public string LeaderCor
+        {
+            get => TipoTexto.LeaderCor;
+            set
+            {
+                if (!ColorPickerWindow.TryNormalizeHexColor(value, out string normalizada))
+                    normalizada = "#FF000000";
+
+                if (TipoTexto.LeaderCor == normalizada)
+                    return;
+
+                TipoTexto.LeaderCor = normalizada;
+                OnPropertyChanged();
+                OnPropertyChanged(nameof(LeaderCorBrush));
+            }
+        }
+
+        public Brush LeaderCorBrush => CriarBrush(LeaderCor);
+
+        public double LeaderEspessura
+        {
+            get => TipoTexto.LeaderEspessura;
+            set
+            {
+                if (Math.Abs(TipoTexto.LeaderEspessura - value) < 0.0001)
+                    return;
+
+                TipoTexto.LeaderEspessura = value;
+                OnPropertyChanged();
+            }
+        }
+
+        public double LeaderTamanhoSeta
+        {
+            get => TipoTexto.LeaderTamanhoSeta;
+            set
+            {
+                if (Math.Abs(TipoTexto.LeaderTamanhoSeta - value) < 0.0001)
+                    return;
+
+                TipoTexto.LeaderTamanhoSeta = value;
                 OnPropertyChanged();
             }
         }
@@ -235,7 +303,11 @@ namespace Araci.ViewModels
                 CorTexto = TipoTexto.CorTexto,
                 Fonte = TipoTexto.Fonte,
                 AlturaTexto = TipoTexto.AlturaTexto,
-                AlinhamentoHorizontal = TipoTexto.AlinhamentoHorizontal
+                AlinhamentoHorizontal = TipoTexto.AlinhamentoHorizontal,
+                LeaderEstiloSeta = TipoTexto.LeaderEstiloSeta,
+                LeaderCor = TipoTexto.LeaderCor,
+                LeaderEspessura = TipoTexto.LeaderEspessura,
+                LeaderTamanhoSeta = TipoTexto.LeaderTamanhoSeta
             };
 
             _tiposTemporarios.Add(novo);
@@ -361,6 +433,17 @@ namespace Araci.ViewModels
                 CorTexto = window.SelectedColorHex;
         }
 
+        private void EscolherCorLeader()
+        {
+            var window = new ColorPickerWindow(LeaderCor)
+            {
+                Owner = Application.Current?.MainWindow
+            };
+
+            if (window.ShowDialog() == true)
+                LeaderCor = window.SelectedColorHex;
+        }
+
         private void NotificarTudo()
         {
             OnPropertyChanged(nameof(TipoSelecionado));
@@ -374,6 +457,11 @@ namespace Araci.ViewModels
             OnPropertyChanged(nameof(Fonte));
             OnPropertyChanged(nameof(AlturaTexto));
             OnPropertyChanged(nameof(AlinhamentoHorizontal));
+            OnPropertyChanged(nameof(LeaderEstiloSeta));
+            OnPropertyChanged(nameof(LeaderCor));
+            OnPropertyChanged(nameof(LeaderCorBrush));
+            OnPropertyChanged(nameof(LeaderEspessura));
+            OnPropertyChanged(nameof(LeaderTamanhoSeta));
         }
 
         private static TipoTextoAnotativo ClonarTipo(TipoTextoAnotativo origem)
@@ -386,7 +474,11 @@ namespace Araci.ViewModels
                 CorTexto = origem.CorTexto,
                 Fonte = origem.Fonte,
                 AlturaTexto = origem.AlturaTexto,
-                AlinhamentoHorizontal = origem.AlinhamentoHorizontal
+                AlinhamentoHorizontal = origem.AlinhamentoHorizontal,
+                LeaderEstiloSeta = origem.LeaderEstiloSeta,
+                LeaderCor = origem.LeaderCor,
+                LeaderEspessura = origem.LeaderEspessura,
+                LeaderTamanhoSeta = origem.LeaderTamanhoSeta
             };
         }
 

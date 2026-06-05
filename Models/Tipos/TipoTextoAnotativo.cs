@@ -6,6 +6,10 @@
         public const string PARAM_FONTE = "Fonte";
         public const string PARAM_ALTURA_TEXTO = "AlturaTexto";
         public const string PARAM_ALINHAMENTO_HORIZONTAL = "AlinhamentoHorizontal";
+        public const string PARAM_LEADER_ESTILO_SETA = "LeaderEstiloSeta";
+        public const string PARAM_LEADER_COR = "LeaderCor";
+        public const string PARAM_LEADER_ESPESSURA = "LeaderEspessura";
+        public const string PARAM_LEADER_TAMANHO_SETA = "LeaderTamanhoSeta";
 
         public TipoTextoAnotativo()
         {
@@ -16,6 +20,10 @@
             DefinirParametro(new Parameter<string>(PARAM_FONTE, "Arial"));
             DefinirParametro(new Parameter<double>(PARAM_ALTURA_TEXTO, 14.0));
             DefinirParametro(new Parameter<string>(PARAM_ALINHAMENTO_HORIZONTAL, "Esquerda"));
+            DefinirParametro(new Parameter<string>(PARAM_LEADER_ESTILO_SETA, "Seta preenchida"));
+            DefinirParametro(new Parameter<string>(PARAM_LEADER_COR, "#FF000000"));
+            DefinirParametro(new Parameter<double>(PARAM_LEADER_ESPESSURA, 1.2));
+            DefinirParametro(new Parameter<double>(PARAM_LEADER_TAMANHO_SETA, 10.0));
         }
 
         public string CorTexto
@@ -40,6 +48,30 @@
         {
             get => Obter<string>(PARAM_ALINHAMENTO_HORIZONTAL);
             set => Definir(PARAM_ALINHAMENTO_HORIZONTAL, NormalizarAlinhamento(value));
+        }
+
+        public string LeaderEstiloSeta
+        {
+            get => Obter<string>(PARAM_LEADER_ESTILO_SETA);
+            set => Definir(PARAM_LEADER_ESTILO_SETA, NormalizarEstiloSetaLeader(value));
+        }
+
+        public string LeaderCor
+        {
+            get => Obter<string>(PARAM_LEADER_COR);
+            set => Definir(PARAM_LEADER_COR, string.IsNullOrWhiteSpace(value) ? "#FF000000" : value.Trim());
+        }
+
+        public double LeaderEspessura
+        {
+            get => Obter<double>(PARAM_LEADER_ESPESSURA);
+            set => Definir(PARAM_LEADER_ESPESSURA, value <= 0 ? 1.2 : value);
+        }
+
+        public double LeaderTamanhoSeta
+        {
+            get => Obter<double>(PARAM_LEADER_TAMANHO_SETA);
+            set => Definir(PARAM_LEADER_TAMANHO_SETA, value <= 0 ? 10.0 : value);
         }
 
         private static string NormalizarFonte(string? valor)
@@ -67,6 +99,17 @@
                 "Centro" => "Centro",
                 "Direita" => "Direita",
                 _ => "Esquerda"
+            };
+        }
+
+        private static string NormalizarEstiloSetaLeader(string? valor)
+        {
+            return valor switch
+            {
+                "Sem seta" => "Sem seta",
+                "Seta aberta" => "Seta aberta",
+                "Ponto" => "Ponto",
+                _ => "Seta preenchida"
             };
         }
     }

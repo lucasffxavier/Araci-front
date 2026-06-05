@@ -145,7 +145,11 @@ namespace Araci.Core.Commands
                 CorTexto = origem.CorTexto,
                 Fonte = origem.Fonte,
                 AlturaTexto = origem.AlturaTexto,
-                AlinhamentoHorizontal = origem.AlinhamentoHorizontal
+                AlinhamentoHorizontal = origem.AlinhamentoHorizontal,
+                LeaderEstiloSeta = origem.LeaderEstiloSeta,
+                LeaderCor = origem.LeaderCor,
+                LeaderEspessura = origem.LeaderEspessura,
+                LeaderTamanhoSeta = origem.LeaderTamanhoSeta
             };
         }
 
@@ -158,6 +162,10 @@ namespace Araci.Core.Commands
             destino.Fonte = origem.Fonte;
             destino.AlturaTexto = origem.AlturaTexto;
             destino.AlinhamentoHorizontal = origem.AlinhamentoHorizontal;
+            destino.LeaderEstiloSeta = origem.LeaderEstiloSeta;
+            destino.LeaderCor = origem.LeaderCor;
+            destino.LeaderEspessura = origem.LeaderEspessura;
+            destino.LeaderTamanhoSeta = origem.LeaderTamanhoSeta;
         }
 
         private sealed class TextAnnotationTypeBeforeState

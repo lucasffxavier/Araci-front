@@ -14,8 +14,6 @@ namespace Araci.ViewModels
 {
     public class TextoAnotativoViewModel : ElementoViewModel
     {
-        private const double LeaderArrowLength = 10.0;
-        private const double LeaderArrowHalfWidth = 4.5;
         private bool _isEditingInline;
         private string _conteudoEdicao = string.Empty;
 
@@ -260,6 +258,15 @@ namespace Araci.ViewModels
         public double AlturaTexto => Texto.AlturaTexto;
         public string Fonte => Texto.Fonte;
         public string AlinhamentoHorizontal => Texto.AlinhamentoHorizontal;
+        public string LeaderEstiloSeta => TipoTexto?.LeaderEstiloSeta ?? "Seta preenchida";
+        public string LeaderCor => TipoTexto?.LeaderCor ?? CorTexto;
+        public double LeaderEspessura => Math.Max(0.1, TipoTexto?.LeaderEspessura ?? 1.2);
+        public double LeaderTamanhoSeta => Math.Max(1.0, TipoTexto?.LeaderTamanhoSeta ?? 10.0);
+        public double LeaderArrowHalfWidth => Math.Max(2.0, LeaderTamanhoSeta * 0.45);
+        public bool LeaderArrowVisivel => LeaderVisivel && LeaderEstiloSeta != "Sem seta";
+        public bool LeaderArrowFillVisivel => LeaderArrowVisivel && LeaderEstiloSeta != "Seta aberta";
+        public bool LeaderArrowOpenVisivel => LeaderArrowVisivel && LeaderEstiloSeta == "Seta aberta";
+        public bool LeaderPointArrowVisivel => LeaderArrowVisivel && LeaderEstiloSeta == "Ponto";
 
         public bool Visivel
         {
@@ -276,6 +283,7 @@ namespace Araci.ViewModels
         }
 
         public Brush ForegroundBrush => CriarBrush(CorTexto);
+        public Brush LeaderBrush => CriarBrush(LeaderCor);
 
         public TextAlignment TextAlignment => AlinhamentoHorizontal switch
         {
@@ -413,8 +421,8 @@ namespace Araci.ViewModels
                 direcao.Normalize();
 
             Vector normal = new(-direcao.Y, direcao.X);
-            Point p1 = fim + direcao * LeaderArrowLength + normal * LeaderArrowHalfWidth;
-            Point p2 = fim + direcao * LeaderArrowLength - normal * LeaderArrowHalfWidth;
+            Point p1 = fim + direcao * LeaderTamanhoSeta + normal * LeaderArrowHalfWidth;
+            Point p2 = fim + direcao * LeaderTamanhoSeta - normal * LeaderArrowHalfWidth;
 
             return new PointCollection { fim, p1, p2 };
         }
@@ -431,8 +439,8 @@ namespace Araci.ViewModels
                 direcao.Normalize();
 
             Vector normal = new(-direcao.Y, direcao.X);
-            Point p1 = fim + direcao * LeaderArrowLength + normal * LeaderArrowHalfWidth;
-            Point p2 = fim + direcao * LeaderArrowLength - normal * LeaderArrowHalfWidth;
+            Point p1 = fim + direcao * LeaderTamanhoSeta + normal * LeaderArrowHalfWidth;
+            Point p2 = fim + direcao * LeaderTamanhoSeta - normal * LeaderArrowHalfWidth;
 
             return new PointCollection { fim, p1, p2 };
         }
@@ -500,6 +508,10 @@ namespace Araci.ViewModels
             OnPropertyChanged(nameof(LeaderInicioWorld));
             OnPropertyChanged(nameof(LeaderArrowPoints));
             OnPropertyChanged(nameof(LeaderArrowWorldPoints));
+            OnPropertyChanged(nameof(LeaderArrowVisivel));
+            OnPropertyChanged(nameof(LeaderArrowFillVisivel));
+            OnPropertyChanged(nameof(LeaderArrowOpenVisivel));
+            OnPropertyChanged(nameof(LeaderPointArrowVisivel));
         }
 
         private void NotificarParametrosDeTipo()
@@ -508,7 +520,17 @@ namespace Araci.ViewModels
             OnPropertyChanged(nameof(Fonte));
             OnPropertyChanged(nameof(AlturaTexto));
             OnPropertyChanged(nameof(AlinhamentoHorizontal));
+            OnPropertyChanged(nameof(LeaderEstiloSeta));
+            OnPropertyChanged(nameof(LeaderCor));
+            OnPropertyChanged(nameof(LeaderEspessura));
+            OnPropertyChanged(nameof(LeaderTamanhoSeta));
+            OnPropertyChanged(nameof(LeaderArrowHalfWidth));
+            OnPropertyChanged(nameof(LeaderArrowVisivel));
+            OnPropertyChanged(nameof(LeaderArrowFillVisivel));
+            OnPropertyChanged(nameof(LeaderArrowOpenVisivel));
+            OnPropertyChanged(nameof(LeaderPointArrowVisivel));
             OnPropertyChanged(nameof(ForegroundBrush));
+            OnPropertyChanged(nameof(LeaderBrush));
             OnPropertyChanged(nameof(FontFamily));
             OnPropertyChanged(nameof(TextAlignment));
             OnPropertyChanged(nameof(TextBoxHorizontalContentAlignment));
