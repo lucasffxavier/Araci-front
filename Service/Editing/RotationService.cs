@@ -67,7 +67,7 @@ namespace Araci.Services.Editing
 
         public static bool PodeRotacionar(ElementoViewModel vm)
         {
-            return vm.Modelo is Barra or Carga or Gerador or Sin or Transformador;
+            return vm.Modelo is Barra or Carga or Gerador or Sin or Transformador or TextoAnotativo;
         }
 
         private static double Normalize(double value)

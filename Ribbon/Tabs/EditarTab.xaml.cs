@@ -175,6 +175,15 @@ namespace Araci.Ribbon.Tabs
             FocarViewport();
         }
 
+        private void RotacionarButton_Click(object sender, RoutedEventArgs e)
+        {
+            if (Context == null)
+                return;
+
+            Context.Rotation.RotateSelectionClockwise();
+            FocarViewport();
+        }
+
         private void DesfazerButton_Click(object sender, RoutedEventArgs e)
         {
             Context?.Commands.Undo();

@@ -23,6 +23,7 @@ namespace Araci.Views
         private TextoAnotativoViewModel? _textoWidthResizeAtivo;
         private TextoWidthResizeSide _textoWidthResizeSide = TextoWidthResizeSide.Right;
         private double _textoWidthResizeXInicial;
+        private double _textoWidthResizeYInicial;
         private double _textoWidthResizeLarguraInicial;
         private double _textoWidthResizeDeltaAcumulado;
 
@@ -513,6 +514,7 @@ namespace Araci.Views
             _textoWidthResizeAtivo = texto;
             _textoWidthResizeSide = ObterTextoResizeSide(thumb);
             _textoWidthResizeXInicial = texto.X;
+            _textoWidthResizeYInicial = texto.Y;
             _textoWidthResizeLarguraInicial = texto.LarguraCaixa;
             _textoWidthResizeDeltaAcumulado = 0;
             Cursor = Cursors.SizeWE;
@@ -524,14 +526,14 @@ namespace Araci.Views
             if (_textoWidthResizeAtivo == null)
                 return;
 
-            _textoWidthResizeDeltaAcumulado += e.HorizontalChange;
             double zoom = _context?.Viewport?.Camera.Zoom ?? 1;
-            double deltaWorld = zoom > 0 ? _textoWidthResizeDeltaAcumulado / zoom : _textoWidthResizeDeltaAcumulado;
+            double deltaWorld = CalcularDeltaLocalTexto(_textoWidthResizeAtivo, e.HorizontalChange, e.VerticalChange, zoom);
+            _textoWidthResizeDeltaAcumulado += deltaWorld;
 
             if (_textoWidthResizeSide == TextoWidthResizeSide.Left)
-                AplicarResizeTextoEsquerda(_textoWidthResizeAtivo, deltaWorld);
+                AplicarResizeTextoEsquerda(_textoWidthResizeAtivo, _textoWidthResizeDeltaAcumulado);
             else
-                AplicarResizeTextoDireita(_textoWidthResizeAtivo, deltaWorld);
+                AplicarResizeTextoDireita(_textoWidthResizeAtivo, _textoWidthResizeDeltaAcumulado);
 
             _context?.SceneQueries.Invalidate();
             _viewportViewModel?.AtualizarViewModel(_textoWidthResizeAtivo.Modelo);
@@ -546,8 +548,10 @@ namespace Araci.Views
 
             TextoAnotativoViewModel texto = _textoWidthResizeAtivo;
             double xAntes = _textoWidthResizeXInicial;
+            double yAntes = _textoWidthResizeYInicial;
             double larguraAntes = _textoWidthResizeLarguraInicial;
             double xDepois = texto.X;
+            double yDepois = texto.Y;
             double larguraDepois = texto.LarguraCaixa;
 
             _textoWidthResizeAtivo = null;
@@ -560,12 +564,13 @@ namespace Araci.Views
             var itens = new[]
             {
                 new BulkPropertyChangeCommand.Item(texto, nameof(TextoAnotativoViewModel.X), xAntes, xDepois),
+                new BulkPropertyChangeCommand.Item(texto, nameof(TextoAnotativoViewModel.Y), yAntes, yDepois),
                 new BulkPropertyChangeCommand.Item(texto, nameof(TextoAnotativoViewModel.LarguraCaixa), larguraAntes, larguraDepois)
             };
 
             var command = new BulkPropertyChangeCommand(itens);
 
-            if (!command.IsEmpty && (Math.Abs(xAntes - xDepois) > 0.000001 || Math.Abs(larguraAntes - larguraDepois) > 0.000001))
+            if (!command.IsEmpty && (Math.Abs(xAntes - xDepois) > 0.000001 || Math.Abs(yAntes - yDepois) > 0.000001 || Math.Abs(larguraAntes - larguraDepois) > 0.000001))
                 _context.Commands.Execute(command);
 
             e.Handled = true;
@@ -573,17 +578,45 @@ namespace Araci.Views
 
         private void AplicarResizeTextoDireita(TextoAnotativoViewModel texto, double deltaWorld)
         {
-            texto.X = _textoWidthResizeXInicial;
-            texto.LarguraCaixa = Math.Max(TextoAnotativo.LarguraCaixaMinima, _textoWidthResizeLarguraInicial + deltaWorld);
+            double novaLargura = Math.Max(TextoAnotativo.LarguraCaixaMinima, _textoWidthResizeLarguraInicial + deltaWorld);
+            AplicarResizeTextoComArestaFixa(texto, novaLargura, false);
         }
 
         private void AplicarResizeTextoEsquerda(TextoAnotativoViewModel texto, double deltaWorld)
         {
-            double direitaFixa = _textoWidthResizeXInicial + _textoWidthResizeLarguraInicial;
             double novaLargura = Math.Max(TextoAnotativo.LarguraCaixaMinima, _textoWidthResizeLarguraInicial - deltaWorld);
-            double novoX = direitaFixa - novaLargura;
-            texto.X = novoX;
+            AplicarResizeTextoComArestaFixa(texto, novaLargura, true);
+        }
+
+        private void AplicarResizeTextoComArestaFixa(TextoAnotativoViewModel texto, double novaLargura, bool fixaDireita)
+        {
+            double altura = Math.Max(1, texto.Altura);
+            Point centroInicial = new(_textoWidthResizeXInicial + _textoWidthResizeLarguraInicial / 2, _textoWidthResizeYInicial + altura / 2);
+            Vector eixo = ObterEixoLocalX(texto.Rotacao);
+            Point arestaFixa = fixaDireita
+                ? centroInicial + eixo * (_textoWidthResizeLarguraInicial / 2)
+                : centroInicial - eixo * (_textoWidthResizeLarguraInicial / 2);
+            Point novoCentro = fixaDireita
+                ? arestaFixa - eixo * (novaLargura / 2)
+                : arestaFixa + eixo * (novaLargura / 2);
+
+            texto.X = novoCentro.X - novaLargura / 2;
+            texto.Y = novoCentro.Y - altura / 2;
             texto.LarguraCaixa = novaLargura;
+        }
+
+        private static double CalcularDeltaLocalTexto(TextoAnotativoViewModel texto, double horizontalScreen, double verticalScreen, double zoom)
+        {
+            double escala = zoom > 0 ? zoom : 1;
+            var delta = new Vector(horizontalScreen / escala, verticalScreen / escala);
+            Vector eixo = ObterEixoLocalX(texto.Rotacao);
+            return Vector.Multiply(delta, eixo);
+        }
+
+        private static Vector ObterEixoLocalX(double rotacao)
+        {
+            double radians = rotacao * Math.PI / 180.0;
+            return new Vector(Math.Cos(radians), Math.Sin(radians));
         }
 
         private void CancelarResizeLarguraTexto()
@@ -592,6 +625,7 @@ namespace Araci.Views
                 return;
 
             _textoWidthResizeAtivo.X = _textoWidthResizeXInicial;
+            _textoWidthResizeAtivo.Y = _textoWidthResizeYInicial;
             _textoWidthResizeAtivo.LarguraCaixa = _textoWidthResizeLarguraInicial;
             _context?.SceneQueries.Invalidate();
             _viewportViewModel?.AtualizarViewModel(_textoWidthResizeAtivo.Modelo);

@@ -31,6 +31,7 @@ namespace Araci.Services.Geometry
                     ElementGeometryDefaults.EquipamentoLargura,
                     ElementGeometryDefaults.EquipamentoAltura),
                 ElementoLinear => Size.Empty,
+                TextoAnotativo texto => new Size(texto.LarguraEstimada, texto.AlturaEstimada),
                 _ => new Size(
                     ElementGeometryDefaults.EquipamentoLargura,
                     ElementGeometryDefaults.EquipamentoAltura)
