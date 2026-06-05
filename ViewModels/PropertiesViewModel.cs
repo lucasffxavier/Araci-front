@@ -280,11 +280,13 @@ namespace Araci.ViewModels
 
                 if (tipo == typeof(bool))
                 {
-                    if (!bool.TryParse(valorSemUnidade, out bool b))
-                        return false;
+                    if (TentarConverterBooleano(valorSemUnidade, out bool b))
+                    {
+                        convertido = b;
+                        return true;
+                    }
 
-                    convertido = b;
-                    return true;
+                    return false;
                 }
 
                 if (tipo.IsEnum)
@@ -301,6 +303,33 @@ namespace Araci.ViewModels
                 convertido = null;
                 return false;
             }
+        }
+
+        private static bool TentarConverterBooleano(string valor, out bool convertido)
+        {
+            convertido = false;
+
+            if (bool.TryParse(valor, out bool b))
+            {
+                convertido = b;
+                return true;
+            }
+
+            string normalizado = (valor ?? string.Empty).Trim().ToLowerInvariant();
+
+            if (normalizado is "sim" or "s" or "yes" or "y" or "1")
+            {
+                convertido = true;
+                return true;
+            }
+
+            if (normalizado is "não" or "nao" or "n" or "no" or "0")
+            {
+                convertido = false;
+                return true;
+            }
+
+            return false;
         }
 
         private static bool EhTipoEditavel(Type tipo)
@@ -383,6 +412,11 @@ namespace Araci.ViewModels
         private bool _varia;
         private bool _temErro;
         private string _mensagemErro = string.Empty;
+        private static readonly IReadOnlyList<BooleanPropertyOption> _booleanOptions = new[]
+        {
+            new BooleanPropertyOption(true, "Sim"),
+            new BooleanPropertyOption(false, "Não")
+        };
 
         public PropertyDescriptorViewModel(IReadOnlyList<ElementoViewModel> elementos, InstancePropertyDescriptor descriptor, Type tipoValor, bool varia, bool isEditable, EditarPropriedadesUseCase? editarPropriedades = null)
             : this(elementos, descriptor, tipoValor, varia, isEditable, editarPropriedades, null)
@@ -406,7 +440,7 @@ namespace Araci.ViewModels
             IsReadOnly = !isEditable;
             IsColor = descriptor.IsColor;
             _varia = varia;
-            _valor = varia ? "<varia>" : PropertiesViewModel.FormatarValor(ObterValorAtual(), BaseUnit, DisplayUnit);
+            _valor = varia ? "<varia>" : FormatarValorLocal(ObterValorAtual());
             AssinarAlteracoesDosElementos();
         }
 
@@ -422,6 +456,26 @@ namespace Araci.ViewModels
         public bool IsEditable { get; }
         public bool IsReadOnly { get; }
         public bool IsColor { get; }
+        public bool IsBoolean => (Nullable.GetUnderlyingType(_tipoValor) ?? _tipoValor) == typeof(bool);
+        public IReadOnlyList<BooleanPropertyOption> BooleanOptions => _booleanOptions;
+        public bool? BooleanValue
+        {
+            get
+            {
+                if (_varia)
+                    return null;
+
+                object? atual = ObterValorAtual();
+                return atual is bool b ? b : null;
+            }
+            set
+            {
+                if (!IsEditable || value == null)
+                    return;
+
+                AplicarValor(value.Value ? "true" : "false");
+            }
+        }
         public bool IsMixed => _varia;
         public bool Varia => _varia;
         public Brush ColorBrush => CriarColorBrush(_valor);
@@ -511,6 +565,7 @@ namespace Araci.ViewModels
             OnPropertyChanged(nameof(Valor));
             OnPropertyChanged(nameof(Value));
             OnPropertyChanged(nameof(ColorBrush));
+            OnPropertyChanged(nameof(BooleanValue));
         }
 
         private void AtualizarValorLocal(object? convertido)
@@ -546,6 +601,9 @@ namespace Araci.ViewModels
             if (IsColor && convertido is string cor && ColorPickerWindow.TryNormalizeHexColor(cor, out string corNormalizada))
                 return corNormalizada;
 
+            if (IsBoolean && convertido is bool b)
+                return b ? "Sim" : "Não";
+
             return PropertiesViewModel.FormatarValor(convertido, BaseUnit, DisplayUnit);
         }
 
@@ -565,6 +623,7 @@ namespace Araci.ViewModels
             OnPropertyChanged(nameof(Valor));
             OnPropertyChanged(nameof(Value));
             OnPropertyChanged(nameof(ColorBrush));
+            OnPropertyChanged(nameof(BooleanValue));
             OnPropertyChanged(nameof(IsMixed));
             OnPropertyChanged(nameof(Varia));
         }
@@ -654,6 +713,18 @@ namespace Araci.ViewModels
         {
             PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nome));
         }
+    }
+
+    public sealed class BooleanPropertyOption
+    {
+        public BooleanPropertyOption(bool value, string displayName)
+        {
+            Value = value;
+            DisplayName = displayName;
+        }
+
+        public bool Value { get; }
+        public string DisplayName { get; }
     }
 
     public class PropertyRowViewModel : PropertyDescriptorViewModel

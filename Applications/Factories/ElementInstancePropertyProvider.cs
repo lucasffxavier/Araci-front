@@ -144,7 +144,8 @@ namespace Araci.Applications.Factories
                 Prop<TextoAnotativoViewModel>("Nome", "Nome", 10, false),
                 Prop<TextoAnotativoViewModel>("Conteudo", "Texto", 20),
                 Prop<TextoAnotativoViewModel>("LarguraCaixa", "Largura da caixa", 30, allowMixedTypeEdit: true, unit: UnitKind.LengthMeter),
-                Prop<TextoAnotativoViewModel>("Rotacao", "Rotação", 40, allowMixedTypeEdit: true)
+                Prop<TextoAnotativoViewModel>("Rotacao", "Rotação", 40, allowMixedTypeEdit: true),
+                Prop<TextoAnotativoViewModel>("LeaderAtivo", "Leader", 50, allowMixedTypeEdit: true)
             };
         }
 

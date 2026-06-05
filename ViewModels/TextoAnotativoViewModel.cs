@@ -162,8 +162,21 @@ namespace Araci.ViewModels
                 if (Texto.LeaderAtivo == value)
                     return;
 
+                bool criouPontoPadrao = value && !LeaderPossuiPontoValido();
+
+                if (criouPontoPadrao)
+                    CriarLeaderPadrao();
+
                 Texto.LeaderAtivo = value;
                 OnPropertyChanged();
+
+                if (criouPontoPadrao)
+                {
+                    OnPropertyChanged(nameof(LeaderX));
+                    OnPropertyChanged(nameof(LeaderY));
+                    OnPropertyChanged(nameof(LeaderPoint));
+                }
+
                 NotificarLeader();
                 AtualizarNode();
                 NotificarParametros();
@@ -429,6 +442,18 @@ namespace Araci.ViewModels
             double dx = local.X - largura / 2;
             double dy = local.Y - altura / 2;
             return new Point(centroWorld.X + dx * cos - dy * sin, centroWorld.Y + dx * sin + dy * cos);
+        }
+
+        private bool LeaderPossuiPontoValido()
+        {
+            return Math.Abs(Texto.LeaderX) > 0.000001 || Math.Abs(Texto.LeaderY) > 0.000001;
+        }
+
+        private void CriarLeaderPadrao()
+        {
+            Point ponto = LocalToWorld(new Point(Math.Max(1, Largura) + 70, Math.Max(1, AlturaVisual) + 50));
+            Texto.LeaderX = ponto.X;
+            Texto.LeaderY = ponto.Y;
         }
 
         private void SelecionarTipoTexto(TipoTextoAnotativo tipo)
