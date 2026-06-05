@@ -69,6 +69,7 @@ namespace Araci.ViewModels
         public double CirculoHandleStrokeThickness => 1.5 * _inverseZoom;
         public double TextoHandleVisualSize => 10 * _inverseZoom;
         public double TextoHandleVisualHalfOffset => 5 * _inverseZoom;
+        public double TextoHandleVisualNegativeHalfOffset => -5 * _inverseZoom;
         public double TextoHandleStrokeThickness => 1.5 * _inverseZoom;
         public double TerminalMarkerVisualSize => 20 * _inverseZoom;
         public double TerminalMarkerVisualOffset => -10 * _inverseZoom;
@@ -100,6 +101,7 @@ namespace Araci.ViewModels
             OnPropertyChanged(nameof(CirculoHandleStrokeThickness));
             OnPropertyChanged(nameof(TextoHandleVisualSize));
             OnPropertyChanged(nameof(TextoHandleVisualHalfOffset));
+            OnPropertyChanged(nameof(TextoHandleVisualNegativeHalfOffset));
             OnPropertyChanged(nameof(TextoHandleStrokeThickness));
             OnPropertyChanged(nameof(TerminalMarkerVisualSize));
             OnPropertyChanged(nameof(TerminalMarkerVisualOffset));

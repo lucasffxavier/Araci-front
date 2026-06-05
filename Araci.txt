@@ -474,287 +474,6 @@ Araci Engine
 
 
 ====================================================================================================
-ARQUIVO: C:\Araci-Engine-Front\Araci Engine\Applications\Editar\Selecionar\SelecionarTool.cs
-====================================================================================================
-
-using System;
-using System.Windows;
-using System.Windows.Input;
-using Araci.Applications.Editar.Base;
-using Araci.Core.SceneQueries;
-using Araci.Services;
-using Araci.ViewModels;
-using Araci.Services.Editing;
-
-namespace Araci.Applications.Editar.Selecionar
-{
-    public class SelecionarTool : ITool
-    {
-        private readonly ISceneQueryService _queries;
-        private readonly SelectionController _selection;
-        private readonly SelectionBoxController _selectionBox;
-        private readonly DragMoveController _dragMove;
-        private readonly CableVertexEditService _cableVertexEdit;
-        private readonly LinhaEndpointEditService _linhaEndpointEdit;
-        private readonly RetanguloResizeService _retanguloResize;
-        private readonly CirculoResizeService _circuloResize;
-        private readonly BarraResizeService _barraResize;
-        private readonly AlignmentGuideService _alignmentGuides;
-        private readonly RotationService _rotation;
-        private readonly bool _modoSoMover;
-
-        public SelecionarTool(ISceneQueryService queries, SelectionService selection, SelectionBoxViewModel selectionBox, CableVertexEditService cableVertexEdit, LinhaEndpointEditService linhaEndpointEdit, RetanguloResizeService retanguloResize, CirculoResizeService circuloResize, BarraResizeService barraResize, MoveService move, MoveHudService moveHud, AlignmentGuideService alignmentGuides, MoveConstraintService moveConstraints, RotationService rotation, bool modoSoMover = false, bool mostrarHud = false)
-        {
-            _queries = queries ?? throw new ArgumentNullException(nameof(queries));
-            _selection = new SelectionController(selection ?? throw new ArgumentNullException(nameof(selection)));
-            _selectionBox = new SelectionBoxController(selectionBox ?? throw new ArgumentNullException(nameof(selectionBox)), _queries, selection);
-            _cableVertexEdit = cableVertexEdit ?? throw new ArgumentNullException(nameof(cableVertexEdit));
-            _linhaEndpointEdit = linhaEndpointEdit ?? throw new ArgumentNullException(nameof(linhaEndpointEdit));
-            _retanguloResize = retanguloResize ?? throw new ArgumentNullException(nameof(retanguloResize));
-            _circuloResize = circuloResize ?? throw new ArgumentNullException(nameof(circuloResize));
-            _barraResize = barraResize ?? throw new ArgumentNullException(nameof(barraResize));
-            _alignmentGuides = alignmentGuides ?? throw new ArgumentNullException(nameof(alignmentGuides));
-            _rotation = rotation ?? throw new ArgumentNullException(nameof(rotation));
-            _dragMove = new DragMoveController(selection, move ?? throw new ArgumentNullException(nameof(move)), moveHud ?? throw new ArgumentNullException(nameof(moveHud)), _alignmentGuides, moveConstraints ?? throw new ArgumentNullException(nameof(moveConstraints)), mostrarHud);
-            _modoSoMover = modoSoMover;
-        }
-
-        public string Nome => "Selecionar";
-        public bool MantemBotaoAtivado => true;
-
-        public bool IsBusy =>
-            _barraResize.IsResizing ||
-            _retanguloResize.IsResizing ||
-            _circuloResize.IsResizing ||
-            _linhaEndpointEdit.IsEditing ||
-            _dragMove.IsActive ||
-            _selectionBox.IsActive ||
-            _cableVertexEdit.IsEditing;
-
-        public void Ativar()
-        {
-            _linhaEndpointEdit.Refresh();
-            _retanguloResize.Refresh();
-            _circuloResize.Refresh();
-
-            if (!_modoSoMover)
-                _cableVertexEdit.Refresh();
-        }
-
-        public void Desativar()
-        {
-            Cancelar();
-            _linhaEndpointEdit.Clear();
-            _retanguloResize.Clear();
-            _circuloResize.Clear();
-            _cableVertexEdit.Clear();
-        }
-
-        public void Cancelar()
-        {
-            _barraResize.Cancel();
-            _retanguloResize.Cancel();
-            _circuloResize.Cancel();
-            _linhaEndpointEdit.Cancel();
-            _dragMove.Cancel();
-            _selectionBox.Cancel();
-            _cableVertexEdit.Cancel();
-            RefreshEditHandles();
-            _alignmentGuides.Limpar();
-        }
-
-        public void OnMouseDown(ElementoViewModel? vm, Point position, ToolInputState inputState)
-        {
-            bool ctrl = inputState.IsControlPressed;
-            bool shift = inputState.IsShiftPressed;
-
-            if (!_modoSoMover && _barraResize.TryBegin(position))
-                return;
-
-            if (_circuloResize.TryBegin(position))
-            {
-                _linhaEndpointEdit.Clear();
-                _retanguloResize.Clear();
-                _cableVertexEdit.Clear();
-                return;
-            }
-
-            if (_retanguloResize.TryBegin(position))
-            {
-                _linhaEndpointEdit.Clear();
-                _circuloResize.Clear();
-                _cableVertexEdit.Clear();
-                return;
-            }
-
-            if (_linhaEndpointEdit.TryBegin(position))
-            {
-                _retanguloResize.Clear();
-                _circuloResize.Clear();
-                _cableVertexEdit.Clear();
-                return;
-            }
-
-            if (!_modoSoMover && inputState.IsAltPressed && _cableVertexEdit.TryRemoveHandle(position))
-                return;
-
-            if (!_modoSoMover && ctrl && _cableVertexEdit.TryInsertVertex(position))
-                return;
-
-            if (!_modoSoMover && _cableVertexEdit.TryBegin(position))
-                return;
-
-            var hit = vm ?? _queries.HitTest(position)?.Elemento;
-
-            if (hit != null)
-            {
-                if (!_modoSoMover)
-                {
-                    bool podeMover = _selection.Select(hit, ctrl, shift);
-                    _cableVertexEdit.Clear();
-
-                    if (!podeMover)
-                    {
-                        RefreshEditHandles();
-                        return;
-                    }
-                }
-
-                _linhaEndpointEdit.Clear();
-                _retanguloResize.Clear();
-                _circuloResize.Clear();
-                _dragMove.Begin(position);
-                return;
-            }
-
-            if (_modoSoMover)
-                return;
-
-            _selectionBox.Begin(position, ctrl);
-        }
-
-        public void OnMouseMove(Point position, ToolInputState inputState)
-        {
-            if (_barraResize.IsResizing)
-            {
-                _barraResize.Update(position);
-                return;
-            }
-
-            if (_circuloResize.IsResizing)
-            {
-                _circuloResize.Update(position);
-                return;
-            }
-
-            if (_retanguloResize.IsResizing)
-            {
-                _retanguloResize.Update(position, inputState);
-                return;
-            }
-
-            if (_linhaEndpointEdit.IsEditing)
-            {
-                _linhaEndpointEdit.Update(position, inputState);
-                return;
-            }
-
-            if (_cableVertexEdit.IsEditing)
-            {
-                _cableVertexEdit.Update(position, inputState);
-                return;
-            }
-
-            if (_dragMove.IsActive)
-            {
-                _dragMove.Update(position, inputState);
-                return;
-            }
-
-            if (_selectionBox.IsActive)
-                _selectionBox.Update(position);
-        }
-
-        public void OnMouseUp(Point position, ToolInputState inputState)
-        {
-            if (_barraResize.IsResizing)
-            {
-                _barraResize.End();
-                RefreshEditHandles();
-                return;
-            }
-
-            if (_circuloResize.IsResizing)
-            {
-                _circuloResize.End();
-                _linhaEndpointEdit.Refresh();
-                _retanguloResize.Refresh();
-                _cableVertexEdit.Refresh();
-                return;
-            }
-
-            if (_retanguloResize.IsResizing)
-            {
-                _retanguloResize.End();
-                _linhaEndpointEdit.Refresh();
-                _circuloResize.Refresh();
-                _cableVertexEdit.Refresh();
-                return;
-            }
-
-            if (_linhaEndpointEdit.IsEditing)
-            {
-                _linhaEndpointEdit.End();
-                _retanguloResize.Refresh();
-                _circuloResize.Refresh();
-                _cableVertexEdit.Refresh();
-                return;
-            }
-
-            if (_cableVertexEdit.IsEditing)
-            {
-                _cableVertexEdit.End();
-                return;
-            }
-
-            if (_dragMove.IsActive)
-            {
-                _dragMove.End();
-                RefreshEditHandles();
-            }
-
-            if (_selectionBox.IsActive)
-            {
-                _selectionBox.End();
-                RefreshEditHandles();
-            }
-        }
-
-        public void OnKeyDown(Key key)
-        {
-            if (!_modoSoMover && key == Key.Space)
-            {
-                _rotation.RotateSelectionClockwise();
-                RefreshEditHandles();
-                return;
-            }
-
-            if (!_modoSoMover && key == Key.Delete)
-                _cableVertexEdit.TryRemoveActive();
-        }
-
-        private void RefreshEditHandles()
-        {
-            _linhaEndpointEdit.Refresh();
-            _retanguloResize.Refresh();
-            _circuloResize.Refresh();
-            _cableVertexEdit.Refresh();
-        }
-    }
-}
-
-
-====================================================================================================
 ARQUIVO: C:\Araci-Engine-Front\Araci Engine\Core\Commands\BulkPropertyChangeCommand.cs
 ====================================================================================================
 
@@ -830,65 +549,6 @@ namespace Araci.Core.Commands
         }
     }
 }
-
-
-====================================================================================================
-ARQUIVO: C:\Araci-Engine-Front\Araci Engine\Core\SceneNodes\TextoAnotativoNode.cs
-====================================================================================================
-
-﻿using System;
-using System.Windows;
-using Araci.Models;
-
-namespace Araci.Core.SceneNodes
-{
-    public class TextoAnotativoNode : ElementoNode
-    {
-        private readonly TextoAnotativo _texto;
-
-        public TextoAnotativoNode(TextoAnotativo texto)
-            : base(texto)
-        {
-            _texto = texto ?? throw new ArgumentNullException(nameof(texto));
-            AtualizarGeometria();
-        }
-
-        public override Rect BoundsAlinhamento
-        {
-            get
-            {
-                double y = Bounds.Top + Bounds.Height / 2;
-                return new Rect(Bounds.Left, y, Bounds.Width, 1);
-            }
-        }
-
-        public override double X
-        {
-            get => _texto.PosicaoX;
-            set
-            {
-                _texto.PosicaoX = value;
-                AtualizarGeometria();
-            }
-        }
-
-        public override double Y
-        {
-            get => _texto.PosicaoY;
-            set
-            {
-                _texto.PosicaoY = value;
-                AtualizarGeometria();
-            }
-        }
-
-        public override void AtualizarGeometria()
-        {
-            Bounds = new Rect(_texto.PosicaoX, _texto.PosicaoY, Math.Max(1, _texto.LarguraEstimada), Math.Max(1, _texto.AlturaEstimada));
-        }
-    }
-}
-
 
 
 ====================================================================================================
@@ -1043,450 +703,6 @@ namespace Araci.Models
                 return LarguraCaixaPadrao;
 
             return Math.Max(LarguraCaixaMinima, valor);
-        }
-    }
-}
-
-
-
-====================================================================================================
-ARQUIVO: C:\Araci-Engine-Front\Araci Engine\Service\Editing\SelectionService.cs
-====================================================================================================
-
-using System;
-using System.Collections.Generic;
-using System.Collections.ObjectModel;
-using System.Linq;
-using Araci.Applications.Abstractions;
-using Araci.Applications.UseCases.Editar;
-using Araci.Core.Events;
-using Araci.Services.Settings;
-using Araci.ViewModels;
-
-namespace Araci.Services.Editing
-{
-    public class SelectionService : ISelectionService
-    {
-        private readonly EditorState _editorState;
-        private readonly IEventBus _events;
-        private readonly EditarPropriedadesUseCase _editarPropriedades;
-        private readonly EditorSettings _settings;
-        private readonly ObservableCollection<ElementoViewModel> _selecionados = new();
-
-        public SelectionService(
-            EditorState editorState,
-            IEventBus events,
-            EditarPropriedadesUseCase editarPropriedades,
-            EditorSettings? settings = null)
-        {
-            _editorState = editorState ?? throw new ArgumentNullException(nameof(editorState));
-            _events = events ?? throw new ArgumentNullException(nameof(events));
-            _editarPropriedades = editarPropriedades ?? throw new ArgumentNullException(nameof(editarPropriedades));
-            _settings = settings ?? new EditorSettings();
-        }
-
-        public IReadOnlyList<ElementoViewModel> Selecionados => _selecionados;
-        public ObservableCollection<ElementoViewModel> SelecionadosObservable => _selecionados;
-        public bool TemSelecionados => _selecionados.Count > 0;
-        public event Action? SelectionChanged;
-
-        public void RefreshProperties()
-        {
-            if (_selecionados.Count == 1)
-                _editorState.ElementoSelecionado = null;
-
-            AtualizarElementoSelecionado();
-        }
-
-        public void Selecionar(ElementoViewModel vm, bool adicionarAoExistente = false)
-        {
-            if (!adicionarAoExistente)
-                Limpar();
-
-            if (_selecionados.Contains(vm))
-            {
-                AtualizarElementoSelecionado();
-                return;
-            }
-
-            vm.IsSelecionado = true;
-            _selecionados.Add(vm);
-            AtualizarElementoSelecionado();
-            PublicarAlteracao();
-        }
-
-        public void Toggle(ElementoViewModel vm)
-        {
-            if (_selecionados.Contains(vm))
-            {
-                Deselecionar(vm);
-                return;
-            }
-
-            Selecionar(vm, true);
-        }
-
-        public void Deselecionar(ElementoViewModel vm)
-        {
-            if (!_selecionados.Contains(vm))
-                return;
-
-            vm.IsSelecionado = false;
-            _selecionados.Remove(vm);
-            AtualizarElementoSelecionado();
-            PublicarAlteracao();
-        }
-
-        public void Limpar()
-        {
-            if (_selecionados.Count == 0)
-                return;
-
-            foreach (var vm in _selecionados)
-                vm.IsSelecionado = false;
-
-            _selecionados.Clear();
-            AtualizarElementoSelecionado();
-            PublicarAlteracao();
-        }
-
-        private void AtualizarElementoSelecionado()
-        {
-            _editorState.ElementoSelecionado = _selecionados.Count switch
-            {
-                0 => null,
-                1 => CriarPainelSelecaoUnica(_selecionados[0]),
-                _ => new PropertiesViewModel(_selecionados, _editarPropriedades, _settings)
-            };
-        }
-
-        private object CriarPainelSelecaoUnica(ElementoViewModel vm)
-        {
-            return UsaPainelEspecifico(vm)
-                ? vm
-                : new PropertiesViewModel(_selecionados, _editarPropriedades, _settings);
-        }
-
-        private static bool UsaPainelEspecifico(ElementoViewModel vm)
-        {
-            return vm is BarraViewModel or
-                CaboViewModel or
-                CargaViewModel or
-                GeradorViewModel or
-                SinViewModel or
-                TransformadorViewModel;
-        }
-
-        private void PublicarAlteracao()
-        {
-            _events.Publish(new SelecaoAlteradaEvent(_selecionados.ToList()));
-            SelectionChanged?.Invoke();
-        }
-    }
-}
-
-
-
-====================================================================================================
-ARQUIVO: C:\Araci-Engine-Front\Araci Engine\ViewModels\ElementoViewModel.cs
-====================================================================================================
-
-using System;
-using System.Collections;
-using System.Collections.ObjectModel;
-using System.Linq;
-using System.Windows;
-using System.Windows.Input;
-using System.Windows.Media;
-using Araci.Core.Rendering;
-using Araci.Core.SceneNodes;
-using Araci.Models;
-using Araci.Models.Tipos;
-using Araci.Services;
-using Araci.ViewModels.Base;
-using Araci.ViewModels.VisualStates;
-using Araci.Services.UI;
-using Araci.Services.Catalog;
-using Araci.Services.Naming;
-
-namespace Araci.ViewModels
-{
-    public abstract class ElementoViewModel : ViewModelBase
-    {
-        private readonly ElementoNode _node;
-        private readonly NameService _names;
-        private readonly TypePropertiesDialogService _typePropertiesDialogs;
-        private ICommand? _abrirPropriedadesTipoCommand;
-        private ObservableCollection<ParameterViewModel>? _parametros;
-        private bool _isPreview;
-
-        protected ElementoViewModel(Elemento modelo, ElementoNode node, TypeLibraryService types, NameService names, TypePropertiesDialogService typePropertiesDialogs)
-        {
-            Modelo = modelo ?? throw new ArgumentNullException(nameof(modelo));
-            _node = node ?? throw new ArgumentNullException(nameof(node));
-            Types = types ?? throw new ArgumentNullException(nameof(types));
-            _names = names ?? throw new ArgumentNullException(nameof(names));
-            _typePropertiesDialogs = typePropertiesDialogs ?? throw new ArgumentNullException(nameof(typePropertiesDialogs));
-            VisualState = new ElementoVisualState();
-            _node.AtualizarGeometria();
-        }
-
-        public Elemento Modelo { get; }
-        public ElementoNode Node => _node;
-        protected TypeLibraryService Types { get; }
-
-        protected void RenomearModelo(string novoNome)
-        {
-            _names.Renomear(Modelo, novoNome);
-        }
-
-        public virtual TipoElemento Tipo
-        {
-            get => Modelo.Tipo!;
-            set
-            {
-                if (ReferenceEquals(Modelo.Tipo, value))
-                    return;
-
-                Modelo.Tipo = value;
-                OnPropertyChanged();
-                OnPropertyChanged(nameof(TipoViewModel));
-            }
-        }
-
-        public abstract IEnumerable TiposDisponiveis { get; }
-
-        public virtual TipoElementoViewModel? TipoViewModel => TipoElementoViewModelFactory.Criar(Tipo);
-
-        public ICommand AbrirPropriedadesTipoCommand => _abrirPropriedadesTipoCommand ??= new RelayCommand(AbrirPropriedadesTipo);
-
-        public ElementoVisualState VisualState { get; }
-
-        public bool IsSelecionado
-        {
-            get => VisualState.IsSelecionado;
-            set
-            {
-                if (VisualState.IsSelecionado == value)
-                    return;
-
-                VisualState.AtualizarSelecao(value);
-                OnPropertyChanged();
-                OnPropertyChanged(nameof(Stroke));
-                OnPropertyChanged(nameof(StrokeThickness));
-                OnPropertyChanged(nameof(RenderData));
-            }
-        }
-
-        public bool IsHover
-        {
-            get => VisualState.IsHover;
-            set
-            {
-                if (VisualState.IsHover == value)
-                    return;
-
-                VisualState.AtualizarHover(value);
-                OnPropertyChanged();
-                OnPropertyChanged(nameof(Stroke));
-                OnPropertyChanged(nameof(StrokeThickness));
-                OnPropertyChanged(nameof(RenderData));
-            }
-        }
-
-        public bool IsPreview
-        {
-            get => _isPreview;
-            set
-            {
-                if (_isPreview == value)
-                    return;
-
-                _isPreview = value;
-                OnPropertyChanged();
-                OnPropertyChanged(nameof(RenderData));
-            }
-        }
-
-        public Brush Stroke => VisualState.Stroke;
-        public double StrokeThickness => VisualState.StrokeThickness;
-
-        public virtual ElementoRenderData RenderData => new(Largura, Altura, PontoLocalInicial, PontoLocalFinal, Stroke, StrokeThickness);
-
-        public double Rotacao
-        {
-            get => Modelo.Rotacao;
-            set
-            {
-                if (Math.Abs(Modelo.Rotacao - value) < 0.0001)
-                    return;
-
-                Modelo.Rotacao = value;
-                AtualizarAposModeloAlterado();
-            }
-        }
-
-        public virtual double X
-        {
-            get => Node.X;
-            set
-            {
-                if (Math.Abs(Node.X - value) < 0.0001)
-                    return;
-
-                Node.X = value;
-                AtualizarNode();
-            }
-        }
-
-        public virtual double Y
-        {
-            get => Node.Y;
-            set
-            {
-                if (Math.Abs(Node.Y - value) < 0.0001)
-                    return;
-
-                Node.Y = value;
-                AtualizarNode();
-            }
-        }
-
-        public virtual double WorldX => Node.X;
-        public virtual double WorldY => Node.Y;
-        public virtual double Largura => Node.Largura;
-
-        public virtual double Altura
-        {
-            get => Node.Altura;
-            set { }
-        }
-
-        public virtual Rect Bounds => Node.Bounds;
-        public virtual Rect BoundsAlinhamento => ObterBoundsRotacionado(Node.BoundsAlinhamento);
-        public virtual Point Centro => Node.Centro;
-
-        public ObservableCollection<ParameterViewModel> Parametros =>
-            _parametros ??= new ObservableCollection<ParameterViewModel>(Modelo.Parametros.Values.Select(p => new ParameterViewModel(p)));
-
-        protected virtual Point PontoLocalInicial => new(0, 0);
-        protected virtual Point PontoLocalFinal => new(Largura, Altura);
-
-        protected void SelecionarPrimeiroTipoDisponivel()
-        {
-            TipoElemento? primeiroTipo = null;
-            bool tipoAtualExiste = false;
-
-            foreach (object? item in TiposDisponiveis)
-            {
-                if (item is not TipoElemento tipo)
-                    continue;
-
-                primeiroTipo ??= tipo;
-
-                if (ReferenceEquals(tipo, Modelo.Tipo))
-                {
-                    tipoAtualExiste = true;
-                    break;
-                }
-            }
-
-            if (tipoAtualExiste || primeiroTipo == null)
-                return;
-
-            Tipo = primeiroTipo;
-        }
-
-        public virtual void Mover(Vector delta)
-        {
-            Node.Mover(delta);
-            NotificarGeometria();
-        }
-
-        public virtual ElementoEstado CapturarEstado()
-        {
-            return new ElementoEstado(X, Y, rotacao: Modelo.Rotacao);
-        }
-
-        public virtual void AplicarEstado(ElementoEstado estado)
-        {
-            Node.X = estado.X;
-            Node.Y = estado.Y;
-            AtualizarNode();
-        }
-
-        public virtual void AtualizarAposModeloAlterado()
-        {
-            AtualizarNode();
-        }
-
-        public virtual void NotificarParametros()
-        {
-            foreach (var parametro in Parametros)
-                parametro.Atualizar();
-
-            OnPropertyChanged(nameof(Parametros));
-        }
-
-        public void NotificarPropriedades(params string[] nomes)
-        {
-            foreach (string nome in nomes)
-                OnPropertyChanged(nome);
-
-            NotificarParametros();
-        }
-
-        protected virtual void AtualizarNode()
-        {
-            Node.AtualizarGeometria();
-            NotificarGeometria();
-        }
-
-        protected virtual void NotificarGeometria()
-        {
-            OnPropertyChanged(nameof(X));
-            OnPropertyChanged(nameof(Y));
-            OnPropertyChanged(nameof(WorldX));
-            OnPropertyChanged(nameof(WorldY));
-            OnPropertyChanged(nameof(Largura));
-            OnPropertyChanged(nameof(Altura));
-            OnPropertyChanged(nameof(Bounds));
-            OnPropertyChanged(nameof(BoundsAlinhamento));
-            OnPropertyChanged(nameof(Centro));
-            OnPropertyChanged(nameof(Rotacao));
-            OnPropertyChanged(nameof(RenderData));
-        }
-
-        private Rect ObterBoundsRotacionado(Rect bounds)
-        {
-            if (Math.Abs(Rotacao) <= 0.000001)
-                return bounds;
-
-            Point center = Centro;
-            Point p1 = RotateAround(new Point(bounds.Left, bounds.Top), center, Rotacao);
-            Point p2 = RotateAround(new Point(bounds.Right, bounds.Top), center, Rotacao);
-            Point p3 = RotateAround(new Point(bounds.Right, bounds.Bottom), center, Rotacao);
-            Point p4 = RotateAround(new Point(bounds.Left, bounds.Bottom), center, Rotacao);
-            double minX = Math.Min(Math.Min(p1.X, p2.X), Math.Min(p3.X, p4.X));
-            double minY = Math.Min(Math.Min(p1.Y, p2.Y), Math.Min(p3.Y, p4.Y));
-            double maxX = Math.Max(Math.Max(p1.X, p2.X), Math.Max(p3.X, p4.X));
-            double maxY = Math.Max(Math.Max(p1.Y, p2.Y), Math.Max(p3.Y, p4.Y));
-            return new Rect(new Point(minX, minY), new Point(maxX, maxY));
-        }
-
-        private static Point RotateAround(Point point, Point center, double angle)
-        {
-            double radians = angle * Math.PI / 180.0;
-            double cos = Math.Cos(radians);
-            double sin = Math.Sin(radians);
-            double x = point.X - center.X;
-            double y = point.Y - center.Y;
-            return new Point(center.X + x * cos - y * sin, center.Y + x * sin + y * cos);
-        }
-
-        private void AbrirPropriedadesTipo()
-        {
-            _typePropertiesDialogs.Show(TipoViewModel);
         }
     }
 }
@@ -1856,6 +1072,7 @@ namespace Araci.ViewModels
         public double CirculoHandleStrokeThickness => 1.5 * _inverseZoom;
         public double TextoHandleVisualSize => 10 * _inverseZoom;
         public double TextoHandleVisualHalfOffset => 5 * _inverseZoom;
+        public double TextoHandleVisualNegativeHalfOffset => -5 * _inverseZoom;
         public double TextoHandleStrokeThickness => 1.5 * _inverseZoom;
         public double TerminalMarkerVisualSize => 20 * _inverseZoom;
         public double TerminalMarkerVisualOffset => -10 * _inverseZoom;
@@ -1887,6 +1104,7 @@ namespace Araci.ViewModels
             OnPropertyChanged(nameof(CirculoHandleStrokeThickness));
             OnPropertyChanged(nameof(TextoHandleVisualSize));
             OnPropertyChanged(nameof(TextoHandleVisualHalfOffset));
+            OnPropertyChanged(nameof(TextoHandleVisualNegativeHalfOffset));
             OnPropertyChanged(nameof(TextoHandleStrokeThickness));
             OnPropertyChanged(nameof(TerminalMarkerVisualSize));
             OnPropertyChanged(nameof(TerminalMarkerVisualOffset));
@@ -1983,7 +1201,7 @@ ARQUIVO: C:\Araci-Engine-Front\Araci Engine\Views\ViewportView.xaml
                         <Ellipse Width="{Binding Largura}" Height="{Binding Altura}" Stroke="{Binding StrokeBrush}" Fill="{x:Null}" StrokeThickness="{Binding EspessuraLinha}" StrokeDashArray="{Binding StrokeDashArray}" Visibility="{Binding Visivel, Converter={StaticResource BooleanToVisibilityConverter}}" SnapsToDevicePixels="True"/>
                     </DataTemplate>
                     <DataTemplate DataType="{x:Type viewModels:TextoAnotativoViewModel}">
-                        <Grid Width="{Binding Largura}" Height="{Binding Altura}" Visibility="{Binding Visivel, Converter={StaticResource BooleanToVisibilityConverter}}" SnapsToDevicePixels="True">
+                        <Grid Width="{Binding Largura}" Height="{Binding Altura}" Visibility="{Binding Visivel, Converter={StaticResource BooleanToVisibilityConverter}}" SnapsToDevicePixels="True" ClipToBounds="False">
                             <Rectangle Fill="Transparent" Stroke="#007ACC" StrokeThickness="1" StrokeDashArray="4 2" SnapsToDevicePixels="True">
                                 <Rectangle.Style>
                                     <Style TargetType="Rectangle">
@@ -1992,10 +1210,7 @@ ARQUIVO: C:\Araci-Engine-Front\Araci Engine\Views\ViewportView.xaml
                                             <DataTrigger Binding="{Binding IsHover}" Value="True">
                                                 <Setter Property="Visibility" Value="Visible"/>
                                             </DataTrigger>
-                                            <DataTrigger Binding="{Binding IsSelected}" Value="True">
-                                                <Setter Property="Visibility" Value="Visible"/>
-                                            </DataTrigger>
-                                            <DataTrigger Binding="{Binding Selecionado}" Value="True">
+                                            <DataTrigger Binding="{Binding IsSelecionado}" Value="True">
                                                 <Setter Property="Visibility" Value="Visible"/>
                                             </DataTrigger>
                                             <DataTrigger Binding="{Binding IsEditingInline}" Value="True">
@@ -2014,10 +1229,7 @@ ARQUIVO: C:\Araci-Engine-Front\Araci Engine\Views\ViewportView.xaml
                                             <DataTrigger Binding="{Binding IsHover}" Value="True">
                                                 <Setter Property="Foreground" Value="#007ACC"/>
                                             </DataTrigger>
-                                            <DataTrigger Binding="{Binding IsSelected}" Value="True">
-                                                <Setter Property="Foreground" Value="#007ACC"/>
-                                            </DataTrigger>
-                                            <DataTrigger Binding="{Binding Selecionado}" Value="True">
+                                            <DataTrigger Binding="{Binding IsSelecionado}" Value="True">
                                                 <Setter Property="Foreground" Value="#007ACC"/>
                                             </DataTrigger>
                                             <DataTrigger Binding="{Binding IsEditingInline}" Value="True">
@@ -2056,7 +1268,9 @@ ARQUIVO: C:\Araci-Engine-Front\Araci Engine\Views\ViewportView.xaml
                                     </Style>
                                 </TextBox.Style>
                             </TextBox>
-                            <primitives:Thumb HorizontalAlignment="Right"
+
+                            <primitives:Thumb Tag="Left"
+                                              HorizontalAlignment="Left"
                                               VerticalAlignment="Center"
                                               Width="{Binding DataContext.TextoHandleVisualSize, RelativeSource={RelativeSource AncestorType=UserControl}}"
                                               Height="{Binding DataContext.TextoHandleVisualSize, RelativeSource={RelativeSource AncestorType=UserControl}}"
@@ -2065,7 +1279,8 @@ ARQUIVO: C:\Araci-Engine-Front\Araci Engine\Views\ViewportView.xaml
                                               DragDelta="OnTextoWidthHandleDragDelta"
                                               DragCompleted="OnTextoWidthHandleDragCompleted"
                                               Focusable="False"
-                                              SnapsToDevicePixels="True">
+                                              SnapsToDevicePixels="True"
+                                              Panel.ZIndex="20">
                                 <primitives:Thumb.Style>
                                     <Style TargetType="primitives:Thumb">
                                         <Setter Property="Visibility" Value="Collapsed"/>
@@ -2079,14 +1294,45 @@ ARQUIVO: C:\Araci-Engine-Front\Araci Engine\Views\ViewportView.xaml
                                         <Style.Triggers>
                                             <MultiDataTrigger>
                                                 <MultiDataTrigger.Conditions>
-                                                    <Condition Binding="{Binding IsSelected}" Value="True"/>
+                                                    <Condition Binding="{Binding IsSelecionado}" Value="True"/>
                                                     <Condition Binding="{Binding IsEditingInline}" Value="False"/>
                                                 </MultiDataTrigger.Conditions>
                                                 <Setter Property="Visibility" Value="Visible"/>
                                             </MultiDataTrigger>
+                                        </Style.Triggers>
+                                    </Style>
+                                </primitives:Thumb.Style>
+                                <primitives:Thumb.RenderTransform>
+                                    <TranslateTransform X="{Binding DataContext.TextoHandleVisualNegativeHalfOffset, RelativeSource={RelativeSource AncestorType=UserControl}}"/>
+                                </primitives:Thumb.RenderTransform>
+                            </primitives:Thumb>
+
+                            <primitives:Thumb Tag="Right"
+                                              HorizontalAlignment="Right"
+                                              VerticalAlignment="Center"
+                                              Width="{Binding DataContext.TextoHandleVisualSize, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                              Height="{Binding DataContext.TextoHandleVisualSize, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                              Cursor="SizeWE"
+                                              DragStarted="OnTextoWidthHandleDragStarted"
+                                              DragDelta="OnTextoWidthHandleDragDelta"
+                                              DragCompleted="OnTextoWidthHandleDragCompleted"
+                                              Focusable="False"
+                                              SnapsToDevicePixels="True"
+                                              Panel.ZIndex="20">
+                                <primitives:Thumb.Style>
+                                    <Style TargetType="primitives:Thumb">
+                                        <Setter Property="Visibility" Value="Collapsed"/>
+                                        <Setter Property="Template">
+                                            <Setter.Value>
+                                                <ControlTemplate TargetType="primitives:Thumb">
+                                                    <Rectangle Fill="White" Stroke="#007ACC" StrokeThickness="{Binding DataContext.TextoHandleStrokeThickness, RelativeSource={RelativeSource AncestorType=UserControl}}" SnapsToDevicePixels="True"/>
+                                                </ControlTemplate>
+                                            </Setter.Value>
+                                        </Setter>
+                                        <Style.Triggers>
                                             <MultiDataTrigger>
                                                 <MultiDataTrigger.Conditions>
-                                                    <Condition Binding="{Binding Selecionado}" Value="True"/>
+                                                    <Condition Binding="{Binding IsSelecionado}" Value="True"/>
                                                     <Condition Binding="{Binding IsEditingInline}" Value="False"/>
                                                 </MultiDataTrigger.Conditions>
                                                 <Setter Property="Visibility" Value="Visible"/>
@@ -2133,148 +1379,11 @@ ARQUIVO: C:\Araci-Engine-Front\Araci Engine\Views\ViewportView.xaml
             </Canvas>
 
             <Canvas x:Name="CableVertexHandleLayer" IsHitTestVisible="False"/>
-
-            <ItemsControl x:Name="CirculoResizeHandleLayer" ItemsSource="{Binding CirculoResize.Handles}" IsHitTestVisible="False" ClipToBounds="False">
-                <ItemsControl.ItemsPanel>
-                    <ItemsPanelTemplate>
-                        <Canvas ClipToBounds="False"/>
-                    </ItemsPanelTemplate>
-                </ItemsControl.ItemsPanel>
-                <ItemsControl.ItemContainerStyle>
-                    <Style TargetType="ContentPresenter">
-                        <Setter Property="Canvas.Left" Value="{Binding X}"/>
-                        <Setter Property="Canvas.Top" Value="{Binding Y}"/>
-                    </Style>
-                </ItemsControl.ItemContainerStyle>
-                <ItemsControl.ItemTemplate>
-                    <DataTemplate>
-                        <Ellipse Width="{Binding DataContext.CirculoHandleVisualSize, RelativeSource={RelativeSource AncestorType=ItemsControl}}" Height="{Binding DataContext.CirculoHandleVisualSize, RelativeSource={RelativeSource AncestorType=ItemsControl}}" Stroke="#007ACC" StrokeThickness="{Binding DataContext.CirculoHandleStrokeThickness, RelativeSource={RelativeSource AncestorType=ItemsControl}}">
-                            <Ellipse.Style>
-                                <Style TargetType="Ellipse">
-                                    <Setter Property="Fill" Value="White"/>
-                                    <Style.Triggers>
-                                        <DataTrigger Binding="{Binding IsActive}" Value="True">
-                                            <Setter Property="Fill" Value="#99CFE8FF"/>
-                                        </DataTrigger>
-                                    </Style.Triggers>
-                                </Style>
-                            </Ellipse.Style>
-                            <Ellipse.RenderTransform>
-                                <TranslateTransform X="{Binding DataContext.CirculoHandleVisualOffset, RelativeSource={RelativeSource AncestorType=ItemsControl}}" Y="{Binding DataContext.CirculoHandleVisualOffset, RelativeSource={RelativeSource AncestorType=ItemsControl}}"/>
-                            </Ellipse.RenderTransform>
-                        </Ellipse>
-                    </DataTemplate>
-                </ItemsControl.ItemTemplate>
-            </ItemsControl>
-
-            <ItemsControl x:Name="RetanguloResizeHandleLayer" ItemsSource="{Binding RetanguloResize.Handles}" IsHitTestVisible="False" ClipToBounds="False">
-                <ItemsControl.ItemsPanel>
-                    <ItemsPanelTemplate>
-                        <Canvas ClipToBounds="False"/>
-                    </ItemsPanelTemplate>
-                </ItemsControl.ItemsPanel>
-                <ItemsControl.ItemContainerStyle>
-                    <Style TargetType="ContentPresenter">
-                        <Setter Property="Canvas.Left" Value="{Binding X}"/>
-                        <Setter Property="Canvas.Top" Value="{Binding Y}"/>
-                    </Style>
-                </ItemsControl.ItemContainerStyle>
-                <ItemsControl.ItemTemplate>
-                    <DataTemplate>
-                        <Rectangle Width="{Binding DataContext.RetanguloHandleVisualSize, RelativeSource={RelativeSource AncestorType=ItemsControl}}" Height="{Binding DataContext.RetanguloHandleVisualSize, RelativeSource={RelativeSource AncestorType=ItemsControl}}" Stroke="#007ACC" StrokeThickness="{Binding DataContext.RetanguloHandleStrokeThickness, RelativeSource={RelativeSource AncestorType=ItemsControl}}">
-                            <Rectangle.Style>
-                                <Style TargetType="Rectangle">
-                                    <Setter Property="Fill" Value="White"/>
-                                    <Style.Triggers>
-                                        <DataTrigger Binding="{Binding IsActive}" Value="True">
-                                            <Setter Property="Fill" Value="#99CFE8FF"/>
-                                        </DataTrigger>
-                                    </Style.Triggers>
-                                </Style>
-                            </Rectangle.Style>
-                            <Rectangle.RenderTransform>
-                                <TranslateTransform X="{Binding DataContext.RetanguloHandleVisualOffset, RelativeSource={RelativeSource AncestorType=ItemsControl}}" Y="{Binding DataContext.RetanguloHandleVisualOffset, RelativeSource={RelativeSource AncestorType=ItemsControl}}"/>
-                            </Rectangle.RenderTransform>
-                        </Rectangle>
-                    </DataTemplate>
-                </ItemsControl.ItemTemplate>
-            </ItemsControl>
-
-            <ItemsControl x:Name="LinhaEndpointInsertionSnapLayer" ItemsSource="{Binding LinhaEndpointEdit.InsertionSnapHandles}" IsHitTestVisible="False" ClipToBounds="False">
-                <ItemsControl.ItemsPanel>
-                    <ItemsPanelTemplate>
-                        <Canvas ClipToBounds="False"/>
-                    </ItemsPanelTemplate>
-                </ItemsControl.ItemsPanel>
-                <ItemsControl.ItemContainerStyle>
-                    <Style TargetType="ContentPresenter">
-                        <Setter Property="Canvas.Left" Value="{Binding X}"/>
-                        <Setter Property="Canvas.Top" Value="{Binding Y}"/>
-                    </Style>
-                </ItemsControl.ItemContainerStyle>
-                <ItemsControl.ItemTemplate>
-                    <DataTemplate>
-                        <Rectangle Width="{Binding DataContext.LinhaHandleVisualSize, RelativeSource={RelativeSource AncestorType=ItemsControl}}" Height="{Binding DataContext.LinhaHandleVisualSize, RelativeSource={RelativeSource AncestorType=ItemsControl}}" Stroke="#007ACC" Fill="#E6FFFFFF" StrokeThickness="{Binding DataContext.LinhaHandleStrokeThickness, RelativeSource={RelativeSource AncestorType=ItemsControl}}">
-                            <Rectangle.RenderTransform>
-                                <TranslateTransform X="{Binding DataContext.LinhaHandleVisualOffset, RelativeSource={RelativeSource AncestorType=ItemsControl}}" Y="{Binding DataContext.LinhaHandleVisualOffset, RelativeSource={RelativeSource AncestorType=ItemsControl}}"/>
-                            </Rectangle.RenderTransform>
-                        </Rectangle>
-                    </DataTemplate>
-                </ItemsControl.ItemTemplate>
-            </ItemsControl>
-
-            <ItemsControl x:Name="LinhaEndpointHandleLayer" ItemsSource="{Binding LinhaEndpointEdit.Handles}" IsHitTestVisible="False" ClipToBounds="False">
-                <ItemsControl.ItemsPanel>
-                    <ItemsPanelTemplate>
-                        <Canvas ClipToBounds="False"/>
-                    </ItemsPanelTemplate>
-                </ItemsControl.ItemsPanel>
-                <ItemsControl.ItemContainerStyle>
-                    <Style TargetType="ContentPresenter">
-                        <Setter Property="Canvas.Left" Value="{Binding X}"/>
-                        <Setter Property="Canvas.Top" Value="{Binding Y}"/>
-                    </Style>
-                </ItemsControl.ItemContainerStyle>
-                <ItemsControl.ItemTemplate>
-                    <DataTemplate>
-                        <Ellipse Width="{Binding DataContext.LinhaHandleVisualSize, RelativeSource={RelativeSource AncestorType=ItemsControl}}" Height="{Binding DataContext.LinhaHandleVisualSize, RelativeSource={RelativeSource AncestorType=ItemsControl}}" Stroke="#007ACC" StrokeThickness="{Binding DataContext.LinhaHandleStrokeThickness, RelativeSource={RelativeSource AncestorType=ItemsControl}}">
-                            <Ellipse.Style>
-                                <Style TargetType="Ellipse">
-                                    <Setter Property="Fill" Value="White"/>
-                                    <Style.Triggers>
-                                        <DataTrigger Binding="{Binding IsActive}" Value="True">
-                                            <Setter Property="Fill" Value="#99CFE8FF"/>
-                                        </DataTrigger>
-                                    </Style.Triggers>
-                                </Style>
-                            </Ellipse.Style>
-                            <Ellipse.RenderTransform>
-                                <TranslateTransform X="{Binding DataContext.LinhaHandleVisualOffset, RelativeSource={RelativeSource AncestorType=ItemsControl}}" Y="{Binding DataContext.LinhaHandleVisualOffset, RelativeSource={RelativeSource AncestorType=ItemsControl}}"/>
-                            </Ellipse.RenderTransform>
-                        </Ellipse>
-                    </DataTemplate>
-                </ItemsControl.ItemTemplate>
-            </ItemsControl>
-
-            <Canvas x:Name="TerminalSnapLayer" IsHitTestVisible="False">
-                <Ellipse Width="{Binding TerminalMarkerVisualSize}" Height="{Binding TerminalMarkerVisualSize}" Canvas.Left="{Binding TerminalSnap.X}" Canvas.Top="{Binding TerminalSnap.Y}" Stroke="#007ACC" StrokeThickness="{Binding TerminalMarkerStrokeThickness}" Fill="#55FFFFFF" Visibility="{Binding TerminalSnap.MarcadorValidoVisivel, Converter={StaticResource BooleanToVisibilityConverter}}">
-                    <Ellipse.RenderTransform>
-                        <TranslateTransform X="{Binding TerminalMarkerVisualOffset}" Y="{Binding TerminalMarkerVisualOffset}"/>
-                    </Ellipse.RenderTransform>
-                </Ellipse>
-                <Ellipse Width="{Binding TerminalMarkerVisualSize}" Height="{Binding TerminalMarkerVisualSize}" Canvas.Left="{Binding TerminalSnap.X}" Canvas.Top="{Binding TerminalSnap.Y}" Stroke="#D32F2F" StrokeThickness="{Binding TerminalMarkerStrokeThickness}" Fill="#33D32F2F" Visibility="{Binding TerminalSnap.MarcadorInvalidoVisivel, Converter={StaticResource BooleanToVisibilityConverter}}">
-                    <Ellipse.RenderTransform>
-                        <TranslateTransform X="{Binding TerminalMarkerVisualOffset}" Y="{Binding TerminalMarkerVisualOffset}"/>
-                    </Ellipse.RenderTransform>
-                </Ellipse>
-                <Border Background="#DD1E1E1E" BorderBrush="#D32F2F" BorderThickness="{Binding TerminalMarkerStrokeThickness}" CornerRadius="{Binding TerminalMessageCornerRadius}" Padding="{Binding TerminalMessagePadding}" Canvas.Left="{Binding TerminalSnap.MensagemX}" Canvas.Top="{Binding TerminalSnap.MensagemY}" Visibility="{Binding TerminalSnap.MensagemVisivel, Converter={StaticResource BooleanToVisibilityConverter}}">
-                    <Border.RenderTransform>
-                        <TranslateTransform X="{Binding TerminalMessageVisualOffsetX}" Y="{Binding TerminalMessageVisualOffsetY}"/>
-                    </Border.RenderTransform>
-                    <TextBlock Foreground="White" FontSize="{Binding TerminalMessageFontSize}" FontWeight="SemiBold" Text="{Binding TerminalSnap.Mensagem}"/>
-                </Border>
-            </Canvas>
-
+            <ItemsControl x:Name="CirculoResizeHandleLayer" ItemsSource="{Binding CirculoResize.Handles}" IsHitTestVisible="False" ClipToBounds="False"/>
+            <ItemsControl x:Name="RetanguloResizeHandleLayer" ItemsSource="{Binding RetanguloResize.Handles}" IsHitTestVisible="False" ClipToBounds="False"/>
+            <ItemsControl x:Name="LinhaEndpointInsertionSnapLayer" ItemsSource="{Binding LinhaEndpointEdit.InsertionSnapHandles}" IsHitTestVisible="False" ClipToBounds="False"/>
+            <ItemsControl x:Name="LinhaEndpointHandleLayer" ItemsSource="{Binding LinhaEndpointEdit.Handles}" IsHitTestVisible="False" ClipToBounds="False"/>
+            <Canvas x:Name="TerminalSnapLayer" IsHitTestVisible="False"/>
             <Canvas IsHitTestVisible="False" ClipToBounds="True">
                 <Border Background="#AA1E1E1E" CornerRadius="6" Padding="8" Canvas.Left="{Binding MoveHud.X}" Canvas.Top="{Binding MoveHud.Y}" Visibility="{Binding MoveHud.Visivel, Converter={StaticResource BooleanToVisibilityConverter}}">
                     <StackPanel>
@@ -2316,6 +1425,8 @@ namespace Araci.Views
         private bool _commitInlineTextInProgress;
         private bool _cancelInlineTextInProgress;
         private TextoAnotativoViewModel? _textoWidthResizeAtivo;
+        private TextoWidthResizeSide _textoWidthResizeSide = TextoWidthResizeSide.Right;
+        private double _textoWidthResizeXInicial;
         private double _textoWidthResizeLarguraInicial;
         private double _textoWidthResizeDeltaAcumulado;
 
@@ -2786,13 +1897,15 @@ namespace Araci.Views
 
         private void OnTextoWidthHandleDragStarted(object sender, DragStartedEventArgs e)
         {
-            if (sender is not Thumb { DataContext: TextoAnotativoViewModel texto } || _context == null)
+            if (sender is not Thumb { DataContext: TextoAnotativoViewModel texto } thumb || _context == null)
                 return;
 
             ConfirmarEdicaoInlineAtiva();
             _context.Selection.Selecionar(texto);
             _context.Hover.Clear();
             _textoWidthResizeAtivo = texto;
+            _textoWidthResizeSide = ObterTextoResizeSide(thumb);
+            _textoWidthResizeXInicial = texto.X;
             _textoWidthResizeLarguraInicial = texto.LarguraCaixa;
             _textoWidthResizeDeltaAcumulado = 0;
             Cursor = Cursors.SizeWE;
@@ -2807,7 +1920,12 @@ namespace Araci.Views
             _textoWidthResizeDeltaAcumulado += e.HorizontalChange;
             double zoom = _context?.Viewport?.Camera.Zoom ?? 1;
             double deltaWorld = zoom > 0 ? _textoWidthResizeDeltaAcumulado / zoom : _textoWidthResizeDeltaAcumulado;
-            _textoWidthResizeAtivo.LarguraCaixa = Math.Max(TextoAnotativo.LarguraCaixaMinima, _textoWidthResizeLarguraInicial + deltaWorld);
+
+            if (_textoWidthResizeSide == TextoWidthResizeSide.Left)
+                AplicarResizeTextoEsquerda(_textoWidthResizeAtivo, deltaWorld);
+            else
+                AplicarResizeTextoDireita(_textoWidthResizeAtivo, deltaWorld);
+
             _context?.SceneQueries.Invalidate();
             _viewportViewModel?.AtualizarViewModel(_textoWidthResizeAtivo.Modelo);
             Cursor = Cursors.SizeWE;
@@ -2820,27 +1938,48 @@ namespace Araci.Views
                 return;
 
             TextoAnotativoViewModel texto = _textoWidthResizeAtivo;
-            double antes = _textoWidthResizeLarguraInicial;
-            double depois = texto.LarguraCaixa;
+            double xAntes = _textoWidthResizeXInicial;
+            double larguraAntes = _textoWidthResizeLarguraInicial;
+            double xDepois = texto.X;
+            double larguraDepois = texto.LarguraCaixa;
 
             _textoWidthResizeAtivo = null;
             _textoWidthResizeDeltaAcumulado = 0;
+            _textoWidthResizeSide = TextoWidthResizeSide.Right;
             _context.SceneQueries.Invalidate();
             _viewportViewModel?.AtualizarViewModel(texto.Modelo);
             AtualizarCursorNavegacao();
 
-            if (Math.Abs(antes - depois) > 0.000001)
+            var itens = new[]
             {
-                var command = new BulkPropertyChangeCommand(new[]
-                {
-                    new BulkPropertyChangeCommand.Item(texto, nameof(TextoAnotativoViewModel.LarguraCaixa), antes, depois)
-                });
+                new BulkPropertyChangeCommand.Item(texto, nameof(TextoAnotativoViewModel.X), xAntes, xDepois),
+                new BulkPropertyChangeCommand.Item(texto, nameof(TextoAnotativoViewModel.LarguraCaixa), larguraAntes, larguraDepois)
+            };
 
-                if (!command.IsEmpty)
-                    _context.Commands.Execute(command);
-            }
+            var command = new BulkPropertyChangeCommand(itens);
+
+            if (!command.IsEmpty && (Math.Abs(xAntes - xDepois) > 0.000001 || Math.Abs(larguraAntes - larguraDepois) > 0.000001))
+                _context.Commands.Execute(command);
 
             e.Handled = true;
+        }
+
+        private static void AplicarResizeTextoDireita(TextoAnotativoViewModel texto, double deltaWorld)
+        {
+            texto.LarguraCaixa = Math.Max(TextoAnotativo.LarguraCaixaMinima, texto.LarguraCaixa == texto.Texto.LarguraCaixa ? texto.Texto.LarguraCaixa : texto.LarguraCaixa);
+            texto.LarguraCaixa = Math.Max(TextoAnotativo.LarguraCaixaMinima, texto.Texto.LarguraCaixa + 0);
+            texto.LarguraCaixa = Math.Max(TextoAnotativo.LarguraCaixaMinima, texto.Texto.LarguraCaixa - texto.Texto.LarguraCaixa + texto.LarguraCaixa);
+            texto.LarguraCaixa = Math.Max(TextoAnotativo.LarguraCaixaMinima, texto.LarguraCaixa);
+        }
+
+
+        private void AplicarResizeTextoEsquerda(TextoAnotativoViewModel texto, double deltaWorld)
+        {
+            double direitaFixa = _textoWidthResizeXInicial + _textoWidthResizeLarguraInicial;
+            double novaLargura = Math.Max(TextoAnotativo.LarguraCaixaMinima, _textoWidthResizeLarguraInicial - deltaWorld);
+            double novoX = direitaFixa - novaLargura;
+            texto.X = novoX;
+            texto.LarguraCaixa = novaLargura;
         }
 
         private void CancelarResizeLarguraTexto()
@@ -2848,11 +1987,13 @@ namespace Araci.Views
             if (_textoWidthResizeAtivo == null)
                 return;
 
+            _textoWidthResizeAtivo.X = _textoWidthResizeXInicial;
             _textoWidthResizeAtivo.LarguraCaixa = _textoWidthResizeLarguraInicial;
             _context?.SceneQueries.Invalidate();
             _viewportViewModel?.AtualizarViewModel(_textoWidthResizeAtivo.Modelo);
             _textoWidthResizeAtivo = null;
             _textoWidthResizeDeltaAcumulado = 0;
+            _textoWidthResizeSide = TextoWidthResizeSide.Right;
         }
 
         private bool ExisteEdicaoInlineAtiva()
@@ -2937,6 +2078,13 @@ namespace Araci.Views
             }
         }
 
+        private static TextoWidthResizeSide ObterTextoResizeSide(Thumb thumb)
+        {
+            return string.Equals(thumb.Tag?.ToString(), "Left", StringComparison.OrdinalIgnoreCase)
+                ? TextoWidthResizeSide.Left
+                : TextoWidthResizeSide.Right;
+        }
+
         private static bool OrigemEstaDentroDeEditorInline(DependencyObject? origem)
         {
             while (origem != null)
@@ -2994,6 +2142,12 @@ namespace Araci.Views
             }
 
             return null;
+        }
+
+        private enum TextoWidthResizeSide
+        {
+            Left,
+            Right
         }
     }
 }

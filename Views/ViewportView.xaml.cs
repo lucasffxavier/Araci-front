@@ -21,6 +21,8 @@ namespace Araci.Views
         private bool _commitInlineTextInProgress;
         private bool _cancelInlineTextInProgress;
         private TextoAnotativoViewModel? _textoWidthResizeAtivo;
+        private TextoWidthResizeSide _textoWidthResizeSide = TextoWidthResizeSide.Right;
+        private double _textoWidthResizeXInicial;
         private double _textoWidthResizeLarguraInicial;
         private double _textoWidthResizeDeltaAcumulado;
 
@@ -491,13 +493,15 @@ namespace Araci.Views
 
         private void OnTextoWidthHandleDragStarted(object sender, DragStartedEventArgs e)
         {
-            if (sender is not Thumb { DataContext: TextoAnotativoViewModel texto } || _context == null)
+            if (sender is not Thumb { DataContext: TextoAnotativoViewModel texto } thumb || _context == null)
                 return;
 
             ConfirmarEdicaoInlineAtiva();
             _context.Selection.Selecionar(texto);
             _context.Hover.Clear();
             _textoWidthResizeAtivo = texto;
+            _textoWidthResizeSide = ObterTextoResizeSide(thumb);
+            _textoWidthResizeXInicial = texto.X;
             _textoWidthResizeLarguraInicial = texto.LarguraCaixa;
             _textoWidthResizeDeltaAcumulado = 0;
             Cursor = Cursors.SizeWE;
@@ -512,7 +516,12 @@ namespace Araci.Views
             _textoWidthResizeDeltaAcumulado += e.HorizontalChange;
             double zoom = _context?.Viewport?.Camera.Zoom ?? 1;
             double deltaWorld = zoom > 0 ? _textoWidthResizeDeltaAcumulado / zoom : _textoWidthResizeDeltaAcumulado;
-            _textoWidthResizeAtivo.LarguraCaixa = Math.Max(TextoAnotativo.LarguraCaixaMinima, _textoWidthResizeLarguraInicial + deltaWorld);
+
+            if (_textoWidthResizeSide == TextoWidthResizeSide.Left)
+                AplicarResizeTextoEsquerda(_textoWidthResizeAtivo, deltaWorld);
+            else
+                AplicarResizeTextoDireita(_textoWidthResizeAtivo, deltaWorld);
+
             _context?.SceneQueries.Invalidate();
             _viewportViewModel?.AtualizarViewModel(_textoWidthResizeAtivo.Modelo);
             Cursor = Cursors.SizeWE;
@@ -525,27 +534,45 @@ namespace Araci.Views
                 return;
 
             TextoAnotativoViewModel texto = _textoWidthResizeAtivo;
-            double antes = _textoWidthResizeLarguraInicial;
-            double depois = texto.LarguraCaixa;
+            double xAntes = _textoWidthResizeXInicial;
+            double larguraAntes = _textoWidthResizeLarguraInicial;
+            double xDepois = texto.X;
+            double larguraDepois = texto.LarguraCaixa;
 
             _textoWidthResizeAtivo = null;
             _textoWidthResizeDeltaAcumulado = 0;
+            _textoWidthResizeSide = TextoWidthResizeSide.Right;
             _context.SceneQueries.Invalidate();
             _viewportViewModel?.AtualizarViewModel(texto.Modelo);
             AtualizarCursorNavegacao();
 
-            if (Math.Abs(antes - depois) > 0.000001)
+            var itens = new[]
             {
-                var command = new BulkPropertyChangeCommand(new[]
-                {
-                    new BulkPropertyChangeCommand.Item(texto, nameof(TextoAnotativoViewModel.LarguraCaixa), antes, depois)
-                });
+                new BulkPropertyChangeCommand.Item(texto, nameof(TextoAnotativoViewModel.X), xAntes, xDepois),
+                new BulkPropertyChangeCommand.Item(texto, nameof(TextoAnotativoViewModel.LarguraCaixa), larguraAntes, larguraDepois)
+            };
 
-                if (!command.IsEmpty)
-                    _context.Commands.Execute(command);
-            }
+            var command = new BulkPropertyChangeCommand(itens);
+
+            if (!command.IsEmpty && (Math.Abs(xAntes - xDepois) > 0.000001 || Math.Abs(larguraAntes - larguraDepois) > 0.000001))
+                _context.Commands.Execute(command);
 
             e.Handled = true;
+        }
+
+        private void AplicarResizeTextoDireita(TextoAnotativoViewModel texto, double deltaWorld)
+        {
+            texto.X = _textoWidthResizeXInicial;
+            texto.LarguraCaixa = Math.Max(TextoAnotativo.LarguraCaixaMinima, _textoWidthResizeLarguraInicial + deltaWorld);
+        }
+
+        private void AplicarResizeTextoEsquerda(TextoAnotativoViewModel texto, double deltaWorld)
+        {
+            double direitaFixa = _textoWidthResizeXInicial + _textoWidthResizeLarguraInicial;
+            double novaLargura = Math.Max(TextoAnotativo.LarguraCaixaMinima, _textoWidthResizeLarguraInicial - deltaWorld);
+            double novoX = direitaFixa - novaLargura;
+            texto.X = novoX;
+            texto.LarguraCaixa = novaLargura;
         }
 
         private void CancelarResizeLarguraTexto()
@@ -553,11 +580,13 @@ namespace Araci.Views
             if (_textoWidthResizeAtivo == null)
                 return;
 
+            _textoWidthResizeAtivo.X = _textoWidthResizeXInicial;
             _textoWidthResizeAtivo.LarguraCaixa = _textoWidthResizeLarguraInicial;
             _context?.SceneQueries.Invalidate();
             _viewportViewModel?.AtualizarViewModel(_textoWidthResizeAtivo.Modelo);
             _textoWidthResizeAtivo = null;
             _textoWidthResizeDeltaAcumulado = 0;
+            _textoWidthResizeSide = TextoWidthResizeSide.Right;
         }
 
         private bool ExisteEdicaoInlineAtiva()
@@ -642,6 +671,13 @@ namespace Araci.Views
             }
         }
 
+        private static TextoWidthResizeSide ObterTextoResizeSide(Thumb thumb)
+        {
+            return string.Equals(thumb.Tag?.ToString(), "Left", StringComparison.OrdinalIgnoreCase)
+                ? TextoWidthResizeSide.Left
+                : TextoWidthResizeSide.Right;
+        }
+
         private static bool OrigemEstaDentroDeEditorInline(DependencyObject? origem)
         {
             while (origem != null)
@@ -699,6 +735,12 @@ namespace Araci.Views
             }
 
             return null;
+        }
+
+        private enum TextoWidthResizeSide
+        {
+            Left,
+            Right
         }
     }
 }
