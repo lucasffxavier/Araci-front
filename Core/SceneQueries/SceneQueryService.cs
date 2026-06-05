@@ -235,8 +235,13 @@ namespace Araci.Core.SceneQueries
         private static HitCandidate? CriarCandidatoTextoAnotativo(TextoAnotativoViewModel texto, Point point, double tolerance, int order)
         {
             Rect bounds = texto.Bounds;
-            Rect area = new(bounds.X - tolerance, bounds.Y - tolerance, bounds.Width + tolerance * 2, bounds.Height + tolerance * 2);
-            return area.Contains(point) ? new HitCandidate(texto, 0, 1, order) : null;
+            Rect area = new(bounds.X - tolerance, bounds.Y - tolerance, Math.Max(1, bounds.Width + tolerance * 2), Math.Max(1, bounds.Height + tolerance * 2));
+
+            if (Math.Abs(texto.Rotacao) <= 0.000001)
+                return area.Contains(point) ? new HitCandidate(texto, 0, 1, order) : null;
+
+            Point localPoint = RotateAround(point, texto.Centro, -texto.Rotacao);
+            return area.Contains(localPoint) ? new HitCandidate(texto, 0, 1, order) : null;
         }
 
         private static bool EhMelhor(HitCandidate candidato, HitCandidate? atual)
