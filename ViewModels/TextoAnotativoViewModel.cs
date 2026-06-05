@@ -88,7 +88,7 @@ namespace Araci.ViewModels
                 if (Texto.Texto == value)
                     return;
 
-                Texto.Texto = value;
+                Texto.Texto = value ?? string.Empty;
                 OnPropertyChanged();
                 AtualizarNode();
                 NotificarParametros();
@@ -119,10 +119,12 @@ namespace Araci.ViewModels
                 _isEditingInline = value;
                 OnPropertyChanged();
                 OnPropertyChanged(nameof(IsNotEditingInline));
+                OnPropertyChanged(nameof(IsInteractionLocked));
             }
         }
 
         public bool IsNotEditingInline => !IsEditingInline;
+        public bool IsInteractionLocked => IsEditingInline;
 
         public string CorTexto => Texto.CorTexto;
         public double AlturaTexto => Texto.AlturaTexto;
@@ -165,6 +167,7 @@ namespace Araci.ViewModels
         {
             ConteudoEdicao = Conteudo;
             IsEditingInline = true;
+            IsHover = false;
         }
 
         public void CancelarEdicaoInline()
@@ -185,6 +188,9 @@ namespace Araci.ViewModels
 
         public override void Mover(Vector delta)
         {
+            if (IsEditingInline)
+                return;
+
             Texto.PosicaoX += delta.X;
             Texto.PosicaoY += delta.Y;
             AtualizarNode();

@@ -474,6 +474,273 @@ Araci Engine
 
 
 ====================================================================================================
+ARQUIVO: C:\Araci-Engine-Front\Araci Engine\Core\Commands\BulkPropertyChangeCommand.cs
+====================================================================================================
+
+﻿using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Reflection;
+using Araci.ViewModels;
+
+namespace Araci.Core.Commands
+{
+    public class BulkPropertyChangeCommand : IUndoableCommand
+    {
+        private readonly IReadOnlyList<Item> _items;
+
+        public BulkPropertyChangeCommand(IEnumerable<Item> items)
+        {
+            _items = items?.Where(i => i.Elemento != null && !string.IsNullOrWhiteSpace(i.PropertyName)).ToList() ?? throw new ArgumentNullException(nameof(items));
+        }
+
+        public bool IsEmpty => _items.Count == 0;
+
+        public void Execute()
+        {
+            AplicarDepois();
+        }
+
+        public void Undo()
+        {
+            for (int i = _items.Count - 1; i >= 0; i--)
+                Aplicar(_items[i], _items[i].ValorAntes);
+        }
+
+        public void Redo()
+        {
+            AplicarDepois();
+        }
+
+        private void AplicarDepois()
+        {
+            foreach (var item in _items)
+                Aplicar(item, item.ValorDepois);
+        }
+
+        private static void Aplicar(Item item, object? valor)
+        {
+            PropertyInfo? prop = item.Elemento.GetType().GetProperty(item.PropertyName, BindingFlags.Instance | BindingFlags.Public);
+
+            if (prop == null || !prop.CanWrite || prop.GetIndexParameters().Length > 0)
+                return;
+
+            prop.SetValue(item.Elemento, valor);
+            item.Elemento.NotificarPropriedades(item.PropertyName);
+
+            if (item.PropertyName == nameof(ElementoViewModel.Tipo))
+                item.Elemento.NotificarPropriedades(nameof(ElementoViewModel.TipoViewModel));
+        }
+
+        public readonly struct Item
+        {
+            public Item(ElementoViewModel elemento, string propertyName, object? valorAntes, object? valorDepois)
+            {
+                Elemento = elemento ?? throw new ArgumentNullException(nameof(elemento));
+                PropertyName = propertyName ?? throw new ArgumentNullException(nameof(propertyName));
+                ValorAntes = valorAntes;
+                ValorDepois = valorDepois;
+            }
+
+            public ElementoViewModel Elemento { get; }
+            public string PropertyName { get; }
+            public object? ValorAntes { get; }
+            public object? ValorDepois { get; }
+        }
+    }
+}
+
+
+====================================================================================================
+ARQUIVO: C:\Araci-Engine-Front\Araci Engine\Service\Editing\SelectionService.cs
+====================================================================================================
+
+using System;
+using System.Collections.Generic;
+using System.Collections.ObjectModel;
+using System.Linq;
+using Araci.Applications.Abstractions;
+using Araci.Applications.UseCases.Editar;
+using Araci.Core.Events;
+using Araci.Services.Settings;
+using Araci.ViewModels;
+
+namespace Araci.Services.Editing
+{
+    public class SelectionService : ISelectionService
+    {
+        private readonly EditorState _editorState;
+        private readonly IEventBus _events;
+        private readonly EditarPropriedadesUseCase _editarPropriedades;
+        private readonly EditorSettings _settings;
+        private readonly ObservableCollection<ElementoViewModel> _selecionados = new();
+
+        public SelectionService(
+            EditorState editorState,
+            IEventBus events,
+            EditarPropriedadesUseCase editarPropriedades,
+            EditorSettings? settings = null)
+        {
+            _editorState = editorState ?? throw new ArgumentNullException(nameof(editorState));
+            _events = events ?? throw new ArgumentNullException(nameof(events));
+            _editarPropriedades = editarPropriedades ?? throw new ArgumentNullException(nameof(editarPropriedades));
+            _settings = settings ?? new EditorSettings();
+        }
+
+        public IReadOnlyList<ElementoViewModel> Selecionados => _selecionados;
+        public ObservableCollection<ElementoViewModel> SelecionadosObservable => _selecionados;
+        public bool TemSelecionados => _selecionados.Count > 0;
+        public event Action? SelectionChanged;
+
+        public void RefreshProperties()
+        {
+            if (_selecionados.Count == 1)
+                _editorState.ElementoSelecionado = null;
+
+            AtualizarElementoSelecionado();
+        }
+
+        public void Selecionar(ElementoViewModel vm, bool adicionarAoExistente = false)
+        {
+            if (!adicionarAoExistente)
+                Limpar();
+
+            if (_selecionados.Contains(vm))
+            {
+                AtualizarElementoSelecionado();
+                return;
+            }
+
+            vm.IsSelecionado = true;
+            _selecionados.Add(vm);
+            AtualizarElementoSelecionado();
+            PublicarAlteracao();
+        }
+
+        public void Toggle(ElementoViewModel vm)
+        {
+            if (_selecionados.Contains(vm))
+            {
+                Deselecionar(vm);
+                return;
+            }
+
+            Selecionar(vm, true);
+        }
+
+        public void Deselecionar(ElementoViewModel vm)
+        {
+            if (!_selecionados.Contains(vm))
+                return;
+
+            vm.IsSelecionado = false;
+            _selecionados.Remove(vm);
+            AtualizarElementoSelecionado();
+            PublicarAlteracao();
+        }
+
+        public void Limpar()
+        {
+            if (_selecionados.Count == 0)
+                return;
+
+            foreach (var vm in _selecionados)
+                vm.IsSelecionado = false;
+
+            _selecionados.Clear();
+            AtualizarElementoSelecionado();
+            PublicarAlteracao();
+        }
+
+        private void AtualizarElementoSelecionado()
+        {
+            _editorState.ElementoSelecionado = _selecionados.Count switch
+            {
+                0 => null,
+                1 => CriarPainelSelecaoUnica(_selecionados[0]),
+                _ => new PropertiesViewModel(_selecionados, _editarPropriedades, _settings)
+            };
+        }
+
+        private object CriarPainelSelecaoUnica(ElementoViewModel vm)
+        {
+            return UsaPainelEspecifico(vm)
+                ? vm
+                : new PropertiesViewModel(_selecionados, _editarPropriedades, _settings);
+        }
+
+        private static bool UsaPainelEspecifico(ElementoViewModel vm)
+        {
+            return vm is BarraViewModel or
+                CaboViewModel or
+                CargaViewModel or
+                GeradorViewModel or
+                SinViewModel or
+                TransformadorViewModel;
+        }
+
+        private void PublicarAlteracao()
+        {
+            _events.Publish(new SelecaoAlteradaEvent(_selecionados.ToList()));
+            SelectionChanged?.Invoke();
+        }
+    }
+}
+
+
+
+====================================================================================================
+ARQUIVO: C:\Araci-Engine-Front\Araci Engine\Service\Interaction\HoverService.cs
+====================================================================================================
+
+using System;
+using System.Windows;
+using Araci.Applications.Abstractions;
+using Araci.Core.SceneQueries;
+using Araci.ViewModels;
+
+namespace Araci.Services.Interaction
+{
+    public class HoverService : IHoverService
+    {
+        private readonly ISceneQueryService _queries;
+        private ElementoViewModel? _atual;
+
+        public HoverService(ISceneQueryService queries)
+        {
+            _queries = queries ?? throw new ArgumentNullException(nameof(queries));
+        }
+
+        public void Update(Point worldPosition)
+        {
+            ElementoViewModel? novo = _queries.HitTest(worldPosition)?.Elemento;
+
+            if (ReferenceEquals(_atual, novo))
+                return;
+
+            Clear();
+
+            if (novo == null)
+                return;
+
+            novo.IsHover = true;
+            _atual = novo;
+        }
+
+        public void Clear()
+        {
+            if (_atual == null)
+                return;
+
+            _atual.IsHover = false;
+            _atual = null;
+        }
+    }
+}
+
+
+
+====================================================================================================
 ARQUIVO: C:\Araci-Engine-Front\Araci Engine\ViewModels\TextoAnotativoViewModel.cs
 ====================================================================================================
 
@@ -631,11 +898,11 @@ namespace Araci.ViewModels
             _ => TextAlignment.Left
         };
 
-        public HorizontalContentAlignment TextBoxHorizontalContentAlignment => AlinhamentoHorizontal switch
+        public HorizontalAlignment TextBoxHorizontalContentAlignment => AlinhamentoHorizontal switch
         {
-            "Centro" => HorizontalContentAlignment.Center,
-            "Direita" => HorizontalContentAlignment.Right,
-            _ => HorizontalContentAlignment.Left
+            "Centro" => HorizontalAlignment.Center,
+            "Direita" => HorizontalAlignment.Right,
+            _ => HorizontalAlignment.Left
         };
 
         public FontFamily FontFamily => new(string.IsNullOrWhiteSpace(Fonte) ? "Arial" : Fonte);
@@ -733,6 +1000,141 @@ namespace Araci.ViewModels
     }
 }
 
+
+====================================================================================================
+ARQUIVO: C:\Araci-Engine-Front\Araci Engine\ViewModels\ViewportViewModel.cs
+====================================================================================================
+
+using System;
+using System.Collections.ObjectModel;
+using System.ComponentModel;
+using System.Runtime.CompilerServices;
+using System.Windows;
+using Araci.Applications.Editar.Selecionar;
+using Araci.Applications.Scene;
+using Araci.Core.Documents;
+using Araci.Core.Scenes;
+using Araci.Models;
+using Araci.Services;
+using Araci.Services.Editing;
+
+namespace Araci.ViewModels
+{
+    public class ViewportViewModel : INotifyPropertyChanged
+    {
+        private readonly DocumentSceneSyncService _documentSceneSync;
+        private double _inverseZoom = 1;
+
+        public ViewportViewModel(
+            AraciDocument document,
+            Scene scene,
+            SelectionBoxViewModel selectionBox,
+            TerminalSnapState terminalSnap,
+            CableVertexEditService cableVertexEdit,
+            LinhaEndpointEditService linhaEndpointEdit,
+            RetanguloResizeService retanguloResize,
+            CirculoResizeService circuloResize,
+            MoveHudService moveHud,
+            AlignmentGuideService alignmentGuides,
+            DocumentSceneSyncService documentSceneSync)
+        {
+            Document = document ?? throw new ArgumentNullException(nameof(document));
+            Scene = scene ?? throw new ArgumentNullException(nameof(scene));
+            SelectionBox = selectionBox ?? throw new ArgumentNullException(nameof(selectionBox));
+            TerminalSnap = terminalSnap ?? throw new ArgumentNullException(nameof(terminalSnap));
+            CableVertexEdit = cableVertexEdit ?? throw new ArgumentNullException(nameof(cableVertexEdit));
+            LinhaEndpointEdit = linhaEndpointEdit ?? throw new ArgumentNullException(nameof(linhaEndpointEdit));
+            RetanguloResize = retanguloResize ?? throw new ArgumentNullException(nameof(retanguloResize));
+            CirculoResize = circuloResize ?? throw new ArgumentNullException(nameof(circuloResize));
+            MoveHud = moveHud ?? throw new ArgumentNullException(nameof(moveHud));
+            ArgumentNullException.ThrowIfNull(alignmentGuides);
+            AlignmentGuides = alignmentGuides.Linhas;
+            _documentSceneSync = documentSceneSync ?? throw new ArgumentNullException(nameof(documentSceneSync));
+        }
+
+        public AraciDocument Document { get; }
+        public Scene Scene { get; }
+        public SelectionBoxViewModel SelectionBox { get; }
+        public TerminalSnapState TerminalSnap { get; }
+        public CableVertexEditService CableVertexEdit { get; }
+        public LinhaEndpointEditService LinhaEndpointEdit { get; }
+        public RetanguloResizeService RetanguloResize { get; }
+        public CirculoResizeService CirculoResize { get; }
+        public MoveHudService MoveHud { get; }
+        public ObservableCollection<AlignmentGuideLineViewModel> AlignmentGuides { get; }
+        public ObservableCollection<ElementoViewModel> Elementos => Scene.Elementos;
+        public double InverseZoom => _inverseZoom;
+        public double CableHandleVisualOffset => -5 * _inverseZoom;
+        public double LinhaHandleVisualSize => 10 * _inverseZoom;
+        public double LinhaHandleVisualOffset => -5 * _inverseZoom;
+        public double LinhaHandleStrokeThickness => 1.5 * _inverseZoom;
+        public double RetanguloHandleVisualSize => 10 * _inverseZoom;
+        public double RetanguloHandleVisualOffset => -5 * _inverseZoom;
+        public double RetanguloHandleStrokeThickness => 1.5 * _inverseZoom;
+        public double CirculoHandleVisualSize => 10 * _inverseZoom;
+        public double CirculoHandleVisualOffset => -5 * _inverseZoom;
+        public double CirculoHandleStrokeThickness => 1.5 * _inverseZoom;
+        public double TerminalMarkerVisualSize => 20 * _inverseZoom;
+        public double TerminalMarkerVisualOffset => -10 * _inverseZoom;
+        public double TerminalMarkerStrokeThickness => 2 * _inverseZoom;
+        public double TerminalMessageVisualOffsetX => 16 * _inverseZoom;
+        public double TerminalMessageVisualOffsetY => -34 * _inverseZoom;
+        public double TerminalMessageFontSize => 12 * _inverseZoom;
+        public Thickness TerminalMessagePadding => new(7 * _inverseZoom, 4 * _inverseZoom, 7 * _inverseZoom, 4 * _inverseZoom);
+        public CornerRadius TerminalMessageCornerRadius => new(5 * _inverseZoom);
+
+        public void AtualizarZoomVisual(double zoom)
+        {
+            double inverseZoom = zoom > 0 ? 1 / zoom : 1;
+
+            if (Math.Abs(_inverseZoom - inverseZoom) < 0.000001)
+                return;
+
+            _inverseZoom = inverseZoom;
+            OnPropertyChanged(nameof(InverseZoom));
+            OnPropertyChanged(nameof(CableHandleVisualOffset));
+            OnPropertyChanged(nameof(LinhaHandleVisualSize));
+            OnPropertyChanged(nameof(LinhaHandleVisualOffset));
+            OnPropertyChanged(nameof(LinhaHandleStrokeThickness));
+            OnPropertyChanged(nameof(RetanguloHandleVisualSize));
+            OnPropertyChanged(nameof(RetanguloHandleVisualOffset));
+            OnPropertyChanged(nameof(RetanguloHandleStrokeThickness));
+            OnPropertyChanged(nameof(CirculoHandleVisualSize));
+            OnPropertyChanged(nameof(CirculoHandleVisualOffset));
+            OnPropertyChanged(nameof(CirculoHandleStrokeThickness));
+            OnPropertyChanged(nameof(TerminalMarkerVisualSize));
+            OnPropertyChanged(nameof(TerminalMarkerVisualOffset));
+            OnPropertyChanged(nameof(TerminalMarkerStrokeThickness));
+            OnPropertyChanged(nameof(TerminalMessageVisualOffsetX));
+            OnPropertyChanged(nameof(TerminalMessageVisualOffsetY));
+            OnPropertyChanged(nameof(TerminalMessageFontSize));
+            OnPropertyChanged(nameof(TerminalMessagePadding));
+            OnPropertyChanged(nameof(TerminalMessageCornerRadius));
+        }
+
+        public void RegistrarViewModel(ElementoViewModel vm)
+        {
+            _documentSceneSync.RegistrarViewModel(vm);
+        }
+
+        public ElementoViewModel? ObterViewModel(Elemento modelo)
+        {
+            return _documentSceneSync.ObterViewModel(modelo);
+        }
+
+        public void AtualizarViewModel(Elemento modelo)
+        {
+            _documentSceneSync.AtualizarViewModel(modelo);
+        }
+
+        public event PropertyChangedEventHandler? PropertyChanged;
+
+        protected virtual void OnPropertyChanged([CallerMemberName] string? nome = null)
+        {
+            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nome));
+        }
+    }
+}
 
 
 ====================================================================================================

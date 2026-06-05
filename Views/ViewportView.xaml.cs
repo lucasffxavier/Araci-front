@@ -17,6 +17,7 @@ namespace Araci.Views
         private ViewportViewModel? _viewportViewModel;
         private EditorContext? _context;
         private bool _commitInlineTextInProgress;
+        private bool _cancelInlineTextInProgress;
 
         public ViewportView()
         {
@@ -153,7 +154,15 @@ namespace Araci.Views
                 return;
             }
 
-            ConfirmarEdicaoInlineAtiva();
+            if (ExisteEdicaoInlineAtiva())
+            {
+                if (!OrigemEstaDentroDeEditorInline(e.OriginalSource as DependencyObject))
+                    ConfirmarEdicaoInlineAtiva();
+
+                e.Handled = true;
+                return;
+            }
+
             Focus();
             Keyboard.Focus(this);
             ToolInputState inputState = CriarInputState(e, e.ChangedButton, e.ClickCount);
@@ -173,6 +182,12 @@ namespace Araci.Views
 
             if (_context == null)
                 return;
+
+            if (ExisteEdicaoInlineAtiva())
+            {
+                AtualizarCursorInteracao(GetWorldPos(e));
+                return;
+            }
 
             Point worldPosition = GetWorldPos(e);
             _context.Input.MouseMove(worldPosition, CriarInputState(e));
@@ -211,6 +226,13 @@ namespace Araci.Views
                 return;
             }
 
+            if (ExisteEdicaoInlineAtiva())
+            {
+                LiberarCapturaMouse();
+                e.Handled = true;
+                return;
+            }
+
             if (_context != null)
             {
                 Point worldPosition = GetWorldPos(e);
@@ -234,6 +256,19 @@ namespace Araci.Views
             if (e.OriginalSource is TextBox textBox && textBox.DataContext is TextoAnotativoViewModel)
                 return;
 
+            if (ExisteEdicaoInlineAtiva())
+            {
+                if (e.Key == Key.Escape)
+                {
+                    CancelarEdicaoInlineAtiva();
+                    Focus();
+                    Keyboard.Focus(this);
+                    e.Handled = true;
+                }
+
+                return;
+            }
+
             if (_context != null && e.Key == Key.Space && _context.Input.KeyDown(e.Key))
             {
                 e.Handled = true;
@@ -253,10 +288,7 @@ namespace Araci.Views
             e.Handled = _context.Input.KeyDown(e.Key);
 
             if (e.Handled && e.Key == Key.Escape)
-            {
-                CancelarEdicaoInlineAtiva();
                 LiberarCapturaMouse();
-            }
         }
 
         private void OnPreviewKeyUp(object sender, KeyEventArgs e)
@@ -271,6 +303,9 @@ namespace Araci.Views
 
         private void OnMouseLeave(object sender, MouseEventArgs e)
         {
+            if (ExisteEdicaoInlineAtiva())
+                return;
+
             _context?.Hover.Clear();
             _context?.TerminalSnap.Limpar();
             _context?.AlignmentGuides.Limpar();
@@ -294,6 +329,12 @@ namespace Araci.Views
 
         private void AtualizarCursorInteracao(Point worldPosition)
         {
+            if (ExisteEdicaoInlineAtiva())
+            {
+                Cursor = Cursors.IBeam;
+                return;
+            }
+
             if (_context?.Navigation.IsPanning == true || _context?.Navigation.IsSpacePressed == true)
             {
                 Cursor = Cursors.ScrollAll;
@@ -351,7 +392,7 @@ namespace Araci.Views
         {
             TextBox? textBox = EncontrarTextBoxInline(WorldLayer, texto);
 
-            if (textBox == null)
+            if (textBox == null || !texto.IsEditingInline)
                 return;
 
             textBox.Focus();
@@ -365,6 +406,9 @@ namespace Araci.Views
             {
                 Dispatcher.BeginInvoke(new Action(() =>
                 {
+                    if (!texto.IsEditingInline)
+                        return;
+
                     textBox.Focus();
                     Keyboard.Focus(textBox);
                     textBox.SelectAll();
@@ -391,52 +435,86 @@ namespace Araci.Views
 
             if (e.Key == Key.Escape)
             {
-                texto.CancelarEdicaoInline();
+                CancelarEdicaoInlineTexto(texto);
                 Focus();
                 Keyboard.Focus(this);
                 e.Handled = true;
             }
         }
 
-        private void OnInlineTextBoxLostFocus(object sender, RoutedEventArgs e)
+        private void OnInlineTextBoxLostKeyboardFocus(object sender, KeyboardFocusChangedEventArgs e)
         {
-            if (sender is TextBox { DataContext: TextoAnotativoViewModel texto })
-                ConfirmarEdicaoInlineTexto(texto);
+            if (sender is not TextBox { DataContext: TextoAnotativoViewModel texto })
+                return;
+
+            if (_cancelInlineTextInProgress || _commitInlineTextInProgress || !texto.IsEditingInline)
+                return;
+
+            if (e.NewFocus is DependencyObject novoFoco && OrigemEstaDentroDeEditorInline(novoFoco))
+                return;
+
+            Dispatcher.BeginInvoke(new Action(() =>
+            {
+                if (!_cancelInlineTextInProgress && !_commitInlineTextInProgress && texto.IsEditingInline)
+                    ConfirmarEdicaoInlineTexto(texto);
+            }));
+        }
+
+        private bool ExisteEdicaoInlineAtiva()
+        {
+            return ObterTextoEmEdicaoInline() != null;
+        }
+
+        private TextoAnotativoViewModel? ObterTextoEmEdicaoInline()
+        {
+            if (_viewportViewModel == null)
+                return null;
+
+            foreach (ElementoViewModel elemento in _viewportViewModel.Elementos)
+            {
+                if (elemento is TextoAnotativoViewModel texto && texto.IsEditingInline)
+                    return texto;
+            }
+
+            return null;
         }
 
         private void ConfirmarEdicaoInlineAtiva()
         {
-            if (_viewportViewModel == null)
-                return;
+            TextoAnotativoViewModel? texto = ObterTextoEmEdicaoInline();
 
-            foreach (ElementoViewModel elemento in _viewportViewModel.Elementos)
-            {
-                if (elemento is TextoAnotativoViewModel texto && texto.IsEditingInline)
-                {
-                    ConfirmarEdicaoInlineTexto(texto);
-                    return;
-                }
-            }
+            if (texto != null)
+                ConfirmarEdicaoInlineTexto(texto);
         }
 
         private void CancelarEdicaoInlineAtiva()
         {
-            if (_viewportViewModel == null)
+            TextoAnotativoViewModel? texto = ObterTextoEmEdicaoInline();
+
+            if (texto != null)
+                CancelarEdicaoInlineTexto(texto);
+        }
+
+        private void CancelarEdicaoInlineTexto(TextoAnotativoViewModel texto)
+        {
+            if (!texto.IsEditingInline || _commitInlineTextInProgress || _cancelInlineTextInProgress)
                 return;
 
-            foreach (ElementoViewModel elemento in _viewportViewModel.Elementos)
+            _cancelInlineTextInProgress = true;
+
+            try
             {
-                if (elemento is TextoAnotativoViewModel texto && texto.IsEditingInline)
-                {
-                    texto.CancelarEdicaoInline();
-                    return;
-                }
+                texto.CancelarEdicaoInline();
+            }
+            finally
+            {
+                _cancelInlineTextInProgress = false;
             }
         }
 
         private void ConfirmarEdicaoInlineTexto(TextoAnotativoViewModel texto)
         {
-            if (_context == null || !texto.IsEditingInline || _commitInlineTextInProgress)
+            if (_context == null || !texto.IsEditingInline || _commitInlineTextInProgress || _cancelInlineTextInProgress)
                 return;
 
             _commitInlineTextInProgress = true;
@@ -462,6 +540,19 @@ namespace Araci.Views
             {
                 _commitInlineTextInProgress = false;
             }
+        }
+
+        private static bool OrigemEstaDentroDeEditorInline(DependencyObject? origem)
+        {
+            while (origem != null)
+            {
+                if (origem is TextBox { DataContext: TextoAnotativoViewModel texto } && texto.IsEditingInline)
+                    return true;
+
+                origem = VisualTreeHelper.GetParent(origem);
+            }
+
+            return false;
         }
 
         private static TextBox? EncontrarTextBoxInline(DependencyObject origem, TextoAnotativoViewModel texto)
