@@ -122,6 +122,11 @@ namespace Araci.ViewModels
 
         public FontFamily FontFamily => new(string.IsNullOrWhiteSpace(Fonte) ? "Arial" : Fonte);
 
+        public void AtualizarAposTipoAlterado()
+        {
+            NotificarAlteracaoVisualPorTipo();
+        }
+
         public override void Mover(Vector delta)
         {
             Texto.PosicaoX += delta.X;

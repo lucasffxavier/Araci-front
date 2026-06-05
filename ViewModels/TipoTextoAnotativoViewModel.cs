@@ -6,6 +6,7 @@ using System.Windows;
 using System.Windows.Data;
 using System.Windows.Input;
 using System.Windows.Media;
+using Araci.Core.Commands;
 using Araci.Models.Tipos;
 using Araci.Properties;
 using Araci.Properties.Types;
@@ -16,9 +17,11 @@ namespace Araci.ViewModels
     {
         private readonly ObservableCollection<TipoTextoAnotativo>? _tiposReais;
         private readonly ObservableCollection<TipoTextoAnotativo>? _tiposTemporarios;
+        private readonly List<TipoTextoAnotativo> _tiposReaisOriginais = new();
         private readonly Dictionary<TipoTextoAnotativo, TipoTextoAnotativo?> _mapaTemporarioParaReal = new();
         private readonly Action<TipoTextoAnotativo>? _selecionarTipo;
         private readonly Action? _tipoAlterado;
+        private readonly TipoTextoAnotativo? _tipoRealInicial;
         private ICommand? _escolherCorCommand;
         private ICommand? _novoTipoCommand;
         private ICommand? _renomearTipoCommand;
@@ -39,6 +42,7 @@ namespace Araci.ViewModels
             _tiposReais = tiposDisponiveis;
             _selecionarTipo = selecionarTipo;
             _tipoAlterado = tipoAlterado;
+            _tipoRealInicial = tipo;
 
             if (_tiposReais != null)
             {
@@ -46,6 +50,7 @@ namespace Araci.ViewModels
 
                 foreach (TipoTextoAnotativo tipoReal in _tiposReais)
                 {
+                    _tiposReaisOriginais.Add(tipoReal);
                     TipoTextoAnotativo temporario = ClonarTipo(tipoReal);
                     _tiposTemporarios.Add(temporario);
                     _mapaTemporarioParaReal[temporario] = tipoReal;
@@ -166,44 +171,50 @@ namespace Araci.ViewModels
             }
         }
 
-        public override void CommitChanges()
+        public IUndoableCommand? CreateCommitCommand(Action? tiposAlterados)
         {
             if (_tiposTemporarios == null || _tiposReais == null)
+                return null;
+
+            int indiceSelecionado = _tiposTemporarios.IndexOf(TipoTexto);
+            var alteracoes = _tiposTemporarios
+                .Select(t => new UpdateTextAnnotationTypeChange(ObterTipoReal(t), ClonarTipo(t)))
+                .ToList();
+
+            return new UpdateTextAnnotationTypeLibraryCommand(
+                _tiposReais,
+                _tiposReaisOriginais,
+                alteracoes,
+                _tipoRealInicial,
+                indiceSelecionado,
+                _selecionarTipo,
+                () =>
+                {
+                    _tipoAlterado?.Invoke();
+                    tiposAlterados?.Invoke();
+                });
+        }
+
+        public override void CommitChanges()
+        {
+            var command = CreateCommitCommand(null);
+
+            if (command != null)
             {
-                _tipoAlterado?.Invoke();
+                command.Execute();
                 return;
             }
-
-            TipoTextoAnotativo selecionadoTemporario = TipoTexto;
-            TipoTextoAnotativo? selecionadoReal = null;
-
-            foreach (TipoTextoAnotativo temporario in _tiposTemporarios)
-            {
-                if (!_mapaTemporarioParaReal.TryGetValue(temporario, out TipoTextoAnotativo? real) || real == null)
-                {
-                    real = ClonarTipo(temporario);
-                    _tiposReais.Add(real);
-                    _mapaTemporarioParaReal[temporario] = real;
-                }
-                else
-                {
-                    CopiarValores(temporario, real);
-                }
-
-                if (ReferenceEquals(temporario, selecionadoTemporario))
-                    selecionadoReal = real;
-            }
-
-            CollectionViewSource.GetDefaultView(_tiposReais)?.Refresh();
-
-            if (selecionadoReal != null)
-                _selecionarTipo?.Invoke(selecionadoReal);
 
             _tipoAlterado?.Invoke();
         }
 
         public override void CancelChanges()
         {
+        }
+
+        private TipoTextoAnotativo? ObterTipoReal(TipoTextoAnotativo temporario)
+        {
+            return _mapaTemporarioParaReal.TryGetValue(temporario, out TipoTextoAnotativo? real) ? real : null;
         }
 
         private void CriarNovoTipo()
@@ -337,17 +348,6 @@ namespace Araci.ViewModels
                 AlturaTexto = origem.AlturaTexto,
                 AlinhamentoHorizontal = origem.AlinhamentoHorizontal
             };
-        }
-
-        private static void CopiarValores(TipoTextoAnotativo origem, TipoTextoAnotativo destino)
-        {
-            destino.NomeTipo = origem.NomeTipo;
-            destino.Familia = origem.Familia;
-            destino.Categoria = origem.Categoria;
-            destino.CorTexto = origem.CorTexto;
-            destino.Fonte = origem.Fonte;
-            destino.AlturaTexto = origem.AlturaTexto;
-            destino.AlinhamentoHorizontal = origem.AlinhamentoHorizontal;
         }
 
         private static string NormalizarNome(string? nome)

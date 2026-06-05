@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using System.Linq;
 using System.Windows;
 using Araci.Applications.Abstractions;
 using Araci.Applications.Editor;
@@ -57,6 +58,7 @@ namespace Araci.Services
             Hover = core.Hover;
             Snap = core.Snap;
             TypePropertiesDialogs = core.TypePropertiesDialogs;
+            TypePropertiesDialogs.Configure(Commands, NotifyTextAnnotationTypeViewModels);
             Dialogs = core.Dialogs;
             Elements = core.Elements;
             Connectivity = core.Connectivity;
@@ -229,6 +231,18 @@ namespace Araci.Services
                 if (vm.Modelo is Cabo or Carga)
                     vm.NotificarPropriedades("CorrenteLinha", "CorrenteFaseA", "CorrenteFaseB", "CorrenteFaseC");
             }
+        }
+
+        private void NotifyTextAnnotationTypeViewModels()
+        {
+            if (Viewport == null)
+                return;
+
+            foreach (TextoAnotativoViewModel vm in Viewport.Elementos.OfType<TextoAnotativoViewModel>())
+                vm.AtualizarAposTipoAlterado();
+
+            RefreshProperties();
+            SceneQueries.Invalidate();
         }
 
         private SelecionarTool CriarSelecionarTool()
