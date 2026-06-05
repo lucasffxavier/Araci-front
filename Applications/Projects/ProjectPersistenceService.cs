@@ -5,7 +5,6 @@ using Araci.Applications.Abstractions;
 using Araci.Core.Documents;
 using Araci.Infrastructure.Persistence;
 using Araci.Models;
-using Araci.Services;
 using Araci.Services.Settings;
 
 namespace Araci.Applications.Projects
@@ -47,6 +46,7 @@ namespace Araci.Applications.Projects
         {
             _document.Limpar();
             _serializer.ApplyUnitSettings(null, _settings.Units);
+            _serializer.ApplyTypeLibraries(null);
             _limparEstadoTransitorio();
             _commands.Clear();
             _currentPath = null;
@@ -107,8 +107,9 @@ namespace Araci.Applications.Projects
                         "O Araci tentara abrir de forma conservadora.");
                 }
 
-                var elementos = _serializer.CreateElements(dto);
                 _serializer.ApplyUnitSettings(dto.Units, _settings.Units);
+                _serializer.ApplyTypeLibraries(dto.TypeLibraries);
+                var elementos = _serializer.CreateElements(dto);
 
                 _document.Limpar();
 

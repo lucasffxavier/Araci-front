@@ -14,6 +14,7 @@ namespace Araci.Infrastructure.Persistence
         public string? Generator { get; set; }
         public string? Notes { get; set; }
         public ProjectUnitSettingsDto? Units { get; set; }
+        public TypeLibrariesDto? TypeLibraries { get; set; }
         public List<ElementDto> Elements { get; set; } = new();
     }
 
@@ -31,12 +32,26 @@ namespace Araci.Infrastructure.Persistence
             return new ProjectMetadataDto
             {
                 AppName = ProjectSerializer.AppName,
-                ProjectName = string.IsNullOrWhiteSpace(projectName)
-                    ? ProjectSerializer.UntitledProjectName
-                    : projectName,
+                ProjectName = string.IsNullOrWhiteSpace(projectName) ? ProjectSerializer.UntitledProjectName : projectName,
                 Generator = ProjectSerializer.AppName
             };
         }
+    }
+
+    public sealed class TypeLibrariesDto
+    {
+        public List<TextAnnotationTypeDto> TextAnnotationTypes { get; set; } = new();
+    }
+
+    public sealed class TextAnnotationTypeDto
+    {
+        public string NomeTipo { get; set; } = string.Empty;
+        public string Familia { get; set; } = string.Empty;
+        public string Categoria { get; set; } = string.Empty;
+        public string CorTexto { get; set; } = "#FF000000";
+        public string Fonte { get; set; } = "Arial";
+        public double AlturaTexto { get; set; } = 14.0;
+        public string AlinhamentoHorizontal { get; set; } = "Esquerda";
     }
 
     public sealed class ElementDto

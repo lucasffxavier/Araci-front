@@ -10,8 +10,8 @@ using Araci.Core.Documents;
 using Araci.Models;
 using Araci.Models.Tipos;
 using Araci.Services;
-using Araci.Services.Geometry;
 using Araci.Services.Catalog;
+using Araci.Services.Geometry;
 using Araci.Services.Settings;
 
 namespace Araci.Infrastructure.Persistence
@@ -63,6 +63,7 @@ namespace Araci.Infrastructure.Persistence
                 Generator = metadata.Generator,
                 Notes = metadata.Notes,
                 Units = CreateUnitSettingsDto(units),
+                TypeLibraries = CreateTypeLibrariesDto(),
                 Elements = document.Elementos
                     .Select(CriarElementoDto)
                     .ToList()
@@ -98,6 +99,25 @@ namespace Araci.Infrastructure.Persistence
             target.ReactivePower = ParseUnit(dto?.ReactivePower, UnitQuantityKind.ReactivePower, defaults.ReactivePower);
             target.ApparentPower = ParseUnit(dto?.ApparentPower, UnitQuantityKind.ApparentPower, defaults.ApparentPower);
             target.Percent = ParseUnit(dto?.Percent, UnitQuantityKind.Percent, defaults.Percent);
+        }
+
+        public void ApplyTypeLibraries(TypeLibrariesDto? dto)
+        {
+            IEnumerable<TextAnnotationTypeDto> textTypes = dto?.TextAnnotationTypes != null && dto.TextAnnotationTypes.Count > 0
+                ? dto.TextAnnotationTypes
+                : CreateDefaultTextAnnotationTypeDtos();
+
+            List<TipoTextoAnotativo> tipos = textTypes
+                .Select(CriarTipoTextoAnotativo)
+                .Where(t => !string.IsNullOrWhiteSpace(t.NomeTipo))
+                .GroupBy(CriarChaveTipo, StringComparer.OrdinalIgnoreCase)
+                .Select(g => g.Last())
+                .ToList();
+
+            if (tipos.Count == 0)
+                tipos = CreateDefaultTextAnnotationTypeDtos().Select(CriarTipoTextoAnotativo).ToList();
+
+            _elements.ReplaceTypes(ElementKinds.TextoAnotativo, tipos);
         }
 
         public IReadOnlyList<Elemento> CreateElements(ProjectFileDto dto)
@@ -163,6 +183,57 @@ namespace Araci.Infrastructure.Persistence
         public int GetVersion(ProjectFileDto dto)
         {
             return dto.Version <= 0 ? 1 : dto.Version;
+        }
+
+        private TypeLibrariesDto CreateTypeLibrariesDto()
+        {
+            return new TypeLibrariesDto
+            {
+                TextAnnotationTypes = _elements.GetTypes(ElementKinds.TextoAnotativo)
+                    .OfType<TipoTextoAnotativo>()
+                    .Select(CriarTextAnnotationTypeDto)
+                    .ToList()
+            };
+        }
+
+        private static IEnumerable<TextAnnotationTypeDto> CreateDefaultTextAnnotationTypeDtos()
+        {
+            yield return new TextAnnotationTypeDto { NomeTipo = "Texto padrão", Familia = "Anotações", Categoria = "Textos", CorTexto = "#FF000000", Fonte = "Arial", AlturaTexto = 14.0, AlinhamentoHorizontal = "Esquerda" };
+            yield return new TextAnnotationTypeDto { NomeTipo = "Texto pequeno", Familia = "Anotações", Categoria = "Textos", CorTexto = "#FF000000", Fonte = "Arial", AlturaTexto = 10.0, AlinhamentoHorizontal = "Esquerda" };
+            yield return new TextAnnotationTypeDto { NomeTipo = "Texto título", Familia = "Anotações", Categoria = "Textos", CorTexto = "#FF000000", Fonte = "Arial", AlturaTexto = 20.0, AlinhamentoHorizontal = "Centro" };
+        }
+
+        private static TextAnnotationTypeDto CriarTextAnnotationTypeDto(TipoTextoAnotativo tipo)
+        {
+            return new TextAnnotationTypeDto
+            {
+                NomeTipo = tipo.NomeTipo,
+                Familia = tipo.Familia,
+                Categoria = tipo.Categoria,
+                CorTexto = tipo.CorTexto,
+                Fonte = tipo.Fonte,
+                AlturaTexto = tipo.AlturaTexto,
+                AlinhamentoHorizontal = tipo.AlinhamentoHorizontal
+            };
+        }
+
+        private static TipoTextoAnotativo CriarTipoTextoAnotativo(TextAnnotationTypeDto dto)
+        {
+            return new TipoTextoAnotativo
+            {
+                NomeTipo = string.IsNullOrWhiteSpace(dto.NomeTipo) ? "Texto padrão" : dto.NomeTipo.Trim(),
+                Familia = string.IsNullOrWhiteSpace(dto.Familia) ? "Anotações" : dto.Familia.Trim(),
+                Categoria = string.IsNullOrWhiteSpace(dto.Categoria) ? "Textos" : dto.Categoria.Trim(),
+                CorTexto = dto.CorTexto,
+                Fonte = dto.Fonte,
+                AlturaTexto = dto.AlturaTexto,
+                AlinhamentoHorizontal = dto.AlinhamentoHorizontal
+            };
+        }
+
+        private static string CriarChaveTipo(TipoTextoAnotativo tipo)
+        {
+            return $"{tipo.NomeTipo.Trim()}|{tipo.Familia.Trim()}|{tipo.Categoria.Trim()}";
         }
 
         private static UnitKind ParseUnit(string? value, UnitQuantityKind quantity, UnitKind fallback)

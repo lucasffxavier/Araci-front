@@ -108,6 +108,29 @@ namespace Araci.Services.Catalog
             return FindByKind(kind)?.ObterTipoPadrao();
         }
 
+        public void ReplaceTypes<T>(string kind, IEnumerable<T> types) where T : TipoElemento
+        {
+            if (string.IsNullOrWhiteSpace(kind))
+                throw new ArgumentException("Kind invalido.", nameof(kind));
+
+            if (types == null)
+                throw new ArgumentNullException(nameof(types));
+
+            ElementDefinition definition = FindByKind(kind)
+                ?? throw new InvalidOperationException($"Elemento nao registrado: {kind}.");
+
+            if (definition.TypeModelType != null && !definition.TypeModelType.IsAssignableFrom(typeof(T)))
+                throw new InvalidOperationException($"O tipo '{typeof(T).Name}' nao e compativel com o elemento '{kind}'.");
+
+            if (definition.ObterTipos() is not ICollection<T> collection)
+                throw new InvalidOperationException($"A biblioteca de tipos do elemento '{kind}' nao pode ser substituida.");
+
+            collection.Clear();
+
+            foreach (T type in types.Where(t => t != null))
+                collection.Add(type);
+        }
+
         public TipoElemento? ResolveType(string kind, string? nomeTipo, string? familia, string? categoria)
         {
             TipoElemento? tipo = null;
