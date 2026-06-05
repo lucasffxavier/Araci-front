@@ -151,6 +151,62 @@ namespace Araci.ViewModels
             }
         }
 
+        public bool LeaderAtivo
+        {
+            get => Texto.LeaderAtivo;
+            set
+            {
+                if (Texto.LeaderAtivo == value)
+                    return;
+
+                Texto.LeaderAtivo = value;
+                OnPropertyChanged();
+                AtualizarNode();
+                NotificarParametros();
+            }
+        }
+
+        public double LeaderX
+        {
+            get => Texto.LeaderX;
+            set
+            {
+                if (Math.Abs(Texto.LeaderX - value) < 0.000001)
+                    return;
+
+                Texto.LeaderX = value;
+                OnPropertyChanged();
+                AtualizarNode();
+                NotificarParametros();
+            }
+        }
+
+        public double LeaderY
+        {
+            get => Texto.LeaderY;
+            set
+            {
+                if (Math.Abs(Texto.LeaderY - value) < 0.000001)
+                    return;
+
+                Texto.LeaderY = value;
+                OnPropertyChanged();
+                AtualizarNode();
+                NotificarParametros();
+            }
+        }
+
+        public Point LeaderPoint
+        {
+            get => new(LeaderX, LeaderY);
+            set
+            {
+                LeaderX = value.X;
+                LeaderY = value.Y;
+                OnPropertyChanged();
+            }
+        }
+
         public bool IsEditingInline
         {
             get => _isEditingInline;
@@ -244,7 +300,7 @@ namespace Araci.ViewModels
 
         public override ElementoEstado CapturarEstado()
         {
-            return new ElementoEstado(Texto.PosicaoX, Texto.PosicaoY, Texto.LarguraCaixa, Texto.AlturaEstimada, Texto.Rotacao);
+            return new ElementoEstado(Texto.PosicaoX, Texto.PosicaoY, Texto.LarguraCaixa, Texto.AlturaEstimada, Texto.Rotacao, null, Texto.LeaderAtivo, Texto.LeaderX, Texto.LeaderY);
         }
 
         public override void AplicarEstado(ElementoEstado estado)
@@ -256,6 +312,9 @@ namespace Araci.ViewModels
             if (estado.X2 > 0)
                 Texto.LarguraCaixa = estado.X2;
 
+            Texto.LeaderAtivo = estado.TextoLeaderAtivo;
+            Texto.LeaderX = estado.TextoLeaderX;
+            Texto.LeaderY = estado.TextoLeaderY;
             AtualizarNode();
         }
 
@@ -265,6 +324,10 @@ namespace Araci.ViewModels
             OnPropertyChanged(nameof(Conteudo));
             OnPropertyChanged(nameof(LarguraCaixa));
             OnPropertyChanged(nameof(Rotacao));
+            OnPropertyChanged(nameof(LeaderAtivo));
+            OnPropertyChanged(nameof(LeaderX));
+            OnPropertyChanged(nameof(LeaderY));
+            OnPropertyChanged(nameof(LeaderPoint));
             OnPropertyChanged(nameof(AlturaEdicao));
             OnPropertyChanged(nameof(AlturaVisual));
             NotificarParametrosDeTipo();

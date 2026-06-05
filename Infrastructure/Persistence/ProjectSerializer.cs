@@ -331,6 +331,9 @@ namespace Araci.Infrastructure.Persistence
             {
                 texto.Texto = texto.Texto;
                 texto.LarguraCaixa = texto.LarguraCaixa;
+                texto.LeaderAtivo = texto.LeaderAtivo;
+                texto.LeaderX = texto.LeaderX;
+                texto.LeaderY = texto.LeaderY;
             }
         }
 

@@ -12,8 +12,11 @@ namespace Araci.ViewModels
         public double Y2 { get; }
         public double Rotacao { get; }
         public List<Point> Vertices { get; }
+        public bool TextoLeaderAtivo { get; }
+        public double TextoLeaderX { get; }
+        public double TextoLeaderY { get; }
 
-        public ElementoEstado(double x, double y, double x2 = 0, double y2 = 0, double rotacao = 0, IEnumerable<Point>? vertices = null)
+        public ElementoEstado(double x, double y, double x2 = 0, double y2 = 0, double rotacao = 0, IEnumerable<Point>? vertices = null, bool textoLeaderAtivo = false, double textoLeaderX = 0, double textoLeaderY = 0)
         {
             X = x;
             Y = y;
@@ -21,6 +24,9 @@ namespace Araci.ViewModels
             Y2 = y2;
             Rotacao = rotacao;
             Vertices = vertices != null ? new List<Point>(vertices) : new List<Point>();
+            TextoLeaderAtivo = textoLeaderAtivo;
+            TextoLeaderX = textoLeaderX;
+            TextoLeaderY = textoLeaderY;
         }
 
         public void AplicarEm(Elemento elemento)
@@ -54,6 +60,9 @@ namespace Araci.ViewModels
             {
                 texto.PosicaoX = X;
                 texto.PosicaoY = Y;
+                texto.LeaderAtivo = TextoLeaderAtivo;
+                texto.LeaderX = TextoLeaderX;
+                texto.LeaderY = TextoLeaderY;
 
                 if (X2 > 0)
                     texto.LarguraCaixa = X2;

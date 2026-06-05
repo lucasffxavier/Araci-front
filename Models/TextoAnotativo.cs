@@ -9,6 +9,9 @@ namespace Araci.Models
     {
         public const string PARAM_TEXTO = "Texto";
         public const string PARAM_LARGURA_CAIXA = "LarguraCaixa";
+        public const string PARAM_LEADER_ATIVO = "LeaderAtivo";
+        public const string PARAM_LEADER_X = "LeaderX";
+        public const string PARAM_LEADER_Y = "LeaderY";
         public const double LarguraCaixaPadrao = 200.0;
         public const double LarguraCaixaMinima = 20.0;
         public const double MargemHorizontalCaixa = 8.0;
@@ -17,6 +20,9 @@ namespace Araci.Models
         {
             DefinirParametro(new Parameter<string>(PARAM_TEXTO, "Texto"));
             DefinirParametro(new Parameter<double>(PARAM_LARGURA_CAIXA, CalcularLarguraNatural("Texto", 14.0)));
+            DefinirParametro(new Parameter<bool>(PARAM_LEADER_ATIVO, false));
+            DefinirParametro(new Parameter<double>(PARAM_LEADER_X, 0.0));
+            DefinirParametro(new Parameter<double>(PARAM_LEADER_Y, 0.0));
         }
 
         public string Texto
@@ -29,6 +35,24 @@ namespace Araci.Models
         {
             get => Obter<double>(PARAM_LARGURA_CAIXA);
             set => Definir(PARAM_LARGURA_CAIXA, NormalizarLargura(value));
+        }
+
+        public bool LeaderAtivo
+        {
+            get => Obter<bool>(PARAM_LEADER_ATIVO);
+            set => Definir(PARAM_LEADER_ATIVO, value);
+        }
+
+        public double LeaderX
+        {
+            get => Obter<double>(PARAM_LEADER_X);
+            set => Definir(PARAM_LEADER_X, NormalizarCoordenada(value));
+        }
+
+        public double LeaderY
+        {
+            get => Obter<double>(PARAM_LEADER_Y);
+            set => Definir(PARAM_LEADER_Y, NormalizarCoordenada(value));
         }
 
         public TipoTextoAnotativo? TipoTexto => Tipo as TipoTextoAnotativo;
@@ -67,6 +91,9 @@ namespace Araci.Models
         {
             var clone = new TextoAnotativo();
             CopiarBasePara(clone);
+            clone.LeaderAtivo = LeaderAtivo;
+            clone.LeaderX = LeaderX;
+            clone.LeaderY = LeaderY;
             return clone;
         }
 
@@ -161,6 +188,11 @@ namespace Araci.Models
                 return LarguraCaixaPadrao;
 
             return Math.Max(LarguraCaixaMinima, valor);
+        }
+
+        private static double NormalizarCoordenada(double valor)
+        {
+            return double.IsNaN(valor) || double.IsInfinity(valor) ? 0.0 : valor;
         }
     }
 }
