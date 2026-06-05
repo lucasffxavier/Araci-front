@@ -108,6 +108,21 @@ namespace Araci.ViewModels
             }
         }
 
+        public double LarguraCaixa
+        {
+            get => Texto.LarguraCaixa;
+            set
+            {
+                if (Math.Abs(Texto.LarguraCaixa - value) < 0.000001)
+                    return;
+
+                Texto.LarguraCaixa = value;
+                OnPropertyChanged();
+                AtualizarNode();
+                NotificarParametros();
+            }
+        }
+
         public bool IsEditingInline
         {
             get => _isEditingInline;
@@ -213,6 +228,7 @@ namespace Araci.ViewModels
         {
             base.NotificarGeometria();
             OnPropertyChanged(nameof(Conteudo));
+            OnPropertyChanged(nameof(LarguraCaixa));
             NotificarParametrosDeTipo();
         }
 

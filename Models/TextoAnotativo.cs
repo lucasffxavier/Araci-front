@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Collections.Generic;
 using System.Linq;
 using Araci.Models.Tipos;
 
@@ -7,16 +8,26 @@ namespace Araci.Models
     public class TextoAnotativo : ElementoAnotativo
     {
         public const string PARAM_TEXTO = "Texto";
+        public const string PARAM_LARGURA_CAIXA = "LarguraCaixa";
+        public const double LarguraCaixaPadrao = 200.0;
+        public const double LarguraCaixaMinima = 20.0;
 
         public TextoAnotativo()
         {
             DefinirParametro(new Parameter<string>(PARAM_TEXTO, "Texto"));
+            DefinirParametro(new Parameter<double>(PARAM_LARGURA_CAIXA, LarguraCaixaPadrao));
         }
 
         public string Texto
         {
             get => Obter<string>(PARAM_TEXTO);
             set => Definir(PARAM_TEXTO, value ?? string.Empty);
+        }
+
+        public double LarguraCaixa
+        {
+            get => Obter<double>(PARAM_LARGURA_CAIXA);
+            set => Definir(PARAM_LARGURA_CAIXA, NormalizarLargura(value));
         }
 
         public TipoTextoAnotativo? TipoTexto => Tipo as TipoTextoAnotativo;
@@ -26,22 +37,14 @@ namespace Araci.Models
         public string Fonte => TipoTexto?.Fonte ?? "Arial";
         public string AlinhamentoHorizontal => TipoTexto?.AlinhamentoHorizontal ?? "Esquerda";
 
-        public double LarguraEstimada
-        {
-            get
-            {
-                string[] linhas = ObterLinhas();
-                int maiorLinha = Math.Max(1, linhas.Length == 0 ? 1 : linhas.Max(l => l.Length));
-                return Math.Max(1, maiorLinha * AlturaTexto * 0.58 + 4);
-            }
-        }
+        public double LarguraEstimada => Math.Max(LarguraCaixaMinima, LarguraCaixa);
 
         public double AlturaEstimada
         {
             get
             {
-                int linhas = Math.Max(1, ObterLinhas().Length);
-                return Math.Max(AlturaTexto, linhas * AlturaTexto * 1.25);
+                int linhas = Math.Max(1, ObterLinhasRenderizadas().Count);
+                return Math.Max(AlturaTexto, linhas * AlturaTexto * 1.25 + 4);
             }
         }
 
@@ -52,9 +55,81 @@ namespace Araci.Models
             return clone;
         }
 
-        private string[] ObterLinhas()
+        private IReadOnlyList<string> ObterLinhasRenderizadas()
+        {
+            string[] linhasManuais = ObterLinhasManuais();
+            var linhas = new List<string>();
+
+            foreach (string linha in linhasManuais)
+            {
+                foreach (string renderizada in QuebrarLinha(linha))
+                    linhas.Add(renderizada);
+            }
+
+            return linhas.Count == 0 ? new[] { string.Empty } : linhas;
+        }
+
+        private IEnumerable<string> QuebrarLinha(string linha)
+        {
+            string texto = linha ?? string.Empty;
+            int caracteresPorLinha = CalcularCaracteresPorLinha();
+
+            if (texto.Length <= caracteresPorLinha)
+            {
+                yield return texto;
+                yield break;
+            }
+
+            int inicio = 0;
+
+            while (inicio < texto.Length)
+            {
+                int restante = texto.Length - inicio;
+
+                if (restante <= caracteresPorLinha)
+                {
+                    yield return texto[inicio..];
+                    yield break;
+                }
+
+                int limite = inicio + caracteresPorLinha;
+                int quebra = texto.LastIndexOf(' ', limite, caracteresPorLinha);
+
+                if (quebra <= inicio)
+                    quebra = limite;
+
+                string trecho = texto[inicio..quebra].TrimEnd();
+
+                if (trecho.Length == 0)
+                    trecho = texto.Substring(inicio, Math.Min(caracteresPorLinha, restante));
+
+                yield return trecho;
+
+                inicio = quebra;
+
+                while (inicio < texto.Length && texto[inicio] == ' ')
+                    inicio++;
+            }
+        }
+
+        private int CalcularCaracteresPorLinha()
+        {
+            double larguraUtil = Math.Max(1, LarguraEstimada - 4);
+            double larguraMedia = Math.Max(1, AlturaTexto * 0.58);
+            return Math.Max(1, (int)Math.Floor(larguraUtil / larguraMedia));
+        }
+
+        private string[] ObterLinhasManuais()
         {
             return (Texto ?? string.Empty).Replace("\r\n", "\n").Replace('\r', '\n').Split('\n');
+        }
+
+        private static double NormalizarLargura(double valor)
+        {
+            if (double.IsNaN(valor) || double.IsInfinity(valor))
+                return LarguraCaixaPadrao;
+
+            return Math.Max(LarguraCaixaMinima, valor);
         }
     }
 }
