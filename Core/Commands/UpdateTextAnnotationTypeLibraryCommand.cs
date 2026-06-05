@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Linq;
 using System.Windows.Data;
+using Araci.Models;
 using Araci.Models.Tipos;
 
 namespace Araci.Core.Commands
@@ -12,6 +13,7 @@ namespace Araci.Core.Commands
         private readonly ObservableCollection<TipoTextoAnotativo> _tipos;
         private readonly List<TextAnnotationTypeBeforeState> _antes;
         private readonly List<TextAnnotationTypeAfterState> _depois;
+        private readonly List<TextAnnotationElementTypeState> _associacoesAntes;
         private readonly TipoTextoAnotativo? _tipoSelecionadoAntes;
         private readonly int _indiceSelecionadoDepois;
         private readonly Action<TipoTextoAnotativo>? _selecionarTipo;
@@ -24,7 +26,8 @@ namespace Araci.Core.Commands
             TipoTextoAnotativo? tipoSelecionadoAntes,
             int indiceSelecionadoDepois,
             Action<TipoTextoAnotativo>? selecionarTipo,
-            Action? tiposAlterados)
+            Action? tiposAlterados,
+            IEnumerable<TextoAnotativo>? textos = null)
         {
             _tipos = tipos ?? throw new ArgumentNullException(nameof(tipos));
             _antes = (tiposAntes ?? throw new ArgumentNullException(nameof(tiposAntes)))
@@ -34,6 +37,10 @@ namespace Araci.Core.Commands
             _depois = (alteracoesDepois ?? throw new ArgumentNullException(nameof(alteracoesDepois)))
                 .Where(t => t != null)
                 .Select(t => new TextAnnotationTypeAfterState(t.TipoReal, ClonarTipo(t.EstadoDepois)))
+                .ToList();
+            _associacoesAntes = (textos ?? Enumerable.Empty<TextoAnotativo>())
+                .Where(t => t != null)
+                .Select(t => new TextAnnotationElementTypeState(t, t.TipoTexto))
                 .ToList();
             _tipoSelecionadoAntes = tipoSelecionadoAntes;
             _indiceSelecionadoDepois = indiceSelecionadoDepois;
@@ -73,6 +80,8 @@ namespace Araci.Core.Commands
                     selecionado = tipo;
             }
 
+            selecionado ??= _tipos.FirstOrDefault();
+            ReatribuirTextosComTipoRemovido(selecionado);
             AtualizarColecao();
 
             if (selecionado != null)
@@ -91,12 +100,34 @@ namespace Araci.Core.Commands
                 _tipos.Add(estado.TipoReal);
             }
 
+            RestaurarAssociacoesAntes();
             AtualizarColecao();
 
             if (_tipoSelecionadoAntes != null)
                 _selecionarTipo?.Invoke(_tipoSelecionadoAntes);
 
             _tiposAlterados?.Invoke();
+        }
+
+        private void ReatribuirTextosComTipoRemovido(TipoTextoAnotativo? fallback)
+        {
+            if (fallback == null)
+                return;
+
+            foreach (TextAnnotationElementTypeState estado in _associacoesAntes)
+            {
+                if (estado.Texto.TipoTexto == null || !_tipos.Contains(estado.Texto.TipoTexto))
+                    estado.Texto.Tipo = fallback;
+            }
+        }
+
+        private void RestaurarAssociacoesAntes()
+        {
+            foreach (TextAnnotationElementTypeState estado in _associacoesAntes)
+            {
+                if (estado.TipoAntes != null)
+                    estado.Texto.Tipo = estado.TipoAntes;
+            }
         }
 
         private void AtualizarColecao()
@@ -162,6 +193,18 @@ namespace Araci.Core.Commands
                 _tipoCriado ??= ClonarTipo(EstadoDepois);
                 return _tipoCriado;
             }
+        }
+
+        private sealed class TextAnnotationElementTypeState
+        {
+            public TextAnnotationElementTypeState(TextoAnotativo texto, TipoTextoAnotativo? tipoAntes)
+            {
+                Texto = texto;
+                TipoAntes = tipoAntes;
+            }
+
+            public TextoAnotativo Texto { get; }
+            public TipoTextoAnotativo? TipoAntes { get; }
         }
     }
 

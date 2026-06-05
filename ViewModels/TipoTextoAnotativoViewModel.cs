@@ -7,6 +7,7 @@ using System.Windows.Data;
 using System.Windows.Input;
 using System.Windows.Media;
 using Araci.Core.Commands;
+using Araci.Models;
 using Araci.Models.Tipos;
 using Araci.Properties;
 using Araci.Properties.Types;
@@ -22,9 +23,10 @@ namespace Araci.ViewModels
         private readonly Action<TipoTextoAnotativo>? _selecionarTipo;
         private readonly Action? _tipoAlterado;
         private readonly TipoTextoAnotativo? _tipoRealInicial;
-        private ICommand? _escolherCorCommand;
-        private ICommand? _novoTipoCommand;
-        private ICommand? _renomearTipoCommand;
+        private SimpleCommand? _escolherCorCommand;
+        private SimpleCommand? _novoTipoCommand;
+        private SimpleCommand? _renomearTipoCommand;
+        private SimpleCommand? _excluirTipoCommand;
 
         public TipoTextoAnotativoViewModel(TipoTextoAnotativo tipo)
             : this(tipo, null, null, null)
@@ -83,6 +85,7 @@ namespace Araci.ViewModels
 
                 AtualizarTipoBase(value);
                 NotificarTudo();
+                AtualizarEstadoDosComandos();
             }
         }
 
@@ -112,6 +115,7 @@ namespace Araci.ViewModels
         public ICommand EscolherCorCommand => _escolherCorCommand ??= new SimpleCommand(EscolherCor);
         public ICommand NovoTipoCommand => _novoTipoCommand ??= new SimpleCommand(CriarNovoTipo, () => _tiposTemporarios != null);
         public ICommand RenomearTipoCommand => _renomearTipoCommand ??= new SimpleCommand(RenomearTipo, () => _tiposTemporarios != null);
+        public ICommand ExcluirTipoCommand => _excluirTipoCommand ??= new SimpleCommand(ExcluirTipo, PodeExcluirTipo);
 
         public string CorTexto
         {
@@ -171,7 +175,7 @@ namespace Araci.ViewModels
             }
         }
 
-        public IUndoableCommand? CreateCommitCommand(Action? tiposAlterados)
+        public IUndoableCommand? CreateCommitCommand(Action? tiposAlterados, IEnumerable<TextoAnotativo>? textosAnotativos = null)
         {
             if (_tiposTemporarios == null || _tiposReais == null)
                 return null;
@@ -192,7 +196,8 @@ namespace Araci.ViewModels
                 {
                     _tipoAlterado?.Invoke();
                     tiposAlterados?.Invoke();
-                });
+                },
+                textosAnotativos);
         }
 
         public override void CommitChanges()
@@ -273,6 +278,33 @@ namespace Araci.ViewModels
             }
         }
 
+        private void ExcluirTipo()
+        {
+            if (_tiposTemporarios == null || !PodeExcluirTipo())
+                return;
+
+            int indiceRemovido = _tiposTemporarios.IndexOf(TipoTexto);
+
+            if (indiceRemovido < 0)
+                return;
+
+            TipoTextoAnotativo removido = TipoTexto;
+            int indiceNovo = indiceRemovido >= _tiposTemporarios.Count - 1 ? indiceRemovido - 1 : indiceRemovido;
+            _tiposTemporarios.RemoveAt(indiceRemovido);
+            _mapaTemporarioParaReal.Remove(removido);
+
+            if (_tiposTemporarios.Count > 0)
+                TipoSelecionado = _tiposTemporarios[Math.Max(0, indiceNovo)];
+
+            AtualizarListaDeTipos();
+            AtualizarEstadoDosComandos();
+        }
+
+        private bool PodeExcluirTipo()
+        {
+            return _tiposTemporarios != null && _tiposTemporarios.Count > 1;
+        }
+
         private bool ExisteNomeDuplicado(string nome)
         {
             IEnumerable<TipoTextoAnotativo> tipos = _tiposTemporarios != null ? _tiposTemporarios : new[] { TipoTexto };
@@ -307,7 +339,15 @@ namespace Araci.ViewModels
                 CollectionViewSource.GetDefaultView(_tiposTemporarios)?.Refresh();
 
             OnPropertyChanged(nameof(TiposDisponiveis));
+            OnPropertyChanged(nameof(TipoSelecionado));
             OnPropertyChanged(nameof(TipoSelecionadoNome));
+        }
+
+        private void AtualizarEstadoDosComandos()
+        {
+            _novoTipoCommand?.RaiseCanExecuteChanged();
+            _renomearTipoCommand?.RaiseCanExecuteChanged();
+            _excluirTipoCommand?.RaiseCanExecuteChanged();
         }
 
         private void EscolherCor()
@@ -393,11 +433,12 @@ namespace Araci.ViewModels
                     _execute();
             }
 
-            public event EventHandler? CanExecuteChanged
+            public void RaiseCanExecuteChanged()
             {
-                add { }
-                remove { }
+                CanExecuteChanged?.Invoke(this, EventArgs.Empty);
             }
+
+            public event EventHandler? CanExecuteChanged;
         }
     }
 }

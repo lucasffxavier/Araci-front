@@ -1,6 +1,9 @@
 using System;
+using System.Collections.Generic;
+using System.Linq;
 using System.Windows;
 using Araci.Applications.Abstractions;
+using Araci.Models;
 using Araci.Properties;
 using Araci.ViewModels;
 
@@ -10,11 +13,13 @@ namespace Araci.Services.UI
     {
         private ICommandHistory? _commands;
         private Action? _afterTypeLibraryChanged;
+        private Func<IEnumerable<TextoAnotativo>>? _textosAnotativosProvider;
 
-        public void Configure(ICommandHistory commands, Action? afterTypeLibraryChanged)
+        public void Configure(ICommandHistory commands, Action? afterTypeLibraryChanged, Func<IEnumerable<TextoAnotativo>>? textosAnotativosProvider = null)
         {
             _commands = commands ?? throw new ArgumentNullException(nameof(commands));
             _afterTypeLibraryChanged = afterTypeLibraryChanged;
+            _textosAnotativosProvider = textosAnotativosProvider;
         }
 
         public void Show(TipoElementoViewModel? viewModel)
@@ -40,7 +45,8 @@ namespace Araci.Services.UI
 
             if (viewModel is TipoTextoAnotativoViewModel textoViewModel && _commands != null)
             {
-                var command = textoViewModel.CreateCommitCommand(_afterTypeLibraryChanged);
+                var textos = _textosAnotativosProvider?.Invoke().ToList();
+                var command = textoViewModel.CreateCommitCommand(_afterTypeLibraryChanged, textos);
 
                 if (command != null)
                 {

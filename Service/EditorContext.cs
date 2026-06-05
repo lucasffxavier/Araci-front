@@ -58,7 +58,6 @@ namespace Araci.Services
             Hover = core.Hover;
             Snap = core.Snap;
             TypePropertiesDialogs = core.TypePropertiesDialogs;
-            TypePropertiesDialogs.Configure(Commands, NotifyTextAnnotationTypeViewModels);
             Dialogs = core.Dialogs;
             Elements = core.Elements;
             Connectivity = core.Connectivity;
@@ -67,6 +66,7 @@ namespace Araci.Services
             Topology = core.Topology;
             Geometry = core.Geometry;
             TerminalLayout = core.TerminalLayout;
+            TypePropertiesDialogs.Configure(Commands, NotifyTextAnnotationTypeLibraryChanged, () => Document.Elementos.OfType<TextoAnotativo>());
 
             var simulation = SimulationComposition.Create(Document, NotifySimulationResultViewModels, Dialogs);
             SimulationResults = simulation.Results;
@@ -233,13 +233,16 @@ namespace Araci.Services
             }
         }
 
-        private void NotifyTextAnnotationTypeViewModels()
+        private void NotifyTextAnnotationTypeLibraryChanged()
         {
             if (Viewport == null)
                 return;
 
-            foreach (TextoAnotativoViewModel vm in Viewport.Elementos.OfType<TextoAnotativoViewModel>())
-                vm.AtualizarAposTipoAlterado();
+            foreach (ElementoViewModel vm in Viewport.Elementos)
+            {
+                if (vm is TextoAnotativoViewModel texto)
+                    texto.AtualizarAposTipoAlterado();
+            }
 
             RefreshProperties();
             SceneQueries.Invalidate();
