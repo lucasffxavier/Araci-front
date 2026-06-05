@@ -25,6 +25,10 @@ namespace Araci.ViewModels
             : base(modelo, new TextoAnotativoNode(modelo), types, names, typePropertiesDialogs)
         {
             SelecionarPrimeiroTipoDisponivel();
+
+            if (Texto.LarguraCaixa <= TextoAnotativo.LarguraCaixaMinima + 0.000001)
+                Texto.AjustarLarguraAoConteudo();
+
             AtualizarAposModeloAlterado();
         }
 

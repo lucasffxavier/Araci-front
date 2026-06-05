@@ -11,11 +11,12 @@ namespace Araci.Models
         public const string PARAM_LARGURA_CAIXA = "LarguraCaixa";
         public const double LarguraCaixaPadrao = 200.0;
         public const double LarguraCaixaMinima = 20.0;
+        public const double MargemHorizontalCaixa = 8.0;
 
         public TextoAnotativo()
         {
             DefinirParametro(new Parameter<string>(PARAM_TEXTO, "Texto"));
-            DefinirParametro(new Parameter<double>(PARAM_LARGURA_CAIXA, LarguraCaixaPadrao));
+            DefinirParametro(new Parameter<double>(PARAM_LARGURA_CAIXA, CalcularLarguraNatural("Texto", 14.0)));
         }
 
         public string Texto
@@ -46,6 +47,21 @@ namespace Araci.Models
                 int linhas = Math.Max(1, ObterLinhasRenderizadas().Count);
                 return Math.Max(AlturaTexto, linhas * AlturaTexto * 1.25 + 4);
             }
+        }
+
+        public void AjustarLarguraAoConteudo()
+        {
+            LarguraCaixa = CalcularLarguraNatural(Texto, AlturaTexto);
+        }
+
+        public static double CalcularLarguraNatural(string? texto, double alturaTexto)
+        {
+            string normalizado = texto ?? string.Empty;
+            string[] linhas = normalizado.Replace("\r\n", "\n").Replace('\r', '\n').Split('\n');
+            int maiorLinha = Math.Max(1, linhas.Length == 0 ? 1 : linhas.Max(l => l.Length));
+            double altura = alturaTexto <= 0 ? 14.0 : alturaTexto;
+            double largura = maiorLinha * altura * 0.58 + MargemHorizontalCaixa;
+            return NormalizarLargura(largura);
         }
 
         public override Elemento Clonar()
@@ -114,7 +130,7 @@ namespace Araci.Models
 
         private int CalcularCaracteresPorLinha()
         {
-            double larguraUtil = Math.Max(1, LarguraEstimada - 4);
+            double larguraUtil = Math.Max(1, LarguraEstimada - MargemHorizontalCaixa);
             double larguraMedia = Math.Max(1, AlturaTexto * 0.58);
             return Math.Max(1, (int)Math.Floor(larguraUtil / larguraMedia));
         }
