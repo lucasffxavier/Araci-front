@@ -308,8 +308,7 @@ namespace Araci.ViewModels
             if (normalizada < 0)
                 normalizada += 360;
 
-            double arredondada = Math.Round(normalizada / 90.0) * 90.0;
-            return arredondada >= 360 ? 0 : arredondada;
+            return normalizada >= 360 ? 0 : normalizada;
         }
 
         private static Brush CriarBrush(string cor)

@@ -6,6 +6,7 @@ using System.Windows.Controls.Primitives;
 using System.Windows.Input;
 using System.Windows.Media;
 using Araci.Applications.Editar.Base;
+using Araci.Applications.UseCases.Editar;
 using Araci.Core.Commands;
 using Araci.Models;
 using Araci.Services;
@@ -21,6 +22,8 @@ namespace Araci.Views
         private bool _commitInlineTextInProgress;
         private bool _cancelInlineTextInProgress;
         private TextoAnotativoViewModel? _textoWidthResizeAtivo;
+        private TextoAnotativoViewModel? _textoRotationAtivo;
+        private ElementoEstado? _textoRotationEstadoInicial;
         private TextoWidthResizeSide _textoWidthResizeSide = TextoWidthResizeSide.Right;
         private double _textoWidthResizeXInicial;
         private double _textoWidthResizeYInicial;
@@ -43,6 +46,7 @@ namespace Araci.Views
         }
 
         private bool IsTextoWidthResizing => _textoWidthResizeAtivo != null;
+        private bool IsTextoRotating => _textoRotationAtivo != null;
 
         private void ConfigurarCamera()
         {
@@ -206,6 +210,12 @@ namespace Araci.Views
                 return;
             }
 
+            if (IsTextoRotating)
+            {
+                Cursor = Cursors.Hand;
+                return;
+            }
+
             if (ExisteEdicaoInlineAtiva())
             {
                 AtualizarCursorInteracao(GetWorldPos(e));
@@ -229,7 +239,7 @@ namespace Araci.Views
 
         private void OnPreviewMouseLeftButtonUp(object sender, MouseButtonEventArgs e)
         {
-            if (IsTextoWidthResizing)
+            if (IsTextoWidthResizing || IsTextoRotating)
                 return;
 
             if (_context?.Navigation.TryEndSpaceLeftPan(e) == true)
@@ -329,7 +339,7 @@ namespace Araci.Views
 
         private void OnMouseLeave(object sender, MouseEventArgs e)
         {
-            if (ExisteEdicaoInlineAtiva() || IsTextoWidthResizing)
+            if (ExisteEdicaoInlineAtiva() || IsTextoWidthResizing || IsTextoRotating)
                 return;
 
             _context?.Hover.Clear();
@@ -344,6 +354,7 @@ namespace Araci.Views
         {
             ConfirmarEdicaoInlineAtiva();
             CancelarResizeLarguraTexto();
+            CancelarRotacaoTexto();
             _context?.Navigation.Reset();
             _context?.AlignmentGuides.Limpar();
             _context?.LinhaEndpointEdit.LimparSnapInsercao();
@@ -359,6 +370,12 @@ namespace Araci.Views
             if (IsTextoWidthResizing)
             {
                 Cursor = Cursors.SizeWE;
+                return;
+            }
+
+            if (IsTextoRotating)
+            {
+                Cursor = Cursors.Hand;
                 return;
             }
 
@@ -501,6 +518,107 @@ namespace Araci.Views
                 if (!_cancelInlineTextInProgress && !_commitInlineTextInProgress && texto.IsEditingInline)
                     ConfirmarEdicaoInlineTexto(texto);
             }));
+        }
+
+
+        private void OnTextoRotationHandleDragStarted(object sender, DragStartedEventArgs e)
+        {
+            if (sender is not Thumb { DataContext: TextoAnotativoViewModel texto } || _context == null)
+                return;
+
+            ConfirmarEdicaoInlineAtiva();
+            _context.Selection.Selecionar(texto);
+            _context.Hover.Clear();
+            _textoRotationAtivo = texto;
+            _textoRotationEstadoInicial = texto.CapturarEstado();
+            AplicarRotacaoTextoPorMouse(texto);
+            Cursor = Cursors.Hand;
+            e.Handled = true;
+        }
+
+        private void OnTextoRotationHandleDragDelta(object sender, DragDeltaEventArgs e)
+        {
+            if (_textoRotationAtivo == null)
+                return;
+
+            AplicarRotacaoTextoPorMouse(_textoRotationAtivo);
+            _context?.SceneQueries.Invalidate();
+            _viewportViewModel?.AtualizarViewModel(_textoRotationAtivo.Modelo);
+            Cursor = Cursors.Hand;
+            e.Handled = true;
+        }
+
+        private void OnTextoRotationHandleDragCompleted(object sender, DragCompletedEventArgs e)
+        {
+            if (_textoRotationAtivo == null || _textoRotationEstadoInicial == null || _context == null)
+                return;
+
+            TextoAnotativoViewModel texto = _textoRotationAtivo;
+            ElementoEstado antes = _textoRotationEstadoInicial;
+            ElementoEstado depois = texto.CapturarEstado();
+
+            _textoRotationAtivo = null;
+            _textoRotationEstadoInicial = null;
+            AtualizarCursorNavegacao();
+
+            if (Math.Abs(NormalizarAngulo(depois.Rotacao - antes.Rotacao)) < 0.000001)
+            {
+                texto.AplicarEstado(antes);
+                _context.SceneQueries.Invalidate();
+                _viewportViewModel?.AtualizarViewModel(texto.Modelo);
+                e.Handled = true;
+                return;
+            }
+
+            texto.AplicarEstado(antes);
+            _context.SceneQueries.Invalidate();
+            _viewportViewModel?.AtualizarViewModel(texto.Modelo);
+            _context.RotacionarElemento.Executar(new[] { new RotacionarElementoItem(texto.Modelo, antes, depois) }, _context.VisualUpdates.AtualizarElementoRotacionado);
+            e.Handled = true;
+        }
+
+        private void AplicarRotacaoTextoPorMouse(TextoAnotativoViewModel texto)
+        {
+            Point screen = Mouse.GetPosition(this);
+            Point world = _context?.Viewport?.ScreenToWorld(screen) ?? screen;
+            texto.Rotacao = CalcularRotacaoTexto(texto.Centro, world);
+        }
+
+        private static double CalcularRotacaoTexto(Point centro, Point mouse)
+        {
+            double dx = mouse.X - centro.X;
+            double dy = mouse.Y - centro.Y;
+
+            if (Math.Abs(dx) < 0.000001 && Math.Abs(dy) < 0.000001)
+                return 0;
+
+            double angle = Math.Atan2(dy, dx) * 180.0 / Math.PI + 90.0;
+            return NormalizarAngulo(angle);
+        }
+
+        private static double NormalizarAngulo(double valor)
+        {
+            if (double.IsNaN(valor) || double.IsInfinity(valor))
+                return 0;
+
+            double normalizado = valor % 360.0;
+
+            if (normalizado < 0)
+                normalizado += 360.0;
+
+            return normalizado >= 360.0 ? 0 : normalizado;
+        }
+
+        private void CancelarRotacaoTexto()
+        {
+            if (_textoRotationAtivo == null || _textoRotationEstadoInicial == null)
+                return;
+
+            _textoRotationAtivo.AplicarEstado(_textoRotationEstadoInicial);
+            _context?.SceneQueries.Invalidate();
+            _viewportViewModel?.AtualizarViewModel(_textoRotationAtivo.Modelo);
+            _textoRotationAtivo = null;
+            _textoRotationEstadoInicial = null;
         }
 
         private void OnTextoWidthHandleDragStarted(object sender, DragStartedEventArgs e)
