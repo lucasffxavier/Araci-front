@@ -219,16 +219,18 @@ namespace Araci.Infrastructure.Persistence
 
         private static TipoTextoAnotativo CriarTipoTextoAnotativo(TextAnnotationTypeDto dto)
         {
-            return new TipoTextoAnotativo
+            var tipo = new TipoTextoAnotativo
             {
                 NomeTipo = string.IsNullOrWhiteSpace(dto.NomeTipo) ? "Texto padrão" : dto.NomeTipo.Trim(),
                 Familia = string.IsNullOrWhiteSpace(dto.Familia) ? "Anotações" : dto.Familia.Trim(),
-                Categoria = string.IsNullOrWhiteSpace(dto.Categoria) ? "Textos" : dto.Categoria.Trim(),
-                CorTexto = dto.CorTexto,
-                Fonte = dto.Fonte,
-                AlturaTexto = dto.AlturaTexto,
-                AlinhamentoHorizontal = dto.AlinhamentoHorizontal
+                Categoria = string.IsNullOrWhiteSpace(dto.Categoria) ? "Textos" : dto.Categoria.Trim()
             };
+
+            tipo.CorTexto = dto.CorTexto;
+            tipo.Fonte = dto.Fonte;
+            tipo.AlturaTexto = dto.AlturaTexto;
+            tipo.AlinhamentoHorizontal = dto.AlinhamentoHorizontal;
+            return tipo;
         }
 
         private static string CriarChaveTipo(TipoTextoAnotativo tipo)
@@ -324,6 +326,12 @@ namespace Araci.Infrastructure.Persistence
         {
             if (elemento is Barra barra)
                 barra.Altura = barra.Altura;
+
+            if (elemento is TextoAnotativo texto)
+            {
+                texto.Texto = texto.Texto;
+                texto.LarguraCaixa = texto.LarguraCaixa;
+            }
         }
 
         private static object? ConverterValor(ParameterDto dto, Type destino)
@@ -332,19 +340,29 @@ namespace Araci.Infrastructure.Persistence
                 return null;
 
             if (destino == typeof(string))
-                return dto.Value.GetString() ?? string.Empty;
+                return dto.Value.ValueKind == JsonValueKind.String
+                    ? dto.Value.GetString() ?? string.Empty
+                    : dto.Value.ToString();
 
             if (destino == typeof(int))
-                return dto.Value.GetInt32();
+                return dto.Value.ValueKind == JsonValueKind.Number && dto.Value.TryGetInt32(out int i)
+                    ? i
+                    : 0;
 
             if (destino == typeof(double))
-                return dto.Value.GetDouble();
+                return dto.Value.ValueKind == JsonValueKind.Number && dto.Value.TryGetDouble(out double d)
+                    ? d
+                    : 0.0;
 
             if (destino == typeof(bool))
-                return dto.Value.GetBoolean();
+                return dto.Value.ValueKind == JsonValueKind.True || dto.Value.ValueKind == JsonValueKind.False
+                    ? dto.Value.GetBoolean()
+                    : false;
 
             if (destino == typeof(Guid))
-                return dto.Value.GetGuid();
+                return dto.Value.ValueKind == JsonValueKind.String && dto.Value.TryGetGuid(out Guid guid)
+                    ? guid
+                    : Guid.Empty;
 
             return dto.Value.ToString();
         }
