@@ -314,6 +314,15 @@ namespace Araci.ViewModels
             if (vm is LinhaAnotativaViewModel)
                 return plural ? "Linhas" : "Linha";
 
+            if (vm is TextoAnotativoViewModel)
+                return plural ? "Textos" : "Texto";
+
+            if (vm is RetanguloAnotativoViewModel)
+                return plural ? "Retângulos" : "Retângulo";
+
+            if (vm is CirculoAnotativoViewModel)
+                return plural ? "Círculos" : "Círculo";
+
             return vm.GetType().Name.Replace("ViewModel", string.Empty);
         }
 
@@ -322,7 +331,7 @@ namespace Araci.ViewModels
             if (vm is LinhaAnotativaViewModel)
                 return plural ? "selecionadas" : "selecionada";
 
-            return "selecionados";
+            return plural ? "selecionados" : "selecionado";
         }
 
         public event PropertyChangedEventHandler? PropertyChanged;
@@ -470,12 +479,7 @@ namespace Araci.ViewModels
             {
                 if (!ColorPickerWindow.TryNormalizeHexColor(novoValor, out string corNormalizada))
                 {
-                    TemErro = true;
-                    MensagemErro = "Valor inválido";
-                    _valor = novoValor;
-                    OnPropertyChanged(nameof(Valor));
-                    OnPropertyChanged(nameof(Value));
-                    OnPropertyChanged(nameof(ColorBrush));
+                    AtualizarValorInvalido(novoValor);
                     return;
                 }
 
@@ -487,17 +491,26 @@ namespace Araci.ViewModels
 
             if (!PropertiesViewModel.TentarConverterValor(novoValor, _tipoValor, BaseUnit, DisplayUnit, out object? convertido))
             {
-                TemErro = true;
-                MensagemErro = "Valor inválido";
-                _valor = novoValor;
-                OnPropertyChanged(nameof(Valor));
-                OnPropertyChanged(nameof(Value));
-                OnPropertyChanged(nameof(ColorBrush));
+                AtualizarValorInvalido(novoValor);
                 return;
             }
 
-            _editarPropriedades?.Executar(_elementos, _descriptor.PropertyName, convertido);
-            AtualizarValorLocal(convertido);
+            bool aplicado = _editarPropriedades?.Executar(_elementos, _descriptor.PropertyName, convertido) ?? false;
+
+            if (aplicado)
+                AtualizarValorDoModelo();
+            else
+                AtualizarValorLocal(convertido);
+        }
+
+        private void AtualizarValorInvalido(string valor)
+        {
+            TemErro = true;
+            MensagemErro = "Valor inválido";
+            _valor = valor;
+            OnPropertyChanged(nameof(Valor));
+            OnPropertyChanged(nameof(Value));
+            OnPropertyChanged(nameof(ColorBrush));
         }
 
         private void AtualizarValorLocal(object? convertido)
@@ -518,7 +531,10 @@ namespace Araci.ViewModels
             string valorAtualizado = varia ? "<varia>" : FormatarValorLocal(primeiro);
 
             if (_varia == varia && string.Equals(_valor, valorAtualizado, StringComparison.Ordinal))
+            {
+                AtualizarEstadoValido();
                 return;
+            }
 
             _varia = varia;
             _valor = valorAtualizado;
