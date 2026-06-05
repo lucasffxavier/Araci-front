@@ -657,6 +657,7 @@ namespace Araci.Views
             if (_context == null || !texto.IsEditingInline || _commitInlineTextInProgress || _cancelInlineTextInProgress)
                 return;
 
+            bool elementoExcluido = false;
             _commitInlineTextInProgress = true;
 
             try
@@ -668,7 +669,7 @@ namespace Araci.Views
                 if (string.IsNullOrWhiteSpace(valorDepois))
                 {
                     _context.Selection.Selecionar(texto);
-                    _context.SafeDelete.DeleteSelection();
+                    elementoExcluido = _context.SafeDelete.DeleteSelection();
                     return;
                 }
 
@@ -687,7 +688,9 @@ namespace Araci.Views
             {
                 _commitInlineTextInProgress = false;
                 _context.SceneQueries.Invalidate();
-                _viewportViewModel?.AtualizarViewModel(texto.Modelo);
+
+                if (!elementoExcluido)
+                    _viewportViewModel?.AtualizarViewModel(texto.Modelo);
             }
         }
 
