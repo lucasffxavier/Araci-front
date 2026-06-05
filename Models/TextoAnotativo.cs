@@ -39,15 +39,7 @@ namespace Araci.Models
         public string AlinhamentoHorizontal => TipoTexto?.AlinhamentoHorizontal ?? "Esquerda";
 
         public double LarguraEstimada => Math.Max(LarguraCaixaMinima, LarguraCaixa);
-
-        public double AlturaEstimada
-        {
-            get
-            {
-                int linhas = Math.Max(1, ObterLinhasRenderizadas().Count);
-                return Math.Max(AlturaTexto, linhas * AlturaTexto * 1.25 + 4);
-            }
-        }
+        public double AlturaEstimada => CalcularAlturaEstimada(Texto, LarguraCaixa, AlturaTexto);
 
         public void AjustarLarguraAoConteudo()
         {
@@ -64,6 +56,13 @@ namespace Araci.Models
             return NormalizarLargura(largura);
         }
 
+        public static double CalcularAlturaEstimada(string? texto, double larguraCaixa, double alturaTexto)
+        {
+            double altura = alturaTexto <= 0 ? 14.0 : alturaTexto;
+            int linhas = Math.Max(1, ObterLinhasRenderizadas(texto, larguraCaixa, altura).Count);
+            return Math.Max(altura, linhas * altura * 1.25 + 4);
+        }
+
         public override Elemento Clonar()
         {
             var clone = new TextoAnotativo();
@@ -73,22 +72,27 @@ namespace Araci.Models
 
         private IReadOnlyList<string> ObterLinhasRenderizadas()
         {
-            string[] linhasManuais = ObterLinhasManuais();
+            return ObterLinhasRenderizadas(Texto, LarguraCaixa, AlturaTexto);
+        }
+
+        private static IReadOnlyList<string> ObterLinhasRenderizadas(string? texto, double larguraCaixa, double alturaTexto)
+        {
+            string[] linhasManuais = ObterLinhasManuais(texto);
             var linhas = new List<string>();
 
             foreach (string linha in linhasManuais)
             {
-                foreach (string renderizada in QuebrarLinha(linha))
+                foreach (string renderizada in QuebrarLinha(linha, larguraCaixa, alturaTexto))
                     linhas.Add(renderizada);
             }
 
             return linhas.Count == 0 ? new[] { string.Empty } : linhas;
         }
 
-        private IEnumerable<string> QuebrarLinha(string linha)
+        private static IEnumerable<string> QuebrarLinha(string linha, double larguraCaixa, double alturaTexto)
         {
             string texto = linha ?? string.Empty;
-            int caracteresPorLinha = CalcularCaracteresPorLinha();
+            int caracteresPorLinha = CalcularCaracteresPorLinha(larguraCaixa, alturaTexto);
 
             if (texto.Length <= caracteresPorLinha)
             {
@@ -130,14 +134,25 @@ namespace Araci.Models
 
         private int CalcularCaracteresPorLinha()
         {
-            double larguraUtil = Math.Max(1, LarguraEstimada - MargemHorizontalCaixa);
-            double larguraMedia = Math.Max(1, AlturaTexto * 0.58);
+            return CalcularCaracteresPorLinha(LarguraCaixa, AlturaTexto);
+        }
+
+        private static int CalcularCaracteresPorLinha(double larguraCaixa, double alturaTexto)
+        {
+            double larguraUtil = Math.Max(1, NormalizarLargura(larguraCaixa) - MargemHorizontalCaixa);
+            double altura = alturaTexto <= 0 ? 14.0 : alturaTexto;
+            double larguraMedia = Math.Max(1, altura * 0.58);
             return Math.Max(1, (int)Math.Floor(larguraUtil / larguraMedia));
         }
 
         private string[] ObterLinhasManuais()
         {
-            return (Texto ?? string.Empty).Replace("\r\n", "\n").Replace('\r', '\n').Split('\n');
+            return ObterLinhasManuais(Texto);
+        }
+
+        private static string[] ObterLinhasManuais(string? texto)
+        {
+            return (texto ?? string.Empty).Replace("\r\n", "\n").Replace('\r', '\n').Split('\n');
         }
 
         private static double NormalizarLargura(double valor)

@@ -159,21 +159,25 @@ namespace Araci.Views
                 return;
             }
 
+            bool clicouDentroEditorInline = OrigemEstaDentroDeEditorInline(e.OriginalSource as DependencyObject);
+
+            if (ExisteEdicaoInlineAtiva())
+            {
+                if (clicouDentroEditorInline)
+                {
+                    e.Handled = true;
+                    return;
+                }
+
+                ConfirmarEdicaoInlineAtiva();
+            }
+
             Point worldPosition = GetWorldPos(e);
             ElementoViewModel? vm = ResolverElementoClicado(e.OriginalSource as DependencyObject, worldPosition);
 
             if (e.ClickCount >= 2 && vm is TextoAnotativoViewModel texto)
             {
                 IniciarEdicaoInlineTexto(texto);
-                e.Handled = true;
-                return;
-            }
-
-            if (ExisteEdicaoInlineAtiva())
-            {
-                if (!OrigemEstaDentroDeEditorInline(e.OriginalSource as DependencyObject))
-                    ConfirmarEdicaoInlineAtiva();
-
                 e.Handled = true;
                 return;
             }
@@ -668,6 +672,8 @@ namespace Araci.Views
             finally
             {
                 _commitInlineTextInProgress = false;
+                _context.SceneQueries.Invalidate();
+                _viewportViewModel?.AtualizarViewModel(texto.Modelo);
             }
         }
 

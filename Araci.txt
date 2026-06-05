@@ -474,81 +474,58 @@ Araci Engine
 
 
 ====================================================================================================
-ARQUIVO: C:\Araci-Engine-Front\Araci Engine\Core\Commands\BulkPropertyChangeCommand.cs
+ARQUIVO: C:\Araci-Engine-Front\Araci Engine\Applications\Editar\Deletar\DeletarTool.cs
 ====================================================================================================
 
-﻿using System;
-using System.Collections.Generic;
 using System.Linq;
-using System.Reflection;
+using System.Windows;
+using System.Windows.Input;
+
+using Araci.Applications.Editar.Base;
+using Araci.Services;
 using Araci.ViewModels;
+using Araci.Services.Editing;
 
-namespace Araci.Core.Commands
+namespace Araci.Applications.Editar.Deletar
 {
-    public class BulkPropertyChangeCommand : IUndoableCommand
+    public class DeletarTool : ITool
     {
-        private readonly IReadOnlyList<Item> _items;
+        private readonly SafeDeleteService _safeDelete;
 
-        public BulkPropertyChangeCommand(IEnumerable<Item> items)
+        public DeletarTool(SafeDeleteService safeDelete)
         {
-            _items = items?.Where(i => i.Elemento != null && !string.IsNullOrWhiteSpace(i.PropertyName)).ToList() ?? throw new ArgumentNullException(nameof(items));
+            _safeDelete = safeDelete
+                ?? throw new System.ArgumentNullException(nameof(safeDelete));
         }
 
-        public bool IsEmpty => _items.Count == 0;
+        public string Nome => "Deletar";
 
-        public void Execute()
+        public bool MantemBotaoAtivado => true;
+
+        public bool IsBusy => false;
+
+        public void Ativar() { }
+
+        public void Desativar() { }
+
+        public void Cancelar() { }
+
+        public void OnMouseDown(
+            ElementoViewModel? vm,
+            Point position,
+            ToolInputState inputState)
         {
-            AplicarDepois();
+            _safeDelete.DeleteSelection();
         }
 
-        public void Undo()
-        {
-            for (int i = _items.Count - 1; i >= 0; i--)
-                Aplicar(_items[i], _items[i].ValorAntes);
-        }
+        public void OnMouseMove(Point position, ToolInputState inputState) { }
 
-        public void Redo()
-        {
-            AplicarDepois();
-        }
+        public void OnMouseUp(Point position, ToolInputState inputState) { }
 
-        private void AplicarDepois()
-        {
-            foreach (var item in _items)
-                Aplicar(item, item.ValorDepois);
-        }
-
-        private static void Aplicar(Item item, object? valor)
-        {
-            PropertyInfo? prop = item.Elemento.GetType().GetProperty(item.PropertyName, BindingFlags.Instance | BindingFlags.Public);
-
-            if (prop == null || !prop.CanWrite || prop.GetIndexParameters().Length > 0)
-                return;
-
-            prop.SetValue(item.Elemento, valor);
-            item.Elemento.NotificarPropriedades(item.PropertyName);
-
-            if (item.PropertyName == nameof(ElementoViewModel.Tipo))
-                item.Elemento.NotificarPropriedades(nameof(ElementoViewModel.TipoViewModel));
-        }
-
-        public readonly struct Item
-        {
-            public Item(ElementoViewModel elemento, string propertyName, object? valorAntes, object? valorDepois)
-            {
-                Elemento = elemento ?? throw new ArgumentNullException(nameof(elemento));
-                PropertyName = propertyName ?? throw new ArgumentNullException(nameof(propertyName));
-                ValorAntes = valorAntes;
-                ValorDepois = valorDepois;
-            }
-
-            public ElementoViewModel Elemento { get; }
-            public string PropertyName { get; }
-            public object? ValorAntes { get; }
-            public object? ValorDepois { get; }
-        }
+        public void OnKeyDown(Key key) { }
     }
 }
+
 
 
 ====================================================================================================
@@ -596,15 +573,7 @@ namespace Araci.Models
         public string AlinhamentoHorizontal => TipoTexto?.AlinhamentoHorizontal ?? "Esquerda";
 
         public double LarguraEstimada => Math.Max(LarguraCaixaMinima, LarguraCaixa);
-
-        public double AlturaEstimada
-        {
-            get
-            {
-                int linhas = Math.Max(1, ObterLinhasRenderizadas().Count);
-                return Math.Max(AlturaTexto, linhas * AlturaTexto * 1.25 + 4);
-            }
-        }
+        public double AlturaEstimada => CalcularAlturaEstimada(Texto, LarguraCaixa, AlturaTexto);
 
         public void AjustarLarguraAoConteudo()
         {
@@ -621,6 +590,13 @@ namespace Araci.Models
             return NormalizarLargura(largura);
         }
 
+        public static double CalcularAlturaEstimada(string? texto, double larguraCaixa, double alturaTexto)
+        {
+            double altura = alturaTexto <= 0 ? 14.0 : alturaTexto;
+            int linhas = Math.Max(1, ObterLinhasRenderizadas(texto, larguraCaixa, altura).Count);
+            return Math.Max(altura, linhas * altura * 1.25 + 4);
+        }
+
         public override Elemento Clonar()
         {
             var clone = new TextoAnotativo();
@@ -630,22 +606,27 @@ namespace Araci.Models
 
         private IReadOnlyList<string> ObterLinhasRenderizadas()
         {
-            string[] linhasManuais = ObterLinhasManuais();
+            return ObterLinhasRenderizadas(Texto, LarguraCaixa, AlturaTexto);
+        }
+
+        private static IReadOnlyList<string> ObterLinhasRenderizadas(string? texto, double larguraCaixa, double alturaTexto)
+        {
+            string[] linhasManuais = ObterLinhasManuais(texto);
             var linhas = new List<string>();
 
             foreach (string linha in linhasManuais)
             {
-                foreach (string renderizada in QuebrarLinha(linha))
+                foreach (string renderizada in QuebrarLinha(linha, larguraCaixa, alturaTexto))
                     linhas.Add(renderizada);
             }
 
             return linhas.Count == 0 ? new[] { string.Empty } : linhas;
         }
 
-        private IEnumerable<string> QuebrarLinha(string linha)
+        private static IEnumerable<string> QuebrarLinha(string linha, double larguraCaixa, double alturaTexto)
         {
             string texto = linha ?? string.Empty;
-            int caracteresPorLinha = CalcularCaracteresPorLinha();
+            int caracteresPorLinha = CalcularCaracteresPorLinha(larguraCaixa, alturaTexto);
 
             if (texto.Length <= caracteresPorLinha)
             {
@@ -687,14 +668,25 @@ namespace Araci.Models
 
         private int CalcularCaracteresPorLinha()
         {
-            double larguraUtil = Math.Max(1, LarguraEstimada - MargemHorizontalCaixa);
-            double larguraMedia = Math.Max(1, AlturaTexto * 0.58);
+            return CalcularCaracteresPorLinha(LarguraCaixa, AlturaTexto);
+        }
+
+        private static int CalcularCaracteresPorLinha(double larguraCaixa, double alturaTexto)
+        {
+            double larguraUtil = Math.Max(1, NormalizarLargura(larguraCaixa) - MargemHorizontalCaixa);
+            double altura = alturaTexto <= 0 ? 14.0 : alturaTexto;
+            double larguraMedia = Math.Max(1, altura * 0.58);
             return Math.Max(1, (int)Math.Floor(larguraUtil / larguraMedia));
         }
 
         private string[] ObterLinhasManuais()
         {
-            return (Texto ?? string.Empty).Replace("\r\n", "\n").Replace('\r', '\n').Split('\n');
+            return ObterLinhasManuais(Texto);
+        }
+
+        private static string[] ObterLinhasManuais(string? texto)
+        {
+            return (texto ?? string.Empty).Replace("\r\n", "\n").Replace('\r', '\n').Split('\n');
         }
 
         private static double NormalizarLargura(double valor)
@@ -703,6 +695,82 @@ namespace Araci.Models
                 return LarguraCaixaPadrao;
 
             return Math.Max(LarguraCaixaMinima, valor);
+        }
+    }
+}
+
+
+
+====================================================================================================
+ARQUIVO: C:\Araci-Engine-Front\Araci Engine\Service\Editing\SafeDeleteService.cs
+====================================================================================================
+
+using System;
+using System.Linq;
+using Araci.Applications.Abstractions;
+using Araci.Applications.Editar.Selecionar;
+using Araci.Applications.UseCases.Editar;
+using Araci.Core.SceneQueries;
+using Araci.ViewModels;
+using Araci.Services;
+using Araci.Services.Interaction;
+
+namespace Araci.Services.Editing
+{
+    public class SafeDeleteService : ISafeDeleteService
+    {
+        private readonly SelectionService _selection;
+        private readonly CableVertexEditService _cableVertexEdit;
+        private readonly ExcluirElementoUseCase _excluirElemento;
+        private readonly HoverService _hover;
+        private readonly TerminalSnapState _terminalSnap;
+        private readonly ISceneQueryService _sceneQueries;
+
+        public SafeDeleteService(
+            SelectionService selection,
+            CableVertexEditService cableVertexEdit,
+            ExcluirElementoUseCase excluirElemento,
+            HoverService hover,
+            TerminalSnapState terminalSnap,
+            ISceneQueryService sceneQueries)
+        {
+            _selection = selection ?? throw new ArgumentNullException(nameof(selection));
+            _cableVertexEdit = cableVertexEdit ?? throw new ArgumentNullException(nameof(cableVertexEdit));
+            _excluirElemento = excluirElemento ?? throw new ArgumentNullException(nameof(excluirElemento));
+            _hover = hover ?? throw new ArgumentNullException(nameof(hover));
+            _terminalSnap = terminalSnap ?? throw new ArgumentNullException(nameof(terminalSnap));
+            _sceneQueries = sceneQueries ?? throw new ArgumentNullException(nameof(sceneQueries));
+        }
+
+        public bool DeleteActiveHandleOrSelection()
+        {
+            if (_cableVertexEdit.TryRemoveActive())
+                return true;
+
+            return DeleteSelection();
+        }
+
+        public bool DeleteSelection()
+        {
+            var selecionados = _selection.Selecionados.ToList();
+
+            if (selecionados.Count == 0)
+                return false;
+
+            if (!_excluirElemento.Executar(selecionados))
+                return false;
+
+            LimparEstadoVisual();
+            return true;
+        }
+
+        private void LimparEstadoVisual()
+        {
+            _selection.Limpar();
+            _cableVertexEdit.Clear();
+            _hover.Clear();
+            _terminalSnap.Limpar();
+            _sceneQueries.Invalidate();
         }
     }
 }
@@ -783,6 +851,8 @@ namespace Araci.ViewModels
         public override double Largura => Bounds.Width;
         public override double Altura => Bounds.Height;
 
+        public double AlturaEdicao => Math.Max(Texto.AlturaEstimada, TextoAnotativo.CalcularAlturaEstimada(ConteudoEdicao, LarguraCaixa, AlturaTexto));
+
         public override ElementoRenderData RenderData => new(Largura, Altura, new Point(0, 0), new Point(Largura, Altura), ForegroundBrush, 1);
 
         public string Nome
@@ -824,6 +894,7 @@ namespace Araci.ViewModels
 
                 _conteudoEdicao = value ?? string.Empty;
                 OnPropertyChanged();
+                OnPropertyChanged(nameof(AlturaEdicao));
             }
         }
 
@@ -837,6 +908,7 @@ namespace Araci.ViewModels
 
                 Texto.LarguraCaixa = value;
                 OnPropertyChanged();
+                OnPropertyChanged(nameof(AlturaEdicao));
                 AtualizarNode();
                 NotificarParametros();
             }
@@ -854,6 +926,8 @@ namespace Araci.ViewModels
                 OnPropertyChanged();
                 OnPropertyChanged(nameof(IsNotEditingInline));
                 OnPropertyChanged(nameof(IsInteractionLocked));
+                OnPropertyChanged(nameof(AlturaEdicao));
+                AtualizarNode();
             }
         }
 
@@ -932,7 +1006,7 @@ namespace Araci.ViewModels
 
         public override ElementoEstado CapturarEstado()
         {
-            return new ElementoEstado(Texto.PosicaoX, Texto.PosicaoY, Texto.LarguraEstimada, Texto.AlturaEstimada, Texto.Rotacao);
+            return new ElementoEstado(Texto.PosicaoX, Texto.PosicaoY, Texto.LarguraCaixa, Texto.AlturaEstimada, Texto.Rotacao);
         }
 
         public override void AplicarEstado(ElementoEstado estado)
@@ -940,6 +1014,10 @@ namespace Araci.ViewModels
             Texto.PosicaoX = estado.X;
             Texto.PosicaoY = estado.Y;
             Texto.Rotacao = estado.Rotacao;
+
+            if (estado.X2 > 0)
+                Texto.LarguraCaixa = estado.X2;
+
             AtualizarNode();
         }
 
@@ -948,6 +1026,7 @@ namespace Araci.ViewModels
             base.NotificarGeometria();
             OnPropertyChanged(nameof(Conteudo));
             OnPropertyChanged(nameof(LarguraCaixa));
+            OnPropertyChanged(nameof(AlturaEdicao));
             NotificarParametrosDeTipo();
         }
 
@@ -960,6 +1039,7 @@ namespace Araci.ViewModels
         {
             OnPropertyChanged(nameof(TipoTexto));
             OnPropertyChanged(nameof(TipoViewModel));
+            OnPropertyChanged(nameof(AlturaEdicao));
             NotificarParametrosDeTipo();
             AtualizarNode();
         }
@@ -991,151 +1071,6 @@ namespace Araci.ViewModels
             }
 
             return Brushes.Black;
-        }
-    }
-}
-
-
-
-====================================================================================================
-ARQUIVO: C:\Araci-Engine-Front\Araci Engine\ViewModels\ViewportViewModel.cs
-====================================================================================================
-
-using System;
-using System.Collections.ObjectModel;
-using System.ComponentModel;
-using System.Runtime.CompilerServices;
-using System.Windows;
-using Araci.Applications.Editar.Selecionar;
-using Araci.Applications.Scene;
-using Araci.Core.Documents;
-using Araci.Core.Scenes;
-using Araci.Models;
-using Araci.Services;
-using Araci.Services.Editing;
-
-namespace Araci.ViewModels
-{
-    public class ViewportViewModel : INotifyPropertyChanged
-    {
-        private readonly DocumentSceneSyncService _documentSceneSync;
-        private double _inverseZoom = 1;
-
-        public ViewportViewModel(
-            AraciDocument document,
-            Scene scene,
-            SelectionBoxViewModel selectionBox,
-            TerminalSnapState terminalSnap,
-            CableVertexEditService cableVertexEdit,
-            LinhaEndpointEditService linhaEndpointEdit,
-            RetanguloResizeService retanguloResize,
-            CirculoResizeService circuloResize,
-            MoveHudService moveHud,
-            AlignmentGuideService alignmentGuides,
-            DocumentSceneSyncService documentSceneSync)
-        {
-            Document = document ?? throw new ArgumentNullException(nameof(document));
-            Scene = scene ?? throw new ArgumentNullException(nameof(scene));
-            SelectionBox = selectionBox ?? throw new ArgumentNullException(nameof(selectionBox));
-            TerminalSnap = terminalSnap ?? throw new ArgumentNullException(nameof(terminalSnap));
-            CableVertexEdit = cableVertexEdit ?? throw new ArgumentNullException(nameof(cableVertexEdit));
-            LinhaEndpointEdit = linhaEndpointEdit ?? throw new ArgumentNullException(nameof(linhaEndpointEdit));
-            RetanguloResize = retanguloResize ?? throw new ArgumentNullException(nameof(retanguloResize));
-            CirculoResize = circuloResize ?? throw new ArgumentNullException(nameof(circuloResize));
-            MoveHud = moveHud ?? throw new ArgumentNullException(nameof(moveHud));
-            ArgumentNullException.ThrowIfNull(alignmentGuides);
-            AlignmentGuides = alignmentGuides.Linhas;
-            _documentSceneSync = documentSceneSync ?? throw new ArgumentNullException(nameof(documentSceneSync));
-        }
-
-        public AraciDocument Document { get; }
-        public Scene Scene { get; }
-        public SelectionBoxViewModel SelectionBox { get; }
-        public TerminalSnapState TerminalSnap { get; }
-        public CableVertexEditService CableVertexEdit { get; }
-        public LinhaEndpointEditService LinhaEndpointEdit { get; }
-        public RetanguloResizeService RetanguloResize { get; }
-        public CirculoResizeService CirculoResize { get; }
-        public MoveHudService MoveHud { get; }
-        public ObservableCollection<AlignmentGuideLineViewModel> AlignmentGuides { get; }
-        public ObservableCollection<ElementoViewModel> Elementos => Scene.Elementos;
-        public double InverseZoom => _inverseZoom;
-        public double CableHandleVisualOffset => -5 * _inverseZoom;
-        public double LinhaHandleVisualSize => 10 * _inverseZoom;
-        public double LinhaHandleVisualOffset => -5 * _inverseZoom;
-        public double LinhaHandleStrokeThickness => 1.5 * _inverseZoom;
-        public double RetanguloHandleVisualSize => 10 * _inverseZoom;
-        public double RetanguloHandleVisualOffset => -5 * _inverseZoom;
-        public double RetanguloHandleStrokeThickness => 1.5 * _inverseZoom;
-        public double CirculoHandleVisualSize => 10 * _inverseZoom;
-        public double CirculoHandleVisualOffset => -5 * _inverseZoom;
-        public double CirculoHandleStrokeThickness => 1.5 * _inverseZoom;
-        public double TextoHandleVisualSize => 10 * _inverseZoom;
-        public double TextoHandleVisualHalfOffset => 5 * _inverseZoom;
-        public double TextoHandleVisualNegativeHalfOffset => -5 * _inverseZoom;
-        public double TextoHandleStrokeThickness => 1.5 * _inverseZoom;
-        public double TerminalMarkerVisualSize => 20 * _inverseZoom;
-        public double TerminalMarkerVisualOffset => -10 * _inverseZoom;
-        public double TerminalMarkerStrokeThickness => 2 * _inverseZoom;
-        public double TerminalMessageVisualOffsetX => 16 * _inverseZoom;
-        public double TerminalMessageVisualOffsetY => -34 * _inverseZoom;
-        public double TerminalMessageFontSize => 12 * _inverseZoom;
-        public Thickness TerminalMessagePadding => new(7 * _inverseZoom, 4 * _inverseZoom, 7 * _inverseZoom, 4 * _inverseZoom);
-        public CornerRadius TerminalMessageCornerRadius => new(5 * _inverseZoom);
-
-        public void AtualizarZoomVisual(double zoom)
-        {
-            double inverseZoom = zoom > 0 ? 1 / zoom : 1;
-
-            if (Math.Abs(_inverseZoom - inverseZoom) < 0.000001)
-                return;
-
-            _inverseZoom = inverseZoom;
-            OnPropertyChanged(nameof(InverseZoom));
-            OnPropertyChanged(nameof(CableHandleVisualOffset));
-            OnPropertyChanged(nameof(LinhaHandleVisualSize));
-            OnPropertyChanged(nameof(LinhaHandleVisualOffset));
-            OnPropertyChanged(nameof(LinhaHandleStrokeThickness));
-            OnPropertyChanged(nameof(RetanguloHandleVisualSize));
-            OnPropertyChanged(nameof(RetanguloHandleVisualOffset));
-            OnPropertyChanged(nameof(RetanguloHandleStrokeThickness));
-            OnPropertyChanged(nameof(CirculoHandleVisualSize));
-            OnPropertyChanged(nameof(CirculoHandleVisualOffset));
-            OnPropertyChanged(nameof(CirculoHandleStrokeThickness));
-            OnPropertyChanged(nameof(TextoHandleVisualSize));
-            OnPropertyChanged(nameof(TextoHandleVisualHalfOffset));
-            OnPropertyChanged(nameof(TextoHandleVisualNegativeHalfOffset));
-            OnPropertyChanged(nameof(TextoHandleStrokeThickness));
-            OnPropertyChanged(nameof(TerminalMarkerVisualSize));
-            OnPropertyChanged(nameof(TerminalMarkerVisualOffset));
-            OnPropertyChanged(nameof(TerminalMarkerStrokeThickness));
-            OnPropertyChanged(nameof(TerminalMessageVisualOffsetX));
-            OnPropertyChanged(nameof(TerminalMessageVisualOffsetY));
-            OnPropertyChanged(nameof(TerminalMessageFontSize));
-            OnPropertyChanged(nameof(TerminalMessagePadding));
-            OnPropertyChanged(nameof(TerminalMessageCornerRadius));
-        }
-
-        public void RegistrarViewModel(ElementoViewModel vm)
-        {
-            _documentSceneSync.RegistrarViewModel(vm);
-        }
-
-        public ElementoViewModel? ObterViewModel(Elemento modelo)
-        {
-            return _documentSceneSync.ObterViewModel(modelo);
-        }
-
-        public void AtualizarViewModel(Elemento modelo)
-        {
-            _documentSceneSync.AtualizarViewModel(modelo);
-        }
-
-        public event PropertyChangedEventHandler? PropertyChanged;
-
-        protected virtual void OnPropertyChanged([CallerMemberName] string? nome = null)
-        {
-            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nome));
         }
     }
 }
@@ -1241,7 +1176,8 @@ ARQUIVO: C:\Araci-Engine-Front\Araci Engine\Views\ViewportView.xaml
                             </TextBlock>
                             <TextBox Text="{Binding ConteudoEdicao, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
                                      Width="{Binding Largura}"
-                                     Height="{Binding Altura}"
+                                     Height="{Binding AlturaEdicao}"
+                                     MinHeight="{Binding Altura}"
                                      FontFamily="{Binding FontFamily}"
                                      FontSize="{Binding AlturaTexto}"
                                      Foreground="{Binding ForegroundBrush}"
@@ -1253,6 +1189,8 @@ ARQUIVO: C:\Araci-Engine-Front\Araci Engine\Views\ViewportView.xaml
                                      VerticalContentAlignment="Top"
                                      AcceptsReturn="True"
                                      TextWrapping="Wrap"
+                                     VerticalScrollBarVisibility="Disabled"
+                                     HorizontalScrollBarVisibility="Disabled"
                                      PreviewKeyDown="OnInlineTextBoxPreviewKeyDown"
                                      LostKeyboardFocus="OnInlineTextBoxLostKeyboardFocus"
                                      Loaded="OnInlineTextBoxLoaded"
@@ -1563,21 +1501,25 @@ namespace Araci.Views
                 return;
             }
 
+            bool clicouDentroEditorInline = OrigemEstaDentroDeEditorInline(e.OriginalSource as DependencyObject);
+
+            if (ExisteEdicaoInlineAtiva())
+            {
+                if (clicouDentroEditorInline)
+                {
+                    e.Handled = true;
+                    return;
+                }
+
+                ConfirmarEdicaoInlineAtiva();
+            }
+
             Point worldPosition = GetWorldPos(e);
             ElementoViewModel? vm = ResolverElementoClicado(e.OriginalSource as DependencyObject, worldPosition);
 
             if (e.ClickCount >= 2 && vm is TextoAnotativoViewModel texto)
             {
                 IniciarEdicaoInlineTexto(texto);
-                e.Handled = true;
-                return;
-            }
-
-            if (ExisteEdicaoInlineAtiva())
-            {
-                if (!OrigemEstaDentroDeEditorInline(e.OriginalSource as DependencyObject))
-                    ConfirmarEdicaoInlineAtiva();
-
                 e.Handled = true;
                 return;
             }
@@ -1964,14 +1906,11 @@ namespace Araci.Views
             e.Handled = true;
         }
 
-        private static void AplicarResizeTextoDireita(TextoAnotativoViewModel texto, double deltaWorld)
+        private void AplicarResizeTextoDireita(TextoAnotativoViewModel texto, double deltaWorld)
         {
-            texto.LarguraCaixa = Math.Max(TextoAnotativo.LarguraCaixaMinima, texto.LarguraCaixa == texto.Texto.LarguraCaixa ? texto.Texto.LarguraCaixa : texto.LarguraCaixa);
-            texto.LarguraCaixa = Math.Max(TextoAnotativo.LarguraCaixaMinima, texto.Texto.LarguraCaixa + 0);
-            texto.LarguraCaixa = Math.Max(TextoAnotativo.LarguraCaixaMinima, texto.Texto.LarguraCaixa - texto.Texto.LarguraCaixa + texto.LarguraCaixa);
-            texto.LarguraCaixa = Math.Max(TextoAnotativo.LarguraCaixaMinima, texto.LarguraCaixa);
+            texto.X = _textoWidthResizeXInicial;
+            texto.LarguraCaixa = Math.Max(TextoAnotativo.LarguraCaixaMinima, _textoWidthResizeLarguraInicial + deltaWorld);
         }
-
 
         private void AplicarResizeTextoEsquerda(TextoAnotativoViewModel texto, double deltaWorld)
         {
@@ -2075,6 +2014,8 @@ namespace Araci.Views
             finally
             {
                 _commitInlineTextInProgress = false;
+                _context.SceneQueries.Invalidate();
+                _viewportViewModel?.AtualizarViewModel(texto.Modelo);
             }
         }
 

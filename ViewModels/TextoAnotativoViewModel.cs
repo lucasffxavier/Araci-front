@@ -68,6 +68,8 @@ namespace Araci.ViewModels
         public override double Largura => Bounds.Width;
         public override double Altura => Bounds.Height;
 
+        public double AlturaEdicao => Math.Max(Texto.AlturaEstimada, TextoAnotativo.CalcularAlturaEstimada(ConteudoEdicao, LarguraCaixa, AlturaTexto));
+
         public override ElementoRenderData RenderData => new(Largura, Altura, new Point(0, 0), new Point(Largura, Altura), ForegroundBrush, 1);
 
         public string Nome
@@ -109,6 +111,7 @@ namespace Araci.ViewModels
 
                 _conteudoEdicao = value ?? string.Empty;
                 OnPropertyChanged();
+                OnPropertyChanged(nameof(AlturaEdicao));
             }
         }
 
@@ -122,6 +125,7 @@ namespace Araci.ViewModels
 
                 Texto.LarguraCaixa = value;
                 OnPropertyChanged();
+                OnPropertyChanged(nameof(AlturaEdicao));
                 AtualizarNode();
                 NotificarParametros();
             }
@@ -139,6 +143,8 @@ namespace Araci.ViewModels
                 OnPropertyChanged();
                 OnPropertyChanged(nameof(IsNotEditingInline));
                 OnPropertyChanged(nameof(IsInteractionLocked));
+                OnPropertyChanged(nameof(AlturaEdicao));
+                AtualizarNode();
             }
         }
 
@@ -217,7 +223,7 @@ namespace Araci.ViewModels
 
         public override ElementoEstado CapturarEstado()
         {
-            return new ElementoEstado(Texto.PosicaoX, Texto.PosicaoY, Texto.LarguraEstimada, Texto.AlturaEstimada, Texto.Rotacao);
+            return new ElementoEstado(Texto.PosicaoX, Texto.PosicaoY, Texto.LarguraCaixa, Texto.AlturaEstimada, Texto.Rotacao);
         }
 
         public override void AplicarEstado(ElementoEstado estado)
@@ -225,6 +231,10 @@ namespace Araci.ViewModels
             Texto.PosicaoX = estado.X;
             Texto.PosicaoY = estado.Y;
             Texto.Rotacao = estado.Rotacao;
+
+            if (estado.X2 > 0)
+                Texto.LarguraCaixa = estado.X2;
+
             AtualizarNode();
         }
 
@@ -233,6 +243,7 @@ namespace Araci.ViewModels
             base.NotificarGeometria();
             OnPropertyChanged(nameof(Conteudo));
             OnPropertyChanged(nameof(LarguraCaixa));
+            OnPropertyChanged(nameof(AlturaEdicao));
             NotificarParametrosDeTipo();
         }
 
@@ -245,6 +256,7 @@ namespace Araci.ViewModels
         {
             OnPropertyChanged(nameof(TipoTexto));
             OnPropertyChanged(nameof(TipoViewModel));
+            OnPropertyChanged(nameof(AlturaEdicao));
             NotificarParametrosDeTipo();
             AtualizarNode();
         }

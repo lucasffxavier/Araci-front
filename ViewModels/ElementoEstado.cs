@@ -54,6 +54,9 @@ namespace Araci.ViewModels
             {
                 texto.PosicaoX = X;
                 texto.PosicaoY = Y;
+
+                if (X2 > 0)
+                    texto.LarguraCaixa = X2;
             }
 
             if (elemento is not Cabo cabo)
