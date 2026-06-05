@@ -471,109 +471,537 @@ Araci-front
 
 
 ====================================================================================================
-ARQUIVO: C:\Users\User\source\repos\lucasffxavier\Araci-front\ViewModels\CirculoResizeHandleViewModel.cs
+ARQUIVO: C:\Users\User\source\repos\lucasffxavier\Araci-front\ViewModels\TextoAnotativoViewModel.cs
 ====================================================================================================
 
-﻿namespace Araci.ViewModels
-{
-    public class CirculoResizeHandleViewModel
-    {
-        public CirculoResizeHandleViewModel(CirculoAnotativoViewModel circulo, double x, double y, bool isActive)
-        {
-            Circulo = circulo;
-            X = x;
-            Y = y;
-            IsActive = isActive;
-        }
-
-        public CirculoAnotativoViewModel Circulo { get; }
-        public double X { get; }
-        public double Y { get; }
-        public bool IsActive { get; }
-    }
-}
-
-
-====================================================================================================
-ARQUIVO: C:\Users\User\source\repos\lucasffxavier\Araci-front\ViewModels\LinhaEndpointHandleViewModel.cs
-====================================================================================================
+﻿using System;
+using System.Collections;
+using System.Windows;
+using System.Windows.Media;
+using Araci.Core.Rendering;
+using Araci.Core.SceneNodes;
+using Araci.Models;
+using Araci.Models.Tipos;
+using Araci.Services.Catalog;
+using Araci.Services.Naming;
+using Araci.Services.UI;
 
 namespace Araci.ViewModels
 {
-    public enum LinhaEndpointKind
+    public class TextoAnotativoViewModel : ElementoViewModel
     {
-        Inicio,
-        Fim
-    }
+        private const double LeaderArrowLength = 10.0;
+        private const double LeaderArrowHalfWidth = 4.5;
+        private bool _isEditingInline;
+        private string _conteudoEdicao = string.Empty;
 
-    public class LinhaEndpointHandleViewModel
-    {
-        public LinhaEndpointHandleViewModel(LinhaAnotativaViewModel linha, LinhaEndpointKind kind, double x, double y, bool isActive)
+        public TextoAnotativoViewModel(
+            TextoAnotativo modelo,
+            TypeLibraryService types,
+            NameService names,
+            TypePropertiesDialogService typePropertiesDialogs)
+            : base(modelo, new TextoAnotativoNode(modelo), types, names, typePropertiesDialogs)
         {
-            Linha = linha;
-            Kind = kind;
-            X = x;
-            Y = y;
-            IsActive = isActive;
+            SelecionarPrimeiroTipoDisponivel();
+
+            if (Texto.LarguraCaixa <= TextoAnotativo.LarguraCaixaMinima + 0.000001)
+                Texto.AjustarLarguraAoConteudo();
+
+            AtualizarAposModeloAlterado();
         }
 
-        public LinhaAnotativaViewModel Linha { get; }
-        public LinhaEndpointKind Kind { get; }
-        public double X { get; }
-        public double Y { get; }
-        public bool IsActive { get; }
-    }
+        public TextoAnotativo Texto => (TextoAnotativo)Modelo;
 
-    public class LinhaEndpointSnapViewModel
-    {
-        public LinhaEndpointSnapViewModel(double x, double y)
+        public override IEnumerable TiposDisponiveis => Types.TiposTextosAnotativos;
+
+        public override TipoElementoViewModel? TipoViewModel
         {
-            X = x;
-            Y = y;
+            get
+            {
+                if (Texto.TipoTexto != null)
+                    return new TipoTextoAnotativoViewModel(Texto.TipoTexto, Types.TiposTextosAnotativos, SelecionarTipoTexto, NotificarAlteracaoVisualPorTipo);
+
+                return null;
+            }
         }
 
-        public double X { get; }
-        public double Y { get; }
+        public TipoTextoAnotativo? TipoTexto => Texto.TipoTexto;
+
+        public override TipoElemento Tipo
+        {
+            get => base.Tipo;
+            set
+            {
+                if (ReferenceEquals(Texto.Tipo, value))
+                    return;
+
+                base.Tipo = value;
+                NotificarAlteracaoVisualPorTipo();
+                NotificarParametros();
+            }
+        }
+
+        public override double WorldX => Bounds.X;
+        public override double WorldY => Bounds.Y;
+        public override double Largura => Bounds.Width;
+        public override double Altura => Bounds.Height;
+
+        public double AlturaEdicao => Math.Max(Texto.AlturaEstimada, TextoAnotativo.CalcularAlturaEstimada(ConteudoEdicao, LarguraCaixa, AlturaTexto));
+        public double AlturaVisual => IsEditingInline ? AlturaEdicao : Altura;
+
+        public override ElementoRenderData RenderData => new(Largura, Altura, new Point(0, 0), new Point(Largura, Altura), ForegroundBrush, 1);
+
+        public string Nome
+        {
+            get => Texto.Nome;
+            set
+            {
+                if (Texto.Nome == value)
+                    return;
+
+                RenomearModelo(value);
+                OnPropertyChanged();
+                NotificarParametros();
+            }
+        }
+
+        public string Conteudo
+        {
+            get => Texto.Texto;
+            set
+            {
+                if (Texto.Texto == value)
+                    return;
+
+                Texto.Texto = value ?? string.Empty;
+                OnPropertyChanged();
+                AtualizarNode();
+                NotificarParametros();
+            }
+        }
+
+        public string ConteudoEdicao
+        {
+            get => _conteudoEdicao;
+            set
+            {
+                if (_conteudoEdicao == value)
+                    return;
+
+                _conteudoEdicao = value ?? string.Empty;
+                OnPropertyChanged();
+                OnPropertyChanged(nameof(AlturaEdicao));
+                OnPropertyChanged(nameof(AlturaVisual));
+            }
+        }
+
+        public double LarguraCaixa
+        {
+            get => Texto.LarguraCaixa;
+            set
+            {
+                if (Math.Abs(Texto.LarguraCaixa - value) < 0.000001)
+                    return;
+
+                Texto.LarguraCaixa = value;
+                OnPropertyChanged();
+                OnPropertyChanged(nameof(AlturaEdicao));
+                OnPropertyChanged(nameof(AlturaVisual));
+                AtualizarNode();
+                NotificarParametros();
+            }
+        }
+
+        public new double Rotacao
+        {
+            get => NormalizarRotacao(Texto.Rotacao);
+            set
+            {
+                double normalizada = NormalizarRotacao(value);
+
+                if (Math.Abs(Texto.Rotacao - normalizada) < 0.000001)
+                    return;
+
+                Texto.Rotacao = normalizada;
+                OnPropertyChanged();
+                AtualizarNode();
+                NotificarLeader();
+                NotificarParametros();
+            }
+        }
+
+        public bool LeaderAtivo
+        {
+            get => Texto.LeaderAtivo;
+            set
+            {
+                if (Texto.LeaderAtivo == value)
+                    return;
+
+                bool criouPontoPadrao = value && !LeaderPossuiPontoValido();
+
+                if (criouPontoPadrao)
+                    CriarLeaderPadrao();
+
+                Texto.LeaderAtivo = value;
+                OnPropertyChanged();
+
+                if (criouPontoPadrao)
+                {
+                    OnPropertyChanged(nameof(LeaderX));
+                    OnPropertyChanged(nameof(LeaderY));
+                    OnPropertyChanged(nameof(LeaderPoint));
+                }
+
+                NotificarLeader();
+                AtualizarNode();
+                NotificarParametros();
+            }
+        }
+
+        public double LeaderX
+        {
+            get => Texto.LeaderX;
+            set
+            {
+                if (Math.Abs(Texto.LeaderX - value) < 0.000001)
+                    return;
+
+                Texto.LeaderX = value;
+                OnPropertyChanged();
+                NotificarLeader();
+                AtualizarNode();
+                NotificarParametros();
+            }
+        }
+
+        public double LeaderY
+        {
+            get => Texto.LeaderY;
+            set
+            {
+                if (Math.Abs(Texto.LeaderY - value) < 0.000001)
+                    return;
+
+                Texto.LeaderY = value;
+                OnPropertyChanged();
+                NotificarLeader();
+                AtualizarNode();
+                NotificarParametros();
+            }
+        }
+
+        public Point LeaderPoint
+        {
+            get => new(LeaderX, LeaderY);
+            set
+            {
+                LeaderX = value.X;
+                LeaderY = value.Y;
+                OnPropertyChanged();
+                NotificarLeader();
+            }
+        }
+
+        public bool LeaderVisivel => LeaderAtivo && !IsEditingInline;
+        public Point LeaderInicioLocal => CalcularLeaderInicioLocal();
+        public Point LeaderFimLocal => WorldToLocal(LeaderPoint);
+        public Point LeaderInicioWorld => LocalToWorld(LeaderInicioLocal);
+        public PointCollection LeaderArrowPoints => CalcularLeaderArrowPoints();
+
+        public bool IsEditingInline
+        {
+            get => _isEditingInline;
+            private set
+            {
+                if (_isEditingInline == value)
+                    return;
+
+                _isEditingInline = value;
+                OnPropertyChanged();
+                OnPropertyChanged(nameof(IsNotEditingInline));
+                OnPropertyChanged(nameof(IsInteractionLocked));
+                OnPropertyChanged(nameof(AlturaEdicao));
+                OnPropertyChanged(nameof(AlturaVisual));
+                NotificarLeader();
+                AtualizarNode();
+            }
+        }
+
+        public bool IsNotEditingInline => !IsEditingInline;
+        public bool IsInteractionLocked => IsEditingInline;
+
+        public string CorTexto => Texto.CorTexto;
+        public double AlturaTexto => Texto.AlturaTexto;
+        public string Fonte => Texto.Fonte;
+        public string AlinhamentoHorizontal => Texto.AlinhamentoHorizontal;
+
+        public bool Visivel
+        {
+            get => Texto.Visivel;
+            set
+            {
+                if (Texto.Visivel == value)
+                    return;
+
+                Texto.Visivel = value;
+                OnPropertyChanged();
+                NotificarParametros();
+            }
+        }
+
+        public Brush ForegroundBrush => CriarBrush(CorTexto);
+
+        public TextAlignment TextAlignment => AlinhamentoHorizontal switch
+        {
+            "Centro" => TextAlignment.Center,
+            "Direita" => TextAlignment.Right,
+            _ => TextAlignment.Left
+        };
+
+        public HorizontalAlignment TextBoxHorizontalContentAlignment => AlinhamentoHorizontal switch
+        {
+            "Centro" => HorizontalAlignment.Center,
+            "Direita" => HorizontalAlignment.Right,
+            _ => HorizontalAlignment.Left
+        };
+
+        public FontFamily FontFamily => new(string.IsNullOrWhiteSpace(Fonte) ? "Arial" : Fonte);
+
+        public void IniciarEdicaoInline()
+        {
+            ConteudoEdicao = Conteudo;
+            IsEditingInline = true;
+            IsHover = false;
+        }
+
+        public void CancelarEdicaoInline()
+        {
+            ConteudoEdicao = Conteudo;
+            IsEditingInline = false;
+        }
+
+        public void EncerrarEdicaoInline()
+        {
+            IsEditingInline = false;
+        }
+
+        public void AtualizarAposTipoAlterado()
+        {
+            NotificarAlteracaoVisualPorTipo();
+        }
+
+        public override void Mover(Vector delta)
+        {
+            if (IsEditingInline)
+                return;
+
+            Texto.PosicaoX += delta.X;
+            Texto.PosicaoY += delta.Y;
+
+            if (LeaderAtivo)
+            {
+                Texto.LeaderX += delta.X;
+                Texto.LeaderY += delta.Y;
+            }
+
+            AtualizarNode();
+            NotificarLeader();
+        }
+
+        public override ElementoEstado CapturarEstado()
+        {
+            return new ElementoEstado(Texto.PosicaoX, Texto.PosicaoY, Texto.LarguraCaixa, Texto.AlturaEstimada, Texto.Rotacao, null, Texto.LeaderAtivo, Texto.LeaderX, Texto.LeaderY);
+        }
+
+        public override void AplicarEstado(ElementoEstado estado)
+        {
+            Texto.PosicaoX = estado.X;
+            Texto.PosicaoY = estado.Y;
+            Texto.Rotacao = NormalizarRotacao(estado.Rotacao);
+
+            if (estado.X2 > 0)
+                Texto.LarguraCaixa = estado.X2;
+
+            Texto.LeaderAtivo = estado.TextoLeaderAtivo;
+            Texto.LeaderX = estado.TextoLeaderX;
+            Texto.LeaderY = estado.TextoLeaderY;
+            AtualizarNode();
+            NotificarLeader();
+        }
+
+        protected override void NotificarGeometria()
+        {
+            base.NotificarGeometria();
+            OnPropertyChanged(nameof(Conteudo));
+            OnPropertyChanged(nameof(LarguraCaixa));
+            OnPropertyChanged(nameof(Rotacao));
+            OnPropertyChanged(nameof(LeaderAtivo));
+            OnPropertyChanged(nameof(LeaderX));
+            OnPropertyChanged(nameof(LeaderY));
+            OnPropertyChanged(nameof(LeaderPoint));
+            OnPropertyChanged(nameof(AlturaEdicao));
+            OnPropertyChanged(nameof(AlturaVisual));
+            NotificarLeader();
+            NotificarParametrosDeTipo();
+        }
+
+        private Point CalcularLeaderInicioLocal()
+        {
+            double largura = Math.Max(1, Largura);
+            double altura = Math.Max(1, AlturaVisual);
+            Point centro = new(largura / 2, altura / 2);
+            Point fim = LeaderFimLocal;
+            Vector direcao = fim - centro;
+
+            if (direcao.Length < 0.000001)
+                return centro;
+
+            double t = double.PositiveInfinity;
+
+            if (direcao.X > 0.000001)
+                t = Math.Min(t, (largura - centro.X) / direcao.X);
+            else if (direcao.X < -0.000001)
+                t = Math.Min(t, (0 - centro.X) / direcao.X);
+
+            if (direcao.Y > 0.000001)
+                t = Math.Min(t, (altura - centro.Y) / direcao.Y);
+            else if (direcao.Y < -0.000001)
+                t = Math.Min(t, (0 - centro.Y) / direcao.Y);
+
+            if (double.IsNaN(t) || double.IsInfinity(t))
+                t = 0;
+
+            t = Math.Max(0, Math.Min(1, t));
+            return centro + direcao * t;
+        }
+
+        private PointCollection CalcularLeaderArrowPoints()
+        {
+            Point fim = LeaderFimLocal;
+            Point inicio = LeaderInicioLocal;
+            Vector direcao = inicio - fim;
+
+            if (direcao.Length < 0.000001)
+                direcao = new Vector(0, -1);
+            else
+                direcao.Normalize();
+
+            Vector normal = new(-direcao.Y, direcao.X);
+            Point p1 = fim + direcao * LeaderArrowLength + normal * LeaderArrowHalfWidth;
+            Point p2 = fim + direcao * LeaderArrowLength - normal * LeaderArrowHalfWidth;
+
+            return new PointCollection { fim, p1, p2 };
+        }
+
+        private Point WorldToLocal(Point world)
+        {
+            double largura = Math.Max(1, Largura);
+            double altura = Math.Max(1, AlturaVisual);
+            Point centroWorld = new(WorldX + largura / 2, WorldY + altura / 2);
+            double radians = -Rotacao * Math.PI / 180.0;
+            double cos = Math.Cos(radians);
+            double sin = Math.Sin(radians);
+            double dx = world.X - centroWorld.X;
+            double dy = world.Y - centroWorld.Y;
+            return new Point(largura / 2 + dx * cos - dy * sin, altura / 2 + dx * sin + dy * cos);
+        }
+
+        private Point LocalToWorld(Point local)
+        {
+            double largura = Math.Max(1, Largura);
+            double altura = Math.Max(1, AlturaVisual);
+            Point centroWorld = new(WorldX + largura / 2, WorldY + altura / 2);
+            double radians = Rotacao * Math.PI / 180.0;
+            double cos = Math.Cos(radians);
+            double sin = Math.Sin(radians);
+            double dx = local.X - largura / 2;
+            double dy = local.Y - altura / 2;
+            return new Point(centroWorld.X + dx * cos - dy * sin, centroWorld.Y + dx * sin + dy * cos);
+        }
+
+        private bool LeaderPossuiPontoValido()
+        {
+            return Math.Abs(Texto.LeaderX) > 0.000001 || Math.Abs(Texto.LeaderY) > 0.000001;
+        }
+
+        private void CriarLeaderPadrao()
+        {
+            Point ponto = LocalToWorld(new Point(Math.Max(1, Largura) + 70, Math.Max(1, AlturaVisual) + 50));
+            Texto.LeaderX = ponto.X;
+            Texto.LeaderY = ponto.Y;
+        }
+
+        private void SelecionarTipoTexto(TipoTextoAnotativo tipo)
+        {
+            Tipo = tipo;
+        }
+
+        private void NotificarAlteracaoVisualPorTipo()
+        {
+            OnPropertyChanged(nameof(TipoTexto));
+            OnPropertyChanged(nameof(TipoViewModel));
+            OnPropertyChanged(nameof(AlturaEdicao));
+            OnPropertyChanged(nameof(AlturaVisual));
+            NotificarParametrosDeTipo();
+            NotificarLeader();
+            AtualizarNode();
+        }
+
+        private void NotificarLeader()
+        {
+            OnPropertyChanged(nameof(LeaderVisivel));
+            OnPropertyChanged(nameof(LeaderPoint));
+            OnPropertyChanged(nameof(LeaderInicioLocal));
+            OnPropertyChanged(nameof(LeaderFimLocal));
+            OnPropertyChanged(nameof(LeaderInicioWorld));
+            OnPropertyChanged(nameof(LeaderArrowPoints));
+        }
+
+        private void NotificarParametrosDeTipo()
+        {
+            OnPropertyChanged(nameof(CorTexto));
+            OnPropertyChanged(nameof(Fonte));
+            OnPropertyChanged(nameof(AlturaTexto));
+            OnPropertyChanged(nameof(AlinhamentoHorizontal));
+            OnPropertyChanged(nameof(ForegroundBrush));
+            OnPropertyChanged(nameof(FontFamily));
+            OnPropertyChanged(nameof(TextAlignment));
+            OnPropertyChanged(nameof(TextBoxHorizontalContentAlignment));
+            OnPropertyChanged(nameof(RenderData));
+        }
+
+        private static double NormalizarRotacao(double valor)
+        {
+            if (double.IsNaN(valor) || double.IsInfinity(valor))
+                return 0;
+
+            double normalizada = valor % 360;
+
+            if (normalizada < 0)
+                normalizada += 360;
+
+            return normalizada >= 360 ? 0 : normalizada;
+        }
+
+        private static Brush CriarBrush(string cor)
+        {
+            try
+            {
+                object? valor = ColorConverter.ConvertFromString(cor);
+
+                if (valor is Color color)
+                    return new SolidColorBrush(color);
+            }
+            catch (FormatException)
+            {
+            }
+
+            return Brushes.Black;
+        }
     }
 }
 
-
-====================================================================================================
-ARQUIVO: C:\Users\User\source\repos\lucasffxavier\Araci-front\ViewModels\RetanguloResizeHandleViewModel.cs
-====================================================================================================
-
-﻿namespace Araci.ViewModels
-{
-    public enum RetanguloResizeHandleKind
-    {
-        TopLeft,
-        Top,
-        TopRight,
-        Right,
-        BottomRight,
-        Bottom,
-        BottomLeft,
-        Left
-    }
-
-    public class RetanguloResizeHandleViewModel
-    {
-        public RetanguloResizeHandleViewModel(RetanguloAnotativoViewModel retangulo, RetanguloResizeHandleKind kind, double x, double y, bool isActive)
-        {
-            Retangulo = retangulo;
-            Kind = kind;
-            X = x;
-            Y = y;
-            IsActive = isActive;
-        }
-
-        public RetanguloAnotativoViewModel Retangulo { get; }
-        public RetanguloResizeHandleKind Kind { get; }
-        public double X { get; }
-        public double Y { get; }
-        public bool IsActive { get; }
-    }
-}
 
 
 ====================================================================================================
@@ -677,6 +1105,45 @@ ARQUIVO: C:\Users\User\source\repos\lucasffxavier\Araci-front\Views\ViewportView
                                     </Style>
                                 </Polygon.Style>
                             </Polygon>
+                            <Canvas ClipToBounds="False" Panel.ZIndex="35">
+                                <primitives:Thumb Canvas.Left="{Binding LeaderFimLocal.X}"
+                                                  Canvas.Top="{Binding LeaderFimLocal.Y}"
+                                                  Width="{Binding DataContext.TextoHandleVisualSize, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                                  Height="{Binding DataContext.TextoHandleVisualSize, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                                  Cursor="Hand"
+                                                  DragStarted="OnTextoLeaderHandleDragStarted"
+                                                  DragDelta="OnTextoLeaderHandleDragDelta"
+                                                  DragCompleted="OnTextoLeaderHandleDragCompleted"
+                                                  Focusable="False"
+                                                  SnapsToDevicePixels="True">
+                                    <primitives:Thumb.Style>
+                                        <Style TargetType="primitives:Thumb">
+                                            <Setter Property="Visibility" Value="Collapsed"/>
+                                            <Setter Property="Template">
+                                                <Setter.Value>
+                                                    <ControlTemplate TargetType="primitives:Thumb">
+                                                        <Ellipse Fill="White" Stroke="#007ACC" StrokeThickness="{Binding DataContext.TextoHandleStrokeThickness, RelativeSource={RelativeSource AncestorType=UserControl}}" SnapsToDevicePixels="True"/>
+                                                    </ControlTemplate>
+                                                </Setter.Value>
+                                            </Setter>
+                                            <Style.Triggers>
+                                                <MultiDataTrigger>
+                                                    <MultiDataTrigger.Conditions>
+                                                        <Condition Binding="{Binding IsSelecionado}" Value="True"/>
+                                                        <Condition Binding="{Binding LeaderVisivel}" Value="True"/>
+                                                        <Condition Binding="{Binding IsEditingInline}" Value="False"/>
+                                                    </MultiDataTrigger.Conditions>
+                                                    <Setter Property="Visibility" Value="Visible"/>
+                                                </MultiDataTrigger>
+                                            </Style.Triggers>
+                                        </Style>
+                                    </primitives:Thumb.Style>
+                                    <primitives:Thumb.RenderTransform>
+                                        <TranslateTransform X="{Binding DataContext.TextoHandleVisualNegativeHalfOffset, RelativeSource={RelativeSource AncestorType=UserControl}}" Y="{Binding DataContext.TextoHandleVisualNegativeHalfOffset, RelativeSource={RelativeSource AncestorType=UserControl}}"/>
+                                    </primitives:Thumb.RenderTransform>
+                                </primitives:Thumb>
+                            </Canvas>
+
                             <Rectangle Fill="Transparent" Stroke="#007ACC" StrokeThickness="1" StrokeDashArray="4 2" SnapsToDevicePixels="True">
                                 <Rectangle.Style>
                                     <Style TargetType="Rectangle">
@@ -924,10 +1391,94 @@ ARQUIVO: C:\Users\User\source\repos\lucasffxavier\Araci-front\Views\ViewportView
             </Canvas>
 
             <Canvas x:Name="CableVertexHandleLayer" IsHitTestVisible="False"/>
-            <ItemsControl x:Name="CirculoResizeHandleLayer" ItemsSource="{Binding CirculoResize.Handles}" IsHitTestVisible="False" ClipToBounds="False"/>
-            <ItemsControl x:Name="RetanguloResizeHandleLayer" ItemsSource="{Binding RetanguloResize.Handles}" IsHitTestVisible="False" ClipToBounds="False"/>
-            <ItemsControl x:Name="LinhaEndpointInsertionSnapLayer" ItemsSource="{Binding LinhaEndpointEdit.InsertionSnapHandles}" IsHitTestVisible="False" ClipToBounds="False"/>
-            <ItemsControl x:Name="LinhaEndpointHandleLayer" ItemsSource="{Binding LinhaEndpointEdit.Handles}" IsHitTestVisible="False" ClipToBounds="False"/>
+            <ItemsControl x:Name="CirculoResizeHandleLayer" ItemsSource="{Binding CirculoResize.Handles}" IsHitTestVisible="False" ClipToBounds="False">
+                <ItemsControl.ItemsPanel>
+                    <ItemsPanelTemplate>
+                        <Canvas ClipToBounds="False"/>
+                    </ItemsPanelTemplate>
+                </ItemsControl.ItemsPanel>
+                <ItemsControl.ItemContainerStyle>
+                    <Style TargetType="ContentPresenter">
+                        <Setter Property="Canvas.Left" Value="{Binding X}"/>
+                        <Setter Property="Canvas.Top" Value="{Binding Y}"/>
+                    </Style>
+                </ItemsControl.ItemContainerStyle>
+                <ItemsControl.ItemTemplate>
+                    <DataTemplate DataType="{x:Type viewModels:CirculoResizeHandleViewModel}">
+                        <Ellipse Width="9" Height="9" Fill="White" Stroke="#007ACC" StrokeThickness="1.5" RenderTransformOrigin="0.5,0.5" SnapsToDevicePixels="True">
+                            <Ellipse.RenderTransform>
+                                <TranslateTransform X="-4.5" Y="-4.5"/>
+                            </Ellipse.RenderTransform>
+                        </Ellipse>
+                    </DataTemplate>
+                </ItemsControl.ItemTemplate>
+            </ItemsControl>
+            <ItemsControl x:Name="RetanguloResizeHandleLayer" ItemsSource="{Binding RetanguloResize.Handles}" IsHitTestVisible="False" ClipToBounds="False">
+                <ItemsControl.ItemsPanel>
+                    <ItemsPanelTemplate>
+                        <Canvas ClipToBounds="False"/>
+                    </ItemsPanelTemplate>
+                </ItemsControl.ItemsPanel>
+                <ItemsControl.ItemContainerStyle>
+                    <Style TargetType="ContentPresenter">
+                        <Setter Property="Canvas.Left" Value="{Binding X}"/>
+                        <Setter Property="Canvas.Top" Value="{Binding Y}"/>
+                    </Style>
+                </ItemsControl.ItemContainerStyle>
+                <ItemsControl.ItemTemplate>
+                    <DataTemplate DataType="{x:Type viewModels:RetanguloResizeHandleViewModel}">
+                        <Rectangle Width="9" Height="9" Fill="White" Stroke="#007ACC" StrokeThickness="1.5" RenderTransformOrigin="0.5,0.5" SnapsToDevicePixels="True">
+                            <Rectangle.RenderTransform>
+                                <TranslateTransform X="-4.5" Y="-4.5"/>
+                            </Rectangle.RenderTransform>
+                        </Rectangle>
+                    </DataTemplate>
+                </ItemsControl.ItemTemplate>
+            </ItemsControl>
+            <ItemsControl x:Name="LinhaEndpointInsertionSnapLayer" ItemsSource="{Binding LinhaEndpointEdit.InsertionSnapHandles}" IsHitTestVisible="False" ClipToBounds="False">
+                <ItemsControl.ItemsPanel>
+                    <ItemsPanelTemplate>
+                        <Canvas ClipToBounds="False"/>
+                    </ItemsPanelTemplate>
+                </ItemsControl.ItemsPanel>
+                <ItemsControl.ItemContainerStyle>
+                    <Style TargetType="ContentPresenter">
+                        <Setter Property="Canvas.Left" Value="{Binding X}"/>
+                        <Setter Property="Canvas.Top" Value="{Binding Y}"/>
+                    </Style>
+                </ItemsControl.ItemContainerStyle>
+                <ItemsControl.ItemTemplate>
+                    <DataTemplate DataType="{x:Type viewModels:LinhaEndpointSnapViewModel}">
+                        <Ellipse Width="7" Height="7" Fill="#FFFFFFFF" Stroke="#AA007ACC" StrokeThickness="1.25" RenderTransformOrigin="0.5,0.5" SnapsToDevicePixels="True">
+                            <Ellipse.RenderTransform>
+                                <TranslateTransform X="-3.5" Y="-3.5"/>
+                            </Ellipse.RenderTransform>
+                        </Ellipse>
+                    </DataTemplate>
+                </ItemsControl.ItemTemplate>
+            </ItemsControl>
+            <ItemsControl x:Name="LinhaEndpointHandleLayer" ItemsSource="{Binding LinhaEndpointEdit.Handles}" IsHitTestVisible="False" ClipToBounds="False">
+                <ItemsControl.ItemsPanel>
+                    <ItemsPanelTemplate>
+                        <Canvas ClipToBounds="False"/>
+                    </ItemsPanelTemplate>
+                </ItemsControl.ItemsPanel>
+                <ItemsControl.ItemContainerStyle>
+                    <Style TargetType="ContentPresenter">
+                        <Setter Property="Canvas.Left" Value="{Binding X}"/>
+                        <Setter Property="Canvas.Top" Value="{Binding Y}"/>
+                    </Style>
+                </ItemsControl.ItemContainerStyle>
+                <ItemsControl.ItemTemplate>
+                    <DataTemplate DataType="{x:Type viewModels:LinhaEndpointHandleViewModel}">
+                        <Ellipse Width="9" Height="9" Fill="White" Stroke="#007ACC" StrokeThickness="1.5" RenderTransformOrigin="0.5,0.5" SnapsToDevicePixels="True">
+                            <Ellipse.RenderTransform>
+                                <TranslateTransform X="-4.5" Y="-4.5"/>
+                            </Ellipse.RenderTransform>
+                        </Ellipse>
+                    </DataTemplate>
+                </ItemsControl.ItemTemplate>
+            </ItemsControl>
             <Canvas x:Name="TerminalSnapLayer" IsHitTestVisible="False"/>
             <Canvas IsHitTestVisible="False" ClipToBounds="True">
                 <Border Background="#AA1E1E1E" CornerRadius="6" Padding="8" Canvas.Left="{Binding MoveHud.X}" Canvas.Top="{Binding MoveHud.Y}" Visibility="{Binding MoveHud.Visivel, Converter={StaticResource BooleanToVisibilityConverter}}">
@@ -940,934 +1491,5 @@ ARQUIVO: C:\Users\User\source\repos\lucasffxavier\Araci-front\Views\ViewportView
         </Grid>
     </Border>
 </UserControl>
-
-
-
-====================================================================================================
-ARQUIVO: C:\Users\User\source\repos\lucasffxavier\Araci-front\Views\ViewportView.xaml.cs
-====================================================================================================
-
-using System;
-using System.ComponentModel;
-using System.Windows;
-using System.Windows.Controls;
-using System.Windows.Controls.Primitives;
-using System.Windows.Input;
-using System.Windows.Media;
-using Araci.Applications.Editar.Base;
-using Araci.Applications.UseCases.Editar;
-using Araci.Core.Commands;
-using Araci.Models;
-using Araci.Services;
-using Araci.ViewModels;
-
-namespace Araci.Views
-{
-    public partial class ViewportView : UserControl
-    {
-        private readonly MatrixTransform _cameraTransform = new();
-        private ViewportViewModel? _viewportViewModel;
-        private EditorContext? _context;
-        private bool _commitInlineTextInProgress;
-        private bool _cancelInlineTextInProgress;
-        private TextoAnotativoViewModel? _textoWidthResizeAtivo;
-        private TextoAnotativoViewModel? _textoRotationAtivo;
-        private ElementoEstado? _textoRotationEstadoInicial;
-        private TextoWidthResizeSide _textoWidthResizeSide = TextoWidthResizeSide.Right;
-        private double _textoWidthResizeXInicial;
-        private double _textoWidthResizeYInicial;
-        private double _textoWidthResizeLarguraInicial;
-        private double _textoWidthResizeDeltaAcumulado;
-
-        public ViewportView()
-        {
-            InitializeComponent();
-        }
-
-        public void Inicializar(EditorContext context)
-        {
-            _context = context ?? throw new ArgumentNullException(nameof(context));
-            _viewportViewModel = _context.CriarViewportViewModel();
-            DataContext = _viewportViewModel;
-            _context.InicializarViewport(_viewportViewModel);
-            ConfigurarCamera();
-            Unloaded += OnUnloaded;
-        }
-
-        private bool IsTextoWidthResizing => _textoWidthResizeAtivo != null;
-        private bool IsTextoRotating => _textoRotationAtivo != null;
-
-        private void ConfigurarCamera()
-        {
-            if (_context?.Viewport == null)
-                return;
-
-            WorldLayer.RenderTransform = _cameraTransform;
-            AlignmentGuideLayer.RenderTransform = _cameraTransform;
-            SelectionLayer.RenderTransform = _cameraTransform;
-            CableVertexHandleLayer.RenderTransform = _cameraTransform;
-            CirculoResizeHandleLayer.RenderTransform = _cameraTransform;
-            RetanguloResizeHandleLayer.RenderTransform = _cameraTransform;
-            LinhaEndpointInsertionSnapLayer.RenderTransform = _cameraTransform;
-            LinhaEndpointHandleLayer.RenderTransform = _cameraTransform;
-            TerminalSnapLayer.RenderTransform = _cameraTransform;
-            _context.Viewport.Camera.PropertyChanged += OnCameraChanged;
-            AtualizarCameraTransform();
-        }
-
-        private void OnCameraChanged(object? sender, PropertyChangedEventArgs e)
-        {
-            AtualizarCameraTransform();
-        }
-
-        private void AtualizarCameraTransform()
-        {
-            if (_context?.Viewport == null)
-                return;
-
-            var camera = _context.Viewport.Camera;
-            _cameraTransform.Matrix = new Matrix(camera.Zoom, 0, 0, camera.Zoom, camera.Offset.X, camera.Offset.Y);
-            _viewportViewModel?.AtualizarZoomVisual(camera.Zoom);
-        }
-
-        private void OnLoaded(object sender, RoutedEventArgs e)
-        {
-            Focus();
-            Keyboard.Focus(this);
-            AtualizarViewport();
-            SizeChanged += (_, _) => AtualizarViewport();
-        }
-
-        private void AtualizarViewport()
-        {
-            if (_context?.Viewport == null)
-                return;
-
-            double largura = ActualWidth;
-            double altura = ActualHeight;
-
-            if (RootBorder != null)
-            {
-                largura -= RootBorder.BorderThickness.Left + RootBorder.BorderThickness.Right;
-                altura -= RootBorder.BorderThickness.Top + RootBorder.BorderThickness.Bottom;
-            }
-
-            largura = Math.Max(0, largura);
-            altura = Math.Max(0, altura);
-            _context.Viewport.AtualizarTamanho(new Size(largura, altura));
-        }
-
-        private Point GetWorldPos(MouseEventArgs e)
-        {
-            Point screen = e.GetPosition(this);
-            return _context?.Viewport?.ScreenToWorld(screen) ?? screen;
-        }
-
-        private void OnPreviewMouseDown(object sender, MouseButtonEventArgs e)
-        {
-            if (_context == null)
-                return;
-
-            if (OrigemEstaDentroDeTextoWidthHandle(e.OriginalSource as DependencyObject))
-                return;
-
-            if (_context.Navigation.TryHandleMiddleDoubleClick(e))
-            {
-                AtualizarCursorNavegacao();
-                LiberarCapturaMouse();
-                e.Handled = true;
-                return;
-            }
-
-            if (_context.Navigation.TryBeginMiddlePan(e, this))
-            {
-                Focus();
-                Keyboard.Focus(this);
-                AtualizarCursorNavegacao();
-                CaptureMouse();
-                e.Handled = true;
-            }
-        }
-
-        private void OnPreviewMouseLeftButtonDown(object sender, MouseButtonEventArgs e)
-        {
-            if (_context == null)
-                return;
-
-            if (OrigemEstaDentroDeTextoWidthHandle(e.OriginalSource as DependencyObject))
-                return;
-
-            if (_context.Navigation.TryBeginSpaceLeftPan(e, this))
-            {
-                Focus();
-                Keyboard.Focus(this);
-                AtualizarCursorNavegacao();
-                CaptureMouse();
-                e.Handled = true;
-                return;
-            }
-
-            if (_context.Navigation.IsPanning)
-            {
-                e.Handled = true;
-                return;
-            }
-
-            bool clicouDentroEditorInline = OrigemEstaDentroDeEditorInline(e.OriginalSource as DependencyObject);
-
-            if (ExisteEdicaoInlineAtiva())
-            {
-                if (clicouDentroEditorInline)
-                    return;
-
-                ConfirmarEdicaoInlineAtiva();
-            }
-
-            Point worldPosition = GetWorldPos(e);
-            ElementoViewModel? vm = ResolverElementoClicado(e.OriginalSource as DependencyObject, worldPosition);
-
-            if (e.ClickCount >= 2 && vm is TextoAnotativoViewModel texto)
-            {
-                IniciarEdicaoInlineTexto(texto);
-                e.Handled = true;
-                return;
-            }
-
-            Focus();
-            Keyboard.Focus(this);
-            ToolInputState inputState = CriarInputState(e, e.ChangedButton, e.ClickCount);
-            _context.Input.MouseDown(vm, worldPosition, inputState);
-            AtualizarCursorInteracao(worldPosition);
-            CaptureMouse();
-        }
-
-        private void OnPreviewMouseMove(object sender, MouseEventArgs e)
-        {
-            if (_context?.Navigation.TryUpdatePan(e, this) == true)
-            {
-                AtualizarCursorNavegacao();
-                e.Handled = true;
-                return;
-            }
-
-            if (_context == null)
-                return;
-
-            if (IsTextoWidthResizing)
-            {
-                Cursor = Cursors.SizeWE;
-                return;
-            }
-
-            if (IsTextoRotating)
-            {
-                Cursor = Cursors.Hand;
-                return;
-            }
-
-            if (ExisteEdicaoInlineAtiva())
-            {
-                AtualizarCursorInteracao(GetWorldPos(e));
-                return;
-            }
-
-            Point worldPosition = GetWorldPos(e);
-            _context.Input.MouseMove(worldPosition, CriarInputState(e));
-            AtualizarCursorInteracao(worldPosition);
-        }
-
-        private void OnPreviewMouseUp(object sender, MouseButtonEventArgs e)
-        {
-            if (_context?.Navigation.TryEndMiddlePan(e) != true)
-                return;
-
-            AtualizarCursorNavegacao();
-            LiberarCapturaMouse();
-            e.Handled = true;
-        }
-
-        private void OnPreviewMouseLeftButtonUp(object sender, MouseButtonEventArgs e)
-        {
-            if (IsTextoWidthResizing || IsTextoRotating)
-                return;
-
-            if (_context?.Navigation.TryEndSpaceLeftPan(e) == true)
-            {
-                AtualizarCursorNavegacao();
-                LiberarCapturaMouse();
-                e.Handled = true;
-                return;
-            }
-
-            if (_context?.Navigation.ConsumeSuppressNextLeftButtonUp() == true)
-            {
-                e.Handled = true;
-                return;
-            }
-
-            if (_context?.Navigation.IsPanning == true)
-            {
-                e.Handled = true;
-                return;
-            }
-
-            if (ExisteEdicaoInlineAtiva())
-            {
-                LiberarCapturaMouse();
-                e.Handled = true;
-                return;
-            }
-
-            if (_context != null)
-            {
-                Point worldPosition = GetWorldPos(e);
-                _context.Input.MouseUp(worldPosition, CriarInputState(e, e.ChangedButton, e.ClickCount));
-                AtualizarCursorInteracao(worldPosition);
-            }
-
-            LiberarCapturaMouse();
-        }
-
-        private void OnPreviewMouseWheel(object sender, MouseWheelEventArgs e)
-        {
-            if (_context?.Navigation.TryHandleMouseWheel(e, this) != true)
-                return;
-
-            e.Handled = true;
-        }
-
-        private void OnPreviewKeyDown(object sender, KeyEventArgs e)
-        {
-            if (e.OriginalSource is TextBox textBox && textBox.DataContext is TextoAnotativoViewModel)
-                return;
-
-            if (ExisteEdicaoInlineAtiva())
-            {
-                if (e.Key == Key.Escape)
-                {
-                    CancelarEdicaoInlineAtiva();
-                    Focus();
-                    Keyboard.Focus(this);
-                    e.Handled = true;
-                }
-
-                return;
-            }
-
-            if (_context != null && e.Key == Key.Space && _context.Input.KeyDown(e.Key))
-            {
-                e.Handled = true;
-                return;
-            }
-
-            if (_context?.Navigation.TryHandleKeyDown(e) == true)
-            {
-                AtualizarCursorNavegacao();
-                e.Handled = true;
-                return;
-            }
-
-            if (_context == null)
-                return;
-
-            e.Handled = _context.Input.KeyDown(e.Key);
-
-            if (e.Handled && e.Key == Key.Escape)
-                LiberarCapturaMouse();
-        }
-
-        private void OnPreviewKeyUp(object sender, KeyEventArgs e)
-        {
-            if (_context?.Navigation.TryHandleKeyUp(e) != true)
-                return;
-
-            AtualizarCursorNavegacao();
-            LiberarCapturaMouse();
-            e.Handled = true;
-        }
-
-        private void OnMouseLeave(object sender, MouseEventArgs e)
-        {
-            if (ExisteEdicaoInlineAtiva() || IsTextoWidthResizing || IsTextoRotating)
-                return;
-
-            _context?.Hover.Clear();
-            _context?.TerminalSnap.Limpar();
-            _context?.AlignmentGuides.Limpar();
-            _context?.LinhaEndpointEdit.LimparSnapInsercao();
-            _context?.Navigation.CancelPan();
-            AtualizarCursorNavegacao();
-        }
-
-        private void OnUnloaded(object sender, RoutedEventArgs e)
-        {
-            ConfirmarEdicaoInlineAtiva();
-            CancelarResizeLarguraTexto();
-            CancelarRotacaoTexto();
-            _context?.Navigation.Reset();
-            _context?.AlignmentGuides.Limpar();
-            _context?.LinhaEndpointEdit.LimparSnapInsercao();
-            LiberarCapturaMouse();
-            Cursor = Cursors.Arrow;
-
-            if (_context?.Viewport != null)
-                _context.Viewport.Camera.PropertyChanged -= OnCameraChanged;
-        }
-
-        private void AtualizarCursorInteracao(Point worldPosition)
-        {
-            if (IsTextoWidthResizing)
-            {
-                Cursor = Cursors.SizeWE;
-                return;
-            }
-
-            if (IsTextoRotating)
-            {
-                Cursor = Cursors.Hand;
-                return;
-            }
-
-            if (ExisteEdicaoInlineAtiva())
-            {
-                Cursor = Cursors.IBeam;
-                return;
-            }
-
-            if (_context?.Navigation.IsPanning == true || _context?.Navigation.IsSpacePressed == true)
-            {
-                Cursor = Cursors.ScrollAll;
-                return;
-            }
-
-            Cursor = _context?.BarraResize.GetCursor(worldPosition) ?? Cursors.Arrow;
-        }
-
-        private void AtualizarCursorNavegacao()
-        {
-            if (_context?.Navigation.IsPanning == true || _context?.Navigation.IsSpacePressed == true)
-                Cursor = Cursors.ScrollAll;
-            else
-                Cursor = Cursors.Arrow;
-        }
-
-        private void LiberarCapturaMouse()
-        {
-            if (IsMouseCaptured)
-                ReleaseMouseCapture();
-        }
-
-        private ToolInputState CriarInputState(MouseEventArgs e, MouseButton? button = null, int clickCount = 0)
-        {
-            Point screenPosition = e.GetPosition(this);
-            Point worldPosition = _context?.Viewport?.ScreenToWorld(screenPosition) ?? screenPosition;
-            return new ToolInputState(Keyboard.Modifiers, button, clickCount, worldPosition, screenPosition);
-        }
-
-        private ElementoViewModel? ResolverElementoClicado(DependencyObject? origem, Point worldPosition)
-        {
-            ElementoViewModel? visual = EncontrarElemento(origem);
-
-            if (visual is not RetanguloAnotativoViewModel && visual is not CirculoAnotativoViewModel)
-                return visual;
-
-            return _context?.SceneQueries.HitTest(worldPosition)?.Elemento;
-        }
-
-        private void IniciarEdicaoInlineTexto(TextoAnotativoViewModel texto)
-        {
-            if (_context == null)
-                return;
-
-            ConfirmarEdicaoInlineAtiva();
-            _context.Selection.Selecionar(texto);
-            _context.Hover.Clear();
-            texto.IniciarEdicaoInline();
-            LiberarCapturaMouse();
-            Dispatcher.BeginInvoke(new Action(() => FocarTextBoxInline(texto)));
-        }
-
-        private void FocarTextBoxInline(TextoAnotativoViewModel texto)
-        {
-            TextBox? textBox = EncontrarTextBoxInline(WorldLayer, texto);
-
-            if (textBox == null || !texto.IsEditingInline)
-                return;
-
-            textBox.Focus();
-            Keyboard.Focus(textBox);
-            textBox.SelectAll();
-        }
-
-        private void OnInlineTextBoxLoaded(object sender, RoutedEventArgs e)
-        {
-            if (sender is TextBox textBox && textBox.DataContext is TextoAnotativoViewModel texto && texto.IsEditingInline)
-            {
-                Dispatcher.BeginInvoke(new Action(() =>
-                {
-                    if (!texto.IsEditingInline)
-                        return;
-
-                    textBox.Focus();
-                    Keyboard.Focus(textBox);
-                    textBox.SelectAll();
-                }));
-            }
-        }
-
-
-        private void OnInlineTextBoxMouseDoubleClick(object sender, MouseButtonEventArgs e)
-        {
-            if (sender is not TextBox textBox || textBox.DataContext is not TextoAnotativoViewModel texto || !texto.IsEditingInline)
-                return;
-
-            textBox.SelectAll();
-            e.Handled = true;
-        }
-
-        private void OnInlineTextBoxPreviewKeyDown(object sender, KeyEventArgs e)
-        {
-            if (sender is not TextBox textBox || textBox.DataContext is not TextoAnotativoViewModel texto)
-                return;
-
-            if (e.Key == Key.Enter && Keyboard.Modifiers.HasFlag(ModifierKeys.Shift))
-                return;
-
-            if (e.Key == Key.Enter)
-            {
-                ConfirmarEdicaoInlineTexto(texto);
-                Focus();
-                Keyboard.Focus(this);
-                e.Handled = true;
-                return;
-            }
-
-            if (e.Key == Key.Escape)
-            {
-                CancelarEdicaoInlineTexto(texto);
-                Focus();
-                Keyboard.Focus(this);
-                e.Handled = true;
-            }
-        }
-
-        private void OnInlineTextBoxLostKeyboardFocus(object sender, KeyboardFocusChangedEventArgs e)
-        {
-            if (sender is not TextBox { DataContext: TextoAnotativoViewModel texto })
-                return;
-
-            if (_cancelInlineTextInProgress || _commitInlineTextInProgress || !texto.IsEditingInline)
-                return;
-
-            if (e.NewFocus is DependencyObject novoFoco && OrigemEstaDentroDeEditorInline(novoFoco))
-                return;
-
-            Dispatcher.BeginInvoke(new Action(() =>
-            {
-                if (!_cancelInlineTextInProgress && !_commitInlineTextInProgress && texto.IsEditingInline)
-                    ConfirmarEdicaoInlineTexto(texto);
-            }));
-        }
-
-
-        private void OnTextoRotationHandleDragStarted(object sender, DragStartedEventArgs e)
-        {
-            if (sender is not Thumb { DataContext: TextoAnotativoViewModel texto } || _context == null)
-                return;
-
-            ConfirmarEdicaoInlineAtiva();
-            _context.Selection.Selecionar(texto);
-            _context.Hover.Clear();
-            _textoRotationAtivo = texto;
-            _textoRotationEstadoInicial = texto.CapturarEstado();
-            AplicarRotacaoTextoPorMouse(texto);
-            Cursor = Cursors.Hand;
-            e.Handled = true;
-        }
-
-        private void OnTextoRotationHandleDragDelta(object sender, DragDeltaEventArgs e)
-        {
-            if (_textoRotationAtivo == null)
-                return;
-
-            AplicarRotacaoTextoPorMouse(_textoRotationAtivo);
-            _context?.SceneQueries.Invalidate();
-            _viewportViewModel?.AtualizarViewModel(_textoRotationAtivo.Modelo);
-            Cursor = Cursors.Hand;
-            e.Handled = true;
-        }
-
-        private void OnTextoRotationHandleDragCompleted(object sender, DragCompletedEventArgs e)
-        {
-            if (_textoRotationAtivo == null || _textoRotationEstadoInicial == null || _context == null)
-                return;
-
-            TextoAnotativoViewModel texto = _textoRotationAtivo;
-            ElementoEstado antes = _textoRotationEstadoInicial;
-            ElementoEstado depois = texto.CapturarEstado();
-
-            _textoRotationAtivo = null;
-            _textoRotationEstadoInicial = null;
-            AtualizarCursorNavegacao();
-
-            if (Math.Abs(NormalizarAngulo(depois.Rotacao - antes.Rotacao)) < 0.000001)
-            {
-                texto.AplicarEstado(antes);
-                _context.SceneQueries.Invalidate();
-                _viewportViewModel?.AtualizarViewModel(texto.Modelo);
-                e.Handled = true;
-                return;
-            }
-
-            texto.AplicarEstado(antes);
-            _context.SceneQueries.Invalidate();
-            _viewportViewModel?.AtualizarViewModel(texto.Modelo);
-            _context.RotacionarElemento.Executar(new[] { new RotacionarElementoItem(texto.Modelo, antes, depois) }, _context.VisualUpdates.AtualizarElementoRotacionado);
-            e.Handled = true;
-        }
-
-        private void AplicarRotacaoTextoPorMouse(TextoAnotativoViewModel texto)
-        {
-            Point screen = Mouse.GetPosition(this);
-            Point world = _context?.Viewport?.ScreenToWorld(screen) ?? screen;
-            texto.Rotacao = CalcularRotacaoTexto(texto.Centro, world);
-        }
-
-        private static double CalcularRotacaoTexto(Point centro, Point mouse)
-        {
-            double dx = mouse.X - centro.X;
-            double dy = mouse.Y - centro.Y;
-
-            if (Math.Abs(dx) < 0.000001 && Math.Abs(dy) < 0.000001)
-                return 0;
-
-            double angle = Math.Atan2(dy, dx) * 180.0 / Math.PI + 90.0;
-            return NormalizarAngulo(angle);
-        }
-
-        private static double NormalizarAngulo(double valor)
-        {
-            if (double.IsNaN(valor) || double.IsInfinity(valor))
-                return 0;
-
-            double normalizado = valor % 360.0;
-
-            if (normalizado < 0)
-                normalizado += 360.0;
-
-            return normalizado >= 360.0 ? 0 : normalizado;
-        }
-
-        private void CancelarRotacaoTexto()
-        {
-            if (_textoRotationAtivo == null || _textoRotationEstadoInicial == null)
-                return;
-
-            _textoRotationAtivo.AplicarEstado(_textoRotationEstadoInicial);
-            _context?.SceneQueries.Invalidate();
-            _viewportViewModel?.AtualizarViewModel(_textoRotationAtivo.Modelo);
-            _textoRotationAtivo = null;
-            _textoRotationEstadoInicial = null;
-        }
-
-        private void OnTextoWidthHandleDragStarted(object sender, DragStartedEventArgs e)
-        {
-            if (sender is not Thumb { DataContext: TextoAnotativoViewModel texto } thumb || _context == null)
-                return;
-
-            ConfirmarEdicaoInlineAtiva();
-            _context.Selection.Selecionar(texto);
-            _context.Hover.Clear();
-            _textoWidthResizeAtivo = texto;
-            _textoWidthResizeSide = ObterTextoResizeSide(thumb);
-            _textoWidthResizeXInicial = texto.X;
-            _textoWidthResizeYInicial = texto.Y;
-            _textoWidthResizeLarguraInicial = texto.LarguraCaixa;
-            _textoWidthResizeDeltaAcumulado = 0;
-            Cursor = Cursors.SizeWE;
-            e.Handled = true;
-        }
-
-        private void OnTextoWidthHandleDragDelta(object sender, DragDeltaEventArgs e)
-        {
-            if (_textoWidthResizeAtivo == null)
-                return;
-
-            double zoom = _context?.Viewport?.Camera.Zoom ?? 1;
-            double deltaWorld = CalcularDeltaLocalTexto(_textoWidthResizeAtivo, e.HorizontalChange, e.VerticalChange, zoom);
-            _textoWidthResizeDeltaAcumulado += deltaWorld;
-
-            if (_textoWidthResizeSide == TextoWidthResizeSide.Left)
-                AplicarResizeTextoEsquerda(_textoWidthResizeAtivo, _textoWidthResizeDeltaAcumulado);
-            else
-                AplicarResizeTextoDireita(_textoWidthResizeAtivo, _textoWidthResizeDeltaAcumulado);
-
-            _context?.SceneQueries.Invalidate();
-            _viewportViewModel?.AtualizarViewModel(_textoWidthResizeAtivo.Modelo);
-            Cursor = Cursors.SizeWE;
-            e.Handled = true;
-        }
-
-        private void OnTextoWidthHandleDragCompleted(object sender, DragCompletedEventArgs e)
-        {
-            if (_textoWidthResizeAtivo == null || _context == null)
-                return;
-
-            TextoAnotativoViewModel texto = _textoWidthResizeAtivo;
-            double xAntes = _textoWidthResizeXInicial;
-            double yAntes = _textoWidthResizeYInicial;
-            double larguraAntes = _textoWidthResizeLarguraInicial;
-            double xDepois = texto.X;
-            double yDepois = texto.Y;
-            double larguraDepois = texto.LarguraCaixa;
-
-            _textoWidthResizeAtivo = null;
-            _textoWidthResizeDeltaAcumulado = 0;
-            _textoWidthResizeSide = TextoWidthResizeSide.Right;
-            _context.SceneQueries.Invalidate();
-            _viewportViewModel?.AtualizarViewModel(texto.Modelo);
-            AtualizarCursorNavegacao();
-
-            var itens = new[]
-            {
-                new BulkPropertyChangeCommand.Item(texto, nameof(TextoAnotativoViewModel.X), xAntes, xDepois),
-                new BulkPropertyChangeCommand.Item(texto, nameof(TextoAnotativoViewModel.Y), yAntes, yDepois),
-                new BulkPropertyChangeCommand.Item(texto, nameof(TextoAnotativoViewModel.LarguraCaixa), larguraAntes, larguraDepois)
-            };
-
-            var command = new BulkPropertyChangeCommand(itens);
-
-            if (!command.IsEmpty && (Math.Abs(xAntes - xDepois) > 0.000001 || Math.Abs(yAntes - yDepois) > 0.000001 || Math.Abs(larguraAntes - larguraDepois) > 0.000001))
-                _context.Commands.Execute(command);
-
-            e.Handled = true;
-        }
-
-        private void AplicarResizeTextoDireita(TextoAnotativoViewModel texto, double deltaWorld)
-        {
-            double novaLargura = Math.Max(TextoAnotativo.LarguraCaixaMinima, _textoWidthResizeLarguraInicial + deltaWorld);
-            AplicarResizeTextoComArestaFixa(texto, novaLargura, false);
-        }
-
-        private void AplicarResizeTextoEsquerda(TextoAnotativoViewModel texto, double deltaWorld)
-        {
-            double novaLargura = Math.Max(TextoAnotativo.LarguraCaixaMinima, _textoWidthResizeLarguraInicial - deltaWorld);
-            AplicarResizeTextoComArestaFixa(texto, novaLargura, true);
-        }
-
-        private void AplicarResizeTextoComArestaFixa(TextoAnotativoViewModel texto, double novaLargura, bool fixaDireita)
-        {
-            double altura = Math.Max(1, texto.Altura);
-            Point centroInicial = new(_textoWidthResizeXInicial + _textoWidthResizeLarguraInicial / 2, _textoWidthResizeYInicial + altura / 2);
-            Vector eixo = ObterEixoLocalX(texto.Rotacao);
-            Point arestaFixa = fixaDireita
-                ? centroInicial + eixo * (_textoWidthResizeLarguraInicial / 2)
-                : centroInicial - eixo * (_textoWidthResizeLarguraInicial / 2);
-            Point novoCentro = fixaDireita
-                ? arestaFixa - eixo * (novaLargura / 2)
-                : arestaFixa + eixo * (novaLargura / 2);
-
-            texto.X = novoCentro.X - novaLargura / 2;
-            texto.Y = novoCentro.Y - altura / 2;
-            texto.LarguraCaixa = novaLargura;
-        }
-
-        private static double CalcularDeltaLocalTexto(TextoAnotativoViewModel texto, double horizontalScreen, double verticalScreen, double zoom)
-        {
-            double escala = zoom > 0 ? zoom : 1;
-            var delta = new Vector(horizontalScreen / escala, verticalScreen / escala);
-            Vector eixo = ObterEixoLocalX(texto.Rotacao);
-            return Vector.Multiply(delta, eixo);
-        }
-
-        private static Vector ObterEixoLocalX(double rotacao)
-        {
-            double radians = rotacao * Math.PI / 180.0;
-            return new Vector(Math.Cos(radians), Math.Sin(radians));
-        }
-
-        private void CancelarResizeLarguraTexto()
-        {
-            if (_textoWidthResizeAtivo == null)
-                return;
-
-            _textoWidthResizeAtivo.X = _textoWidthResizeXInicial;
-            _textoWidthResizeAtivo.Y = _textoWidthResizeYInicial;
-            _textoWidthResizeAtivo.LarguraCaixa = _textoWidthResizeLarguraInicial;
-            _context?.SceneQueries.Invalidate();
-            _viewportViewModel?.AtualizarViewModel(_textoWidthResizeAtivo.Modelo);
-            _textoWidthResizeAtivo = null;
-            _textoWidthResizeDeltaAcumulado = 0;
-            _textoWidthResizeSide = TextoWidthResizeSide.Right;
-        }
-
-        private bool ExisteEdicaoInlineAtiva()
-        {
-            return ObterTextoEmEdicaoInline() != null;
-        }
-
-        private TextoAnotativoViewModel? ObterTextoEmEdicaoInline()
-        {
-            if (_viewportViewModel == null)
-                return null;
-
-            foreach (ElementoViewModel elemento in _viewportViewModel.Elementos)
-            {
-                if (elemento is TextoAnotativoViewModel texto && texto.IsEditingInline)
-                    return texto;
-            }
-
-            return null;
-        }
-
-        private void ConfirmarEdicaoInlineAtiva()
-        {
-            TextoAnotativoViewModel? texto = ObterTextoEmEdicaoInline();
-
-            if (texto != null)
-                ConfirmarEdicaoInlineTexto(texto);
-        }
-
-        private void CancelarEdicaoInlineAtiva()
-        {
-            TextoAnotativoViewModel? texto = ObterTextoEmEdicaoInline();
-
-            if (texto != null)
-                CancelarEdicaoInlineTexto(texto);
-        }
-
-        private void CancelarEdicaoInlineTexto(TextoAnotativoViewModel texto)
-        {
-            if (!texto.IsEditingInline || _commitInlineTextInProgress || _cancelInlineTextInProgress)
-                return;
-
-            _cancelInlineTextInProgress = true;
-
-            try
-            {
-                texto.CancelarEdicaoInline();
-            }
-            finally
-            {
-                _cancelInlineTextInProgress = false;
-            }
-        }
-
-        private void ConfirmarEdicaoInlineTexto(TextoAnotativoViewModel texto)
-        {
-            if (_context == null || !texto.IsEditingInline || _commitInlineTextInProgress || _cancelInlineTextInProgress)
-                return;
-
-            bool elementoExcluido = false;
-            _commitInlineTextInProgress = true;
-
-            try
-            {
-                string valorAntes = texto.Conteudo;
-                string valorDepois = texto.ConteudoEdicao ?? string.Empty;
-                texto.EncerrarEdicaoInline();
-
-                if (string.IsNullOrWhiteSpace(valorDepois))
-                {
-                    _context.Selection.Selecionar(texto);
-                    elementoExcluido = _context.SafeDelete.DeleteSelection();
-                    return;
-                }
-
-                if (valorAntes == valorDepois)
-                    return;
-
-                var command = new BulkPropertyChangeCommand(new[]
-                {
-                    new BulkPropertyChangeCommand.Item(texto, nameof(TextoAnotativoViewModel.Conteudo), valorAntes, valorDepois)
-                });
-
-                if (!command.IsEmpty)
-                    _context.Commands.Execute(command);
-            }
-            finally
-            {
-                _commitInlineTextInProgress = false;
-                _context.SceneQueries.Invalidate();
-
-                if (!elementoExcluido)
-                    _viewportViewModel?.AtualizarViewModel(texto.Modelo);
-            }
-        }
-
-        private static TextoWidthResizeSide ObterTextoResizeSide(Thumb thumb)
-        {
-            return string.Equals(thumb.Tag?.ToString(), "Left", StringComparison.OrdinalIgnoreCase)
-                ? TextoWidthResizeSide.Left
-                : TextoWidthResizeSide.Right;
-        }
-
-        private static bool OrigemEstaDentroDeEditorInline(DependencyObject? origem)
-        {
-            while (origem != null)
-            {
-                if (origem is TextBox { DataContext: TextoAnotativoViewModel texto } && texto.IsEditingInline)
-                    return true;
-
-                origem = VisualTreeHelper.GetParent(origem);
-            }
-
-            return false;
-        }
-
-        private static bool OrigemEstaDentroDeTextoWidthHandle(DependencyObject? origem)
-        {
-            while (origem != null)
-            {
-                if (origem is Thumb { DataContext: TextoAnotativoViewModel })
-                    return true;
-
-                origem = VisualTreeHelper.GetParent(origem);
-            }
-
-            return false;
-        }
-
-        private static TextBox? EncontrarTextBoxInline(DependencyObject origem, TextoAnotativoViewModel texto)
-        {
-            int count = VisualTreeHelper.GetChildrenCount(origem);
-
-            for (int i = 0; i < count; i++)
-            {
-                DependencyObject child = VisualTreeHelper.GetChild(origem, i);
-
-                if (child is TextBox textBox && ReferenceEquals(textBox.DataContext, texto))
-                    return textBox;
-
-                TextBox? result = EncontrarTextBoxInline(child, texto);
-
-                if (result != null)
-                    return result;
-            }
-
-            return null;
-        }
-
-        private static ElementoViewModel? EncontrarElemento(DependencyObject? origem)
-        {
-            while (origem != null)
-            {
-                if (origem is FrameworkElement fe && fe.DataContext is ElementoViewModel vm)
-                    return vm;
-
-                origem = VisualTreeHelper.GetParent(origem);
-            }
-
-            return null;
-        }
-
-        private enum TextoWidthResizeSide
-        {
-            Left,
-            Right
-        }
-    }
-}
-
 
 

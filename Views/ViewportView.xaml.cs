@@ -24,6 +24,8 @@ namespace Araci.Views
         private TextoAnotativoViewModel? _textoWidthResizeAtivo;
         private TextoAnotativoViewModel? _textoRotationAtivo;
         private ElementoEstado? _textoRotationEstadoInicial;
+        private TextoAnotativoViewModel? _textoLeaderEditAtivo;
+        private ElementoEstado? _textoLeaderEstadoInicial;
         private TextoWidthResizeSide _textoWidthResizeSide = TextoWidthResizeSide.Right;
         private double _textoWidthResizeXInicial;
         private double _textoWidthResizeYInicial;
@@ -47,6 +49,7 @@ namespace Araci.Views
 
         private bool IsTextoWidthResizing => _textoWidthResizeAtivo != null;
         private bool IsTextoRotating => _textoRotationAtivo != null;
+        private bool IsTextoLeaderEditing => _textoLeaderEditAtivo != null;
 
         private void ConfigurarCamera()
         {
@@ -54,6 +57,7 @@ namespace Araci.Views
                 return;
 
             WorldLayer.RenderTransform = _cameraTransform;
+            LeaderLayer.RenderTransform = _cameraTransform;
             AlignmentGuideLayer.RenderTransform = _cameraTransform;
             SelectionLayer.RenderTransform = _cameraTransform;
             CableVertexHandleLayer.RenderTransform = _cameraTransform;
@@ -210,7 +214,7 @@ namespace Araci.Views
                 return;
             }
 
-            if (IsTextoRotating)
+            if (IsTextoRotating || IsTextoLeaderEditing)
             {
                 Cursor = Cursors.Hand;
                 return;
@@ -239,7 +243,7 @@ namespace Araci.Views
 
         private void OnPreviewMouseLeftButtonUp(object sender, MouseButtonEventArgs e)
         {
-            if (IsTextoWidthResizing || IsTextoRotating)
+            if (IsTextoWidthResizing || IsTextoRotating || IsTextoLeaderEditing)
                 return;
 
             if (_context?.Navigation.TryEndSpaceLeftPan(e) == true)
@@ -339,7 +343,7 @@ namespace Araci.Views
 
         private void OnMouseLeave(object sender, MouseEventArgs e)
         {
-            if (ExisteEdicaoInlineAtiva() || IsTextoWidthResizing || IsTextoRotating)
+            if (ExisteEdicaoInlineAtiva() || IsTextoWidthResizing || IsTextoRotating || IsTextoLeaderEditing)
                 return;
 
             _context?.Hover.Clear();
@@ -355,6 +359,7 @@ namespace Araci.Views
             ConfirmarEdicaoInlineAtiva();
             CancelarResizeLarguraTexto();
             CancelarRotacaoTexto();
+            CancelarEdicaoLeaderTexto();
             _context?.Navigation.Reset();
             _context?.AlignmentGuides.Limpar();
             _context?.LinhaEndpointEdit.LimparSnapInsercao();
@@ -373,7 +378,7 @@ namespace Araci.Views
                 return;
             }
 
-            if (IsTextoRotating)
+            if (IsTextoRotating || IsTextoLeaderEditing)
             {
                 Cursor = Cursors.Hand;
                 return;
@@ -520,6 +525,92 @@ namespace Araci.Views
             }));
         }
 
+
+        private void OnTextoLeaderHandleDragStarted(object sender, DragStartedEventArgs e)
+        {
+            if (sender is not Thumb { DataContext: TextoAnotativoViewModel texto } || _context == null)
+                return;
+
+            ConfirmarEdicaoInlineAtiva();
+            _context.Selection.Selecionar(texto);
+            _context.Hover.Clear();
+            _textoLeaderEditAtivo = texto;
+            _textoLeaderEstadoInicial = texto.CapturarEstado();
+            AplicarLeaderTextoPorMouse(texto);
+            Cursor = Cursors.Hand;
+            e.Handled = true;
+        }
+
+        private void OnTextoLeaderHandleDragDelta(object sender, DragDeltaEventArgs e)
+        {
+            if (_textoLeaderEditAtivo == null)
+                return;
+
+            AplicarLeaderTextoPorMouse(_textoLeaderEditAtivo);
+            _context?.SceneQueries.Invalidate();
+            _viewportViewModel?.AtualizarViewModel(_textoLeaderEditAtivo.Modelo);
+            Cursor = Cursors.Hand;
+            e.Handled = true;
+        }
+
+        private void OnTextoLeaderHandleDragCompleted(object sender, DragCompletedEventArgs e)
+        {
+            if (_textoLeaderEditAtivo == null || _textoLeaderEstadoInicial == null || _context == null)
+                return;
+
+            TextoAnotativoViewModel texto = _textoLeaderEditAtivo;
+            ElementoEstado antes = _textoLeaderEstadoInicial;
+            ElementoEstado depois = texto.CapturarEstado();
+
+            _textoLeaderEditAtivo = null;
+            _textoLeaderEstadoInicial = null;
+            AtualizarCursorNavegacao();
+
+            if (Math.Abs(depois.TextoLeaderX - antes.TextoLeaderX) < 0.000001 && Math.Abs(depois.TextoLeaderY - antes.TextoLeaderY) < 0.000001)
+            {
+                texto.AplicarEstado(antes);
+                _context.SceneQueries.Invalidate();
+                _viewportViewModel?.AtualizarViewModel(texto.Modelo);
+                e.Handled = true;
+                return;
+            }
+
+            texto.AplicarEstado(antes);
+            _context.SceneQueries.Invalidate();
+            _viewportViewModel?.AtualizarViewModel(texto.Modelo);
+
+            var itens = new[]
+            {
+                new BulkPropertyChangeCommand.Item(texto, nameof(TextoAnotativoViewModel.LeaderX), antes.TextoLeaderX, depois.TextoLeaderX),
+                new BulkPropertyChangeCommand.Item(texto, nameof(TextoAnotativoViewModel.LeaderY), antes.TextoLeaderY, depois.TextoLeaderY)
+            };
+
+            var command = new BulkPropertyChangeCommand(itens);
+
+            if (!command.IsEmpty)
+                _context.Commands.Execute(command);
+
+            e.Handled = true;
+        }
+
+        private void AplicarLeaderTextoPorMouse(TextoAnotativoViewModel texto)
+        {
+            Point screen = Mouse.GetPosition(this);
+            Point world = _context?.Viewport?.ScreenToWorld(screen) ?? screen;
+            texto.LeaderPoint = world;
+        }
+
+        private void CancelarEdicaoLeaderTexto()
+        {
+            if (_textoLeaderEditAtivo == null || _textoLeaderEstadoInicial == null)
+                return;
+
+            _textoLeaderEditAtivo.AplicarEstado(_textoLeaderEstadoInicial);
+            _context?.SceneQueries.Invalidate();
+            _viewportViewModel?.AtualizarViewModel(_textoLeaderEditAtivo.Modelo);
+            _textoLeaderEditAtivo = null;
+            _textoLeaderEstadoInicial = null;
+        }
 
         private void OnTextoRotationHandleDragStarted(object sender, DragStartedEventArgs e)
         {

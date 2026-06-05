@@ -232,6 +232,7 @@ namespace Araci.ViewModels
         public Point LeaderFimLocal => WorldToLocal(LeaderPoint);
         public Point LeaderInicioWorld => LocalToWorld(LeaderInicioLocal);
         public PointCollection LeaderArrowPoints => CalcularLeaderArrowPoints();
+        public PointCollection LeaderArrowWorldPoints => CalcularLeaderArrowWorldPoints();
 
         public bool IsEditingInline
         {
@@ -418,6 +419,24 @@ namespace Araci.ViewModels
             return new PointCollection { fim, p1, p2 };
         }
 
+        private PointCollection CalcularLeaderArrowWorldPoints()
+        {
+            Point fim = LeaderPoint;
+            Point inicio = LeaderInicioWorld;
+            Vector direcao = inicio - fim;
+
+            if (direcao.Length < 0.000001)
+                direcao = new Vector(0, -1);
+            else
+                direcao.Normalize();
+
+            Vector normal = new(-direcao.Y, direcao.X);
+            Point p1 = fim + direcao * LeaderArrowLength + normal * LeaderArrowHalfWidth;
+            Point p2 = fim + direcao * LeaderArrowLength - normal * LeaderArrowHalfWidth;
+
+            return new PointCollection { fim, p1, p2 };
+        }
+
         private Point WorldToLocal(Point world)
         {
             double largura = Math.Max(1, Largura);
@@ -480,6 +499,7 @@ namespace Araci.ViewModels
             OnPropertyChanged(nameof(LeaderFimLocal));
             OnPropertyChanged(nameof(LeaderInicioWorld));
             OnPropertyChanged(nameof(LeaderArrowPoints));
+            OnPropertyChanged(nameof(LeaderArrowWorldPoints));
         }
 
         private void NotificarParametrosDeTipo()
