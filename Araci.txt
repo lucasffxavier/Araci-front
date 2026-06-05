@@ -474,151 +474,359 @@ Araci Engine
 
 
 ====================================================================================================
-ARQUIVO: C:\Araci-Engine-Front\Araci Engine\Applications\Factories\ElementoFactory.cs
+ARQUIVO: C:\Araci-Engine-Front\Araci Engine\Applications\Editar\Selecionar\SelecionarTool.cs
 ====================================================================================================
 
 using System;
-using Araci.Applications.Abstractions;
-using Araci.Models;
+using System.Windows;
+using System.Windows.Input;
+using Araci.Applications.Editar.Base;
+using Araci.Core.SceneQueries;
+using Araci.Services;
+using Araci.ViewModels;
+using Araci.Services.Editing;
+
+namespace Araci.Applications.Editar.Selecionar
+{
+    public class SelecionarTool : ITool
+    {
+        private readonly ISceneQueryService _queries;
+        private readonly SelectionController _selection;
+        private readonly SelectionBoxController _selectionBox;
+        private readonly DragMoveController _dragMove;
+        private readonly CableVertexEditService _cableVertexEdit;
+        private readonly LinhaEndpointEditService _linhaEndpointEdit;
+        private readonly RetanguloResizeService _retanguloResize;
+        private readonly CirculoResizeService _circuloResize;
+        private readonly BarraResizeService _barraResize;
+        private readonly AlignmentGuideService _alignmentGuides;
+        private readonly RotationService _rotation;
+        private readonly bool _modoSoMover;
+
+        public SelecionarTool(ISceneQueryService queries, SelectionService selection, SelectionBoxViewModel selectionBox, CableVertexEditService cableVertexEdit, LinhaEndpointEditService linhaEndpointEdit, RetanguloResizeService retanguloResize, CirculoResizeService circuloResize, BarraResizeService barraResize, MoveService move, MoveHudService moveHud, AlignmentGuideService alignmentGuides, MoveConstraintService moveConstraints, RotationService rotation, bool modoSoMover = false, bool mostrarHud = false)
+        {
+            _queries = queries ?? throw new ArgumentNullException(nameof(queries));
+            _selection = new SelectionController(selection ?? throw new ArgumentNullException(nameof(selection)));
+            _selectionBox = new SelectionBoxController(selectionBox ?? throw new ArgumentNullException(nameof(selectionBox)), _queries, selection);
+            _cableVertexEdit = cableVertexEdit ?? throw new ArgumentNullException(nameof(cableVertexEdit));
+            _linhaEndpointEdit = linhaEndpointEdit ?? throw new ArgumentNullException(nameof(linhaEndpointEdit));
+            _retanguloResize = retanguloResize ?? throw new ArgumentNullException(nameof(retanguloResize));
+            _circuloResize = circuloResize ?? throw new ArgumentNullException(nameof(circuloResize));
+            _barraResize = barraResize ?? throw new ArgumentNullException(nameof(barraResize));
+            _alignmentGuides = alignmentGuides ?? throw new ArgumentNullException(nameof(alignmentGuides));
+            _rotation = rotation ?? throw new ArgumentNullException(nameof(rotation));
+            _dragMove = new DragMoveController(selection, move ?? throw new ArgumentNullException(nameof(move)), moveHud ?? throw new ArgumentNullException(nameof(moveHud)), _alignmentGuides, moveConstraints ?? throw new ArgumentNullException(nameof(moveConstraints)), mostrarHud);
+            _modoSoMover = modoSoMover;
+        }
+
+        public string Nome => "Selecionar";
+        public bool MantemBotaoAtivado => true;
+
+        public bool IsBusy =>
+            _barraResize.IsResizing ||
+            _retanguloResize.IsResizing ||
+            _circuloResize.IsResizing ||
+            _linhaEndpointEdit.IsEditing ||
+            _dragMove.IsActive ||
+            _selectionBox.IsActive ||
+            _cableVertexEdit.IsEditing;
+
+        public void Ativar()
+        {
+            _linhaEndpointEdit.Refresh();
+            _retanguloResize.Refresh();
+            _circuloResize.Refresh();
+
+            if (!_modoSoMover)
+                _cableVertexEdit.Refresh();
+        }
+
+        public void Desativar()
+        {
+            Cancelar();
+            _linhaEndpointEdit.Clear();
+            _retanguloResize.Clear();
+            _circuloResize.Clear();
+            _cableVertexEdit.Clear();
+        }
+
+        public void Cancelar()
+        {
+            _barraResize.Cancel();
+            _retanguloResize.Cancel();
+            _circuloResize.Cancel();
+            _linhaEndpointEdit.Cancel();
+            _dragMove.Cancel();
+            _selectionBox.Cancel();
+            _cableVertexEdit.Cancel();
+            RefreshEditHandles();
+            _alignmentGuides.Limpar();
+        }
+
+        public void OnMouseDown(ElementoViewModel? vm, Point position, ToolInputState inputState)
+        {
+            bool ctrl = inputState.IsControlPressed;
+            bool shift = inputState.IsShiftPressed;
+
+            if (!_modoSoMover && _barraResize.TryBegin(position))
+                return;
+
+            if (_circuloResize.TryBegin(position))
+            {
+                _linhaEndpointEdit.Clear();
+                _retanguloResize.Clear();
+                _cableVertexEdit.Clear();
+                return;
+            }
+
+            if (_retanguloResize.TryBegin(position))
+            {
+                _linhaEndpointEdit.Clear();
+                _circuloResize.Clear();
+                _cableVertexEdit.Clear();
+                return;
+            }
+
+            if (_linhaEndpointEdit.TryBegin(position))
+            {
+                _retanguloResize.Clear();
+                _circuloResize.Clear();
+                _cableVertexEdit.Clear();
+                return;
+            }
+
+            if (!_modoSoMover && inputState.IsAltPressed && _cableVertexEdit.TryRemoveHandle(position))
+                return;
+
+            if (!_modoSoMover && ctrl && _cableVertexEdit.TryInsertVertex(position))
+                return;
+
+            if (!_modoSoMover && _cableVertexEdit.TryBegin(position))
+                return;
+
+            var hit = vm ?? _queries.HitTest(position)?.Elemento;
+
+            if (hit != null)
+            {
+                if (!_modoSoMover)
+                {
+                    bool podeMover = _selection.Select(hit, ctrl, shift);
+                    _cableVertexEdit.Clear();
+
+                    if (!podeMover)
+                    {
+                        RefreshEditHandles();
+                        return;
+                    }
+                }
+
+                _linhaEndpointEdit.Clear();
+                _retanguloResize.Clear();
+                _circuloResize.Clear();
+                _dragMove.Begin(position);
+                return;
+            }
+
+            if (_modoSoMover)
+                return;
+
+            _selectionBox.Begin(position, ctrl);
+        }
+
+        public void OnMouseMove(Point position, ToolInputState inputState)
+        {
+            if (_barraResize.IsResizing)
+            {
+                _barraResize.Update(position);
+                return;
+            }
+
+            if (_circuloResize.IsResizing)
+            {
+                _circuloResize.Update(position);
+                return;
+            }
+
+            if (_retanguloResize.IsResizing)
+            {
+                _retanguloResize.Update(position, inputState);
+                return;
+            }
+
+            if (_linhaEndpointEdit.IsEditing)
+            {
+                _linhaEndpointEdit.Update(position, inputState);
+                return;
+            }
+
+            if (_cableVertexEdit.IsEditing)
+            {
+                _cableVertexEdit.Update(position, inputState);
+                return;
+            }
+
+            if (_dragMove.IsActive)
+            {
+                _dragMove.Update(position, inputState);
+                return;
+            }
+
+            if (_selectionBox.IsActive)
+                _selectionBox.Update(position);
+        }
+
+        public void OnMouseUp(Point position, ToolInputState inputState)
+        {
+            if (_barraResize.IsResizing)
+            {
+                _barraResize.End();
+                RefreshEditHandles();
+                return;
+            }
+
+            if (_circuloResize.IsResizing)
+            {
+                _circuloResize.End();
+                _linhaEndpointEdit.Refresh();
+                _retanguloResize.Refresh();
+                _cableVertexEdit.Refresh();
+                return;
+            }
+
+            if (_retanguloResize.IsResizing)
+            {
+                _retanguloResize.End();
+                _linhaEndpointEdit.Refresh();
+                _circuloResize.Refresh();
+                _cableVertexEdit.Refresh();
+                return;
+            }
+
+            if (_linhaEndpointEdit.IsEditing)
+            {
+                _linhaEndpointEdit.End();
+                _retanguloResize.Refresh();
+                _circuloResize.Refresh();
+                _cableVertexEdit.Refresh();
+                return;
+            }
+
+            if (_cableVertexEdit.IsEditing)
+            {
+                _cableVertexEdit.End();
+                return;
+            }
+
+            if (_dragMove.IsActive)
+            {
+                _dragMove.End();
+                RefreshEditHandles();
+            }
+
+            if (_selectionBox.IsActive)
+            {
+                _selectionBox.End();
+                RefreshEditHandles();
+            }
+        }
+
+        public void OnKeyDown(Key key)
+        {
+            if (!_modoSoMover && key == Key.Space)
+            {
+                _rotation.RotateSelectionClockwise();
+                RefreshEditHandles();
+                return;
+            }
+
+            if (!_modoSoMover && key == Key.Delete)
+                _cableVertexEdit.TryRemoveActive();
+        }
+
+        private void RefreshEditHandles()
+        {
+            _linhaEndpointEdit.Refresh();
+            _retanguloResize.Refresh();
+            _circuloResize.Refresh();
+            _cableVertexEdit.Refresh();
+        }
+    }
+}
+
+
+====================================================================================================
+ARQUIVO: C:\Araci-Engine-Front\Araci Engine\Core\Commands\BulkPropertyChangeCommand.cs
+====================================================================================================
+
+﻿using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Reflection;
 using Araci.ViewModels;
 
-namespace Araci.Applications.Factories
+namespace Araci.Core.Commands
 {
-    public class ElementoFactory
+    public class BulkPropertyChangeCommand : IUndoableCommand
     {
-        private readonly IElementModelFactory _modelFactory;
-        private readonly IElementViewModelFactory _viewModelFactory;
+        private readonly IReadOnlyList<Item> _items;
 
-        public ElementoFactory(IElementModelFactory modelFactory, IElementViewModelFactory viewModelFactory)
+        public BulkPropertyChangeCommand(IEnumerable<Item> items)
         {
-            _modelFactory = modelFactory ?? throw new ArgumentNullException(nameof(modelFactory));
-            _viewModelFactory = viewModelFactory ?? throw new ArgumentNullException(nameof(viewModelFactory));
+            _items = items?.Where(i => i.Elemento != null && !string.IsNullOrWhiteSpace(i.PropertyName)).ToList() ?? throw new ArgumentNullException(nameof(items));
         }
 
-        public Elemento CriarModelo(string kind)
+        public bool IsEmpty => _items.Count == 0;
+
+        public void Execute()
         {
-            return _modelFactory.CreateModel(kind);
+            AplicarDepois();
         }
 
-        public TModel CriarModelo<TModel>(string kind) where TModel : Elemento
+        public void Undo()
         {
-            return _modelFactory.CreateModel<TModel>(kind);
+            for (int i = _items.Count - 1; i >= 0; i--)
+                Aplicar(_items[i], _items[i].ValorAntes);
         }
 
-        public ElementoViewModel? CriarViewModel(Elemento modelo)
+        public void Redo()
         {
-            return _viewModelFactory.CreateViewModel(modelo);
+            AplicarDepois();
         }
 
-        public TViewModel CriarViewModel<TViewModel>(string kind) where TViewModel : ElementoViewModel
+        private void AplicarDepois()
         {
-            return _viewModelFactory.CreateViewModel<TViewModel>(kind);
+            foreach (var item in _items)
+                Aplicar(item, item.ValorDepois);
         }
 
-        public ElementoViewModel CriarViewModel(string kind)
+        private static void Aplicar(Item item, object? valor)
         {
-            Elemento modelo = CriarModelo(kind);
-            return CriarViewModel(modelo) ?? throw new InvalidOperationException($"Nao foi possivel criar ViewModel para o elemento '{kind}'.");
+            PropertyInfo? prop = item.Elemento.GetType().GetProperty(item.PropertyName, BindingFlags.Instance | BindingFlags.Public);
+
+            if (prop == null || !prop.CanWrite || prop.GetIndexParameters().Length > 0)
+                return;
+
+            prop.SetValue(item.Elemento, valor);
+            item.Elemento.NotificarPropriedades(item.PropertyName);
+
+            if (item.PropertyName == nameof(ElementoViewModel.Tipo))
+                item.Elemento.NotificarPropriedades(nameof(ElementoViewModel.TipoViewModel));
         }
 
-        public Cabo CriarCabo()
+        public readonly struct Item
         {
-            return CriarModelo<Cabo>(ElementKinds.Cabo);
-        }
+            public Item(ElementoViewModel elemento, string propertyName, object? valorAntes, object? valorDepois)
+            {
+                Elemento = elemento ?? throw new ArgumentNullException(nameof(elemento));
+                PropertyName = propertyName ?? throw new ArgumentNullException(nameof(propertyName));
+                ValorAntes = valorAntes;
+                ValorDepois = valorDepois;
+            }
 
-        public CaboViewModel CriarCaboVM()
-        {
-            return CriarViewModel<CaboViewModel>(ElementKinds.Cabo);
-        }
-
-        public Carga CriarCarga()
-        {
-            return CriarModelo<Carga>(ElementKinds.Carga);
-        }
-
-        public CargaViewModel CriarCargaVM()
-        {
-            return CriarViewModel<CargaViewModel>(ElementKinds.Carga);
-        }
-
-        public Gerador CriarGerador()
-        {
-            return CriarModelo<Gerador>(ElementKinds.Gerador);
-        }
-
-        public GeradorViewModel CriarGeradorVM()
-        {
-            return CriarViewModel<GeradorViewModel>(ElementKinds.Gerador);
-        }
-
-        public Sin CriarSin()
-        {
-            return CriarModelo<Sin>(ElementKinds.Sin);
-        }
-
-        public SinViewModel CriarSinVM()
-        {
-            return CriarViewModel<SinViewModel>(ElementKinds.Sin);
-        }
-
-        public Transformador CriarTransformador()
-        {
-            return CriarModelo<Transformador>(ElementKinds.Transformador);
-        }
-
-        public TransformadorViewModel CriarTransformadorVM()
-        {
-            return CriarViewModel<TransformadorViewModel>(ElementKinds.Transformador);
-        }
-
-        public Barra CriarBarra()
-        {
-            return CriarModelo<Barra>(ElementKinds.Barra);
-        }
-
-        public BarraViewModel CriarBarraVM()
-        {
-            return CriarViewModel<BarraViewModel>(ElementKinds.Barra);
-        }
-
-        public LinhaAnotativa CriarLinhaAnotativa()
-        {
-            return CriarModelo<LinhaAnotativa>(ElementKinds.LinhaAnotativa);
-        }
-
-        public LinhaAnotativaViewModel CriarLinhaAnotativaVM()
-        {
-            return CriarViewModel<LinhaAnotativaViewModel>(ElementKinds.LinhaAnotativa);
-        }
-
-        public RetanguloAnotativo CriarRetanguloAnotativo()
-        {
-            return CriarModelo<RetanguloAnotativo>(ElementKinds.RetanguloAnotativo);
-        }
-
-        public RetanguloAnotativoViewModel CriarRetanguloAnotativoVM()
-        {
-            return CriarViewModel<RetanguloAnotativoViewModel>(ElementKinds.RetanguloAnotativo);
-        }
-
-        public CirculoAnotativo CriarCirculoAnotativo()
-        {
-            return CriarModelo<CirculoAnotativo>(ElementKinds.CirculoAnotativo);
-        }
-
-        public CirculoAnotativoViewModel CriarCirculoAnotativoVM()
-        {
-            return CriarViewModel<CirculoAnotativoViewModel>(ElementKinds.CirculoAnotativo);
-        }
-
-        public TextoAnotativo CriarTextoAnotativo()
-        {
-            return CriarModelo<TextoAnotativo>(ElementKinds.TextoAnotativo);
-        }
-
-        public TextoAnotativoViewModel CriarTextoAnotativoVM()
-        {
-            return CriarViewModel<TextoAnotativoViewModel>(ElementKinds.TextoAnotativo);
+            public ElementoViewModel Elemento { get; }
+            public string PropertyName { get; }
+            public object? ValorAntes { get; }
+            public object? ValorDepois { get; }
         }
     }
 }
@@ -700,11 +908,12 @@ namespace Araci.Models
         public const string PARAM_LARGURA_CAIXA = "LarguraCaixa";
         public const double LarguraCaixaPadrao = 200.0;
         public const double LarguraCaixaMinima = 20.0;
+        public const double MargemHorizontalCaixa = 8.0;
 
         public TextoAnotativo()
         {
             DefinirParametro(new Parameter<string>(PARAM_TEXTO, "Texto"));
-            DefinirParametro(new Parameter<double>(PARAM_LARGURA_CAIXA, LarguraCaixaPadrao));
+            DefinirParametro(new Parameter<double>(PARAM_LARGURA_CAIXA, CalcularLarguraNatural("Texto", 14.0)));
         }
 
         public string Texto
@@ -735,6 +944,21 @@ namespace Araci.Models
                 int linhas = Math.Max(1, ObterLinhasRenderizadas().Count);
                 return Math.Max(AlturaTexto, linhas * AlturaTexto * 1.25 + 4);
             }
+        }
+
+        public void AjustarLarguraAoConteudo()
+        {
+            LarguraCaixa = CalcularLarguraNatural(Texto, AlturaTexto);
+        }
+
+        public static double CalcularLarguraNatural(string? texto, double alturaTexto)
+        {
+            string normalizado = texto ?? string.Empty;
+            string[] linhas = normalizado.Replace("\r\n", "\n").Replace('\r', '\n').Split('\n');
+            int maiorLinha = Math.Max(1, linhas.Length == 0 ? 1 : linhas.Max(l => l.Length));
+            double altura = alturaTexto <= 0 ? 14.0 : alturaTexto;
+            double largura = maiorLinha * altura * 0.58 + MargemHorizontalCaixa;
+            return NormalizarLargura(largura);
         }
 
         public override Elemento Clonar()
@@ -803,7 +1027,7 @@ namespace Araci.Models
 
         private int CalcularCaracteresPorLinha()
         {
-            double larguraUtil = Math.Max(1, LarguraEstimada - 4);
+            double larguraUtil = Math.Max(1, LarguraEstimada - MargemHorizontalCaixa);
             double larguraMedia = Math.Max(1, AlturaTexto * 0.58);
             return Math.Max(1, (int)Math.Floor(larguraUtil / larguraMedia));
         }
@@ -819,6 +1043,450 @@ namespace Araci.Models
                 return LarguraCaixaPadrao;
 
             return Math.Max(LarguraCaixaMinima, valor);
+        }
+    }
+}
+
+
+
+====================================================================================================
+ARQUIVO: C:\Araci-Engine-Front\Araci Engine\Service\Editing\SelectionService.cs
+====================================================================================================
+
+using System;
+using System.Collections.Generic;
+using System.Collections.ObjectModel;
+using System.Linq;
+using Araci.Applications.Abstractions;
+using Araci.Applications.UseCases.Editar;
+using Araci.Core.Events;
+using Araci.Services.Settings;
+using Araci.ViewModels;
+
+namespace Araci.Services.Editing
+{
+    public class SelectionService : ISelectionService
+    {
+        private readonly EditorState _editorState;
+        private readonly IEventBus _events;
+        private readonly EditarPropriedadesUseCase _editarPropriedades;
+        private readonly EditorSettings _settings;
+        private readonly ObservableCollection<ElementoViewModel> _selecionados = new();
+
+        public SelectionService(
+            EditorState editorState,
+            IEventBus events,
+            EditarPropriedadesUseCase editarPropriedades,
+            EditorSettings? settings = null)
+        {
+            _editorState = editorState ?? throw new ArgumentNullException(nameof(editorState));
+            _events = events ?? throw new ArgumentNullException(nameof(events));
+            _editarPropriedades = editarPropriedades ?? throw new ArgumentNullException(nameof(editarPropriedades));
+            _settings = settings ?? new EditorSettings();
+        }
+
+        public IReadOnlyList<ElementoViewModel> Selecionados => _selecionados;
+        public ObservableCollection<ElementoViewModel> SelecionadosObservable => _selecionados;
+        public bool TemSelecionados => _selecionados.Count > 0;
+        public event Action? SelectionChanged;
+
+        public void RefreshProperties()
+        {
+            if (_selecionados.Count == 1)
+                _editorState.ElementoSelecionado = null;
+
+            AtualizarElementoSelecionado();
+        }
+
+        public void Selecionar(ElementoViewModel vm, bool adicionarAoExistente = false)
+        {
+            if (!adicionarAoExistente)
+                Limpar();
+
+            if (_selecionados.Contains(vm))
+            {
+                AtualizarElementoSelecionado();
+                return;
+            }
+
+            vm.IsSelecionado = true;
+            _selecionados.Add(vm);
+            AtualizarElementoSelecionado();
+            PublicarAlteracao();
+        }
+
+        public void Toggle(ElementoViewModel vm)
+        {
+            if (_selecionados.Contains(vm))
+            {
+                Deselecionar(vm);
+                return;
+            }
+
+            Selecionar(vm, true);
+        }
+
+        public void Deselecionar(ElementoViewModel vm)
+        {
+            if (!_selecionados.Contains(vm))
+                return;
+
+            vm.IsSelecionado = false;
+            _selecionados.Remove(vm);
+            AtualizarElementoSelecionado();
+            PublicarAlteracao();
+        }
+
+        public void Limpar()
+        {
+            if (_selecionados.Count == 0)
+                return;
+
+            foreach (var vm in _selecionados)
+                vm.IsSelecionado = false;
+
+            _selecionados.Clear();
+            AtualizarElementoSelecionado();
+            PublicarAlteracao();
+        }
+
+        private void AtualizarElementoSelecionado()
+        {
+            _editorState.ElementoSelecionado = _selecionados.Count switch
+            {
+                0 => null,
+                1 => CriarPainelSelecaoUnica(_selecionados[0]),
+                _ => new PropertiesViewModel(_selecionados, _editarPropriedades, _settings)
+            };
+        }
+
+        private object CriarPainelSelecaoUnica(ElementoViewModel vm)
+        {
+            return UsaPainelEspecifico(vm)
+                ? vm
+                : new PropertiesViewModel(_selecionados, _editarPropriedades, _settings);
+        }
+
+        private static bool UsaPainelEspecifico(ElementoViewModel vm)
+        {
+            return vm is BarraViewModel or
+                CaboViewModel or
+                CargaViewModel or
+                GeradorViewModel or
+                SinViewModel or
+                TransformadorViewModel;
+        }
+
+        private void PublicarAlteracao()
+        {
+            _events.Publish(new SelecaoAlteradaEvent(_selecionados.ToList()));
+            SelectionChanged?.Invoke();
+        }
+    }
+}
+
+
+
+====================================================================================================
+ARQUIVO: C:\Araci-Engine-Front\Araci Engine\ViewModels\ElementoViewModel.cs
+====================================================================================================
+
+using System;
+using System.Collections;
+using System.Collections.ObjectModel;
+using System.Linq;
+using System.Windows;
+using System.Windows.Input;
+using System.Windows.Media;
+using Araci.Core.Rendering;
+using Araci.Core.SceneNodes;
+using Araci.Models;
+using Araci.Models.Tipos;
+using Araci.Services;
+using Araci.ViewModels.Base;
+using Araci.ViewModels.VisualStates;
+using Araci.Services.UI;
+using Araci.Services.Catalog;
+using Araci.Services.Naming;
+
+namespace Araci.ViewModels
+{
+    public abstract class ElementoViewModel : ViewModelBase
+    {
+        private readonly ElementoNode _node;
+        private readonly NameService _names;
+        private readonly TypePropertiesDialogService _typePropertiesDialogs;
+        private ICommand? _abrirPropriedadesTipoCommand;
+        private ObservableCollection<ParameterViewModel>? _parametros;
+        private bool _isPreview;
+
+        protected ElementoViewModel(Elemento modelo, ElementoNode node, TypeLibraryService types, NameService names, TypePropertiesDialogService typePropertiesDialogs)
+        {
+            Modelo = modelo ?? throw new ArgumentNullException(nameof(modelo));
+            _node = node ?? throw new ArgumentNullException(nameof(node));
+            Types = types ?? throw new ArgumentNullException(nameof(types));
+            _names = names ?? throw new ArgumentNullException(nameof(names));
+            _typePropertiesDialogs = typePropertiesDialogs ?? throw new ArgumentNullException(nameof(typePropertiesDialogs));
+            VisualState = new ElementoVisualState();
+            _node.AtualizarGeometria();
+        }
+
+        public Elemento Modelo { get; }
+        public ElementoNode Node => _node;
+        protected TypeLibraryService Types { get; }
+
+        protected void RenomearModelo(string novoNome)
+        {
+            _names.Renomear(Modelo, novoNome);
+        }
+
+        public virtual TipoElemento Tipo
+        {
+            get => Modelo.Tipo!;
+            set
+            {
+                if (ReferenceEquals(Modelo.Tipo, value))
+                    return;
+
+                Modelo.Tipo = value;
+                OnPropertyChanged();
+                OnPropertyChanged(nameof(TipoViewModel));
+            }
+        }
+
+        public abstract IEnumerable TiposDisponiveis { get; }
+
+        public virtual TipoElementoViewModel? TipoViewModel => TipoElementoViewModelFactory.Criar(Tipo);
+
+        public ICommand AbrirPropriedadesTipoCommand => _abrirPropriedadesTipoCommand ??= new RelayCommand(AbrirPropriedadesTipo);
+
+        public ElementoVisualState VisualState { get; }
+
+        public bool IsSelecionado
+        {
+            get => VisualState.IsSelecionado;
+            set
+            {
+                if (VisualState.IsSelecionado == value)
+                    return;
+
+                VisualState.AtualizarSelecao(value);
+                OnPropertyChanged();
+                OnPropertyChanged(nameof(Stroke));
+                OnPropertyChanged(nameof(StrokeThickness));
+                OnPropertyChanged(nameof(RenderData));
+            }
+        }
+
+        public bool IsHover
+        {
+            get => VisualState.IsHover;
+            set
+            {
+                if (VisualState.IsHover == value)
+                    return;
+
+                VisualState.AtualizarHover(value);
+                OnPropertyChanged();
+                OnPropertyChanged(nameof(Stroke));
+                OnPropertyChanged(nameof(StrokeThickness));
+                OnPropertyChanged(nameof(RenderData));
+            }
+        }
+
+        public bool IsPreview
+        {
+            get => _isPreview;
+            set
+            {
+                if (_isPreview == value)
+                    return;
+
+                _isPreview = value;
+                OnPropertyChanged();
+                OnPropertyChanged(nameof(RenderData));
+            }
+        }
+
+        public Brush Stroke => VisualState.Stroke;
+        public double StrokeThickness => VisualState.StrokeThickness;
+
+        public virtual ElementoRenderData RenderData => new(Largura, Altura, PontoLocalInicial, PontoLocalFinal, Stroke, StrokeThickness);
+
+        public double Rotacao
+        {
+            get => Modelo.Rotacao;
+            set
+            {
+                if (Math.Abs(Modelo.Rotacao - value) < 0.0001)
+                    return;
+
+                Modelo.Rotacao = value;
+                AtualizarAposModeloAlterado();
+            }
+        }
+
+        public virtual double X
+        {
+            get => Node.X;
+            set
+            {
+                if (Math.Abs(Node.X - value) < 0.0001)
+                    return;
+
+                Node.X = value;
+                AtualizarNode();
+            }
+        }
+
+        public virtual double Y
+        {
+            get => Node.Y;
+            set
+            {
+                if (Math.Abs(Node.Y - value) < 0.0001)
+                    return;
+
+                Node.Y = value;
+                AtualizarNode();
+            }
+        }
+
+        public virtual double WorldX => Node.X;
+        public virtual double WorldY => Node.Y;
+        public virtual double Largura => Node.Largura;
+
+        public virtual double Altura
+        {
+            get => Node.Altura;
+            set { }
+        }
+
+        public virtual Rect Bounds => Node.Bounds;
+        public virtual Rect BoundsAlinhamento => ObterBoundsRotacionado(Node.BoundsAlinhamento);
+        public virtual Point Centro => Node.Centro;
+
+        public ObservableCollection<ParameterViewModel> Parametros =>
+            _parametros ??= new ObservableCollection<ParameterViewModel>(Modelo.Parametros.Values.Select(p => new ParameterViewModel(p)));
+
+        protected virtual Point PontoLocalInicial => new(0, 0);
+        protected virtual Point PontoLocalFinal => new(Largura, Altura);
+
+        protected void SelecionarPrimeiroTipoDisponivel()
+        {
+            TipoElemento? primeiroTipo = null;
+            bool tipoAtualExiste = false;
+
+            foreach (object? item in TiposDisponiveis)
+            {
+                if (item is not TipoElemento tipo)
+                    continue;
+
+                primeiroTipo ??= tipo;
+
+                if (ReferenceEquals(tipo, Modelo.Tipo))
+                {
+                    tipoAtualExiste = true;
+                    break;
+                }
+            }
+
+            if (tipoAtualExiste || primeiroTipo == null)
+                return;
+
+            Tipo = primeiroTipo;
+        }
+
+        public virtual void Mover(Vector delta)
+        {
+            Node.Mover(delta);
+            NotificarGeometria();
+        }
+
+        public virtual ElementoEstado CapturarEstado()
+        {
+            return new ElementoEstado(X, Y, rotacao: Modelo.Rotacao);
+        }
+
+        public virtual void AplicarEstado(ElementoEstado estado)
+        {
+            Node.X = estado.X;
+            Node.Y = estado.Y;
+            AtualizarNode();
+        }
+
+        public virtual void AtualizarAposModeloAlterado()
+        {
+            AtualizarNode();
+        }
+
+        public virtual void NotificarParametros()
+        {
+            foreach (var parametro in Parametros)
+                parametro.Atualizar();
+
+            OnPropertyChanged(nameof(Parametros));
+        }
+
+        public void NotificarPropriedades(params string[] nomes)
+        {
+            foreach (string nome in nomes)
+                OnPropertyChanged(nome);
+
+            NotificarParametros();
+        }
+
+        protected virtual void AtualizarNode()
+        {
+            Node.AtualizarGeometria();
+            NotificarGeometria();
+        }
+
+        protected virtual void NotificarGeometria()
+        {
+            OnPropertyChanged(nameof(X));
+            OnPropertyChanged(nameof(Y));
+            OnPropertyChanged(nameof(WorldX));
+            OnPropertyChanged(nameof(WorldY));
+            OnPropertyChanged(nameof(Largura));
+            OnPropertyChanged(nameof(Altura));
+            OnPropertyChanged(nameof(Bounds));
+            OnPropertyChanged(nameof(BoundsAlinhamento));
+            OnPropertyChanged(nameof(Centro));
+            OnPropertyChanged(nameof(Rotacao));
+            OnPropertyChanged(nameof(RenderData));
+        }
+
+        private Rect ObterBoundsRotacionado(Rect bounds)
+        {
+            if (Math.Abs(Rotacao) <= 0.000001)
+                return bounds;
+
+            Point center = Centro;
+            Point p1 = RotateAround(new Point(bounds.Left, bounds.Top), center, Rotacao);
+            Point p2 = RotateAround(new Point(bounds.Right, bounds.Top), center, Rotacao);
+            Point p3 = RotateAround(new Point(bounds.Right, bounds.Bottom), center, Rotacao);
+            Point p4 = RotateAround(new Point(bounds.Left, bounds.Bottom), center, Rotacao);
+            double minX = Math.Min(Math.Min(p1.X, p2.X), Math.Min(p3.X, p4.X));
+            double minY = Math.Min(Math.Min(p1.Y, p2.Y), Math.Min(p3.Y, p4.Y));
+            double maxX = Math.Max(Math.Max(p1.X, p2.X), Math.Max(p3.X, p4.X));
+            double maxY = Math.Max(Math.Max(p1.Y, p2.Y), Math.Max(p3.Y, p4.Y));
+            return new Rect(new Point(minX, minY), new Point(maxX, maxY));
+        }
+
+        private static Point RotateAround(Point point, Point center, double angle)
+        {
+            double radians = angle * Math.PI / 180.0;
+            double cos = Math.Cos(radians);
+            double sin = Math.Sin(radians);
+            double x = point.X - center.X;
+            double y = point.Y - center.Y;
+            return new Point(center.X + x * cos - y * sin, center.Y + x * sin + y * cos);
+        }
+
+        private void AbrirPropriedadesTipo()
+        {
+            _typePropertiesDialogs.Show(TipoViewModel);
         }
     }
 }
@@ -856,6 +1524,10 @@ namespace Araci.ViewModels
             : base(modelo, new TextoAnotativoNode(modelo), types, names, typePropertiesDialogs)
         {
             SelecionarPrimeiroTipoDisponivel();
+
+            if (Texto.LarguraCaixa <= TextoAnotativo.LarguraCaixaMinima + 0.000001)
+                Texto.AjustarLarguraAoConteudo();
+
             AtualizarAposModeloAlterado();
         }
 
@@ -1182,6 +1854,9 @@ namespace Araci.ViewModels
         public double CirculoHandleVisualSize => 10 * _inverseZoom;
         public double CirculoHandleVisualOffset => -5 * _inverseZoom;
         public double CirculoHandleStrokeThickness => 1.5 * _inverseZoom;
+        public double TextoHandleVisualSize => 10 * _inverseZoom;
+        public double TextoHandleVisualHalfOffset => 5 * _inverseZoom;
+        public double TextoHandleStrokeThickness => 1.5 * _inverseZoom;
         public double TerminalMarkerVisualSize => 20 * _inverseZoom;
         public double TerminalMarkerVisualOffset => -10 * _inverseZoom;
         public double TerminalMarkerStrokeThickness => 2 * _inverseZoom;
@@ -1210,6 +1885,9 @@ namespace Araci.ViewModels
             OnPropertyChanged(nameof(CirculoHandleVisualSize));
             OnPropertyChanged(nameof(CirculoHandleVisualOffset));
             OnPropertyChanged(nameof(CirculoHandleStrokeThickness));
+            OnPropertyChanged(nameof(TextoHandleVisualSize));
+            OnPropertyChanged(nameof(TextoHandleVisualHalfOffset));
+            OnPropertyChanged(nameof(TextoHandleStrokeThickness));
             OnPropertyChanged(nameof(TerminalMarkerVisualSize));
             OnPropertyChanged(nameof(TerminalMarkerVisualOffset));
             OnPropertyChanged(nameof(TerminalMarkerStrokeThickness));
@@ -1243,5 +1921,1082 @@ namespace Araci.ViewModels
         }
     }
 }
+
+
+
+====================================================================================================
+ARQUIVO: C:\Araci-Engine-Front\Araci Engine\Views\ViewportView.xaml
+====================================================================================================
+
+<UserControl x:Class="Araci.Views.ViewportView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:controls="clr-namespace:Araci.Controls"
+             xmlns:viewModels="clr-namespace:Araci.ViewModels"
+             xmlns:primitives="clr-namespace:System.Windows.Controls.Primitives;assembly=PresentationFramework"
+             Focusable="True"
+             PreviewMouseLeftButtonDown="OnPreviewMouseLeftButtonDown"
+             PreviewMouseMove="OnPreviewMouseMove"
+             PreviewMouseLeftButtonUp="OnPreviewMouseLeftButtonUp"
+             PreviewMouseDown="OnPreviewMouseDown"
+             PreviewMouseUp="OnPreviewMouseUp"
+             PreviewMouseWheel="OnPreviewMouseWheel"
+             PreviewKeyDown="OnPreviewKeyDown"
+             PreviewKeyUp="OnPreviewKeyUp"
+             MouseLeave="OnMouseLeave"
+             Loaded="OnLoaded">
+
+    <UserControl.Resources>
+        <BooleanToVisibilityConverter x:Key="BooleanToVisibilityConverter"/>
+    </UserControl.Resources>
+
+    <Border x:Name="RootBorder" BorderThickness="1" BorderBrush="#252526" Background="#F4F4F4" ClipToBounds="True" SnapsToDevicePixels="True" UseLayoutRounding="True">
+        <Grid ClipToBounds="True">
+            <ItemsControl x:Name="WorldLayer" ItemsSource="{Binding Elementos}" ClipToBounds="False" SnapsToDevicePixels="True" HorizontalContentAlignment="Left" VerticalContentAlignment="Top">
+                <ItemsControl.ItemsPanel>
+                    <ItemsPanelTemplate>
+                        <Canvas x:Name="ViewportCanvas" Background="#F4F4F4" ClipToBounds="False" SnapsToDevicePixels="True" UseLayoutRounding="True"/>
+                    </ItemsPanelTemplate>
+                </ItemsControl.ItemsPanel>
+
+                <ItemsControl.ItemContainerStyle>
+                    <Style TargetType="ContentPresenter">
+                        <Setter Property="Canvas.Left" Value="{Binding WorldX}"/>
+                        <Setter Property="Canvas.Top" Value="{Binding WorldY}"/>
+                    </Style>
+                </ItemsControl.ItemContainerStyle>
+
+                <ItemsControl.Resources>
+                    <DataTemplate DataType="{x:Type viewModels:BarraViewModel}">
+                        <controls:BarraControl/>
+                    </DataTemplate>
+                    <DataTemplate DataType="{x:Type viewModels:CaboViewModel}">
+                        <controls:CaboControl/>
+                    </DataTemplate>
+                    <DataTemplate DataType="{x:Type viewModels:LinhaAnotativaViewModel}">
+                        <Line X1="{Binding RenderData.PontoLocalInicial.X}" Y1="{Binding RenderData.PontoLocalInicial.Y}" X2="{Binding RenderData.PontoLocalFinal.X}" Y2="{Binding RenderData.PontoLocalFinal.Y}" Stroke="{Binding RenderData.Stroke}" StrokeThickness="{Binding RenderData.StrokeThickness}" StrokeDashArray="{Binding RenderData.StrokeDashArray}" Visibility="{Binding Visivel, Converter={StaticResource BooleanToVisibilityConverter}}" SnapsToDevicePixels="True"/>
+                    </DataTemplate>
+                    <DataTemplate DataType="{x:Type viewModels:RetanguloAnotativoViewModel}">
+                        <Rectangle Width="{Binding Largura}" Height="{Binding Altura}" Stroke="{Binding StrokeBrush}" Fill="{x:Null}" StrokeThickness="{Binding EspessuraLinha}" StrokeDashArray="{Binding StrokeDashArray}" Visibility="{Binding Visivel, Converter={StaticResource BooleanToVisibilityConverter}}" SnapsToDevicePixels="True"/>
+                    </DataTemplate>
+                    <DataTemplate DataType="{x:Type viewModels:CirculoAnotativoViewModel}">
+                        <Ellipse Width="{Binding Largura}" Height="{Binding Altura}" Stroke="{Binding StrokeBrush}" Fill="{x:Null}" StrokeThickness="{Binding EspessuraLinha}" StrokeDashArray="{Binding StrokeDashArray}" Visibility="{Binding Visivel, Converter={StaticResource BooleanToVisibilityConverter}}" SnapsToDevicePixels="True"/>
+                    </DataTemplate>
+                    <DataTemplate DataType="{x:Type viewModels:TextoAnotativoViewModel}">
+                        <Grid Width="{Binding Largura}" Height="{Binding Altura}" Visibility="{Binding Visivel, Converter={StaticResource BooleanToVisibilityConverter}}" SnapsToDevicePixels="True">
+                            <Rectangle Fill="Transparent" Stroke="#007ACC" StrokeThickness="1" StrokeDashArray="4 2" SnapsToDevicePixels="True">
+                                <Rectangle.Style>
+                                    <Style TargetType="Rectangle">
+                                        <Setter Property="Visibility" Value="Collapsed"/>
+                                        <Style.Triggers>
+                                            <DataTrigger Binding="{Binding IsHover}" Value="True">
+                                                <Setter Property="Visibility" Value="Visible"/>
+                                            </DataTrigger>
+                                            <DataTrigger Binding="{Binding IsSelected}" Value="True">
+                                                <Setter Property="Visibility" Value="Visible"/>
+                                            </DataTrigger>
+                                            <DataTrigger Binding="{Binding Selecionado}" Value="True">
+                                                <Setter Property="Visibility" Value="Visible"/>
+                                            </DataTrigger>
+                                            <DataTrigger Binding="{Binding IsEditingInline}" Value="True">
+                                                <Setter Property="Visibility" Value="Visible"/>
+                                            </DataTrigger>
+                                        </Style.Triggers>
+                                    </Style>
+                                </Rectangle.Style>
+                            </Rectangle>
+                            <TextBlock Width="{Binding Largura}" Height="{Binding Altura}" Text="{Binding Conteudo}" FontFamily="{Binding FontFamily}" FontSize="{Binding AlturaTexto}" TextAlignment="{Binding TextAlignment}" TextWrapping="Wrap" Padding="2,0,2,0" SnapsToDevicePixels="True">
+                                <TextBlock.Style>
+                                    <Style TargetType="TextBlock">
+                                        <Setter Property="Visibility" Value="Visible"/>
+                                        <Setter Property="Foreground" Value="{Binding ForegroundBrush}"/>
+                                        <Style.Triggers>
+                                            <DataTrigger Binding="{Binding IsHover}" Value="True">
+                                                <Setter Property="Foreground" Value="#007ACC"/>
+                                            </DataTrigger>
+                                            <DataTrigger Binding="{Binding IsSelected}" Value="True">
+                                                <Setter Property="Foreground" Value="#007ACC"/>
+                                            </DataTrigger>
+                                            <DataTrigger Binding="{Binding Selecionado}" Value="True">
+                                                <Setter Property="Foreground" Value="#007ACC"/>
+                                            </DataTrigger>
+                                            <DataTrigger Binding="{Binding IsEditingInline}" Value="True">
+                                                <Setter Property="Visibility" Value="Collapsed"/>
+                                            </DataTrigger>
+                                        </Style.Triggers>
+                                    </Style>
+                                </TextBlock.Style>
+                            </TextBlock>
+                            <TextBox Text="{Binding ConteudoEdicao, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                                     Width="{Binding Largura}"
+                                     Height="{Binding Altura}"
+                                     FontFamily="{Binding FontFamily}"
+                                     FontSize="{Binding AlturaTexto}"
+                                     Foreground="{Binding ForegroundBrush}"
+                                     Background="#FFFFFFFF"
+                                     BorderBrush="#007ACC"
+                                     BorderThickness="1"
+                                     Padding="2,0,2,0"
+                                     HorizontalContentAlignment="{Binding TextBoxHorizontalContentAlignment}"
+                                     VerticalContentAlignment="Top"
+                                     AcceptsReturn="True"
+                                     TextWrapping="Wrap"
+                                     PreviewKeyDown="OnInlineTextBoxPreviewKeyDown"
+                                     LostKeyboardFocus="OnInlineTextBoxLostKeyboardFocus"
+                                     Loaded="OnInlineTextBoxLoaded"
+                                     SnapsToDevicePixels="True">
+                                <TextBox.Style>
+                                    <Style TargetType="TextBox">
+                                        <Setter Property="Visibility" Value="Collapsed"/>
+                                        <Style.Triggers>
+                                            <DataTrigger Binding="{Binding IsEditingInline}" Value="True">
+                                                <Setter Property="Visibility" Value="Visible"/>
+                                            </DataTrigger>
+                                        </Style.Triggers>
+                                    </Style>
+                                </TextBox.Style>
+                            </TextBox>
+                            <primitives:Thumb HorizontalAlignment="Right"
+                                              VerticalAlignment="Center"
+                                              Width="{Binding DataContext.TextoHandleVisualSize, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                              Height="{Binding DataContext.TextoHandleVisualSize, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                              Cursor="SizeWE"
+                                              DragStarted="OnTextoWidthHandleDragStarted"
+                                              DragDelta="OnTextoWidthHandleDragDelta"
+                                              DragCompleted="OnTextoWidthHandleDragCompleted"
+                                              Focusable="False"
+                                              SnapsToDevicePixels="True">
+                                <primitives:Thumb.Style>
+                                    <Style TargetType="primitives:Thumb">
+                                        <Setter Property="Visibility" Value="Collapsed"/>
+                                        <Setter Property="Template">
+                                            <Setter.Value>
+                                                <ControlTemplate TargetType="primitives:Thumb">
+                                                    <Rectangle Fill="White" Stroke="#007ACC" StrokeThickness="{Binding DataContext.TextoHandleStrokeThickness, RelativeSource={RelativeSource AncestorType=UserControl}}" SnapsToDevicePixels="True"/>
+                                                </ControlTemplate>
+                                            </Setter.Value>
+                                        </Setter>
+                                        <Style.Triggers>
+                                            <MultiDataTrigger>
+                                                <MultiDataTrigger.Conditions>
+                                                    <Condition Binding="{Binding IsSelected}" Value="True"/>
+                                                    <Condition Binding="{Binding IsEditingInline}" Value="False"/>
+                                                </MultiDataTrigger.Conditions>
+                                                <Setter Property="Visibility" Value="Visible"/>
+                                            </MultiDataTrigger>
+                                            <MultiDataTrigger>
+                                                <MultiDataTrigger.Conditions>
+                                                    <Condition Binding="{Binding Selecionado}" Value="True"/>
+                                                    <Condition Binding="{Binding IsEditingInline}" Value="False"/>
+                                                </MultiDataTrigger.Conditions>
+                                                <Setter Property="Visibility" Value="Visible"/>
+                                            </MultiDataTrigger>
+                                        </Style.Triggers>
+                                    </Style>
+                                </primitives:Thumb.Style>
+                                <primitives:Thumb.RenderTransform>
+                                    <TranslateTransform X="{Binding DataContext.TextoHandleVisualHalfOffset, RelativeSource={RelativeSource AncestorType=UserControl}}"/>
+                                </primitives:Thumb.RenderTransform>
+                            </primitives:Thumb>
+                        </Grid>
+                    </DataTemplate>
+                    <DataTemplate DataType="{x:Type viewModels:CargaViewModel}">
+                        <controls:CargaControl/>
+                    </DataTemplate>
+                    <DataTemplate DataType="{x:Type viewModels:GeradorViewModel}">
+                        <controls:GeradorControl/>
+                    </DataTemplate>
+                    <DataTemplate DataType="{x:Type viewModels:SinViewModel}">
+                        <controls:SinControl/>
+                    </DataTemplate>
+                    <DataTemplate DataType="{x:Type viewModels:TransformadorViewModel}">
+                        <controls:TransformadorControl/>
+                    </DataTemplate>
+                </ItemsControl.Resources>
+            </ItemsControl>
+
+            <ItemsControl x:Name="AlignmentGuideLayer" ItemsSource="{Binding AlignmentGuides}" IsHitTestVisible="False" ClipToBounds="False">
+                <ItemsControl.ItemsPanel>
+                    <ItemsPanelTemplate>
+                        <Canvas ClipToBounds="False"/>
+                    </ItemsPanelTemplate>
+                </ItemsControl.ItemsPanel>
+                <ItemsControl.ItemTemplate>
+                    <DataTemplate>
+                        <Line X1="{Binding X1}" Y1="{Binding Y1}" X2="{Binding X2}" Y2="{Binding Y2}" Stroke="#CC007ACC" StrokeThickness="1" StrokeDashArray="6 4" SnapsToDevicePixels="True"/>
+                    </DataTemplate>
+                </ItemsControl.ItemTemplate>
+            </ItemsControl>
+
+            <Canvas x:Name="SelectionLayer" IsHitTestVisible="False">
+                <Rectangle Stroke="#007ACC" StrokeThickness="1.5" Fill="#22007ACC" StrokeDashArray="3 2" Canvas.Left="{Binding SelectionBox.X}" Canvas.Top="{Binding SelectionBox.Y}" Width="{Binding SelectionBox.Largura}" Height="{Binding SelectionBox.Altura}" Visibility="{Binding SelectionBox.Visivel, Converter={StaticResource BooleanToVisibilityConverter}}"/>
+            </Canvas>
+
+            <Canvas x:Name="CableVertexHandleLayer" IsHitTestVisible="False"/>
+
+            <ItemsControl x:Name="CirculoResizeHandleLayer" ItemsSource="{Binding CirculoResize.Handles}" IsHitTestVisible="False" ClipToBounds="False">
+                <ItemsControl.ItemsPanel>
+                    <ItemsPanelTemplate>
+                        <Canvas ClipToBounds="False"/>
+                    </ItemsPanelTemplate>
+                </ItemsControl.ItemsPanel>
+                <ItemsControl.ItemContainerStyle>
+                    <Style TargetType="ContentPresenter">
+                        <Setter Property="Canvas.Left" Value="{Binding X}"/>
+                        <Setter Property="Canvas.Top" Value="{Binding Y}"/>
+                    </Style>
+                </ItemsControl.ItemContainerStyle>
+                <ItemsControl.ItemTemplate>
+                    <DataTemplate>
+                        <Ellipse Width="{Binding DataContext.CirculoHandleVisualSize, RelativeSource={RelativeSource AncestorType=ItemsControl}}" Height="{Binding DataContext.CirculoHandleVisualSize, RelativeSource={RelativeSource AncestorType=ItemsControl}}" Stroke="#007ACC" StrokeThickness="{Binding DataContext.CirculoHandleStrokeThickness, RelativeSource={RelativeSource AncestorType=ItemsControl}}">
+                            <Ellipse.Style>
+                                <Style TargetType="Ellipse">
+                                    <Setter Property="Fill" Value="White"/>
+                                    <Style.Triggers>
+                                        <DataTrigger Binding="{Binding IsActive}" Value="True">
+                                            <Setter Property="Fill" Value="#99CFE8FF"/>
+                                        </DataTrigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </Ellipse.Style>
+                            <Ellipse.RenderTransform>
+                                <TranslateTransform X="{Binding DataContext.CirculoHandleVisualOffset, RelativeSource={RelativeSource AncestorType=ItemsControl}}" Y="{Binding DataContext.CirculoHandleVisualOffset, RelativeSource={RelativeSource AncestorType=ItemsControl}}"/>
+                            </Ellipse.RenderTransform>
+                        </Ellipse>
+                    </DataTemplate>
+                </ItemsControl.ItemTemplate>
+            </ItemsControl>
+
+            <ItemsControl x:Name="RetanguloResizeHandleLayer" ItemsSource="{Binding RetanguloResize.Handles}" IsHitTestVisible="False" ClipToBounds="False">
+                <ItemsControl.ItemsPanel>
+                    <ItemsPanelTemplate>
+                        <Canvas ClipToBounds="False"/>
+                    </ItemsPanelTemplate>
+                </ItemsControl.ItemsPanel>
+                <ItemsControl.ItemContainerStyle>
+                    <Style TargetType="ContentPresenter">
+                        <Setter Property="Canvas.Left" Value="{Binding X}"/>
+                        <Setter Property="Canvas.Top" Value="{Binding Y}"/>
+                    </Style>
+                </ItemsControl.ItemContainerStyle>
+                <ItemsControl.ItemTemplate>
+                    <DataTemplate>
+                        <Rectangle Width="{Binding DataContext.RetanguloHandleVisualSize, RelativeSource={RelativeSource AncestorType=ItemsControl}}" Height="{Binding DataContext.RetanguloHandleVisualSize, RelativeSource={RelativeSource AncestorType=ItemsControl}}" Stroke="#007ACC" StrokeThickness="{Binding DataContext.RetanguloHandleStrokeThickness, RelativeSource={RelativeSource AncestorType=ItemsControl}}">
+                            <Rectangle.Style>
+                                <Style TargetType="Rectangle">
+                                    <Setter Property="Fill" Value="White"/>
+                                    <Style.Triggers>
+                                        <DataTrigger Binding="{Binding IsActive}" Value="True">
+                                            <Setter Property="Fill" Value="#99CFE8FF"/>
+                                        </DataTrigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </Rectangle.Style>
+                            <Rectangle.RenderTransform>
+                                <TranslateTransform X="{Binding DataContext.RetanguloHandleVisualOffset, RelativeSource={RelativeSource AncestorType=ItemsControl}}" Y="{Binding DataContext.RetanguloHandleVisualOffset, RelativeSource={RelativeSource AncestorType=ItemsControl}}"/>
+                            </Rectangle.RenderTransform>
+                        </Rectangle>
+                    </DataTemplate>
+                </ItemsControl.ItemTemplate>
+            </ItemsControl>
+
+            <ItemsControl x:Name="LinhaEndpointInsertionSnapLayer" ItemsSource="{Binding LinhaEndpointEdit.InsertionSnapHandles}" IsHitTestVisible="False" ClipToBounds="False">
+                <ItemsControl.ItemsPanel>
+                    <ItemsPanelTemplate>
+                        <Canvas ClipToBounds="False"/>
+                    </ItemsPanelTemplate>
+                </ItemsControl.ItemsPanel>
+                <ItemsControl.ItemContainerStyle>
+                    <Style TargetType="ContentPresenter">
+                        <Setter Property="Canvas.Left" Value="{Binding X}"/>
+                        <Setter Property="Canvas.Top" Value="{Binding Y}"/>
+                    </Style>
+                </ItemsControl.ItemContainerStyle>
+                <ItemsControl.ItemTemplate>
+                    <DataTemplate>
+                        <Rectangle Width="{Binding DataContext.LinhaHandleVisualSize, RelativeSource={RelativeSource AncestorType=ItemsControl}}" Height="{Binding DataContext.LinhaHandleVisualSize, RelativeSource={RelativeSource AncestorType=ItemsControl}}" Stroke="#007ACC" Fill="#E6FFFFFF" StrokeThickness="{Binding DataContext.LinhaHandleStrokeThickness, RelativeSource={RelativeSource AncestorType=ItemsControl}}">
+                            <Rectangle.RenderTransform>
+                                <TranslateTransform X="{Binding DataContext.LinhaHandleVisualOffset, RelativeSource={RelativeSource AncestorType=ItemsControl}}" Y="{Binding DataContext.LinhaHandleVisualOffset, RelativeSource={RelativeSource AncestorType=ItemsControl}}"/>
+                            </Rectangle.RenderTransform>
+                        </Rectangle>
+                    </DataTemplate>
+                </ItemsControl.ItemTemplate>
+            </ItemsControl>
+
+            <ItemsControl x:Name="LinhaEndpointHandleLayer" ItemsSource="{Binding LinhaEndpointEdit.Handles}" IsHitTestVisible="False" ClipToBounds="False">
+                <ItemsControl.ItemsPanel>
+                    <ItemsPanelTemplate>
+                        <Canvas ClipToBounds="False"/>
+                    </ItemsPanelTemplate>
+                </ItemsControl.ItemsPanel>
+                <ItemsControl.ItemContainerStyle>
+                    <Style TargetType="ContentPresenter">
+                        <Setter Property="Canvas.Left" Value="{Binding X}"/>
+                        <Setter Property="Canvas.Top" Value="{Binding Y}"/>
+                    </Style>
+                </ItemsControl.ItemContainerStyle>
+                <ItemsControl.ItemTemplate>
+                    <DataTemplate>
+                        <Ellipse Width="{Binding DataContext.LinhaHandleVisualSize, RelativeSource={RelativeSource AncestorType=ItemsControl}}" Height="{Binding DataContext.LinhaHandleVisualSize, RelativeSource={RelativeSource AncestorType=ItemsControl}}" Stroke="#007ACC" StrokeThickness="{Binding DataContext.LinhaHandleStrokeThickness, RelativeSource={RelativeSource AncestorType=ItemsControl}}">
+                            <Ellipse.Style>
+                                <Style TargetType="Ellipse">
+                                    <Setter Property="Fill" Value="White"/>
+                                    <Style.Triggers>
+                                        <DataTrigger Binding="{Binding IsActive}" Value="True">
+                                            <Setter Property="Fill" Value="#99CFE8FF"/>
+                                        </DataTrigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </Ellipse.Style>
+                            <Ellipse.RenderTransform>
+                                <TranslateTransform X="{Binding DataContext.LinhaHandleVisualOffset, RelativeSource={RelativeSource AncestorType=ItemsControl}}" Y="{Binding DataContext.LinhaHandleVisualOffset, RelativeSource={RelativeSource AncestorType=ItemsControl}}"/>
+                            </Ellipse.RenderTransform>
+                        </Ellipse>
+                    </DataTemplate>
+                </ItemsControl.ItemTemplate>
+            </ItemsControl>
+
+            <Canvas x:Name="TerminalSnapLayer" IsHitTestVisible="False">
+                <Ellipse Width="{Binding TerminalMarkerVisualSize}" Height="{Binding TerminalMarkerVisualSize}" Canvas.Left="{Binding TerminalSnap.X}" Canvas.Top="{Binding TerminalSnap.Y}" Stroke="#007ACC" StrokeThickness="{Binding TerminalMarkerStrokeThickness}" Fill="#55FFFFFF" Visibility="{Binding TerminalSnap.MarcadorValidoVisivel, Converter={StaticResource BooleanToVisibilityConverter}}">
+                    <Ellipse.RenderTransform>
+                        <TranslateTransform X="{Binding TerminalMarkerVisualOffset}" Y="{Binding TerminalMarkerVisualOffset}"/>
+                    </Ellipse.RenderTransform>
+                </Ellipse>
+                <Ellipse Width="{Binding TerminalMarkerVisualSize}" Height="{Binding TerminalMarkerVisualSize}" Canvas.Left="{Binding TerminalSnap.X}" Canvas.Top="{Binding TerminalSnap.Y}" Stroke="#D32F2F" StrokeThickness="{Binding TerminalMarkerStrokeThickness}" Fill="#33D32F2F" Visibility="{Binding TerminalSnap.MarcadorInvalidoVisivel, Converter={StaticResource BooleanToVisibilityConverter}}">
+                    <Ellipse.RenderTransform>
+                        <TranslateTransform X="{Binding TerminalMarkerVisualOffset}" Y="{Binding TerminalMarkerVisualOffset}"/>
+                    </Ellipse.RenderTransform>
+                </Ellipse>
+                <Border Background="#DD1E1E1E" BorderBrush="#D32F2F" BorderThickness="{Binding TerminalMarkerStrokeThickness}" CornerRadius="{Binding TerminalMessageCornerRadius}" Padding="{Binding TerminalMessagePadding}" Canvas.Left="{Binding TerminalSnap.MensagemX}" Canvas.Top="{Binding TerminalSnap.MensagemY}" Visibility="{Binding TerminalSnap.MensagemVisivel, Converter={StaticResource BooleanToVisibilityConverter}}">
+                    <Border.RenderTransform>
+                        <TranslateTransform X="{Binding TerminalMessageVisualOffsetX}" Y="{Binding TerminalMessageVisualOffsetY}"/>
+                    </Border.RenderTransform>
+                    <TextBlock Foreground="White" FontSize="{Binding TerminalMessageFontSize}" FontWeight="SemiBold" Text="{Binding TerminalSnap.Mensagem}"/>
+                </Border>
+            </Canvas>
+
+            <Canvas IsHitTestVisible="False" ClipToBounds="True">
+                <Border Background="#AA1E1E1E" CornerRadius="6" Padding="8" Canvas.Left="{Binding MoveHud.X}" Canvas.Top="{Binding MoveHud.Y}" Visibility="{Binding MoveHud.Visivel, Converter={StaticResource BooleanToVisibilityConverter}}">
+                    <StackPanel>
+                        <TextBlock Foreground="White" FontSize="12" Text="{Binding MoveHud.DeltaX, StringFormat=ΔX: {0:F1}}"/>
+                        <TextBlock Foreground="White" FontSize="12" Text="{Binding MoveHud.DeltaY, StringFormat=ΔY: {0:F1}}"/>
+                    </StackPanel>
+                </Border>
+            </Canvas>
+        </Grid>
+    </Border>
+</UserControl>
+
+
+
+====================================================================================================
+ARQUIVO: C:\Araci-Engine-Front\Araci Engine\Views\ViewportView.xaml.cs
+====================================================================================================
+
+using System;
+using System.ComponentModel;
+using System.Windows;
+using System.Windows.Controls;
+using System.Windows.Controls.Primitives;
+using System.Windows.Input;
+using System.Windows.Media;
+using Araci.Applications.Editar.Base;
+using Araci.Core.Commands;
+using Araci.Models;
+using Araci.Services;
+using Araci.ViewModels;
+
+namespace Araci.Views
+{
+    public partial class ViewportView : UserControl
+    {
+        private readonly MatrixTransform _cameraTransform = new();
+        private ViewportViewModel? _viewportViewModel;
+        private EditorContext? _context;
+        private bool _commitInlineTextInProgress;
+        private bool _cancelInlineTextInProgress;
+        private TextoAnotativoViewModel? _textoWidthResizeAtivo;
+        private double _textoWidthResizeLarguraInicial;
+        private double _textoWidthResizeDeltaAcumulado;
+
+        public ViewportView()
+        {
+            InitializeComponent();
+        }
+
+        public void Inicializar(EditorContext context)
+        {
+            _context = context ?? throw new ArgumentNullException(nameof(context));
+            _viewportViewModel = _context.CriarViewportViewModel();
+            DataContext = _viewportViewModel;
+            _context.InicializarViewport(_viewportViewModel);
+            ConfigurarCamera();
+            Unloaded += OnUnloaded;
+        }
+
+        private bool IsTextoWidthResizing => _textoWidthResizeAtivo != null;
+
+        private void ConfigurarCamera()
+        {
+            if (_context?.Viewport == null)
+                return;
+
+            WorldLayer.RenderTransform = _cameraTransform;
+            AlignmentGuideLayer.RenderTransform = _cameraTransform;
+            SelectionLayer.RenderTransform = _cameraTransform;
+            CableVertexHandleLayer.RenderTransform = _cameraTransform;
+            CirculoResizeHandleLayer.RenderTransform = _cameraTransform;
+            RetanguloResizeHandleLayer.RenderTransform = _cameraTransform;
+            LinhaEndpointInsertionSnapLayer.RenderTransform = _cameraTransform;
+            LinhaEndpointHandleLayer.RenderTransform = _cameraTransform;
+            TerminalSnapLayer.RenderTransform = _cameraTransform;
+            _context.Viewport.Camera.PropertyChanged += OnCameraChanged;
+            AtualizarCameraTransform();
+        }
+
+        private void OnCameraChanged(object? sender, PropertyChangedEventArgs e)
+        {
+            AtualizarCameraTransform();
+        }
+
+        private void AtualizarCameraTransform()
+        {
+            if (_context?.Viewport == null)
+                return;
+
+            var camera = _context.Viewport.Camera;
+            _cameraTransform.Matrix = new Matrix(camera.Zoom, 0, 0, camera.Zoom, camera.Offset.X, camera.Offset.Y);
+            _viewportViewModel?.AtualizarZoomVisual(camera.Zoom);
+        }
+
+        private void OnLoaded(object sender, RoutedEventArgs e)
+        {
+            Focus();
+            Keyboard.Focus(this);
+            AtualizarViewport();
+            SizeChanged += (_, _) => AtualizarViewport();
+        }
+
+        private void AtualizarViewport()
+        {
+            if (_context?.Viewport == null)
+                return;
+
+            double largura = ActualWidth;
+            double altura = ActualHeight;
+
+            if (RootBorder != null)
+            {
+                largura -= RootBorder.BorderThickness.Left + RootBorder.BorderThickness.Right;
+                altura -= RootBorder.BorderThickness.Top + RootBorder.BorderThickness.Bottom;
+            }
+
+            largura = Math.Max(0, largura);
+            altura = Math.Max(0, altura);
+            _context.Viewport.AtualizarTamanho(new Size(largura, altura));
+        }
+
+        private Point GetWorldPos(MouseEventArgs e)
+        {
+            Point screen = e.GetPosition(this);
+            return _context?.Viewport?.ScreenToWorld(screen) ?? screen;
+        }
+
+        private void OnPreviewMouseDown(object sender, MouseButtonEventArgs e)
+        {
+            if (_context == null)
+                return;
+
+            if (OrigemEstaDentroDeTextoWidthHandle(e.OriginalSource as DependencyObject))
+                return;
+
+            if (_context.Navigation.TryHandleMiddleDoubleClick(e))
+            {
+                AtualizarCursorNavegacao();
+                LiberarCapturaMouse();
+                e.Handled = true;
+                return;
+            }
+
+            if (_context.Navigation.TryBeginMiddlePan(e, this))
+            {
+                Focus();
+                Keyboard.Focus(this);
+                AtualizarCursorNavegacao();
+                CaptureMouse();
+                e.Handled = true;
+            }
+        }
+
+        private void OnPreviewMouseLeftButtonDown(object sender, MouseButtonEventArgs e)
+        {
+            if (_context == null)
+                return;
+
+            if (OrigemEstaDentroDeTextoWidthHandle(e.OriginalSource as DependencyObject))
+                return;
+
+            if (_context.Navigation.TryBeginSpaceLeftPan(e, this))
+            {
+                Focus();
+                Keyboard.Focus(this);
+                AtualizarCursorNavegacao();
+                CaptureMouse();
+                e.Handled = true;
+                return;
+            }
+
+            if (_context.Navigation.IsPanning)
+            {
+                e.Handled = true;
+                return;
+            }
+
+            Point worldPosition = GetWorldPos(e);
+            ElementoViewModel? vm = ResolverElementoClicado(e.OriginalSource as DependencyObject, worldPosition);
+
+            if (e.ClickCount >= 2 && vm is TextoAnotativoViewModel texto)
+            {
+                IniciarEdicaoInlineTexto(texto);
+                e.Handled = true;
+                return;
+            }
+
+            if (ExisteEdicaoInlineAtiva())
+            {
+                if (!OrigemEstaDentroDeEditorInline(e.OriginalSource as DependencyObject))
+                    ConfirmarEdicaoInlineAtiva();
+
+                e.Handled = true;
+                return;
+            }
+
+            Focus();
+            Keyboard.Focus(this);
+            ToolInputState inputState = CriarInputState(e, e.ChangedButton, e.ClickCount);
+            _context.Input.MouseDown(vm, worldPosition, inputState);
+            AtualizarCursorInteracao(worldPosition);
+            CaptureMouse();
+        }
+
+        private void OnPreviewMouseMove(object sender, MouseEventArgs e)
+        {
+            if (_context?.Navigation.TryUpdatePan(e, this) == true)
+            {
+                AtualizarCursorNavegacao();
+                e.Handled = true;
+                return;
+            }
+
+            if (_context == null)
+                return;
+
+            if (IsTextoWidthResizing)
+            {
+                Cursor = Cursors.SizeWE;
+                return;
+            }
+
+            if (ExisteEdicaoInlineAtiva())
+            {
+                AtualizarCursorInteracao(GetWorldPos(e));
+                return;
+            }
+
+            Point worldPosition = GetWorldPos(e);
+            _context.Input.MouseMove(worldPosition, CriarInputState(e));
+            AtualizarCursorInteracao(worldPosition);
+        }
+
+        private void OnPreviewMouseUp(object sender, MouseButtonEventArgs e)
+        {
+            if (_context?.Navigation.TryEndMiddlePan(e) != true)
+                return;
+
+            AtualizarCursorNavegacao();
+            LiberarCapturaMouse();
+            e.Handled = true;
+        }
+
+        private void OnPreviewMouseLeftButtonUp(object sender, MouseButtonEventArgs e)
+        {
+            if (IsTextoWidthResizing)
+                return;
+
+            if (_context?.Navigation.TryEndSpaceLeftPan(e) == true)
+            {
+                AtualizarCursorNavegacao();
+                LiberarCapturaMouse();
+                e.Handled = true;
+                return;
+            }
+
+            if (_context?.Navigation.ConsumeSuppressNextLeftButtonUp() == true)
+            {
+                e.Handled = true;
+                return;
+            }
+
+            if (_context?.Navigation.IsPanning == true)
+            {
+                e.Handled = true;
+                return;
+            }
+
+            if (ExisteEdicaoInlineAtiva())
+            {
+                LiberarCapturaMouse();
+                e.Handled = true;
+                return;
+            }
+
+            if (_context != null)
+            {
+                Point worldPosition = GetWorldPos(e);
+                _context.Input.MouseUp(worldPosition, CriarInputState(e, e.ChangedButton, e.ClickCount));
+                AtualizarCursorInteracao(worldPosition);
+            }
+
+            LiberarCapturaMouse();
+        }
+
+        private void OnPreviewMouseWheel(object sender, MouseWheelEventArgs e)
+        {
+            if (_context?.Navigation.TryHandleMouseWheel(e, this) != true)
+                return;
+
+            e.Handled = true;
+        }
+
+        private void OnPreviewKeyDown(object sender, KeyEventArgs e)
+        {
+            if (e.OriginalSource is TextBox textBox && textBox.DataContext is TextoAnotativoViewModel)
+                return;
+
+            if (ExisteEdicaoInlineAtiva())
+            {
+                if (e.Key == Key.Escape)
+                {
+                    CancelarEdicaoInlineAtiva();
+                    Focus();
+                    Keyboard.Focus(this);
+                    e.Handled = true;
+                }
+
+                return;
+            }
+
+            if (_context != null && e.Key == Key.Space && _context.Input.KeyDown(e.Key))
+            {
+                e.Handled = true;
+                return;
+            }
+
+            if (_context?.Navigation.TryHandleKeyDown(e) == true)
+            {
+                AtualizarCursorNavegacao();
+                e.Handled = true;
+                return;
+            }
+
+            if (_context == null)
+                return;
+
+            e.Handled = _context.Input.KeyDown(e.Key);
+
+            if (e.Handled && e.Key == Key.Escape)
+                LiberarCapturaMouse();
+        }
+
+        private void OnPreviewKeyUp(object sender, KeyEventArgs e)
+        {
+            if (_context?.Navigation.TryHandleKeyUp(e) != true)
+                return;
+
+            AtualizarCursorNavegacao();
+            LiberarCapturaMouse();
+            e.Handled = true;
+        }
+
+        private void OnMouseLeave(object sender, MouseEventArgs e)
+        {
+            if (ExisteEdicaoInlineAtiva() || IsTextoWidthResizing)
+                return;
+
+            _context?.Hover.Clear();
+            _context?.TerminalSnap.Limpar();
+            _context?.AlignmentGuides.Limpar();
+            _context?.LinhaEndpointEdit.LimparSnapInsercao();
+            _context?.Navigation.CancelPan();
+            AtualizarCursorNavegacao();
+        }
+
+        private void OnUnloaded(object sender, RoutedEventArgs e)
+        {
+            ConfirmarEdicaoInlineAtiva();
+            CancelarResizeLarguraTexto();
+            _context?.Navigation.Reset();
+            _context?.AlignmentGuides.Limpar();
+            _context?.LinhaEndpointEdit.LimparSnapInsercao();
+            LiberarCapturaMouse();
+            Cursor = Cursors.Arrow;
+
+            if (_context?.Viewport != null)
+                _context.Viewport.Camera.PropertyChanged -= OnCameraChanged;
+        }
+
+        private void AtualizarCursorInteracao(Point worldPosition)
+        {
+            if (IsTextoWidthResizing)
+            {
+                Cursor = Cursors.SizeWE;
+                return;
+            }
+
+            if (ExisteEdicaoInlineAtiva())
+            {
+                Cursor = Cursors.IBeam;
+                return;
+            }
+
+            if (_context?.Navigation.IsPanning == true || _context?.Navigation.IsSpacePressed == true)
+            {
+                Cursor = Cursors.ScrollAll;
+                return;
+            }
+
+            Cursor = _context?.BarraResize.GetCursor(worldPosition) ?? Cursors.Arrow;
+        }
+
+        private void AtualizarCursorNavegacao()
+        {
+            if (_context?.Navigation.IsPanning == true || _context?.Navigation.IsSpacePressed == true)
+                Cursor = Cursors.ScrollAll;
+            else
+                Cursor = Cursors.Arrow;
+        }
+
+        private void LiberarCapturaMouse()
+        {
+            if (IsMouseCaptured)
+                ReleaseMouseCapture();
+        }
+
+        private ToolInputState CriarInputState(MouseEventArgs e, MouseButton? button = null, int clickCount = 0)
+        {
+            Point screenPosition = e.GetPosition(this);
+            Point worldPosition = _context?.Viewport?.ScreenToWorld(screenPosition) ?? screenPosition;
+            return new ToolInputState(Keyboard.Modifiers, button, clickCount, worldPosition, screenPosition);
+        }
+
+        private ElementoViewModel? ResolverElementoClicado(DependencyObject? origem, Point worldPosition)
+        {
+            ElementoViewModel? visual = EncontrarElemento(origem);
+
+            if (visual is not RetanguloAnotativoViewModel && visual is not CirculoAnotativoViewModel)
+                return visual;
+
+            return _context?.SceneQueries.HitTest(worldPosition)?.Elemento;
+        }
+
+        private void IniciarEdicaoInlineTexto(TextoAnotativoViewModel texto)
+        {
+            if (_context == null)
+                return;
+
+            ConfirmarEdicaoInlineAtiva();
+            _context.Selection.Selecionar(texto);
+            _context.Hover.Clear();
+            texto.IniciarEdicaoInline();
+            LiberarCapturaMouse();
+            Dispatcher.BeginInvoke(new Action(() => FocarTextBoxInline(texto)));
+        }
+
+        private void FocarTextBoxInline(TextoAnotativoViewModel texto)
+        {
+            TextBox? textBox = EncontrarTextBoxInline(WorldLayer, texto);
+
+            if (textBox == null || !texto.IsEditingInline)
+                return;
+
+            textBox.Focus();
+            Keyboard.Focus(textBox);
+            textBox.SelectAll();
+        }
+
+        private void OnInlineTextBoxLoaded(object sender, RoutedEventArgs e)
+        {
+            if (sender is TextBox textBox && textBox.DataContext is TextoAnotativoViewModel texto && texto.IsEditingInline)
+            {
+                Dispatcher.BeginInvoke(new Action(() =>
+                {
+                    if (!texto.IsEditingInline)
+                        return;
+
+                    textBox.Focus();
+                    Keyboard.Focus(textBox);
+                    textBox.SelectAll();
+                }));
+            }
+        }
+
+        private void OnInlineTextBoxPreviewKeyDown(object sender, KeyEventArgs e)
+        {
+            if (sender is not TextBox textBox || textBox.DataContext is not TextoAnotativoViewModel texto)
+                return;
+
+            if (e.Key == Key.Enter && Keyboard.Modifiers.HasFlag(ModifierKeys.Shift))
+                return;
+
+            if (e.Key == Key.Enter)
+            {
+                ConfirmarEdicaoInlineTexto(texto);
+                Focus();
+                Keyboard.Focus(this);
+                e.Handled = true;
+                return;
+            }
+
+            if (e.Key == Key.Escape)
+            {
+                CancelarEdicaoInlineTexto(texto);
+                Focus();
+                Keyboard.Focus(this);
+                e.Handled = true;
+            }
+        }
+
+        private void OnInlineTextBoxLostKeyboardFocus(object sender, KeyboardFocusChangedEventArgs e)
+        {
+            if (sender is not TextBox { DataContext: TextoAnotativoViewModel texto })
+                return;
+
+            if (_cancelInlineTextInProgress || _commitInlineTextInProgress || !texto.IsEditingInline)
+                return;
+
+            if (e.NewFocus is DependencyObject novoFoco && OrigemEstaDentroDeEditorInline(novoFoco))
+                return;
+
+            Dispatcher.BeginInvoke(new Action(() =>
+            {
+                if (!_cancelInlineTextInProgress && !_commitInlineTextInProgress && texto.IsEditingInline)
+                    ConfirmarEdicaoInlineTexto(texto);
+            }));
+        }
+
+        private void OnTextoWidthHandleDragStarted(object sender, DragStartedEventArgs e)
+        {
+            if (sender is not Thumb { DataContext: TextoAnotativoViewModel texto } || _context == null)
+                return;
+
+            ConfirmarEdicaoInlineAtiva();
+            _context.Selection.Selecionar(texto);
+            _context.Hover.Clear();
+            _textoWidthResizeAtivo = texto;
+            _textoWidthResizeLarguraInicial = texto.LarguraCaixa;
+            _textoWidthResizeDeltaAcumulado = 0;
+            Cursor = Cursors.SizeWE;
+            e.Handled = true;
+        }
+
+        private void OnTextoWidthHandleDragDelta(object sender, DragDeltaEventArgs e)
+        {
+            if (_textoWidthResizeAtivo == null)
+                return;
+
+            _textoWidthResizeDeltaAcumulado += e.HorizontalChange;
+            double zoom = _context?.Viewport?.Camera.Zoom ?? 1;
+            double deltaWorld = zoom > 0 ? _textoWidthResizeDeltaAcumulado / zoom : _textoWidthResizeDeltaAcumulado;
+            _textoWidthResizeAtivo.LarguraCaixa = Math.Max(TextoAnotativo.LarguraCaixaMinima, _textoWidthResizeLarguraInicial + deltaWorld);
+            _context?.SceneQueries.Invalidate();
+            _viewportViewModel?.AtualizarViewModel(_textoWidthResizeAtivo.Modelo);
+            Cursor = Cursors.SizeWE;
+            e.Handled = true;
+        }
+
+        private void OnTextoWidthHandleDragCompleted(object sender, DragCompletedEventArgs e)
+        {
+            if (_textoWidthResizeAtivo == null || _context == null)
+                return;
+
+            TextoAnotativoViewModel texto = _textoWidthResizeAtivo;
+            double antes = _textoWidthResizeLarguraInicial;
+            double depois = texto.LarguraCaixa;
+
+            _textoWidthResizeAtivo = null;
+            _textoWidthResizeDeltaAcumulado = 0;
+            _context.SceneQueries.Invalidate();
+            _viewportViewModel?.AtualizarViewModel(texto.Modelo);
+            AtualizarCursorNavegacao();
+
+            if (Math.Abs(antes - depois) > 0.000001)
+            {
+                var command = new BulkPropertyChangeCommand(new[]
+                {
+                    new BulkPropertyChangeCommand.Item(texto, nameof(TextoAnotativoViewModel.LarguraCaixa), antes, depois)
+                });
+
+                if (!command.IsEmpty)
+                    _context.Commands.Execute(command);
+            }
+
+            e.Handled = true;
+        }
+
+        private void CancelarResizeLarguraTexto()
+        {
+            if (_textoWidthResizeAtivo == null)
+                return;
+
+            _textoWidthResizeAtivo.LarguraCaixa = _textoWidthResizeLarguraInicial;
+            _context?.SceneQueries.Invalidate();
+            _viewportViewModel?.AtualizarViewModel(_textoWidthResizeAtivo.Modelo);
+            _textoWidthResizeAtivo = null;
+            _textoWidthResizeDeltaAcumulado = 0;
+        }
+
+        private bool ExisteEdicaoInlineAtiva()
+        {
+            return ObterTextoEmEdicaoInline() != null;
+        }
+
+        private TextoAnotativoViewModel? ObterTextoEmEdicaoInline()
+        {
+            if (_viewportViewModel == null)
+                return null;
+
+            foreach (ElementoViewModel elemento in _viewportViewModel.Elementos)
+            {
+                if (elemento is TextoAnotativoViewModel texto && texto.IsEditingInline)
+                    return texto;
+            }
+
+            return null;
+        }
+
+        private void ConfirmarEdicaoInlineAtiva()
+        {
+            TextoAnotativoViewModel? texto = ObterTextoEmEdicaoInline();
+
+            if (texto != null)
+                ConfirmarEdicaoInlineTexto(texto);
+        }
+
+        private void CancelarEdicaoInlineAtiva()
+        {
+            TextoAnotativoViewModel? texto = ObterTextoEmEdicaoInline();
+
+            if (texto != null)
+                CancelarEdicaoInlineTexto(texto);
+        }
+
+        private void CancelarEdicaoInlineTexto(TextoAnotativoViewModel texto)
+        {
+            if (!texto.IsEditingInline || _commitInlineTextInProgress || _cancelInlineTextInProgress)
+                return;
+
+            _cancelInlineTextInProgress = true;
+
+            try
+            {
+                texto.CancelarEdicaoInline();
+            }
+            finally
+            {
+                _cancelInlineTextInProgress = false;
+            }
+        }
+
+        private void ConfirmarEdicaoInlineTexto(TextoAnotativoViewModel texto)
+        {
+            if (_context == null || !texto.IsEditingInline || _commitInlineTextInProgress || _cancelInlineTextInProgress)
+                return;
+
+            _commitInlineTextInProgress = true;
+
+            try
+            {
+                string valorAntes = texto.Conteudo;
+                string valorDepois = texto.ConteudoEdicao ?? string.Empty;
+                texto.EncerrarEdicaoInline();
+
+                if (valorAntes == valorDepois)
+                    return;
+
+                var command = new BulkPropertyChangeCommand(new[]
+                {
+                    new BulkPropertyChangeCommand.Item(texto, nameof(TextoAnotativoViewModel.Conteudo), valorAntes, valorDepois)
+                });
+
+                if (!command.IsEmpty)
+                    _context.Commands.Execute(command);
+            }
+            finally
+            {
+                _commitInlineTextInProgress = false;
+            }
+        }
+
+        private static bool OrigemEstaDentroDeEditorInline(DependencyObject? origem)
+        {
+            while (origem != null)
+            {
+                if (origem is TextBox { DataContext: TextoAnotativoViewModel texto } && texto.IsEditingInline)
+                    return true;
+
+                origem = VisualTreeHelper.GetParent(origem);
+            }
+
+            return false;
+        }
+
+        private static bool OrigemEstaDentroDeTextoWidthHandle(DependencyObject? origem)
+        {
+            while (origem != null)
+            {
+                if (origem is Thumb { DataContext: TextoAnotativoViewModel })
+                    return true;
+
+                origem = VisualTreeHelper.GetParent(origem);
+            }
+
+            return false;
+        }
+
+        private static TextBox? EncontrarTextBoxInline(DependencyObject origem, TextoAnotativoViewModel texto)
+        {
+            int count = VisualTreeHelper.GetChildrenCount(origem);
+
+            for (int i = 0; i < count; i++)
+            {
+                DependencyObject child = VisualTreeHelper.GetChild(origem, i);
+
+                if (child is TextBox textBox && ReferenceEquals(textBox.DataContext, texto))
+                    return textBox;
+
+                TextBox? result = EncontrarTextBoxInline(child, texto);
+
+                if (result != null)
+                    return result;
+            }
+
+            return null;
+        }
+
+        private static ElementoViewModel? EncontrarElemento(DependencyObject? origem)
+        {
+            while (origem != null)
+            {
+                if (origem is FrameworkElement fe && fe.DataContext is ElementoViewModel vm)
+                    return vm;
+
+                origem = VisualTreeHelper.GetParent(origem);
+            }
+
+            return null;
+        }
+    }
+}
+
 
 
