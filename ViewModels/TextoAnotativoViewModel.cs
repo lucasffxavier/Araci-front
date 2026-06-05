@@ -69,6 +69,7 @@ namespace Araci.ViewModels
         public override double Altura => Bounds.Height;
 
         public double AlturaEdicao => Math.Max(Texto.AlturaEstimada, TextoAnotativo.CalcularAlturaEstimada(ConteudoEdicao, LarguraCaixa, AlturaTexto));
+        public double AlturaVisual => IsEditingInline ? AlturaEdicao : Altura;
 
         public override ElementoRenderData RenderData => new(Largura, Altura, new Point(0, 0), new Point(Largura, Altura), ForegroundBrush, 1);
 
@@ -112,6 +113,7 @@ namespace Araci.ViewModels
                 _conteudoEdicao = value ?? string.Empty;
                 OnPropertyChanged();
                 OnPropertyChanged(nameof(AlturaEdicao));
+                OnPropertyChanged(nameof(AlturaVisual));
             }
         }
 
@@ -126,6 +128,7 @@ namespace Araci.ViewModels
                 Texto.LarguraCaixa = value;
                 OnPropertyChanged();
                 OnPropertyChanged(nameof(AlturaEdicao));
+                OnPropertyChanged(nameof(AlturaVisual));
                 AtualizarNode();
                 NotificarParametros();
             }
@@ -144,6 +147,7 @@ namespace Araci.ViewModels
                 OnPropertyChanged(nameof(IsNotEditingInline));
                 OnPropertyChanged(nameof(IsInteractionLocked));
                 OnPropertyChanged(nameof(AlturaEdicao));
+                OnPropertyChanged(nameof(AlturaVisual));
                 AtualizarNode();
             }
         }
@@ -244,6 +248,7 @@ namespace Araci.ViewModels
             OnPropertyChanged(nameof(Conteudo));
             OnPropertyChanged(nameof(LarguraCaixa));
             OnPropertyChanged(nameof(AlturaEdicao));
+            OnPropertyChanged(nameof(AlturaVisual));
             NotificarParametrosDeTipo();
         }
 
@@ -257,6 +262,7 @@ namespace Araci.ViewModels
             OnPropertyChanged(nameof(TipoTexto));
             OnPropertyChanged(nameof(TipoViewModel));
             OnPropertyChanged(nameof(AlturaEdicao));
+            OnPropertyChanged(nameof(AlturaVisual));
             NotificarParametrosDeTipo();
             AtualizarNode();
         }

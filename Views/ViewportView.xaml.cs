@@ -164,10 +164,7 @@ namespace Araci.Views
             if (ExisteEdicaoInlineAtiva())
             {
                 if (clicouDentroEditorInline)
-                {
-                    e.Handled = true;
                     return;
-                }
 
                 ConfirmarEdicaoInlineAtiva();
             }
@@ -451,6 +448,16 @@ namespace Araci.Views
             }
         }
 
+
+        private void OnInlineTextBoxMouseDoubleClick(object sender, MouseButtonEventArgs e)
+        {
+            if (sender is not TextBox textBox || textBox.DataContext is not TextoAnotativoViewModel texto || !texto.IsEditingInline)
+                return;
+
+            textBox.SelectAll();
+            e.Handled = true;
+        }
+
         private void OnInlineTextBoxPreviewKeyDown(object sender, KeyEventArgs e)
         {
             if (sender is not TextBox textBox || textBox.DataContext is not TextoAnotativoViewModel texto)
@@ -657,6 +664,13 @@ namespace Araci.Views
                 string valorAntes = texto.Conteudo;
                 string valorDepois = texto.ConteudoEdicao ?? string.Empty;
                 texto.EncerrarEdicaoInline();
+
+                if (string.IsNullOrWhiteSpace(valorDepois))
+                {
+                    _context.Selection.Selecionar(texto);
+                    _context.SafeDelete.DeleteSelection();
+                    return;
+                }
 
                 if (valorAntes == valorDepois)
                     return;
