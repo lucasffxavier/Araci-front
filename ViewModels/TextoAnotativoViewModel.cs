@@ -134,6 +134,23 @@ namespace Araci.ViewModels
             }
         }
 
+        public new double Rotacao
+        {
+            get => NormalizarRotacao(Texto.Rotacao);
+            set
+            {
+                double normalizada = NormalizarRotacao(value);
+
+                if (Math.Abs(Texto.Rotacao - normalizada) < 0.000001)
+                    return;
+
+                Texto.Rotacao = normalizada;
+                OnPropertyChanged();
+                AtualizarNode();
+                NotificarParametros();
+            }
+        }
+
         public bool IsEditingInline
         {
             get => _isEditingInline;
@@ -234,7 +251,7 @@ namespace Araci.ViewModels
         {
             Texto.PosicaoX = estado.X;
             Texto.PosicaoY = estado.Y;
-            Texto.Rotacao = estado.Rotacao;
+            Texto.Rotacao = NormalizarRotacao(estado.Rotacao);
 
             if (estado.X2 > 0)
                 Texto.LarguraCaixa = estado.X2;
@@ -247,6 +264,7 @@ namespace Araci.ViewModels
             base.NotificarGeometria();
             OnPropertyChanged(nameof(Conteudo));
             OnPropertyChanged(nameof(LarguraCaixa));
+            OnPropertyChanged(nameof(Rotacao));
             OnPropertyChanged(nameof(AlturaEdicao));
             OnPropertyChanged(nameof(AlturaVisual));
             NotificarParametrosDeTipo();
@@ -278,6 +296,20 @@ namespace Araci.ViewModels
             OnPropertyChanged(nameof(TextAlignment));
             OnPropertyChanged(nameof(TextBoxHorizontalContentAlignment));
             OnPropertyChanged(nameof(RenderData));
+        }
+
+        private static double NormalizarRotacao(double valor)
+        {
+            if (double.IsNaN(valor) || double.IsInfinity(valor))
+                return 0;
+
+            double normalizada = valor % 360;
+
+            if (normalizada < 0)
+                normalizada += 360;
+
+            double arredondada = Math.Round(normalizada / 90.0) * 90.0;
+            return arredondada >= 360 ? 0 : arredondada;
         }
 
         private static Brush CriarBrush(string cor)
