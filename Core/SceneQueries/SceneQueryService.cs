@@ -139,6 +139,9 @@ namespace Araci.Core.SceneQueries
             if (ObterBoundsRotacionado(vm).IntersectsWith(area))
                 return true;
 
+            if (vm is TextoAnotativoViewModel texto && texto.LeaderAtivo && SegmentIntersectsRect(texto.LeaderInicioWorld, texto.LeaderPoint, area))
+                return true;
+
             if (vm.Modelo is not ITerminalOwner owner)
                 return false;
 
@@ -236,12 +239,24 @@ namespace Araci.Core.SceneQueries
         {
             Rect bounds = texto.Bounds;
             Rect area = new(bounds.X - tolerance, bounds.Y - tolerance, Math.Max(1, bounds.Width + tolerance * 2), Math.Max(1, bounds.Height + tolerance * 2));
+            bool dentroTexto;
 
             if (Math.Abs(texto.Rotacao) <= 0.000001)
-                return area.Contains(point) ? new HitCandidate(texto, 0, 1, order) : null;
+                dentroTexto = area.Contains(point);
+            else
+            {
+                Point localPoint = RotateAround(point, texto.Centro, -texto.Rotacao);
+                dentroTexto = area.Contains(localPoint);
+            }
 
-            Point localPoint = RotateAround(point, texto.Centro, -texto.Rotacao);
-            return area.Contains(localPoint) ? new HitCandidate(texto, 0, 1, order) : null;
+            if (dentroTexto)
+                return new HitCandidate(texto, 0, 1, order);
+
+            if (!texto.LeaderAtivo)
+                return null;
+
+            double distanciaLeader = DistanciaPontoSegmento(point, texto.LeaderInicioWorld, texto.LeaderPoint);
+            return distanciaLeader <= tolerance ? new HitCandidate(texto, distanciaLeader, 2, order) : null;
         }
 
         private static bool EhMelhor(HitCandidate candidato, HitCandidate? atual)
@@ -269,6 +284,52 @@ namespace Araci.Core.SceneQueries
                 menor = Math.Min(menor, DistanciaPontoSegmento(point, vertices[i], vertices[i + 1]));
 
             return menor;
+        }
+
+
+        private static bool SegmentIntersectsRect(Point a, Point b, Rect rect)
+        {
+            if (rect.Contains(a) || rect.Contains(b))
+                return true;
+
+            Point topLeft = new(rect.Left, rect.Top);
+            Point topRight = new(rect.Right, rect.Top);
+            Point bottomRight = new(rect.Right, rect.Bottom);
+            Point bottomLeft = new(rect.Left, rect.Bottom);
+
+            return SegmentsIntersect(a, b, topLeft, topRight) ||
+                SegmentsIntersect(a, b, topRight, bottomRight) ||
+                SegmentsIntersect(a, b, bottomRight, bottomLeft) ||
+                SegmentsIntersect(a, b, bottomLeft, topLeft);
+        }
+
+        private static bool SegmentsIntersect(Point p1, Point p2, Point q1, Point q2)
+        {
+            double o1 = Orientation(p1, p2, q1);
+            double o2 = Orientation(p1, p2, q2);
+            double o3 = Orientation(q1, q2, p1);
+            double o4 = Orientation(q1, q2, p2);
+
+            if (o1 * o2 < 0 && o3 * o4 < 0)
+                return true;
+
+            return Math.Abs(o1) < 0.000001 && OnSegment(p1, q1, p2) ||
+                Math.Abs(o2) < 0.000001 && OnSegment(p1, q2, p2) ||
+                Math.Abs(o3) < 0.000001 && OnSegment(q1, p1, q2) ||
+                Math.Abs(o4) < 0.000001 && OnSegment(q1, p2, q2);
+        }
+
+        private static double Orientation(Point a, Point b, Point c)
+        {
+            return (b.X - a.X) * (c.Y - a.Y) - (b.Y - a.Y) * (c.X - a.X);
+        }
+
+        private static bool OnSegment(Point a, Point b, Point c)
+        {
+            return b.X >= Math.Min(a.X, c.X) - 0.000001 &&
+                b.X <= Math.Max(a.X, c.X) + 0.000001 &&
+                b.Y >= Math.Min(a.Y, c.Y) - 0.000001 &&
+                b.Y <= Math.Max(a.Y, c.Y) + 0.000001;
         }
 
         private static double DistanciaPontoSegmento(Point p, Point a, Point b)
@@ -366,7 +427,12 @@ namespace Araci.Core.SceneQueries
                     nameof(ElementoViewModel.Altura) or
                     nameof(ElementoViewModel.Centro) or
                     nameof(ElementoViewModel.Rotacao) or
-                    nameof(ElementoViewModel.RenderData))
+                    nameof(ElementoViewModel.RenderData) or
+                    nameof(TextoAnotativoViewModel.LeaderAtivo) or
+                    nameof(TextoAnotativoViewModel.LeaderX) or
+                    nameof(TextoAnotativoViewModel.LeaderY) or
+                    nameof(TextoAnotativoViewModel.LeaderPoint) or
+                    nameof(TextoAnotativoViewModel.LeaderInicioWorld))
             {
                 Invalidate();
             }

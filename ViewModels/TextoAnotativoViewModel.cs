@@ -14,6 +14,8 @@ namespace Araci.ViewModels
 {
     public class TextoAnotativoViewModel : ElementoViewModel
     {
+        private const double LeaderArrowLength = 10.0;
+        private const double LeaderArrowHalfWidth = 4.5;
         private bool _isEditingInline;
         private string _conteudoEdicao = string.Empty;
 
@@ -147,6 +149,7 @@ namespace Araci.ViewModels
                 Texto.Rotacao = normalizada;
                 OnPropertyChanged();
                 AtualizarNode();
+                NotificarLeader();
                 NotificarParametros();
             }
         }
@@ -161,6 +164,7 @@ namespace Araci.ViewModels
 
                 Texto.LeaderAtivo = value;
                 OnPropertyChanged();
+                NotificarLeader();
                 AtualizarNode();
                 NotificarParametros();
             }
@@ -176,6 +180,7 @@ namespace Araci.ViewModels
 
                 Texto.LeaderX = value;
                 OnPropertyChanged();
+                NotificarLeader();
                 AtualizarNode();
                 NotificarParametros();
             }
@@ -191,6 +196,7 @@ namespace Araci.ViewModels
 
                 Texto.LeaderY = value;
                 OnPropertyChanged();
+                NotificarLeader();
                 AtualizarNode();
                 NotificarParametros();
             }
@@ -204,8 +210,15 @@ namespace Araci.ViewModels
                 LeaderX = value.X;
                 LeaderY = value.Y;
                 OnPropertyChanged();
+                NotificarLeader();
             }
         }
+
+        public bool LeaderVisivel => LeaderAtivo && !IsEditingInline;
+        public Point LeaderInicioLocal => CalcularLeaderInicioLocal();
+        public Point LeaderFimLocal => WorldToLocal(LeaderPoint);
+        public Point LeaderInicioWorld => LocalToWorld(LeaderInicioLocal);
+        public PointCollection LeaderArrowPoints => CalcularLeaderArrowPoints();
 
         public bool IsEditingInline
         {
@@ -221,6 +234,7 @@ namespace Araci.ViewModels
                 OnPropertyChanged(nameof(IsInteractionLocked));
                 OnPropertyChanged(nameof(AlturaEdicao));
                 OnPropertyChanged(nameof(AlturaVisual));
+                NotificarLeader();
                 AtualizarNode();
             }
         }
@@ -295,7 +309,15 @@ namespace Araci.ViewModels
 
             Texto.PosicaoX += delta.X;
             Texto.PosicaoY += delta.Y;
+
+            if (LeaderAtivo)
+            {
+                Texto.LeaderX += delta.X;
+                Texto.LeaderY += delta.Y;
+            }
+
             AtualizarNode();
+            NotificarLeader();
         }
 
         public override ElementoEstado CapturarEstado()
@@ -316,6 +338,7 @@ namespace Araci.ViewModels
             Texto.LeaderX = estado.TextoLeaderX;
             Texto.LeaderY = estado.TextoLeaderY;
             AtualizarNode();
+            NotificarLeader();
         }
 
         protected override void NotificarGeometria()
@@ -330,7 +353,82 @@ namespace Araci.ViewModels
             OnPropertyChanged(nameof(LeaderPoint));
             OnPropertyChanged(nameof(AlturaEdicao));
             OnPropertyChanged(nameof(AlturaVisual));
+            NotificarLeader();
             NotificarParametrosDeTipo();
+        }
+
+        private Point CalcularLeaderInicioLocal()
+        {
+            double largura = Math.Max(1, Largura);
+            double altura = Math.Max(1, AlturaVisual);
+            Point centro = new(largura / 2, altura / 2);
+            Point fim = LeaderFimLocal;
+            Vector direcao = fim - centro;
+
+            if (direcao.Length < 0.000001)
+                return centro;
+
+            double t = double.PositiveInfinity;
+
+            if (direcao.X > 0.000001)
+                t = Math.Min(t, (largura - centro.X) / direcao.X);
+            else if (direcao.X < -0.000001)
+                t = Math.Min(t, (0 - centro.X) / direcao.X);
+
+            if (direcao.Y > 0.000001)
+                t = Math.Min(t, (altura - centro.Y) / direcao.Y);
+            else if (direcao.Y < -0.000001)
+                t = Math.Min(t, (0 - centro.Y) / direcao.Y);
+
+            if (double.IsNaN(t) || double.IsInfinity(t))
+                t = 0;
+
+            t = Math.Max(0, Math.Min(1, t));
+            return centro + direcao * t;
+        }
+
+        private PointCollection CalcularLeaderArrowPoints()
+        {
+            Point fim = LeaderFimLocal;
+            Point inicio = LeaderInicioLocal;
+            Vector direcao = inicio - fim;
+
+            if (direcao.Length < 0.000001)
+                direcao = new Vector(0, -1);
+            else
+                direcao.Normalize();
+
+            Vector normal = new(-direcao.Y, direcao.X);
+            Point p1 = fim + direcao * LeaderArrowLength + normal * LeaderArrowHalfWidth;
+            Point p2 = fim + direcao * LeaderArrowLength - normal * LeaderArrowHalfWidth;
+
+            return new PointCollection { fim, p1, p2 };
+        }
+
+        private Point WorldToLocal(Point world)
+        {
+            double largura = Math.Max(1, Largura);
+            double altura = Math.Max(1, AlturaVisual);
+            Point centroWorld = new(WorldX + largura / 2, WorldY + altura / 2);
+            double radians = -Rotacao * Math.PI / 180.0;
+            double cos = Math.Cos(radians);
+            double sin = Math.Sin(radians);
+            double dx = world.X - centroWorld.X;
+            double dy = world.Y - centroWorld.Y;
+            return new Point(largura / 2 + dx * cos - dy * sin, altura / 2 + dx * sin + dy * cos);
+        }
+
+        private Point LocalToWorld(Point local)
+        {
+            double largura = Math.Max(1, Largura);
+            double altura = Math.Max(1, AlturaVisual);
+            Point centroWorld = new(WorldX + largura / 2, WorldY + altura / 2);
+            double radians = Rotacao * Math.PI / 180.0;
+            double cos = Math.Cos(radians);
+            double sin = Math.Sin(radians);
+            double dx = local.X - largura / 2;
+            double dy = local.Y - altura / 2;
+            return new Point(centroWorld.X + dx * cos - dy * sin, centroWorld.Y + dx * sin + dy * cos);
         }
 
         private void SelecionarTipoTexto(TipoTextoAnotativo tipo)
@@ -345,7 +443,18 @@ namespace Araci.ViewModels
             OnPropertyChanged(nameof(AlturaEdicao));
             OnPropertyChanged(nameof(AlturaVisual));
             NotificarParametrosDeTipo();
+            NotificarLeader();
             AtualizarNode();
+        }
+
+        private void NotificarLeader()
+        {
+            OnPropertyChanged(nameof(LeaderVisivel));
+            OnPropertyChanged(nameof(LeaderPoint));
+            OnPropertyChanged(nameof(LeaderInicioLocal));
+            OnPropertyChanged(nameof(LeaderFimLocal));
+            OnPropertyChanged(nameof(LeaderInicioWorld));
+            OnPropertyChanged(nameof(LeaderArrowPoints));
         }
 
         private void NotificarParametrosDeTipo()
