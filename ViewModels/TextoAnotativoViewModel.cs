@@ -231,6 +231,7 @@ namespace Araci.ViewModels
         public Point LeaderInicioWorld => LocalToWorld(LeaderInicioLocal);
         public PointCollection LeaderArrowPoints => CalcularLeaderArrowPoints();
         public PointCollection LeaderArrowWorldPoints => CalcularLeaderArrowWorldPoints();
+        public PointCollection LeaderOpenArrowWorldPoints => CalcularLeaderOpenArrowWorldPoints();
 
         public bool IsEditingInline
         {
@@ -264,9 +265,8 @@ namespace Araci.ViewModels
         public double LeaderTamanhoSeta => Math.Max(1.0, TipoTexto?.LeaderTamanhoSeta ?? 10.0);
         public double LeaderArrowHalfWidth => Math.Max(2.0, LeaderTamanhoSeta * 0.45);
         public bool LeaderArrowVisivel => LeaderVisivel && LeaderEstiloSeta != "Sem seta";
-        public bool LeaderArrowFillVisivel => LeaderArrowVisivel && LeaderEstiloSeta != "Seta aberta";
+        public bool LeaderArrowFillVisivel => LeaderArrowVisivel && LeaderEstiloSeta == "Seta preenchida";
         public bool LeaderArrowOpenVisivel => LeaderArrowVisivel && LeaderEstiloSeta == "Seta aberta";
-        public bool LeaderPointArrowVisivel => LeaderArrowVisivel && LeaderEstiloSeta == "Ponto";
 
         public bool Visivel
         {
@@ -445,6 +445,16 @@ namespace Araci.ViewModels
             return new PointCollection { fim, p1, p2 };
         }
 
+        private PointCollection CalcularLeaderOpenArrowWorldPoints()
+        {
+            PointCollection pontos = CalcularLeaderArrowWorldPoints();
+
+            if (pontos.Count < 3)
+                return pontos;
+
+            return new PointCollection { pontos[1], pontos[0], pontos[2] };
+        }
+
         private Point WorldToLocal(Point world)
         {
             double largura = Math.Max(1, Largura);
@@ -508,10 +518,10 @@ namespace Araci.ViewModels
             OnPropertyChanged(nameof(LeaderInicioWorld));
             OnPropertyChanged(nameof(LeaderArrowPoints));
             OnPropertyChanged(nameof(LeaderArrowWorldPoints));
+            OnPropertyChanged(nameof(LeaderOpenArrowWorldPoints));
             OnPropertyChanged(nameof(LeaderArrowVisivel));
             OnPropertyChanged(nameof(LeaderArrowFillVisivel));
             OnPropertyChanged(nameof(LeaderArrowOpenVisivel));
-            OnPropertyChanged(nameof(LeaderPointArrowVisivel));
         }
 
         private void NotificarParametrosDeTipo()
@@ -528,7 +538,6 @@ namespace Araci.ViewModels
             OnPropertyChanged(nameof(LeaderArrowVisivel));
             OnPropertyChanged(nameof(LeaderArrowFillVisivel));
             OnPropertyChanged(nameof(LeaderArrowOpenVisivel));
-            OnPropertyChanged(nameof(LeaderPointArrowVisivel));
             OnPropertyChanged(nameof(ForegroundBrush));
             OnPropertyChanged(nameof(LeaderBrush));
             OnPropertyChanged(nameof(FontFamily));

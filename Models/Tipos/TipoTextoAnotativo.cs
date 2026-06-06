@@ -108,7 +108,6 @@
             {
                 "Sem seta" => "Sem seta",
                 "Seta aberta" => "Seta aberta",
-                "Ponto" => "Ponto",
                 _ => "Seta preenchida"
             };
         }

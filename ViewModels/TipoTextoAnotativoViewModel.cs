@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Globalization;
 using System.Collections.ObjectModel;
 using System.Linq;
 using System.Windows;
@@ -117,7 +118,6 @@ namespace Araci.ViewModels
         {
             "Seta preenchida",
             "Seta aberta",
-            "Ponto",
             "Sem seta"
         };
 
@@ -227,6 +227,23 @@ namespace Araci.ViewModels
 
                 TipoTexto.LeaderEspessura = value;
                 OnPropertyChanged();
+                OnPropertyChanged(nameof(LeaderEspessuraTexto));
+            }
+        }
+
+        public string LeaderEspessuraTexto
+        {
+            get => FormatarNumero(LeaderEspessura);
+            set
+            {
+                if (!TentarConverterNumeroPositivo(value, out double numero))
+                {
+                    OnPropertyChanged();
+                    return;
+                }
+
+                LeaderEspessura = numero;
+                OnPropertyChanged();
             }
         }
 
@@ -239,6 +256,23 @@ namespace Araci.ViewModels
                     return;
 
                 TipoTexto.LeaderTamanhoSeta = value;
+                OnPropertyChanged();
+                OnPropertyChanged(nameof(LeaderTamanhoSetaTexto));
+            }
+        }
+
+        public string LeaderTamanhoSetaTexto
+        {
+            get => FormatarNumero(LeaderTamanhoSeta);
+            set
+            {
+                if (!TentarConverterNumeroPositivo(value, out double numero))
+                {
+                    OnPropertyChanged();
+                    return;
+                }
+
+                LeaderTamanhoSeta = numero;
                 OnPropertyChanged();
             }
         }
@@ -461,7 +495,9 @@ namespace Araci.ViewModels
             OnPropertyChanged(nameof(LeaderCor));
             OnPropertyChanged(nameof(LeaderCorBrush));
             OnPropertyChanged(nameof(LeaderEspessura));
+            OnPropertyChanged(nameof(LeaderEspessuraTexto));
             OnPropertyChanged(nameof(LeaderTamanhoSeta));
+            OnPropertyChanged(nameof(LeaderTamanhoSetaTexto));
         }
 
         private static TipoTextoAnotativo ClonarTipo(TipoTextoAnotativo origem)
@@ -485,6 +521,28 @@ namespace Araci.ViewModels
         private static string NormalizarNome(string? nome)
         {
             return string.IsNullOrWhiteSpace(nome) ? string.Empty : nome.Trim();
+        }
+
+        private static string FormatarNumero(double valor)
+        {
+            return valor.ToString("0.####", CultureInfo.CurrentCulture);
+        }
+
+        private static bool TentarConverterNumeroPositivo(string? texto, out double valor)
+        {
+            valor = 0;
+
+            if (string.IsNullOrWhiteSpace(texto))
+                return false;
+
+            string normalizado = texto.Trim();
+
+            if (double.TryParse(normalizado, NumberStyles.Float, CultureInfo.CurrentCulture, out valor) && valor > 0)
+                return true;
+
+            normalizado = normalizado.Replace(',', '.');
+
+            return double.TryParse(normalizado, NumberStyles.Float, CultureInfo.InvariantCulture, out valor) && valor > 0;
         }
 
         private static Brush CriarBrush(string cor)
