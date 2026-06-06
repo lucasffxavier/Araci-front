@@ -52,6 +52,10 @@ namespace Araci.Infrastructure.Persistence
         public string Fonte { get; set; } = "Arial";
         public double AlturaTexto { get; set; } = 14.0;
         public string AlinhamentoHorizontal { get; set; } = "Esquerda";
+        public string LeaderEstiloSeta { get; set; } = "Seta preenchida";
+        public string LeaderCor { get; set; } = "#FF000000";
+        public double LeaderEspessura { get; set; } = 1.2;
+        public double LeaderTamanhoSeta { get; set; } = 10.0;
     }
 
     public sealed class ElementDto

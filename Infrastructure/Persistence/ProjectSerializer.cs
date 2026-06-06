@@ -198,9 +198,9 @@ namespace Araci.Infrastructure.Persistence
 
         private static IEnumerable<TextAnnotationTypeDto> CreateDefaultTextAnnotationTypeDtos()
         {
-            yield return new TextAnnotationTypeDto { NomeTipo = "Texto padrão", Familia = "Anotações", Categoria = "Textos", CorTexto = "#FF000000", Fonte = "Arial", AlturaTexto = 14.0, AlinhamentoHorizontal = "Esquerda" };
-            yield return new TextAnnotationTypeDto { NomeTipo = "Texto pequeno", Familia = "Anotações", Categoria = "Textos", CorTexto = "#FF000000", Fonte = "Arial", AlturaTexto = 10.0, AlinhamentoHorizontal = "Esquerda" };
-            yield return new TextAnnotationTypeDto { NomeTipo = "Texto título", Familia = "Anotações", Categoria = "Textos", CorTexto = "#FF000000", Fonte = "Arial", AlturaTexto = 20.0, AlinhamentoHorizontal = "Centro" };
+            yield return new TextAnnotationTypeDto { NomeTipo = "Texto padrão", Familia = "Anotações", Categoria = "Textos", CorTexto = "#FF000000", Fonte = "Arial", AlturaTexto = 14.0, AlinhamentoHorizontal = "Esquerda", LeaderEstiloSeta = "Seta preenchida", LeaderCor = "#FF000000", LeaderEspessura = 1.2, LeaderTamanhoSeta = 10.0 };
+            yield return new TextAnnotationTypeDto { NomeTipo = "Texto pequeno", Familia = "Anotações", Categoria = "Textos", CorTexto = "#FF000000", Fonte = "Arial", AlturaTexto = 10.0, AlinhamentoHorizontal = "Esquerda", LeaderEstiloSeta = "Seta preenchida", LeaderCor = "#FF000000", LeaderEspessura = 1.2, LeaderTamanhoSeta = 10.0 };
+            yield return new TextAnnotationTypeDto { NomeTipo = "Texto título", Familia = "Anotações", Categoria = "Textos", CorTexto = "#FF000000", Fonte = "Arial", AlturaTexto = 20.0, AlinhamentoHorizontal = "Centro", LeaderEstiloSeta = "Seta preenchida", LeaderCor = "#FF000000", LeaderEspessura = 1.2, LeaderTamanhoSeta = 10.0 };
         }
 
         private static TextAnnotationTypeDto CriarTextAnnotationTypeDto(TipoTextoAnotativo tipo)
@@ -213,7 +213,11 @@ namespace Araci.Infrastructure.Persistence
                 CorTexto = tipo.CorTexto,
                 Fonte = tipo.Fonte,
                 AlturaTexto = tipo.AlturaTexto,
-                AlinhamentoHorizontal = tipo.AlinhamentoHorizontal
+                AlinhamentoHorizontal = tipo.AlinhamentoHorizontal,
+                LeaderEstiloSeta = tipo.LeaderEstiloSeta,
+                LeaderCor = tipo.LeaderCor,
+                LeaderEspessura = tipo.LeaderEspessura,
+                LeaderTamanhoSeta = tipo.LeaderTamanhoSeta
             };
         }
 
@@ -230,6 +234,10 @@ namespace Araci.Infrastructure.Persistence
             tipo.Fonte = dto.Fonte;
             tipo.AlturaTexto = dto.AlturaTexto;
             tipo.AlinhamentoHorizontal = dto.AlinhamentoHorizontal;
+            tipo.LeaderEstiloSeta = dto.LeaderEstiloSeta;
+            tipo.LeaderCor = dto.LeaderCor;
+            tipo.LeaderEspessura = dto.LeaderEspessura;
+            tipo.LeaderTamanhoSeta = dto.LeaderTamanhoSeta;
             return tipo;
         }
 
