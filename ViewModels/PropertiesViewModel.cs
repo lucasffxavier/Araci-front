@@ -24,7 +24,7 @@ namespace Araci.ViewModels
         private readonly EditarPropriedadesUseCase? _editarPropriedades;
         private readonly EditorSettings _settings;
         private object? _elementoSelecionado;
-        private ICommand? _abrirPropriedadesTipoCommand;
+        private SimpleCommand? _abrirPropriedadesTipoCommand;
 
         public PropertiesViewModel()
         {
@@ -40,6 +40,7 @@ namespace Araci.ViewModels
             QuantidadeSelecionada = _selecionados.Count;
             Titulo = CriarTitulo(_selecionados);
             Propriedades = new ObservableCollection<PropertyDescriptorViewModel>(CriarDescritores(_selecionados, _editarPropriedades, _settings));
+            AssinarAlteracoesDosElementosSelecionados();
         }
 
         public object? ElementoSelecionado
@@ -84,8 +85,7 @@ namespace Araci.ViewModels
                 if (!_editarPropriedades.Executar(_selecionados, nameof(ElementoViewModel.Tipo), value))
                     return;
 
-                OnPropertyChanged();
-                OnPropertyChanged(nameof(PodeAbrirPropriedadesTipo));
+                AtualizarSeletorTipo();
             }
         }
 
@@ -97,6 +97,27 @@ namespace Araci.ViewModels
                 return;
 
             _selecionados[0].AbrirPropriedadesTipoCommand.Execute(null);
+            AtualizarSeletorTipo();
+        }
+
+        private void AssinarAlteracoesDosElementosSelecionados()
+        {
+            foreach (ElementoViewModel elemento in _selecionados)
+                elemento.PropertyChanged += OnElementoSelecionadoPropertyChanged;
+        }
+
+        private void OnElementoSelecionadoPropertyChanged(object? sender, PropertyChangedEventArgs e)
+        {
+            if (string.IsNullOrEmpty(e.PropertyName) || e.PropertyName == nameof(ElementoViewModel.Tipo) || e.PropertyName == nameof(ElementoViewModel.TipoViewModel))
+                AtualizarSeletorTipo();
+        }
+
+        private void AtualizarSeletorTipo()
+        {
+            OnPropertyChanged(nameof(TiposDisponiveis));
+            OnPropertyChanged(nameof(Tipo));
+            OnPropertyChanged(nameof(PodeAbrirPropriedadesTipo));
+            _abrirPropriedadesTipoCommand?.RaiseCanExecuteChanged();
         }
 
         private static string CriarTitulo(IReadOnlyList<ElementoViewModel> itens)
