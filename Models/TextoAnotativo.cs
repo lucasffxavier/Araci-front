@@ -91,6 +91,8 @@ namespace Araci.Models
         {
             var clone = new TextoAnotativo();
             CopiarBasePara(clone);
+            clone.Texto = Texto;
+            clone.LarguraCaixa = LarguraCaixa;
             clone.LeaderAtivo = LeaderAtivo;
             clone.LeaderX = LeaderX;
             clone.LeaderY = LeaderY;

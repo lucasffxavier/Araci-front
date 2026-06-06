@@ -257,9 +257,7 @@ namespace Araci.Infrastructure.Persistence
             return UnitFormatter.GetQuantity(unit) == quantity ? unit : fallback;
         }
 
-        private static string NomeProjetoParaSalvar(
-            ProjectMetadataDto metadata,
-            string path)
+        private static string NomeProjetoParaSalvar(ProjectMetadataDto metadata, string path)
         {
             if (!string.IsNullOrWhiteSpace(metadata.ProjectName) &&
                 !string.Equals(metadata.ProjectName, UntitledProjectName, StringComparison.OrdinalIgnoreCase))
@@ -303,9 +301,9 @@ namespace Araci.Infrastructure.Persistence
                 return null;
 
             elemento.Id = dto.Id == Guid.Empty ? Guid.NewGuid() : dto.Id;
-            elemento.PosicaoX = dto.X;
-            elemento.PosicaoY = dto.Y;
-            elemento.Rotacao = dto.Rotation;
+            elemento.PosicaoX = NormalizarCoordenada(dto.X);
+            elemento.PosicaoY = NormalizarCoordenada(dto.Y);
+            elemento.Rotacao = NormalizarRotacao(dto.Rotation);
             elemento.Escala = dto.Scale == 0 ? 1 : dto.Scale;
             elemento.Tipo = ResolverTipo(dto.Kind, dto.Type);
 
@@ -336,13 +334,17 @@ namespace Araci.Infrastructure.Persistence
                 barra.Altura = barra.Altura;
 
             if (elemento is TextoAnotativo texto)
-            {
-                texto.Texto = texto.Texto;
-                texto.LarguraCaixa = texto.LarguraCaixa;
-                texto.LeaderAtivo = texto.LeaderAtivo;
-                texto.LeaderX = texto.LeaderX;
-                texto.LeaderY = texto.LeaderY;
-            }
+                NormalizarTextoAnotativo(texto);
+        }
+
+        private static void NormalizarTextoAnotativo(TextoAnotativo texto)
+        {
+            texto.Texto = texto.Texto;
+            texto.LarguraCaixa = texto.LarguraCaixa;
+            texto.Rotacao = NormalizarRotacao(texto.Rotacao);
+            texto.LeaderAtivo = texto.LeaderAtivo;
+            texto.LeaderX = NormalizarCoordenada(texto.LeaderX);
+            texto.LeaderY = NormalizarCoordenada(texto.LeaderY);
         }
 
         private static object? ConverterValor(ParameterDto dto, Type destino)
@@ -471,6 +473,24 @@ namespace Araci.Infrastructure.Persistence
         private static PointDto CriarPointDto(Point point)
         {
             return new PointDto { X = point.X, Y = point.Y };
+        }
+
+        private static double NormalizarRotacao(double valor)
+        {
+            if (double.IsNaN(valor) || double.IsInfinity(valor))
+                return 0;
+
+            double normalizada = valor % 360;
+
+            if (normalizada < 0)
+                normalizada += 360;
+
+            return normalizada >= 360 ? 0 : normalizada;
+        }
+
+        private static double NormalizarCoordenada(double valor)
+        {
+            return double.IsNaN(valor) || double.IsInfinity(valor) ? 0.0 : valor;
         }
     }
 }
