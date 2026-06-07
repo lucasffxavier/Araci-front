@@ -345,6 +345,7 @@ namespace Araci.Infrastructure.Persistence
             texto.LeaderAtivo = texto.LeaderAtivo;
             texto.LeaderX = NormalizarCoordenada(texto.LeaderX);
             texto.LeaderY = NormalizarCoordenada(texto.LeaderY);
+            texto.LeaderComCotovelo = texto.LeaderComCotovelo;
             texto.LeaderCotoveloX = NormalizarCoordenada(texto.LeaderCotoveloX);
             texto.LeaderCotoveloY = NormalizarCoordenada(texto.LeaderCotoveloY);
             texto.LeaderCotoveloManual = texto.LeaderCotoveloManual;
