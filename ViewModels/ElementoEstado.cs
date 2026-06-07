@@ -17,8 +17,9 @@ namespace Araci.ViewModels
         public double TextoLeaderY { get; }
         public double TextoLeaderCotoveloX { get; }
         public double TextoLeaderCotoveloY { get; }
+        public bool TextoLeaderCotoveloManual { get; }
 
-        public ElementoEstado(double x, double y, double x2 = 0, double y2 = 0, double rotacao = 0, IEnumerable<Point>? vertices = null, bool textoLeaderAtivo = false, double textoLeaderX = 0, double textoLeaderY = 0, double textoLeaderCotoveloX = 0, double textoLeaderCotoveloY = 0)
+        public ElementoEstado(double x, double y, double x2 = 0, double y2 = 0, double rotacao = 0, IEnumerable<Point>? vertices = null, bool textoLeaderAtivo = false, double textoLeaderX = 0, double textoLeaderY = 0, double textoLeaderCotoveloX = 0, double textoLeaderCotoveloY = 0, bool textoLeaderCotoveloManual = false)
         {
             X = x;
             Y = y;
@@ -31,6 +32,7 @@ namespace Araci.ViewModels
             TextoLeaderY = textoLeaderY;
             TextoLeaderCotoveloX = textoLeaderCotoveloX;
             TextoLeaderCotoveloY = textoLeaderCotoveloY;
+            TextoLeaderCotoveloManual = textoLeaderCotoveloManual;
         }
 
         public void AplicarEm(Elemento elemento)
@@ -69,6 +71,7 @@ namespace Araci.ViewModels
                 texto.LeaderY = TextoLeaderY;
                 texto.LeaderCotoveloX = TextoLeaderCotoveloX;
                 texto.LeaderCotoveloY = TextoLeaderCotoveloY;
+                texto.LeaderCotoveloManual = TextoLeaderCotoveloManual;
 
                 if (X2 > 0)
                     texto.LarguraCaixa = X2;

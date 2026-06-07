@@ -643,7 +643,9 @@ namespace Araci.Views
             _textoLeaderCotoveloEstadoInicial = null;
             AtualizarCursorNavegacao();
 
-            if (Math.Abs(depois.TextoLeaderCotoveloX - antes.TextoLeaderCotoveloX) < 0.000001 && Math.Abs(depois.TextoLeaderCotoveloY - antes.TextoLeaderCotoveloY) < 0.000001)
+            if (Math.Abs(depois.TextoLeaderCotoveloX - antes.TextoLeaderCotoveloX) < 0.000001 &&
+                Math.Abs(depois.TextoLeaderCotoveloY - antes.TextoLeaderCotoveloY) < 0.000001 &&
+                depois.TextoLeaderCotoveloManual == antes.TextoLeaderCotoveloManual)
             {
                 texto.AplicarEstado(antes);
                 _context.SceneQueries.Invalidate();
@@ -659,7 +661,8 @@ namespace Araci.Views
             var itens = new[]
             {
                 new BulkPropertyChangeCommand.Item(texto, nameof(TextoAnotativoViewModel.LeaderCotoveloX), antes.TextoLeaderCotoveloX, depois.TextoLeaderCotoveloX),
-                new BulkPropertyChangeCommand.Item(texto, nameof(TextoAnotativoViewModel.LeaderCotoveloY), antes.TextoLeaderCotoveloY, depois.TextoLeaderCotoveloY)
+                new BulkPropertyChangeCommand.Item(texto, nameof(TextoAnotativoViewModel.LeaderCotoveloY), antes.TextoLeaderCotoveloY, depois.TextoLeaderCotoveloY),
+                new BulkPropertyChangeCommand.Item(texto, nameof(TextoAnotativoViewModel.LeaderCotoveloManual), antes.TextoLeaderCotoveloManual, depois.TextoLeaderCotoveloManual)
             };
 
             var command = new BulkPropertyChangeCommand(itens);

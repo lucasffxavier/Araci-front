@@ -347,6 +347,7 @@ namespace Araci.Infrastructure.Persistence
             texto.LeaderY = NormalizarCoordenada(texto.LeaderY);
             texto.LeaderCotoveloX = NormalizarCoordenada(texto.LeaderCotoveloX);
             texto.LeaderCotoveloY = NormalizarCoordenada(texto.LeaderCotoveloY);
+            texto.LeaderCotoveloManual = texto.LeaderCotoveloManual;
         }
 
         private static object? ConverterValor(ParameterDto dto, Type destino)

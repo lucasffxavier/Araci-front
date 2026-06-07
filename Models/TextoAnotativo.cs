@@ -15,6 +15,7 @@ namespace Araci.Models
         public const string PARAM_LEADER_COM_COTOVELO = "LeaderComCotovelo";
         public const string PARAM_LEADER_COTOVELO_X = "LeaderCotoveloX";
         public const string PARAM_LEADER_COTOVELO_Y = "LeaderCotoveloY";
+        public const string PARAM_LEADER_COTOVELO_MANUAL = "LeaderCotoveloManual";
         public const double LarguraCaixaPadrao = 200.0;
         public const double LarguraCaixaMinima = 20.0;
         public const double MargemHorizontalCaixa = 8.0;
@@ -29,6 +30,7 @@ namespace Araci.Models
             DefinirParametro(new Parameter<bool>(PARAM_LEADER_COM_COTOVELO, false));
             DefinirParametro(new Parameter<double>(PARAM_LEADER_COTOVELO_X, 0.0));
             DefinirParametro(new Parameter<double>(PARAM_LEADER_COTOVELO_Y, 0.0));
+            DefinirParametro(new Parameter<bool>(PARAM_LEADER_COTOVELO_MANUAL, false));
         }
 
         public string Texto
@@ -79,6 +81,12 @@ namespace Araci.Models
             set => Definir(PARAM_LEADER_COTOVELO_Y, NormalizarCoordenada(value));
         }
 
+        public bool LeaderCotoveloManual
+        {
+            get => Obter<bool>(PARAM_LEADER_COTOVELO_MANUAL);
+            set => Definir(PARAM_LEADER_COTOVELO_MANUAL, value);
+        }
+
         public TipoTextoAnotativo? TipoTexto => Tipo as TipoTextoAnotativo;
 
         public string CorTexto => TipoTexto?.CorTexto ?? "#FF000000";
@@ -123,6 +131,7 @@ namespace Araci.Models
             clone.LeaderComCotovelo = LeaderComCotovelo;
             clone.LeaderCotoveloX = LeaderCotoveloX;
             clone.LeaderCotoveloY = LeaderCotoveloY;
+            clone.LeaderCotoveloManual = LeaderCotoveloManual;
             return clone;
         }
 
