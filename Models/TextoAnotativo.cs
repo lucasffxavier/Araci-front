@@ -12,6 +12,9 @@ namespace Araci.Models
         public const string PARAM_LEADER_ATIVO = "LeaderAtivo";
         public const string PARAM_LEADER_X = "LeaderX";
         public const string PARAM_LEADER_Y = "LeaderY";
+        public const string PARAM_LEADER_COM_COTOVELO = "LeaderComCotovelo";
+        public const string PARAM_LEADER_COTOVELO_X = "LeaderCotoveloX";
+        public const string PARAM_LEADER_COTOVELO_Y = "LeaderCotoveloY";
         public const double LarguraCaixaPadrao = 200.0;
         public const double LarguraCaixaMinima = 20.0;
         public const double MargemHorizontalCaixa = 8.0;
@@ -23,6 +26,9 @@ namespace Araci.Models
             DefinirParametro(new Parameter<bool>(PARAM_LEADER_ATIVO, false));
             DefinirParametro(new Parameter<double>(PARAM_LEADER_X, 0.0));
             DefinirParametro(new Parameter<double>(PARAM_LEADER_Y, 0.0));
+            DefinirParametro(new Parameter<bool>(PARAM_LEADER_COM_COTOVELO, false));
+            DefinirParametro(new Parameter<double>(PARAM_LEADER_COTOVELO_X, 0.0));
+            DefinirParametro(new Parameter<double>(PARAM_LEADER_COTOVELO_Y, 0.0));
         }
 
         public string Texto
@@ -53,6 +59,24 @@ namespace Araci.Models
         {
             get => Obter<double>(PARAM_LEADER_Y);
             set => Definir(PARAM_LEADER_Y, NormalizarCoordenada(value));
+        }
+
+        public bool LeaderComCotovelo
+        {
+            get => Obter<bool>(PARAM_LEADER_COM_COTOVELO);
+            set => Definir(PARAM_LEADER_COM_COTOVELO, value);
+        }
+
+        public double LeaderCotoveloX
+        {
+            get => Obter<double>(PARAM_LEADER_COTOVELO_X);
+            set => Definir(PARAM_LEADER_COTOVELO_X, NormalizarCoordenada(value));
+        }
+
+        public double LeaderCotoveloY
+        {
+            get => Obter<double>(PARAM_LEADER_COTOVELO_Y);
+            set => Definir(PARAM_LEADER_COTOVELO_Y, NormalizarCoordenada(value));
         }
 
         public TipoTextoAnotativo? TipoTexto => Tipo as TipoTextoAnotativo;
@@ -96,6 +120,9 @@ namespace Araci.Models
             clone.LeaderAtivo = LeaderAtivo;
             clone.LeaderX = LeaderX;
             clone.LeaderY = LeaderY;
+            clone.LeaderComCotovelo = LeaderComCotovelo;
+            clone.LeaderCotoveloX = LeaderCotoveloX;
+            clone.LeaderCotoveloY = LeaderCotoveloY;
             return clone;
         }
 

@@ -26,6 +26,8 @@ namespace Araci.Views
         private ElementoEstado? _textoRotationEstadoInicial;
         private TextoAnotativoViewModel? _textoLeaderEditAtivo;
         private ElementoEstado? _textoLeaderEstadoInicial;
+        private TextoAnotativoViewModel? _textoLeaderCotoveloEditAtivo;
+        private ElementoEstado? _textoLeaderCotoveloEstadoInicial;
         private TextoWidthResizeSide _textoWidthResizeSide = TextoWidthResizeSide.Right;
         private double _textoWidthResizeXInicial;
         private double _textoWidthResizeYInicial;
@@ -49,7 +51,7 @@ namespace Araci.Views
 
         private bool IsTextoWidthResizing => _textoWidthResizeAtivo != null;
         private bool IsTextoRotating => _textoRotationAtivo != null;
-        private bool IsTextoLeaderEditing => _textoLeaderEditAtivo != null;
+        private bool IsTextoLeaderEditing => _textoLeaderEditAtivo != null || _textoLeaderCotoveloEditAtivo != null;
 
         private void ConfigurarCamera()
         {
@@ -360,6 +362,7 @@ namespace Araci.Views
             CancelarResizeLarguraTexto();
             CancelarRotacaoTexto();
             CancelarEdicaoLeaderTexto();
+            CancelarEdicaoCotoveloLeaderTexto();
             _context?.Navigation.Reset();
             _context?.AlignmentGuides.Limpar();
             _context?.LinhaEndpointEdit.LimparSnapInsercao();
@@ -600,6 +603,80 @@ namespace Araci.Views
             texto.LeaderPoint = world;
         }
 
+        private void OnTextoLeaderCotoveloHandleDragStarted(object sender, DragStartedEventArgs e)
+        {
+            if (sender is not Thumb { DataContext: TextoAnotativoViewModel texto } || _context == null)
+                return;
+
+            ConfirmarEdicaoInlineAtiva();
+            _context.Selection.Selecionar(texto);
+            _context.Hover.Clear();
+            _textoLeaderCotoveloEditAtivo = texto;
+            _textoLeaderCotoveloEstadoInicial = texto.CapturarEstado();
+            AplicarCotoveloLeaderTextoPorMouse(texto);
+            Cursor = Cursors.Hand;
+            e.Handled = true;
+        }
+
+        private void OnTextoLeaderCotoveloHandleDragDelta(object sender, DragDeltaEventArgs e)
+        {
+            if (_textoLeaderCotoveloEditAtivo == null)
+                return;
+
+            AplicarCotoveloLeaderTextoPorMouse(_textoLeaderCotoveloEditAtivo);
+            _context?.SceneQueries.Invalidate();
+            _viewportViewModel?.AtualizarViewModel(_textoLeaderCotoveloEditAtivo.Modelo);
+            Cursor = Cursors.Hand;
+            e.Handled = true;
+        }
+
+        private void OnTextoLeaderCotoveloHandleDragCompleted(object sender, DragCompletedEventArgs e)
+        {
+            if (_textoLeaderCotoveloEditAtivo == null || _textoLeaderCotoveloEstadoInicial == null || _context == null)
+                return;
+
+            TextoAnotativoViewModel texto = _textoLeaderCotoveloEditAtivo;
+            ElementoEstado antes = _textoLeaderCotoveloEstadoInicial;
+            ElementoEstado depois = texto.CapturarEstado();
+
+            _textoLeaderCotoveloEditAtivo = null;
+            _textoLeaderCotoveloEstadoInicial = null;
+            AtualizarCursorNavegacao();
+
+            if (Math.Abs(depois.TextoLeaderCotoveloX - antes.TextoLeaderCotoveloX) < 0.000001 && Math.Abs(depois.TextoLeaderCotoveloY - antes.TextoLeaderCotoveloY) < 0.000001)
+            {
+                texto.AplicarEstado(antes);
+                _context.SceneQueries.Invalidate();
+                _viewportViewModel?.AtualizarViewModel(texto.Modelo);
+                e.Handled = true;
+                return;
+            }
+
+            texto.AplicarEstado(antes);
+            _context.SceneQueries.Invalidate();
+            _viewportViewModel?.AtualizarViewModel(texto.Modelo);
+
+            var itens = new[]
+            {
+                new BulkPropertyChangeCommand.Item(texto, nameof(TextoAnotativoViewModel.LeaderCotoveloX), antes.TextoLeaderCotoveloX, depois.TextoLeaderCotoveloX),
+                new BulkPropertyChangeCommand.Item(texto, nameof(TextoAnotativoViewModel.LeaderCotoveloY), antes.TextoLeaderCotoveloY, depois.TextoLeaderCotoveloY)
+            };
+
+            var command = new BulkPropertyChangeCommand(itens);
+
+            if (!command.IsEmpty)
+                _context.Commands.Execute(command);
+
+            e.Handled = true;
+        }
+
+        private void AplicarCotoveloLeaderTextoPorMouse(TextoAnotativoViewModel texto)
+        {
+            Point screen = Mouse.GetPosition(this);
+            Point world = _context?.Viewport?.ScreenToWorld(screen) ?? screen;
+            texto.LeaderCotoveloPoint = world;
+        }
+
         private void CancelarEdicaoLeaderTexto()
         {
             if (_textoLeaderEditAtivo == null || _textoLeaderEstadoInicial == null)
@@ -610,6 +687,18 @@ namespace Araci.Views
             _viewportViewModel?.AtualizarViewModel(_textoLeaderEditAtivo.Modelo);
             _textoLeaderEditAtivo = null;
             _textoLeaderEstadoInicial = null;
+        }
+
+        private void CancelarEdicaoCotoveloLeaderTexto()
+        {
+            if (_textoLeaderCotoveloEditAtivo == null || _textoLeaderCotoveloEstadoInicial == null)
+                return;
+
+            _textoLeaderCotoveloEditAtivo.AplicarEstado(_textoLeaderCotoveloEstadoInicial);
+            _context?.SceneQueries.Invalidate();
+            _viewportViewModel?.AtualizarViewModel(_textoLeaderCotoveloEditAtivo.Modelo);
+            _textoLeaderCotoveloEditAtivo = null;
+            _textoLeaderCotoveloEstadoInicial = null;
         }
 
         private void OnTextoRotationHandleDragStarted(object sender, DragStartedEventArgs e)

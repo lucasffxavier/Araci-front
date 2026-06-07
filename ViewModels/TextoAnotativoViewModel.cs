@@ -213,6 +213,60 @@ namespace Araci.ViewModels
             }
         }
 
+        public bool LeaderComCotovelo
+        {
+            get => Texto.LeaderComCotovelo;
+            set
+            {
+                if (Texto.LeaderComCotovelo == value)
+                    return;
+
+                if (value && !LeaderCotoveloPossuiPontoValido())
+                    DefinirLeaderCotovelo(CalcularLeaderCotoveloAutomaticoWorld());
+
+                Texto.LeaderComCotovelo = value;
+                OnPropertyChanged();
+                OnPropertyChanged(nameof(LeaderCotoveloX));
+                OnPropertyChanged(nameof(LeaderCotoveloY));
+                OnPropertyChanged(nameof(LeaderCotoveloPoint));
+                NotificarLeader();
+                AtualizarNode();
+                NotificarParametros();
+            }
+        }
+
+        public double LeaderCotoveloX
+        {
+            get => Texto.LeaderCotoveloX;
+            set
+            {
+                if (Math.Abs(Texto.LeaderCotoveloX - value) < 0.000001)
+                    return;
+
+                Texto.LeaderCotoveloX = value;
+                OnPropertyChanged();
+                NotificarLeader();
+                AtualizarNode();
+                NotificarParametros();
+            }
+        }
+
+        public double LeaderCotoveloY
+        {
+            get => Texto.LeaderCotoveloY;
+            set
+            {
+                if (Math.Abs(Texto.LeaderCotoveloY - value) < 0.000001)
+                    return;
+
+                Texto.LeaderCotoveloY = value;
+                OnPropertyChanged();
+                NotificarLeader();
+                AtualizarNode();
+                NotificarParametros();
+            }
+        }
+
         public Point LeaderPoint
         {
             get => new(LeaderX, LeaderY);
@@ -225,10 +279,25 @@ namespace Araci.ViewModels
             }
         }
 
+        public Point LeaderCotoveloPoint
+        {
+            get => CalcularLeaderCotoveloWorld();
+            set
+            {
+                LeaderCotoveloX = value.X;
+                LeaderCotoveloY = value.Y;
+                OnPropertyChanged();
+                NotificarLeader();
+            }
+        }
+
         public bool LeaderVisivel => LeaderAtivo && !IsEditingInline;
+        public bool LeaderRetoVisivel => LeaderVisivel && !LeaderComCotovelo;
+        public bool LeaderCotoveloVisivel => LeaderVisivel && LeaderComCotovelo;
         public Point LeaderInicioLocal => CalcularLeaderInicioLocal();
         public Point LeaderFimLocal => WorldToLocal(LeaderPoint);
         public Point LeaderInicioWorld => LocalToWorld(LeaderInicioLocal);
+        public PointCollection LeaderPolylineWorldPoints => CalcularLeaderPolylineWorldPoints();
         public PointCollection LeaderArrowPoints => CalcularLeaderArrowPoints();
         public PointCollection LeaderArrowWorldPoints => CalcularLeaderArrowWorldPoints();
         public PointCollection LeaderOpenArrowWorldPoints => CalcularLeaderOpenArrowWorldPoints();
@@ -337,6 +406,12 @@ namespace Araci.ViewModels
             {
                 Texto.LeaderX += delta.X;
                 Texto.LeaderY += delta.Y;
+
+                if (LeaderComCotovelo && LeaderCotoveloPossuiPontoValido())
+                {
+                    Texto.LeaderCotoveloX += delta.X;
+                    Texto.LeaderCotoveloY += delta.Y;
+                }
             }
 
             AtualizarNode();
@@ -345,7 +420,7 @@ namespace Araci.ViewModels
 
         public override ElementoEstado CapturarEstado()
         {
-            return new ElementoEstado(Texto.PosicaoX, Texto.PosicaoY, Texto.LarguraCaixa, Texto.AlturaEstimada, Texto.Rotacao, null, Texto.LeaderAtivo, Texto.LeaderX, Texto.LeaderY);
+            return new ElementoEstado(Texto.PosicaoX, Texto.PosicaoY, Texto.LarguraCaixa, Texto.AlturaEstimada, Texto.Rotacao, null, Texto.LeaderAtivo, Texto.LeaderX, Texto.LeaderY, Texto.LeaderCotoveloX, Texto.LeaderCotoveloY);
         }
 
         public override void AplicarEstado(ElementoEstado estado)
@@ -360,6 +435,8 @@ namespace Araci.ViewModels
             Texto.LeaderAtivo = estado.TextoLeaderAtivo;
             Texto.LeaderX = estado.TextoLeaderX;
             Texto.LeaderY = estado.TextoLeaderY;
+            Texto.LeaderCotoveloX = estado.TextoLeaderCotoveloX;
+            Texto.LeaderCotoveloY = estado.TextoLeaderCotoveloY;
             AtualizarNode();
             NotificarLeader();
         }
@@ -373,6 +450,10 @@ namespace Araci.ViewModels
             OnPropertyChanged(nameof(LeaderAtivo));
             OnPropertyChanged(nameof(LeaderX));
             OnPropertyChanged(nameof(LeaderY));
+            OnPropertyChanged(nameof(LeaderComCotovelo));
+            OnPropertyChanged(nameof(LeaderCotoveloX));
+            OnPropertyChanged(nameof(LeaderCotoveloY));
+            OnPropertyChanged(nameof(LeaderCotoveloPoint));
             OnPropertyChanged(nameof(LeaderPoint));
             OnPropertyChanged(nameof(AlturaEdicao));
             OnPropertyChanged(nameof(AlturaVisual));
@@ -431,7 +512,7 @@ namespace Araci.ViewModels
         private PointCollection CalcularLeaderArrowWorldPoints()
         {
             Point fim = LeaderPoint;
-            Point inicio = LeaderInicioWorld;
+            Point inicio = LeaderComCotovelo ? CalcularLeaderCotoveloWorld() : LeaderInicioWorld;
             Vector direcao = inicio - fim;
 
             if (direcao.Length < 0.000001)
@@ -444,6 +525,41 @@ namespace Araci.ViewModels
             Point p2 = fim + direcao * LeaderArrowLength - normal * LeaderArrowHalfWidth;
 
             return new PointCollection { fim, p1, p2 };
+        }
+
+        private PointCollection CalcularLeaderPolylineWorldPoints()
+        {
+            return new PointCollection
+            {
+                LeaderInicioWorld,
+                CalcularLeaderCotoveloWorld(),
+                LeaderPoint
+            };
+        }
+
+        private Point CalcularLeaderCotoveloWorld()
+        {
+            return LeaderCotoveloPossuiPontoValido()
+                ? new Point(LeaderCotoveloX, LeaderCotoveloY)
+                : CalcularLeaderCotoveloAutomaticoWorld();
+        }
+
+        private Point CalcularLeaderCotoveloAutomaticoWorld()
+        {
+            Point inicio = LeaderInicioWorld;
+            Point fim = LeaderPoint;
+            return new Point(fim.X, inicio.Y);
+        }
+
+        private bool LeaderCotoveloPossuiPontoValido()
+        {
+            return Math.Abs(Texto.LeaderCotoveloX) > 0.000001 || Math.Abs(Texto.LeaderCotoveloY) > 0.000001;
+        }
+
+        private void DefinirLeaderCotovelo(Point ponto)
+        {
+            Texto.LeaderCotoveloX = ponto.X;
+            Texto.LeaderCotoveloY = ponto.Y;
         }
 
         private PointCollection CalcularLeaderOpenArrowWorldPoints()
@@ -513,10 +629,14 @@ namespace Araci.ViewModels
         private void NotificarLeader()
         {
             OnPropertyChanged(nameof(LeaderVisivel));
+            OnPropertyChanged(nameof(LeaderRetoVisivel));
+            OnPropertyChanged(nameof(LeaderCotoveloVisivel));
             OnPropertyChanged(nameof(LeaderPoint));
             OnPropertyChanged(nameof(LeaderInicioLocal));
             OnPropertyChanged(nameof(LeaderFimLocal));
             OnPropertyChanged(nameof(LeaderInicioWorld));
+            OnPropertyChanged(nameof(LeaderCotoveloPoint));
+            OnPropertyChanged(nameof(LeaderPolylineWorldPoints));
             OnPropertyChanged(nameof(LeaderArrowPoints));
             OnPropertyChanged(nameof(LeaderArrowWorldPoints));
             OnPropertyChanged(nameof(LeaderOpenArrowWorldPoints));
