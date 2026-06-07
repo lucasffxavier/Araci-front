@@ -1,7 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.Globalization;
 using System.Collections.ObjectModel;
+using System.Globalization;
 using System.Linq;
 using System.Windows;
 using System.Windows.Data;
@@ -74,7 +74,6 @@ namespace Araci.ViewModels
         }
 
         protected TipoTextoAnotativo TipoTexto => (TipoTextoAnotativo)_tipo;
-
         public IEnumerable<TipoTextoAnotativo> TiposDisponiveis => _tiposTemporarios != null ? _tiposTemporarios : new[] { TipoTexto };
 
         public TipoTextoAnotativo TipoSelecionado
@@ -541,7 +540,6 @@ namespace Araci.ViewModels
                 return true;
 
             normalizado = normalizado.Replace(',', '.');
-
             return double.TryParse(normalizado, NumberStyles.Float, CultureInfo.InvariantCulture, out valor) && valor > 0;
         }
 

@@ -263,6 +263,7 @@ namespace Araci.ViewModels
         public string LeaderCor => TipoTexto?.LeaderCor ?? CorTexto;
         public double LeaderEspessura => Math.Max(0.1, TipoTexto?.LeaderEspessura ?? 1.2);
         public double LeaderTamanhoSeta => Math.Max(1.0, TipoTexto?.LeaderTamanhoSeta ?? 10.0);
+        public double LeaderArrowLength => Math.Max(1.0, LeaderTamanhoSeta);
         public double LeaderArrowHalfWidth => Math.Max(2.0, LeaderTamanhoSeta * 0.45);
         public bool LeaderArrowVisivel => LeaderVisivel && LeaderEstiloSeta != "Sem seta";
         public bool LeaderArrowFillVisivel => LeaderArrowVisivel && LeaderEstiloSeta == "Seta preenchida";
@@ -421,8 +422,8 @@ namespace Araci.ViewModels
                 direcao.Normalize();
 
             Vector normal = new(-direcao.Y, direcao.X);
-            Point p1 = fim + direcao * LeaderTamanhoSeta + normal * LeaderArrowHalfWidth;
-            Point p2 = fim + direcao * LeaderTamanhoSeta - normal * LeaderArrowHalfWidth;
+            Point p1 = fim + direcao * LeaderArrowLength + normal * LeaderArrowHalfWidth;
+            Point p2 = fim + direcao * LeaderArrowLength - normal * LeaderArrowHalfWidth;
 
             return new PointCollection { fim, p1, p2 };
         }
@@ -439,8 +440,8 @@ namespace Araci.ViewModels
                 direcao.Normalize();
 
             Vector normal = new(-direcao.Y, direcao.X);
-            Point p1 = fim + direcao * LeaderTamanhoSeta + normal * LeaderArrowHalfWidth;
-            Point p2 = fim + direcao * LeaderTamanhoSeta - normal * LeaderArrowHalfWidth;
+            Point p1 = fim + direcao * LeaderArrowLength + normal * LeaderArrowHalfWidth;
+            Point p2 = fim + direcao * LeaderArrowLength - normal * LeaderArrowHalfWidth;
 
             return new PointCollection { fim, p1, p2 };
         }
@@ -534,6 +535,7 @@ namespace Araci.ViewModels
             OnPropertyChanged(nameof(LeaderCor));
             OnPropertyChanged(nameof(LeaderEspessura));
             OnPropertyChanged(nameof(LeaderTamanhoSeta));
+            OnPropertyChanged(nameof(LeaderArrowLength));
             OnPropertyChanged(nameof(LeaderArrowHalfWidth));
             OnPropertyChanged(nameof(LeaderArrowVisivel));
             OnPropertyChanged(nameof(LeaderArrowFillVisivel));
