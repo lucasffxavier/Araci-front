@@ -487,8 +487,6 @@ namespace Araci.Controls
 {
     public class BarraControl : ElementoControlBase
     {
-        private const double HandleSize = 12;
-        private const double HandleStrokeThickness = 2;
         private readonly Grid _root;
         private readonly SvgViewbox _svg;
         private readonly Border _overlay;
@@ -540,21 +538,19 @@ namespace Araci.Controls
 
         private static Border CriarHandle(VerticalAlignment verticalAlignment)
         {
-            double offset = -HandleSize / 2;
-
             return new Border
             {
-                Width = HandleSize,
-                Height = HandleSize,
-                CornerRadius = new CornerRadius(HandleSize / 2),
-                BorderThickness = new Thickness(HandleStrokeThickness),
+                Width = 12,
+                Height = 12,
+                CornerRadius = new CornerRadius(6),
+                BorderThickness = new Thickness(2),
                 BorderBrush = Brushes.White,
                 Background = Brushes.DeepSkyBlue,
                 HorizontalAlignment = HorizontalAlignment.Center,
                 VerticalAlignment = verticalAlignment,
                 Visibility = Visibility.Collapsed,
                 IsHitTestVisible = false,
-                Margin = verticalAlignment == VerticalAlignment.Top ? new Thickness(0, offset, 0, 0) : new Thickness(0, 0, 0, offset)
+                Margin = verticalAlignment == VerticalAlignment.Top ? new Thickness(0, -6, 0, 0) : new Thickness(0, 0, 0, -6)
             };
         }
 
@@ -568,8 +564,6 @@ namespace Araci.Controls
             _previewOverlay.SetBinding(WidthProperty, new Binding("RenderData.Largura"));
             _previewOverlay.SetBinding(HeightProperty, new Binding("RenderData.Altura"));
             _previewOverlay.SetBinding(VisibilityProperty, new Binding("IsPreview") { Converter = new BooleanToVisibilityConverter() });
-            _overlay.SetBinding(WidthProperty, new Binding("RenderData.Largura"));
-            _overlay.SetBinding(HeightProperty, new Binding("RenderData.Altura"));
             var multi = new MultiBinding { Converter = new SelectionOrHoverToVisibilityConverter() };
             multi.Bindings.Add(new Binding("IsSelecionado"));
             multi.Bindings.Add(new Binding("IsHover"));
@@ -625,7 +619,15 @@ namespace Araci.Core.SceneNodes
         public override double Largura => ElementGeometryDefaults.BarraLargura;
         public override double Altura => _barra.Altura;
 
-        public override Rect BoundsAlinhamento => Bounds;
+        public override Rect BoundsAlinhamento
+        {
+            get
+            {
+                double inset = Math.Min(Altura / 4.0, Math.Max(0, ElementGeometryDefaults.BarraLargura / 2.0));
+                double alturaUtil = Math.Max(1, Altura - inset * 2);
+                return new Rect(Modelo.PosicaoX, Modelo.PosicaoY + inset, Largura, alturaUtil);
+            }
+        }
 
         public override void AtualizarGeometria()
         {
@@ -633,7 +635,6 @@ namespace Araci.Core.SceneNodes
         }
     }
 }
-
 
 
 ====================================================================================================
@@ -730,16 +731,7 @@ namespace Araci.Services.Editing
             _vm.Barra.PosicaoX = novoTopoEsquerdo.X;
             _vm.Barra.PosicaoY = novoTopoEsquerdo.Y;
             _geometryUpdates.AplicarAlturaBarra(_vm.Barra, novaAltura);
-            _vm.NotificarPropriedades(
-                nameof(BarraViewModel.Altura),
-                nameof(BarraViewModel.X),
-                nameof(BarraViewModel.Y),
-                nameof(BarraViewModel.WorldX),
-                nameof(BarraViewModel.WorldY),
-                nameof(BarraViewModel.Bounds),
-                nameof(BarraViewModel.BoundsAlinhamento),
-                nameof(BarraViewModel.Centro),
-                nameof(BarraViewModel.RenderData));
+            _vm.NotificarPropriedades(nameof(BarraViewModel.Altura), nameof(BarraViewModel.X), nameof(BarraViewModel.Y), nameof(BarraViewModel.Bounds));
         }
 
         public void End()
@@ -809,51 +801,31 @@ namespace Araci.Services.Editing
 
         private static Point GetTopHandleWorld(Barra barra)
         {
-            return RotateAround(GetTopLocalCenter(barra), GetCenter(barra), barra.Rotacao);
+            return RotateAround(new Point(barra.PosicaoX + ElementGeometryDefaults.BarraLargura / 2, barra.PosicaoY), GetCenter(barra), barra.Rotacao);
         }
 
         private static Point GetBottomHandleWorld(Barra barra)
         {
-            return RotateAround(GetBottomLocalCenter(barra), GetCenter(barra), barra.Rotacao);
+            return RotateAround(new Point(barra.PosicaoX + ElementGeometryDefaults.BarraLargura / 2, barra.PosicaoY + barra.Altura), GetCenter(barra), barra.Rotacao);
         }
 
         private static Point GetCenter(Barra barra)
         {
-            return new Point(barra.PosicaoX + GetWidth() / 2, barra.PosicaoY + barra.Altura / 2);
+            return new Point(barra.PosicaoX + ElementGeometryDefaults.BarraLargura / 2, barra.PosicaoY + barra.Altura / 2);
         }
 
         private static Point CalcularTopoEsquerdoMantendoTop(Barra barra, double novaAltura, Point topWorld)
         {
             Vector offsetCentroParaTop = RotateVector(new Vector(0, -novaAltura / 2), barra.Rotacao);
             Point novoCentro = topWorld - offsetCentroParaTop;
-            return GetTopLeftFromCenter(novoCentro, novaAltura);
+            return new Point(novoCentro.X - ElementGeometryDefaults.BarraLargura / 2, novoCentro.Y - novaAltura / 2);
         }
 
         private static Point CalcularTopoEsquerdoMantendoBottom(Barra barra, double novaAltura, Point bottomWorld)
         {
             Vector offsetCentroParaBottom = RotateVector(new Vector(0, novaAltura / 2), barra.Rotacao);
             Point novoCentro = bottomWorld - offsetCentroParaBottom;
-            return GetTopLeftFromCenter(novoCentro, novaAltura);
-        }
-
-        private static Point GetTopLocalCenter(Barra barra)
-        {
-            return new Point(barra.PosicaoX + GetWidth() / 2, barra.PosicaoY);
-        }
-
-        private static Point GetBottomLocalCenter(Barra barra)
-        {
-            return new Point(barra.PosicaoX + GetWidth() / 2, barra.PosicaoY + barra.Altura);
-        }
-
-        private static Point GetTopLeftFromCenter(Point center, double height)
-        {
-            return new Point(center.X - GetWidth() / 2, center.Y - height / 2);
-        }
-
-        private static double GetWidth()
-        {
-            return ElementGeometryDefaults.BarraLargura;
+            return new Point(novoCentro.X - ElementGeometryDefaults.BarraLargura / 2, novoCentro.Y - novaAltura / 2);
         }
 
         private static Vector GetLocalVerticalAxis(double rotacao)
