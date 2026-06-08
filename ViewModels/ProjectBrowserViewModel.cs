@@ -18,6 +18,7 @@ namespace Araci.ViewModels
         private readonly Action<Guid> _definirVistaAtiva;
         private readonly RenomearItemProjetoUseCase? _renomearItemProjeto;
         private readonly ExcluirItemProjetoUseCase? _excluirItemProjeto;
+        private readonly DuplicarItemProjetoUseCase? _duplicarItemProjeto;
         private Guid? _selectedItemId;
         private string? _selectedItemKind;
 
@@ -25,12 +26,14 @@ namespace Araci.ViewModels
             AraciDocument document,
             Action<Guid>? definirVistaAtiva = null,
             RenomearItemProjetoUseCase? renomearItemProjeto = null,
-            ExcluirItemProjetoUseCase? excluirItemProjeto = null)
+            ExcluirItemProjetoUseCase? excluirItemProjeto = null,
+            DuplicarItemProjetoUseCase? duplicarItemProjeto = null)
         {
             _document = document;
             _definirVistaAtiva = definirVistaAtiva ?? _document.DefinirVistaAtiva;
             _renomearItemProjeto = renomearItemProjeto;
             _excluirItemProjeto = excluirItemProjeto;
+            _duplicarItemProjeto = duplicarItemProjeto;
             Secoes = new ObservableCollection<ProjectBrowserSectionViewModel>
             {
                 new("Vistas"),
@@ -111,7 +114,8 @@ namespace Araci.ViewModels
                 true,
                 SelecionarItem,
                 RenomearItem,
-                ExcluirItem)
+                ExcluirItem,
+                DuplicarItem)
             {
                 IsActiveView = tipo == "Vista" && _document.VistaAtivaId == id
             };
@@ -184,6 +188,20 @@ namespace Araci.ViewModels
             };
         }
 
+        private bool DuplicarItem(ProjectBrowserItemViewModel item)
+        {
+            if (_duplicarItemProjeto == null)
+                return false;
+
+            return item.Tipo switch
+            {
+                "Vista" => _duplicarItemProjeto.DuplicarVista(item.Id),
+                "Tabela" => _duplicarItemProjeto.DuplicarTabela(item.Id),
+                "Prancha" => _duplicarItemProjeto.DuplicarPrancha(item.Id),
+                _ => false
+            };
+        }
+
         public bool ExcluirSelecionado()
         {
             ProjectBrowserItemViewModel? item = Secoes
@@ -226,6 +244,7 @@ namespace Araci.ViewModels
         private readonly Action<ProjectBrowserItemViewModel>? _selecionar;
         private readonly Func<ProjectBrowserItemViewModel, string, bool>? _renomear;
         private readonly Func<ProjectBrowserItemViewModel, bool>? _excluir;
+        private readonly Func<ProjectBrowserItemViewModel, bool>? _duplicar;
         private bool _isSelected;
         private bool _isActiveView;
         private bool _isEditing;
@@ -241,7 +260,8 @@ namespace Araci.ViewModels
             bool isSelectable,
             Action<ProjectBrowserItemViewModel>? selecionar,
             Func<ProjectBrowserItemViewModel, string, bool>? renomear = null,
-            Func<ProjectBrowserItemViewModel, bool>? excluir = null)
+            Func<ProjectBrowserItemViewModel, bool>? excluir = null,
+            Func<ProjectBrowserItemViewModel, bool>? duplicar = null)
         {
             Id = id;
             Tipo = tipo;
@@ -252,11 +272,13 @@ namespace Araci.ViewModels
             _selecionar = selecionar;
             _renomear = renomear;
             _excluir = excluir;
+            _duplicar = duplicar;
             SelecionarCommand = new RelayCommand(Selecionar, () => IsSelectable);
             IniciarEdicaoCommand = new RelayCommand(IniciarEdicao, () => IsSelectable);
             ConfirmarEdicaoCommand = new RelayCommand(ConfirmarEdicao);
             CancelarEdicaoCommand = new RelayCommand(CancelarEdicao);
             ExcluirCommand = new RelayCommand(Excluir, () => IsSelectable && _excluir != null);
+            DuplicarCommand = new RelayCommand(Duplicar, () => IsSelectable && _duplicar != null);
         }
 
         public Guid Id { get; }
@@ -280,6 +302,7 @@ namespace Araci.ViewModels
         public ICommand ConfirmarEdicaoCommand { get; }
         public ICommand CancelarEdicaoCommand { get; }
         public ICommand ExcluirCommand { get; }
+        public ICommand DuplicarCommand { get; }
 
         public string TextoEdicao
         {
@@ -386,6 +409,11 @@ namespace Araci.ViewModels
         private void Excluir()
         {
             TentarExcluir();
+        }
+
+        private void Duplicar()
+        {
+            _duplicar?.Invoke(this);
         }
 
         public event PropertyChangedEventHandler? PropertyChanged;

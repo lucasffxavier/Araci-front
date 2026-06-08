@@ -94,6 +94,34 @@ namespace Araci.Core.Documents
             };
         }
 
+        public ProjectView CriarDuplicataVista(ProjectView origem)
+        {
+            return new ProjectView
+            {
+                Nome = CriarNomeUnico(origem?.Nome ?? "Vista", Vistas.Select(v => v.Nome)),
+                CameraX = origem?.CameraX ?? 0,
+                CameraY = origem?.CameraY ?? 0,
+                Zoom = origem?.Zoom ?? 1.0
+            };
+        }
+
+        public ProjectTable CriarDuplicataTabela(ProjectTable origem)
+        {
+            return new ProjectTable
+            {
+                Nome = CriarNomeUnico(origem?.Nome ?? "Tabela", Tabelas.Select(t => t.Nome))
+            };
+        }
+
+        public ProjectSheet CriarDuplicataPrancha(ProjectSheet origem)
+        {
+            return new ProjectSheet
+            {
+                Nome = CriarNomeUnico(origem?.Nome ?? "Prancha", Pranchas.Select(p => p.Nome)),
+                Numero = CriarNumeroPranchaUnico()
+            };
+        }
+
         public void AdicionarVista(ProjectView vista)
         {
             if (vista == null || Vistas.Any(v => v.Id == vista.Id))
@@ -333,6 +361,16 @@ namespace Araci.Core.Documents
                 indice++;
 
             return indice;
+        }
+
+        private string CriarNumeroPranchaUnico()
+        {
+            int indice = 1;
+
+            while (Pranchas.Any(p => p.Numero == $"A{indice:000}"))
+                indice++;
+
+            return $"A{indice:000}";
         }
     }
 }

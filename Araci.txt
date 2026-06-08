@@ -488,6 +488,499 @@ Araci-front
 
 
 ====================================================================================================
+ARQUIVO: C:\Users\User\source\repos\lucasffxavier\Araci-front\Applications\Commands\CommandManager.cs
+====================================================================================================
+
+﻿using System.Collections.Generic;
+
+using Araci.Applications.Abstractions;
+using Araci.Core.Transactions;
+
+namespace Araci.Core.Commands
+{
+    public class CommandManager : ICommandHistory
+    {
+        private readonly Stack<IUndoableCommand>
+            _undoStack = new();
+
+        private readonly Stack<IUndoableCommand>
+            _redoStack = new();
+
+        public void Execute(
+            IUndoableCommand command)
+        {
+            command.Execute();
+
+            _undoStack.Push(command);
+
+            _redoStack.Clear();
+        }
+
+        public void Undo()
+        {
+            if (_undoStack.Count == 0)
+                return;
+
+            var command =
+                _undoStack.Pop();
+
+            command.Undo();
+
+            _redoStack.Push(command);
+        }
+
+        public void Redo()
+        {
+            if (_redoStack.Count == 0)
+                return;
+
+            var command =
+                _redoStack.Pop();
+
+            command.Redo();
+
+            _undoStack.Push(command);
+        }
+
+        public void Clear()
+        {
+            _undoStack.Clear();
+            _redoStack.Clear();
+        }
+
+        public TransactionScope BeginTransaction()
+        {
+            return new TransactionScope(this);
+        }
+
+        public bool CanUndo =>
+            _undoStack.Count > 0;
+
+        public bool CanRedo =>
+            _redoStack.Count > 0;
+    }
+}
+
+
+
+====================================================================================================
+ARQUIVO: C:\Users\User\source\repos\lucasffxavier\Araci-front\Applications\Commands\IUndoableCommand.cs
+====================================================================================================
+
+﻿namespace Araci.Core.Commands
+{
+    public interface IUndoableCommand
+    {
+        void Execute();
+
+        void Undo();
+
+        void Redo();
+    }
+}
+
+
+====================================================================================================
+ARQUIVO: C:\Users\User\source\repos\lucasffxavier\Araci-front\Core\Documents\AraciDocument.cs
+====================================================================================================
+
+using System.Collections.Generic;
+using System.Collections.ObjectModel;
+using System.Linq;
+using Araci.Models;
+
+namespace Araci.Core.Documents
+{
+    public class AraciDocument
+    {
+        public AraciDocument()
+        {
+            Elementos = new ObservableCollection<Elemento>();
+            Vistas = new ObservableCollection<ProjectView>();
+            Tabelas = new ObservableCollection<ProjectTable>();
+            Pranchas = new ObservableCollection<ProjectSheet>();
+
+            CriarVistaPadrao();
+        }
+
+        public ObservableCollection<Elemento> Elementos { get; }
+        public ObservableCollection<ProjectView> Vistas { get; }
+        public ObservableCollection<ProjectTable> Tabelas { get; }
+        public ObservableCollection<ProjectSheet> Pranchas { get; }
+        public Guid? VistaAtivaId { get; private set; }
+        public ProjectView? VistaAtiva => Vistas.FirstOrDefault(v => v.Id == VistaAtivaId);
+        public event System.Action? VistaAtivaAlterada;
+        public event System.Action? ItemProjetoRenomeado;
+
+        public IEnumerable<Elemento> ObterElementosDaVistaAtiva()
+        {
+            return VistaAtivaId.HasValue && Vistas.Any(v => v.Id == VistaAtivaId.Value)
+                ? ObterElementosDaVista(VistaAtivaId.Value)
+                : Enumerable.Empty<Elemento>();
+        }
+
+        public IEnumerable<Elemento> ObterElementosDaVista(Guid vistaId)
+        {
+            return Elementos.Where(e => e.ViewId == vistaId);
+        }
+
+        public IEnumerable<Elemento> ObterElementosDaVistaDoElementoOuAtiva(Elemento? elemento)
+        {
+            return elemento?.ViewId.HasValue == true && Vistas.Any(v => v.Id == elemento.ViewId.Value)
+                ? ObterElementosDaVista(elemento.ViewId.Value)
+                : ObterElementosDaVistaAtiva();
+        }
+
+        public bool PertenceAVistaAtiva(Elemento? elemento)
+        {
+            return elemento != null &&
+                VistaAtivaId.HasValue &&
+                Vistas.Any(v => v.Id == VistaAtivaId.Value) &&
+                elemento.ViewId == VistaAtivaId.Value;
+        }
+
+        public ProjectView CriarNovaVista()
+        {
+            ProjectView vista = CriarModeloNovaVista();
+            AdicionarVista(vista);
+            return vista;
+        }
+
+        public ProjectTable CriarNovaTabela()
+        {
+            ProjectTable tabela = CriarModeloNovaTabela();
+            AdicionarTabela(tabela);
+            return tabela;
+        }
+
+        public ProjectSheet CriarNovaPrancha()
+        {
+            ProjectSheet prancha = CriarModeloNovaPrancha();
+            AdicionarPrancha(prancha);
+            return prancha;
+        }
+
+        public ProjectView CriarModeloNovaVista()
+        {
+            return new ProjectView { Nome = CriarNomeUnico("Vista", Vistas.Select(v => v.Nome)) };
+        }
+
+        public ProjectTable CriarModeloNovaTabela()
+        {
+            return new ProjectTable { Nome = CriarNomeUnico("Tabela", Tabelas.Select(t => t.Nome)) };
+        }
+
+        public ProjectSheet CriarModeloNovaPrancha()
+        {
+            int indice = CriarIndiceUnico("Prancha", Pranchas.Select(p => p.Nome));
+            return new ProjectSheet
+            {
+                Nome = $"Prancha {indice}",
+                Numero = $"A{indice:000}"
+            };
+        }
+
+        public void AdicionarVista(ProjectView vista)
+        {
+            if (vista == null || Vistas.Any(v => v.Id == vista.Id))
+                return;
+
+            Vistas.Add(vista);
+            GarantirVistaAtivaValida();
+        }
+
+        public void RemoverVista(ProjectView vista)
+        {
+            if (vista == null || !Vistas.Contains(vista))
+                return;
+
+            if (Vistas.Count <= 1)
+                return;
+
+            Vistas.Remove(vista);
+            GarantirVistaAtivaValida();
+        }
+
+        public void RestaurarVista(ProjectView vista, int indice)
+        {
+            if (vista == null || Vistas.Any(v => v.Id == vista.Id))
+                return;
+
+            int indiceSeguro = indice < 0 || indice > Vistas.Count ? Vistas.Count : indice;
+            Vistas.Insert(indiceSeguro, vista);
+            GarantirVistaAtivaValida();
+        }
+
+        public void AdicionarTabela(ProjectTable tabela)
+        {
+            if (tabela == null || Tabelas.Any(t => t.Id == tabela.Id))
+                return;
+
+            Tabelas.Add(tabela);
+        }
+
+        public void RemoverTabela(ProjectTable tabela)
+        {
+            if (tabela == null || !Tabelas.Contains(tabela))
+                return;
+
+            Tabelas.Remove(tabela);
+        }
+
+        public void RestaurarTabela(ProjectTable tabela, int indice)
+        {
+            if (tabela == null || Tabelas.Any(t => t.Id == tabela.Id))
+                return;
+
+            int indiceSeguro = indice < 0 || indice > Tabelas.Count ? Tabelas.Count : indice;
+            Tabelas.Insert(indiceSeguro, tabela);
+        }
+
+        public void AdicionarPrancha(ProjectSheet prancha)
+        {
+            if (prancha == null || Pranchas.Any(p => p.Id == prancha.Id))
+                return;
+
+            Pranchas.Add(prancha);
+        }
+
+        public void RemoverPrancha(ProjectSheet prancha)
+        {
+            if (prancha == null || !Pranchas.Contains(prancha))
+                return;
+
+            Pranchas.Remove(prancha);
+        }
+
+        public void RestaurarPrancha(ProjectSheet prancha, int indice)
+        {
+            if (prancha == null || Pranchas.Any(p => p.Id == prancha.Id))
+                return;
+
+            int indiceSeguro = indice < 0 || indice > Pranchas.Count ? Pranchas.Count : indice;
+            Pranchas.Insert(indiceSeguro, prancha);
+        }
+
+        public void RenomearVista(ProjectView vista, string nome)
+        {
+            if (vista == null || !Vistas.Contains(vista))
+                return;
+
+            vista.Nome = nome;
+            ItemProjetoRenomeado?.Invoke();
+        }
+
+        public void RenomearTabela(ProjectTable tabela, string nome)
+        {
+            if (tabela == null || !Tabelas.Contains(tabela))
+                return;
+
+            tabela.Nome = nome;
+            ItemProjetoRenomeado?.Invoke();
+        }
+
+        public void RenomearPrancha(ProjectSheet prancha, string nome)
+        {
+            if (prancha == null || !Pranchas.Contains(prancha))
+                return;
+
+            prancha.Nome = nome;
+            ItemProjetoRenomeado?.Invoke();
+        }
+
+        public void SubstituirVistas(IEnumerable<ProjectView> vistas)
+        {
+            Vistas.Clear();
+
+            foreach (ProjectView vista in vistas.Where(v => v != null && !string.IsNullOrWhiteSpace(v.Nome)))
+                Vistas.Add(vista);
+
+            if (Vistas.Count == 0)
+                CriarVistaPadrao();
+
+            GarantirVistaAtivaValida();
+        }
+
+        public void SubstituirTabelas(IEnumerable<ProjectTable> tabelas)
+        {
+            Tabelas.Clear();
+
+            foreach (ProjectTable tabela in tabelas.Where(t => t != null && !string.IsNullOrWhiteSpace(t.Nome)))
+                Tabelas.Add(tabela);
+        }
+
+        public void SubstituirPranchas(IEnumerable<ProjectSheet> pranchas)
+        {
+            Pranchas.Clear();
+
+            foreach (ProjectSheet prancha in pranchas.Where(p => p != null && !string.IsNullOrWhiteSpace(p.Nome)))
+                Pranchas.Add(prancha);
+        }
+
+        public void AdicionarElemento(Elemento elemento)
+        {
+            AdicionarElemento(elemento, preservarVistaExistente: false);
+        }
+
+        public void AdicionarElementoPreservandoVista(Elemento elemento)
+        {
+            AdicionarElemento(elemento, preservarVistaExistente: true);
+        }
+
+        private void AdicionarElemento(Elemento elemento, bool preservarVistaExistente)
+        {
+            if (Elementos.Contains(elemento))
+                return;
+
+            PrepararVistaElemento(elemento, preservarVistaExistente);
+            Elementos.Add(elemento);
+        }
+
+        public void RemoverElemento(Elemento elemento)
+        {
+            if (!Elementos.Contains(elemento))
+                return;
+
+            Elementos.Remove(elemento);
+        }
+
+        public void Limpar()
+        {
+            Elementos.Clear();
+            Vistas.Clear();
+            Tabelas.Clear();
+            Pranchas.Clear();
+            CriarVistaPadrao();
+        }
+
+        private void CriarVistaPadrao()
+        {
+            var vista = new ProjectView { Nome = "Vista principal" };
+            Vistas.Add(vista);
+            AtualizarVistaAtiva(vista.Id);
+        }
+
+        public void DefinirVistaAtiva(Guid vistaId)
+        {
+            if (Vistas.Any(v => v.Id == vistaId))
+                AtualizarVistaAtiva(vistaId);
+
+            GarantirVistaAtivaValida();
+        }
+
+        public void DefinirVistaAtiva(Guid? vistaId)
+        {
+            if (vistaId.HasValue)
+                DefinirVistaAtiva(vistaId.Value);
+            else
+                GarantirVistaAtivaValida();
+        }
+
+        private void GarantirVistaAtivaValida()
+        {
+            if (VistaAtivaId.HasValue && Vistas.Any(v => v.Id == VistaAtivaId.Value))
+                return;
+
+            if (Vistas.Count == 0)
+                CriarVistaPadrao();
+            else
+                AtualizarVistaAtiva(Vistas[0].Id);
+        }
+
+        private void AtualizarVistaAtiva(Guid? vistaId)
+        {
+            if (VistaAtivaId == vistaId)
+                return;
+
+            VistaAtivaId = vistaId;
+            VistaAtivaAlterada?.Invoke();
+        }
+
+        private void PrepararVistaElemento(Elemento elemento, bool preservarVistaExistente)
+        {
+            GarantirVistaAtivaValida();
+
+            if (preservarVistaExistente && elemento.ViewId.HasValue && Vistas.Any(v => v.Id == elemento.ViewId.Value))
+                return;
+
+            elemento.ViewId = VistaAtivaId;
+        }
+
+        private static string CriarNomeUnico(string prefixo, IEnumerable<string> nomesExistentes)
+        {
+            return $"{prefixo} {CriarIndiceUnico(prefixo, nomesExistentes)}";
+        }
+
+        private static int CriarIndiceUnico(string prefixo, IEnumerable<string> nomesExistentes)
+        {
+            int indice = 1;
+
+            while (nomesExistentes.Contains($"{prefixo} {indice}"))
+                indice++;
+
+            return indice;
+        }
+    }
+}
+
+
+
+====================================================================================================
+ARQUIVO: C:\Users\User\source\repos\lucasffxavier\Araci-front\Core\Documents\ProjectSheet.cs
+====================================================================================================
+
+using System;
+
+namespace Araci.Core.Documents
+{
+    public class ProjectSheet
+    {
+        public Guid Id { get; set; } = Guid.NewGuid();
+        public string Nome { get; set; } = string.Empty;
+        public string Numero { get; set; } = string.Empty;
+    }
+}
+
+
+
+====================================================================================================
+ARQUIVO: C:\Users\User\source\repos\lucasffxavier\Araci-front\Core\Documents\ProjectTable.cs
+====================================================================================================
+
+using System;
+
+namespace Araci.Core.Documents
+{
+    public class ProjectTable
+    {
+        public Guid Id { get; set; } = Guid.NewGuid();
+        public string Nome { get; set; } = string.Empty;
+    }
+}
+
+
+
+====================================================================================================
+ARQUIVO: C:\Users\User\source\repos\lucasffxavier\Araci-front\Core\Documents\ProjectView.cs
+====================================================================================================
+
+using System;
+
+namespace Araci.Core.Documents
+{
+    public class ProjectView
+    {
+        public Guid Id { get; set; } = Guid.NewGuid();
+        public string Nome { get; set; } = string.Empty;
+        public double CameraX { get; set; }
+        public double CameraY { get; set; }
+        public double Zoom { get; set; } = 1.0;
+    }
+}
+
+
+
+====================================================================================================
 ARQUIVO: C:\Users\User\source\repos\lucasffxavier\Araci-front\MainWindow.xaml.cs
 ====================================================================================================
 
@@ -1078,9 +1571,11 @@ namespace Araci.ViewModels
             _document.Pranchas.CollectionChanged += OnDocumentCollectionChanged;
             _document.VistaAtivaAlterada += OnVistaAtivaAlterada;
             _document.ItemProjetoRenomeado += OnItemProjetoRenomeado;
+            ExcluirSelecionadoCommand = new RelayCommand(ExecutarExcluirSelecionado);
         }
 
         public ObservableCollection<ProjectBrowserSectionViewModel> Secoes { get; }
+        public ICommand ExcluirSelecionadoCommand { get; }
 
         private void OnDocumentCollectionChanged(object? sender, NotifyCollectionChangedEventArgs e)
         {
@@ -1213,6 +1708,23 @@ namespace Araci.ViewModels
                 "Prancha" => _excluirItemProjeto.ExcluirPrancha(item.Id),
                 _ => false
             };
+        }
+
+        public bool ExcluirSelecionado()
+        {
+            ProjectBrowserItemViewModel? item = Secoes
+                .SelectMany(secao => secao.Itens)
+                .FirstOrDefault(atual =>
+                    atual.IsSelected &&
+                    atual.Id == _selectedItemId &&
+                    atual.Tipo == _selectedItemKind);
+
+            return item?.TentarExcluir() == true;
+        }
+
+        private void ExecutarExcluirSelecionado()
+        {
+            ExcluirSelecionado();
         }
 
         private static string FormatarPrancha(ProjectSheet prancha)
@@ -1392,9 +1904,14 @@ namespace Araci.ViewModels
             IsEditing = false;
         }
 
+        public bool TentarExcluir()
+        {
+            return _excluir?.Invoke(this) == true;
+        }
+
         private void Excluir()
         {
-            _excluir?.Invoke(this);
+            TentarExcluir();
         }
 
         public event PropertyChangedEventHandler? PropertyChanged;
@@ -1414,7 +1931,9 @@ ARQUIVO: C:\Users\User\source\repos\lucasffxavier\Araci-front\Views\ProjectBrows
 
 <UserControl x:Class="Araci.Views.ProjectBrowserView"
              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
-             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             Focusable="True"
+             PreviewKeyDown="OnProjectBrowserPreviewKeyDown">
     <Border Margin="8"
             Background="#252526"
             BorderBrush="#F4F4F4"
@@ -1570,106 +2089,6 @@ ARQUIVO: C:\Users\User\source\repos\lucasffxavier\Araci-front\Views\ProjectBrows
         </Grid>
     </Border>
 </UserControl>
-
-
-
-====================================================================================================
-ARQUIVO: C:\Users\User\source\repos\lucasffxavier\Araci-front\Views\ProjectBrowserView.xaml.cs
-====================================================================================================
-
-using System.Windows;
-using System.Windows.Controls;
-using System.Windows.Input;
-using Araci.ViewModels;
-
-namespace Araci.Views
-{
-    public partial class ProjectBrowserView : UserControl
-    {
-        public static readonly RoutedEvent CloseRequestedEvent = EventManager.RegisterRoutedEvent(
-            nameof(CloseRequested),
-            RoutingStrategy.Bubble,
-            typeof(RoutedEventHandler),
-            typeof(ProjectBrowserView));
-
-        public event RoutedEventHandler CloseRequested
-        {
-            add => AddHandler(CloseRequestedEvent, value);
-            remove => RemoveHandler(CloseRequestedEvent, value);
-        }
-
-        public ProjectBrowserView()
-        {
-            InitializeComponent();
-        }
-
-        private void OnCloseClick(object sender, RoutedEventArgs e)
-        {
-            RaiseEvent(new RoutedEventArgs(CloseRequestedEvent));
-        }
-
-        private void OnItemMouseDoubleClick(object sender, MouseButtonEventArgs e)
-        {
-            if (sender is Button { DataContext: ProjectBrowserItemViewModel item } &&
-                item.IniciarEdicaoCommand.CanExecute(null))
-            {
-                item.IniciarEdicaoCommand.Execute(null);
-                e.Handled = true;
-            }
-        }
-
-        private void OnRenameTextBoxLoaded(object sender, RoutedEventArgs e)
-        {
-            FocarTextBoxEdicao(sender as TextBox);
-        }
-
-        private void OnRenameTextBoxIsVisibleChanged(object sender, DependencyPropertyChangedEventArgs e)
-        {
-            if (e.NewValue is true)
-                FocarTextBoxEdicao(sender as TextBox);
-        }
-
-        private void OnRenameTextBoxLostKeyboardFocus(object sender, KeyboardFocusChangedEventArgs e)
-        {
-            if (sender is TextBox { DataContext: ProjectBrowserItemViewModel item } &&
-                item.IsEditing &&
-                item.ConfirmarEdicaoCommand.CanExecute(null))
-            {
-                item.ConfirmarEdicaoCommand.Execute(null);
-            }
-        }
-
-        private void OnRenameTextBoxPreviewKeyDown(object sender, KeyEventArgs e)
-        {
-            if (sender is not TextBox { DataContext: ProjectBrowserItemViewModel item })
-                return;
-
-            if (e.Key == Key.Enter && item.ConfirmarEdicaoCommand.CanExecute(null))
-            {
-                item.ConfirmarEdicaoCommand.Execute(null);
-                e.Handled = true;
-            }
-            else if (e.Key == Key.Escape && item.CancelarEdicaoCommand.CanExecute(null))
-            {
-                item.CancelarEdicaoCommand.Execute(null);
-                e.Handled = true;
-            }
-        }
-
-        private static void FocarTextBoxEdicao(TextBox? textBox)
-        {
-            if (textBox?.DataContext is not ProjectBrowserItemViewModel { IsEditing: true })
-                return;
-
-            textBox.Dispatcher.BeginInvoke(new System.Action(() =>
-            {
-                textBox.Focus();
-                Keyboard.Focus(textBox);
-                textBox.SelectAll();
-            }));
-        }
-    }
-}
 
 
 
