@@ -366,7 +366,8 @@ namespace Araci.Infrastructure.Persistence
             return new ProjectTableDto
             {
                 Id = tabela.Id,
-                Nome = tabela.Nome
+                Nome = tabela.Nome,
+                Disciplina = tabela.Disciplina.ToString()
             };
         }
 
@@ -407,7 +408,8 @@ namespace Araci.Infrastructure.Persistence
             return new ProjectTable
             {
                 Id = dto.Id == Guid.Empty ? Guid.NewGuid() : dto.Id,
-                Nome = dto.Nome
+                Nome = dto.Nome,
+                Disciplina = ParseEnum(dto.Disciplina, ProjectViewDiscipline.Eletrica)
             };
         }
 

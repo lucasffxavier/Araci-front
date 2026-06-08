@@ -19,7 +19,7 @@ namespace Araci
             InitializeComponent();
             _context = new EditorContext();
             UnitValueConverter.CurrentUnits = _context.Settings.Units;
-            ProjectBrowser.DataContext = new ProjectBrowserViewModel(_context.Document, _context.DefinirVistaAtiva, _context.RenomearItemProjeto, _context.ExcluirItemProjeto, _context.DuplicarItemProjeto, MostrarPropriedadesVista);
+            ProjectBrowser.DataContext = new ProjectBrowserViewModel(_context.Document, _context.DefinirVistaAtiva, _context.RenomearItemProjeto, _context.ExcluirItemProjeto, _context.DuplicarItemProjeto, MostrarPropriedadesVista, MostrarPropriedadesTabela);
             _context.Editor.PropertyChanged += OnEditorStatePropertyChanged;
             Viewport.Inicializar(_context);
             InicializarRibbon();
@@ -69,6 +69,22 @@ namespace Araci
                 vista,
                 _context.RenomearItemProjeto,
                 _context.EditarPropriedadesVista);
+
+            MostrarPropriedades();
+        }
+
+        public void MostrarPropriedadesTabela(System.Guid tabelaId)
+        {
+            Core.Documents.ProjectTable? tabela = _context.Document.Tabelas.FirstOrDefault(t => t.Id == tabelaId);
+
+            if (tabela == null)
+                return;
+
+            _context.Editor.ElementoSelecionado = new ProjectTablePropertiesViewModel(
+                _context.Document,
+                tabela,
+                _context.RenomearItemProjeto,
+                _context.EditarPropriedadesTabela);
 
             MostrarPropriedades();
         }

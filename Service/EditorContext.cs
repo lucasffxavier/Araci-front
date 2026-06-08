@@ -108,6 +108,7 @@ namespace Araci.Services
             ExcluirItemProjeto = new ExcluirItemProjetoUseCase(Document, Commands);
             DuplicarItemProjeto = new DuplicarItemProjetoUseCase(Document, Commands);
             EditarPropriedadesVista = new EditarPropriedadesVistaUseCase(Document, Commands);
+            EditarPropriedadesTabela = new EditarPropriedadesTabelaUseCase(Document, Commands);
 
             var moveServices = EditingComposition.CreateMoveServices(() => Viewport, () => Scene.Elementos, Settings, Connectivity, TerminalLayout, SceneQueries, VisualUpdates, Selection, GeometryUpdates, Commands);
             MoveHud = moveServices.MoveHud;
@@ -203,6 +204,7 @@ namespace Araci.Services
         public ExcluirItemProjetoUseCase ExcluirItemProjeto { get; }
         public DuplicarItemProjetoUseCase DuplicarItemProjeto { get; }
         public EditarPropriedadesVistaUseCase EditarPropriedadesVista { get; }
+        public EditarPropriedadesTabelaUseCase EditarPropriedadesTabela { get; }
         public VisualUpdateService VisualUpdates { get; }
         public SelectionService Selection { get; }
         public SelecionarElementosUseCase SelecionarElementos { get; }

@@ -493,7 +493,156 @@ Araci-front
 
 
 ====================================================================================================
-ARQUIVO: C:\Users\User\source\repos\lucasffxavier\Araci-front\Applications\UseCases\Projeto\EditarPropriedadesVistaUseCase.cs
+ARQUIVO: C:\Users\User\source\repos\lucasffxavier\Araci-front\Applications\Commands\CommandManager.cs
+====================================================================================================
+
+﻿using System.Collections.Generic;
+
+using Araci.Applications.Abstractions;
+using Araci.Core.Transactions;
+
+namespace Araci.Core.Commands
+{
+    public class CommandManager : ICommandHistory
+    {
+        private readonly Stack<IUndoableCommand>
+            _undoStack = new();
+
+        private readonly Stack<IUndoableCommand>
+            _redoStack = new();
+
+        public void Execute(
+            IUndoableCommand command)
+        {
+            command.Execute();
+
+            _undoStack.Push(command);
+
+            _redoStack.Clear();
+        }
+
+        public void Undo()
+        {
+            if (_undoStack.Count == 0)
+                return;
+
+            var command =
+                _undoStack.Pop();
+
+            command.Undo();
+
+            _redoStack.Push(command);
+        }
+
+        public void Redo()
+        {
+            if (_redoStack.Count == 0)
+                return;
+
+            var command =
+                _redoStack.Pop();
+
+            command.Redo();
+
+            _undoStack.Push(command);
+        }
+
+        public void Clear()
+        {
+            _undoStack.Clear();
+            _redoStack.Clear();
+        }
+
+        public TransactionScope BeginTransaction()
+        {
+            return new TransactionScope(this);
+        }
+
+        public bool CanUndo =>
+            _undoStack.Count > 0;
+
+        public bool CanRedo =>
+            _redoStack.Count > 0;
+    }
+}
+
+
+
+====================================================================================================
+ARQUIVO: C:\Users\User\source\repos\lucasffxavier\Araci-front\Applications\Commands\IUndoableCommand.cs
+====================================================================================================
+
+﻿namespace Araci.Core.Commands
+{
+    public interface IUndoableCommand
+    {
+        void Execute();
+
+        void Undo();
+
+        void Redo();
+    }
+}
+
+
+====================================================================================================
+ARQUIVO: C:\Users\User\source\repos\lucasffxavier\Araci-front\Applications\Commands\UpdateProjectViewPropertyCommand.cs
+====================================================================================================
+
+using System;
+using Araci.Core.Documents;
+
+namespace Araci.Core.Commands
+{
+    public class UpdateProjectViewPropertyCommand<T> : IUndoableCommand
+    {
+        private readonly AraciDocument _document;
+        private readonly ProjectView _vista;
+        private readonly Action<ProjectView, T> _aplicar;
+        private readonly T _valorAnterior;
+        private readonly T _valorNovo;
+
+        public UpdateProjectViewPropertyCommand(
+            AraciDocument document,
+            ProjectView vista,
+            Action<ProjectView, T> aplicar,
+            T valorAnterior,
+            T valorNovo)
+        {
+            _document = document ?? throw new ArgumentNullException(nameof(document));
+            _vista = vista ?? throw new ArgumentNullException(nameof(vista));
+            _aplicar = aplicar ?? throw new ArgumentNullException(nameof(aplicar));
+            _valorAnterior = valorAnterior;
+            _valorNovo = valorNovo;
+        }
+
+        public void Execute()
+        {
+            Aplicar(_valorNovo);
+        }
+
+        public void Undo()
+        {
+            Aplicar(_valorAnterior);
+        }
+
+        public void Redo()
+        {
+            Execute();
+        }
+
+        private void Aplicar(T valor)
+        {
+            _aplicar(_vista, valor);
+            _document.AtualizarPropriedadesVista(_vista);
+        }
+    }
+}
+
+
+
+====================================================================================================
+ARQUIVO: C:\Users\User\source\repos\lucasffxavier\Araci-front\Applications\UseCases\Projeto\RenomearItemProjetoUseCase.cs
 ====================================================================================================
 
 using System;
@@ -504,62 +653,82 @@ using Araci.Core.Documents;
 
 namespace Araci.Applications.UseCases.Projeto
 {
-    public class EditarPropriedadesVistaUseCase
+    public class RenomearItemProjetoUseCase
     {
         private readonly AraciDocument _document;
         private readonly ICommandHistory _commands;
 
-        public EditarPropriedadesVistaUseCase(AraciDocument document, ICommandHistory commands)
+        public RenomearItemProjetoUseCase(AraciDocument document, ICommandHistory commands)
         {
             _document = document ?? throw new ArgumentNullException(nameof(document));
             _commands = commands ?? throw new ArgumentNullException(nameof(commands));
         }
 
-        public bool AlterarEscala(Guid id, string escala)
+        public bool RenomearVista(Guid id, string nome)
         {
-            string normalizado = NormalizarTexto(escala, "1:100");
-            return Alterar(id, v => v.Escala, (v, valor) => v.Escala = valor, normalizado);
-        }
+            string normalizado = NormalizarNome(nome);
 
-        public bool AlterarDisciplina(Guid id, ProjectViewDiscipline disciplina)
-        {
-            return Alterar(id, v => v.Disciplina, (v, valor) => v.Disciplina = valor, disciplina);
-        }
-
-        public bool AlterarRecortarVista(Guid id, bool recortarVista)
-        {
-            return Alterar(id, v => v.RecortarVista, (v, valor) => v.RecortarVista = valor, recortarVista);
-        }
-
-        private bool Alterar<T>(
-            Guid id,
-            Func<ProjectView, T> obter,
-            Action<ProjectView, T> aplicar,
-            T valorNovo)
-        {
-            ProjectView? vista = _document.Vistas.FirstOrDefault(v => v.Id == id);
-
-            if (vista == null)
+            if (string.IsNullOrWhiteSpace(normalizado))
                 return false;
 
-            T valorAnterior = obter(vista);
+            ProjectView? vista = _document.Vistas.FirstOrDefault(v => v.Id == id);
 
-            if (Equals(valorAnterior, valorNovo))
-                return true;
+            if (vista == null || NomeIgual(vista.Nome, normalizado))
+                return vista != null;
 
-            _commands.Execute(new UpdateProjectViewPropertyCommand<T>(
-                _document,
-                vista,
-                aplicar,
-                valorAnterior,
-                valorNovo));
+            if (_document.Vistas.Any(v => v.Id != id && NomeIgual(v.Nome, normalizado)))
+                return false;
 
+            _commands.Execute(RenameProjectItemCommand.Vista(_document, vista, normalizado));
             return true;
         }
 
-        private static string NormalizarTexto(string valor, string fallback)
+        public bool RenomearTabela(Guid id, string nome)
         {
-            return string.IsNullOrWhiteSpace(valor) ? fallback : valor.Trim();
+            string normalizado = NormalizarNome(nome);
+
+            if (string.IsNullOrWhiteSpace(normalizado))
+                return false;
+
+            ProjectTable? tabela = _document.Tabelas.FirstOrDefault(t => t.Id == id);
+
+            if (tabela == null || NomeIgual(tabela.Nome, normalizado))
+                return tabela != null;
+
+            if (_document.Tabelas.Any(t => t.Id != id && NomeIgual(t.Nome, normalizado)))
+                return false;
+
+            _commands.Execute(RenameProjectItemCommand.Tabela(_document, tabela, normalizado));
+            return true;
+        }
+
+        public bool RenomearPrancha(Guid id, string nome)
+        {
+            string normalizado = NormalizarNome(nome);
+
+            if (string.IsNullOrWhiteSpace(normalizado))
+                return false;
+
+            ProjectSheet? prancha = _document.Pranchas.FirstOrDefault(p => p.Id == id);
+
+            if (prancha == null || NomeIgual(prancha.Nome, normalizado))
+                return prancha != null;
+
+            if (_document.Pranchas.Any(p => p.Id != id && NomeIgual(p.Nome, normalizado)))
+                return false;
+
+            _commands.Execute(RenameProjectItemCommand.Prancha(_document, prancha, normalizado));
+            return true;
+        }
+
+        private static string NormalizarNome(string nome)
+        {
+            return string.IsNullOrWhiteSpace(nome) ? string.Empty : nome.Trim();
+        }
+
+        private static bool NomeIgual(string atual, string novo)
+        {
+            return string.Equals(NormalizarNome(atual), novo, StringComparison.OrdinalIgnoreCase);
         }
     }
 }
@@ -675,6 +844,7 @@ namespace Araci.Core.Documents
                 Escala = origem?.Escala ?? "1:100",
                 Disciplina = origem?.Disciplina ?? ProjectViewDiscipline.Eletrica,
                 RecortarVista = origem?.RecortarVista ?? false,
+                RegiaoRecorteVisivel = origem?.RegiaoRecorteVisivel ?? true,
                 CameraX = origem?.CameraX ?? 0,
                 CameraY = origem?.CameraY ?? 0,
                 Zoom = origem?.Zoom ?? 1.0
@@ -962,33 +1132,17 @@ namespace Araci.Core.Documents
 
 
 ====================================================================================================
-ARQUIVO: C:\Users\User\source\repos\lucasffxavier\Araci-front\Core\Documents\ProjectView.cs
+ARQUIVO: C:\Users\User\source\repos\lucasffxavier\Araci-front\Core\Documents\ProjectTable.cs
 ====================================================================================================
 
 using System;
 
 namespace Araci.Core.Documents
 {
-    public enum ProjectViewDiscipline
-    {
-        Coordenacao,
-        Eletrica,
-        Solar,
-        Eolica,
-        Distribuicao,
-        Subestacao
-    }
-
-    public class ProjectView
+    public class ProjectTable
     {
         public Guid Id { get; set; } = Guid.NewGuid();
         public string Nome { get; set; } = string.Empty;
-        public string Escala { get; set; } = "1:100";
-        public ProjectViewDiscipline Disciplina { get; set; } = ProjectViewDiscipline.Eletrica;
-        public bool RecortarVista { get; set; }
-        public double CameraX { get; set; }
-        public double CameraY { get; set; }
-        public double Zoom { get; set; } = 1.0;
     }
 }
 
@@ -1029,6 +1183,7 @@ namespace Araci.Infrastructure.Persistence
         public string Escala { get; set; } = "1:100";
         public string Disciplina { get; set; } = "Eletrica";
         public bool RecortarVista { get; set; }
+        public bool? RegiaoRecorteVisivel { get; set; }
         public double CameraX { get; set; }
         public double CameraY { get; set; }
         public double Zoom { get; set; } = 1.0;
@@ -1494,6 +1649,7 @@ namespace Araci.Infrastructure.Persistence
                 Escala = vista.Escala,
                 Disciplina = vista.Disciplina.ToString(),
                 RecortarVista = vista.RecortarVista,
+                RegiaoRecorteVisivel = vista.RegiaoRecorteVisivel,
                 CameraX = vista.CameraX,
                 CameraY = vista.CameraY,
                 Zoom = vista.Zoom
@@ -1531,6 +1687,7 @@ namespace Araci.Infrastructure.Persistence
                 Escala = NormalizarTextoVista(dto.Escala, "1:100"),
                 Disciplina = ParseEnum(dto.Disciplina, ProjectViewDiscipline.Eletrica),
                 RecortarVista = dto.RecortarVista,
+                RegiaoRecorteVisivel = dto.RegiaoRecorteVisivel ?? true,
                 CameraX = NormalizarCoordenadaCamera(dto.CameraX),
                 CameraY = NormalizarCoordenadaCamera(dto.CameraY),
                 Zoom = NormalizarZoomVista(dto.Zoom)
@@ -1798,6 +1955,163 @@ namespace Araci.Infrastructure.Persistence
 
 
 ====================================================================================================
+ARQUIVO: C:\Users\User\source\repos\lucasffxavier\Araci-front\MainWindow.xaml.cs
+====================================================================================================
+
+using Araci.Services;
+using Araci.Properties;
+using Araci.ViewModels;
+using System.ComponentModel;
+using System.Linq;
+using System.Windows;
+using System.Windows.Controls.Primitives;
+
+namespace Araci
+{
+    public partial class MainWindow : Window
+    {
+        private readonly EditorContext _context;
+        private readonly GridLength _projectBrowserColumnWidth = new(260);
+        private readonly GridLength _propertiesColumnWidth = new(320);
+
+        public MainWindow()
+        {
+            InitializeComponent();
+            _context = new EditorContext();
+            UnitValueConverter.CurrentUnits = _context.Settings.Units;
+            ProjectBrowser.DataContext = new ProjectBrowserViewModel(_context.Document, _context.DefinirVistaAtiva, _context.RenomearItemProjeto, _context.ExcluirItemProjeto, _context.DuplicarItemProjeto, MostrarPropriedadesVista);
+            _context.Editor.PropertyChanged += OnEditorStatePropertyChanged;
+            Viewport.Inicializar(_context);
+            InicializarRibbon();
+            AtualizarVisibilidadeNavegadorProjeto();
+        }
+
+        private void InicializarRibbon()
+        {
+            DataContext = _context;
+            ArquivoMenu.DataContext = _context;
+        }
+
+        public void ToggleArquivoMenu(UIElement referencia)
+        {
+            if (ArquivoPopup.IsOpen)
+            {
+                ArquivoPopup.IsOpen = false;
+                return;
+            }
+
+            ArquivoPopup.PlacementTarget = referencia;
+            ArquivoPopup.Placement = PlacementMode.Bottom;
+            ArquivoPopup.IsOpen = true;
+        }
+
+        public void FocarViewport()
+        {
+            Viewport.Focus();
+            System.Windows.Input.Keyboard.Focus(Viewport);
+        }
+
+        public void MostrarPropriedades()
+        {
+            PropertiesColumn.Width = _propertiesColumnWidth;
+            PropertiesHost.Visibility = Visibility.Visible;
+        }
+
+        public void MostrarPropriedadesVista(System.Guid vistaId)
+        {
+            Core.Documents.ProjectView? vista = _context.Document.Vistas.FirstOrDefault(v => v.Id == vistaId);
+
+            if (vista == null)
+                return;
+
+            _context.Editor.ElementoSelecionado = new ProjectViewPropertiesViewModel(
+                _context.Document,
+                vista,
+                _context.RenomearItemProjeto,
+                _context.EditarPropriedadesVista);
+
+            MostrarPropriedades();
+        }
+
+        public void AlternarNavegadorProjeto()
+        {
+            _context.Editor.NavegadorProjetoVisivel = !_context.Editor.NavegadorProjetoVisivel;
+        }
+
+        public void CriarNovaVistaProjeto()
+        {
+            _context.CriarItemProjeto.CriarVista();
+            MostrarNavegadorProjeto();
+        }
+
+        public void CriarNovaTabelaProjeto()
+        {
+            _context.CriarItemProjeto.CriarTabela();
+            MostrarNavegadorProjeto();
+        }
+
+        public void CriarNovaPranchaProjeto()
+        {
+            _context.CriarItemProjeto.CriarPrancha();
+            MostrarNavegadorProjeto();
+        }
+
+        public void MostrarConfiguracaoUnidades()
+        {
+            var viewModel = new UnitsSettingsViewModel(_context.Settings.Units);
+            var window = new UnitsWindow(viewModel)
+            {
+                Owner = this
+            };
+
+            if (window.ShowDialog() == true)
+                _context.AlterarUnidadesProjeto.Executar(viewModel.ToUnitDisplaySettings());
+
+            FocarViewport();
+        }
+
+        private void OnPropertiesCloseRequested(object sender, RoutedEventArgs e)
+        {
+            PropertiesColumn.Width = new GridLength(0);
+            PropertiesHost.Visibility = Visibility.Collapsed;
+            FocarViewport();
+        }
+
+        private void OnProjectBrowserCloseRequested(object sender, RoutedEventArgs e)
+        {
+            _context.Editor.NavegadorProjetoVisivel = false;
+            FocarViewport();
+        }
+
+        private void OnEditorStatePropertyChanged(object? sender, PropertyChangedEventArgs e)
+        {
+            if (string.IsNullOrEmpty(e.PropertyName) || e.PropertyName == nameof(EditorState.NavegadorProjetoVisivel))
+                AtualizarVisibilidadeNavegadorProjeto();
+        }
+
+        private void AtualizarVisibilidadeNavegadorProjeto()
+        {
+            if (_context.Editor.NavegadorProjetoVisivel)
+            {
+                ProjectBrowserColumn.Width = _projectBrowserColumnWidth;
+                ProjectBrowser.Visibility = Visibility.Visible;
+                return;
+            }
+
+            ProjectBrowserColumn.Width = new GridLength(0);
+            ProjectBrowser.Visibility = Visibility.Collapsed;
+        }
+
+        private void MostrarNavegadorProjeto()
+        {
+            _context.Editor.NavegadorProjetoVisivel = true;
+        }
+    }
+}
+
+
+
+====================================================================================================
 ARQUIVO: C:\Users\User\source\repos\lucasffxavier\Araci-front\Properties\PropertiesHostView.xaml
 ====================================================================================================
 
@@ -1997,6 +2311,24 @@ ARQUIVO: C:\Users\User\source\repos\lucasffxavier\Araci-front\Properties\Propert
                                        VerticalAlignment="Center"
                                       HorizontalAlignment="Left"/>
                         </Grid>
+
+                        <Grid Margin="0,0,0,6">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="110"/>
+                                <ColumnDefinition Width="*"/>
+                            </Grid.ColumnDefinitions>
+                            <TextBlock Grid.Column="0"
+                                       Text="Região de recorte visível"
+                                       Foreground="#DCDCDC"
+                                       VerticalAlignment="Center"
+                                       TextTrimming="CharacterEllipsis"
+                                       Margin="0,0,8,0"/>
+                            <CheckBox Grid.Column="1"
+                                      IsChecked="{Binding RegiaoRecorteVisivel, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                                      Foreground="#DCDCDC"
+                                      VerticalAlignment="Center"
+                                      HorizontalAlignment="Left"/>
+                        </Grid>
                     </StackPanel>
                 </ScrollViewer>
             </Grid>
@@ -2134,6 +2466,866 @@ ARQUIVO: C:\Users\User\source\repos\lucasffxavier\Araci-front\Properties\Propert
 
 
 ====================================================================================================
+ARQUIVO: C:\Users\User\source\repos\lucasffxavier\Araci-front\Service\EditorContext.cs
+====================================================================================================
+
+using System.Collections.Generic;
+using System.ComponentModel;
+using System.Linq;
+using System.Windows;
+using Araci.Applications.Abstractions;
+using Araci.Applications.Editor;
+using Araci.Applications.Factories;
+using Araci.Core.Commands;
+using Araci.Core.Documents;
+using Araci.Core.Events;
+using Araci.Core.SceneQueries;
+using Araci.Core.Transactions;
+using Araci.Applications.Anotar.InserirLinha;
+using Araci.Applications.Anotar.InserirRetangulo;
+using Araci.Applications.Anotar.InserirCirculo;
+using Araci.Applications.Diagrama.InserirCabo;
+using Araci.Applications.Diagrama.InserirElemento;
+using Araci.Applications.Editar.Alinhar;
+using Araci.Applications.Editar.Deletar;
+using Araci.Applications.Editar.Mover;
+using Araci.Applications.Editar.Selecionar;
+using Araci.Applications.Projects;
+using Araci.Applications.Simulation;
+using Araci.Applications.UseCases.Analise;
+using Araci.Applications.UseCases.Editar;
+using Araci.Applications.UseCases.Diagrama;
+using Araci.Applications.UseCases.Projeto;
+using Araci.Models;
+using Araci.Services.Composition;
+using Araci.ViewModels;
+using CoreScene = Araci.Core.Scenes.Scene;
+using Araci.Services.Geometry;
+using Araci.Services.Topology;
+using Araci.Services.Editing;
+using Araci.Services.Viewport;
+using Araci.Services.Simulation;
+using Araci.Services.UI;
+using Araci.Services.Settings;
+using Araci.Services.Catalog;
+using Araci.Services.Naming;
+using Araci.Services.Interaction;
+
+namespace Araci.Services
+{
+    public class EditorContext : IEditorSession
+    {
+        private bool _aplicandoCameraVista;
+
+        public EditorContext()
+            : this(new EventBus())
+        {
+        }
+
+        public EditorContext(IEventBus eventBus)
+        {
+            Events = eventBus;
+            Document.VistaAtivaAlterada += OnDocumentoVistaAtivaAlterada;
+
+            var core = EditorCoreComposition.Create(Document, Settings, Types);
+            Scene = core.Scene;
+            SceneQueries = core.SceneQueries;
+            Hover = core.Hover;
+            Snap = core.Snap;
+            TypePropertiesDialogs = core.TypePropertiesDialogs;
+            Dialogs = core.Dialogs;
+            Elements = core.Elements;
+            Connectivity = core.Connectivity;
+            ElectricGraph = core.ElectricGraph;
+            OperationalState = core.OperationalState;
+            Topology = core.Topology;
+            Geometry = core.Geometry;
+            TerminalLayout = core.TerminalLayout;
+            TypePropertiesDialogs.Configure(Commands, NotifyTextAnnotationTypeLibraryChanged, () => Document.Elementos.OfType<TextoAnotativo>());
+
+            var simulation = SimulationComposition.Create(Document, NotifySimulationResultViewModels, Dialogs);
+            SimulationResults = simulation.Results;
+            Simulation = simulation.Pipeline;
+            SimulationExport = simulation.Export;
+            SimulationMessages = simulation.Messages;
+            ExecutarSimulacao = simulation.ExecutarSimulacao;
+
+            VisualUpdates = EditingComposition.CreateVisualUpdates(() => Viewport, TerminalLayout, Connectivity, SceneQueries, TerminalSnap, RefreshEditingHandles);
+            Names = new NameService(Document, Elements);
+            GeometryUpdates = new ElementGeometryUpdateService(TerminalLayout, Connectivity, VisualUpdates);
+            var elementoModelFactory = new ElementoModelFactory(Elements);
+            var elementoViewModelFactory = new ElementoViewModelFactory(Elements, elementoModelFactory, Names, TypePropertiesDialogs, TerminalLayout, GeometryUpdates);
+            ElementoFactory = new ElementoFactory(elementoModelFactory, elementoViewModelFactory);
+            InserirElemento = new InserirElementoUseCase(ElementoFactory, TerminalLayout, Commands, Document, Names);
+            InserirCabo = new InserirCaboUseCase(ElementoFactory, Commands, Document, Names, cabo => Viewport?.ObterViewModel(cabo) as CaboViewModel);
+            CopiarElementos = new CopiarElementosUseCase();
+            ColarElementos = new ColarElementosUseCase(CopiarElementos, Document, Names, Commands, ObterDestinoColagem);
+            ExcluirElemento = new ExcluirElementoUseCase(Document, Connectivity, Commands);
+            EditarPropriedades = new EditarPropriedadesUseCase(Commands);
+            Selection = EditingComposition.CreateSelection(Editor, Events, EditarPropriedades, Settings);
+            SelecionarElementos = new SelecionarElementosUseCase(Selection);
+            AtualizarPropriedadesSelecionadas = new AtualizarPropriedadesSelecionadasUseCase(Selection);
+            EditarVerticesCabo = new EditarVerticesCaboUseCase(Commands);
+            CableVertexEdit = EditingComposition.CreateCableVertexEdit(Selection, SceneQueries, VisualUpdates, EditarVerticesCabo);
+            Selection.SelectionChanged += CableVertexEdit.Refresh;
+            SafeDelete = EditingComposition.CreateSafeDelete(Selection, CableVertexEdit, ExcluirElemento, Hover, TerminalSnap, SceneQueries);
+            Clipboard = EditingComposition.CreateClipboard(CopiarElementos, ColarElementos, Selection, () => Viewport, SceneQueries, CableVertexEdit);
+            Projects = PersistenceComposition.CreateProjects(Document, Commands, Elements, elementoModelFactory, TerminalLayout, Geometry, Dialogs, Settings, LimparEstadoTransitorioProjeto);
+            NovoProjeto = new NovoProjetoUseCase(Projects);
+            AbrirProjeto = new AbrirProjetoUseCase(Projects);
+            SalvarProjeto = new SalvarProjetoUseCase(Projects);
+            CriarItemProjeto = new CriarItemProjetoUseCase(Document, Commands);
+            RenomearItemProjeto = new RenomearItemProjetoUseCase(Document, Commands);
+            ExcluirItemProjeto = new ExcluirItemProjetoUseCase(Document, Commands);
+            DuplicarItemProjeto = new DuplicarItemProjetoUseCase(Document, Commands);
+            EditarPropriedadesVista = new EditarPropriedadesVistaUseCase(Document, Commands);
+
+            var moveServices = EditingComposition.CreateMoveServices(() => Viewport, () => Scene.Elementos, Settings, Connectivity, TerminalLayout, SceneQueries, VisualUpdates, Selection, GeometryUpdates, Commands);
+            MoveHud = moveServices.MoveHud;
+            AlignmentGuides = moveServices.AlignmentGuides;
+            MoveConstraints = moveServices.MoveConstraints;
+            MoverElemento = moveServices.MoverElemento;
+            RotacionarElemento = moveServices.RotacionarElemento;
+            RedimensionarBarra = moveServices.RedimensionarBarra;
+            Move = moveServices.Move;
+            BarraResize = moveServices.BarraResize;
+            Rotation = moveServices.Rotation;
+            LinhaEndpointEdit = EditingComposition.CreateLinhaEndpointEdit(Selection, SceneQueries, MoverElemento, VisualUpdates);
+            Selection.SelectionChanged += LinhaEndpointEdit.Refresh;
+            RetanguloResize = EditingComposition.CreateRetanguloResize(Selection, SceneQueries, MoverElemento, VisualUpdates);
+            Selection.SelectionChanged += RetanguloResize.Refresh;
+            CirculoResize = EditingComposition.CreateCirculoResize(Selection, SceneQueries, MoverElemento, VisualUpdates);
+            Selection.SelectionChanged += CirculoResize.Refresh;
+
+            Tools = new ToolService(
+                Elements,
+                CriarSelecionarTool,
+                CriarMoverTool,
+                CriarAlinharTool,
+                () => new DeletarTool(SafeDelete),
+                CriarInserirCaboTool,
+                CriarInserirElementoGenericoTool,
+                CriarInserirLinhaAnotativaTool,
+                CriarInserirRetanguloAnotativoTool,
+                CriarInserirCirculoAnotativoTool);
+
+            Input = EditingComposition.CreateInput(Tools, Commands, SafeDelete, Selection, Elements, Hover, Clipboard.CopiarSelecionados, Clipboard.Colar);
+            AlterarUnidadesProjeto = new AlterarUnidadesProjetoUseCase(Settings, RefreshProperties);
+            Navigation = ViewportComposition.CreateNavigation(() => Viewport);
+        }
+
+        public IEventBus Events { get; }
+        public AraciDocument Document { get; } = new AraciDocument();
+        public CoreScene Scene { get; }
+        public ISceneQueryService SceneQueries { get; }
+        public HoverService Hover { get; }
+        public ToolService Tools { get; }
+        public InputRouter Input { get; }
+        public ViewportNavigationService Navigation { get; }
+        public ViewportService? Viewport { get; private set; }
+
+        public ViewportViewModel CriarViewportViewModel()
+        {
+            return ViewportComposition.CreateViewModel(Document, Scene, SelectionBox, TerminalSnap, CableVertexEdit, LinhaEndpointEdit, RetanguloResize, CirculoResize, MoveHud, AlignmentGuides, ElementoFactory, Selection, Hover, SceneQueries);
+        }
+
+        public void InicializarViewport(ViewportViewModel viewportViewModel)
+        {
+            if (Viewport != null)
+                Viewport.Camera.PropertyChanged -= OnCameraChanged;
+
+            Viewport = new ViewportService(viewportViewModel);
+            Viewport.Camera.PropertyChanged += OnCameraChanged;
+            AplicarCameraVistaAtiva();
+        }
+
+        public void DefinirVistaAtiva(Guid vistaId)
+        {
+            SalvarCameraVistaAtiva();
+            Document.DefinirVistaAtiva(vistaId);
+        }
+
+        public void RefreshProperties()
+        {
+            AtualizarPropriedadesSelecionadas.Executar();
+        }
+
+        public EditorState Editor { get; } = new EditorState();
+        public EditorSettings Settings { get; } = new EditorSettings();
+        public MoveHudService MoveHud { get; }
+        public AlignmentGuideService AlignmentGuides { get; }
+        public MoveConstraintService MoveConstraints { get; }
+        public SelectionBoxViewModel SelectionBox { get; } = new SelectionBoxViewModel();
+        public TerminalSnapState TerminalSnap { get; } = new TerminalSnapState();
+        public CableVertexEditService CableVertexEdit { get; }
+        public LinhaEndpointEditService LinhaEndpointEdit { get; }
+        public RetanguloResizeService RetanguloResize { get; }
+        public CirculoResizeService CirculoResize { get; }
+        public CommandManager Commands { get; } = new CommandManager();
+        ICommandHistory IEditorSession.Commands => Commands;
+        public SafeDeleteService SafeDelete { get; }
+        public ClipboardService Clipboard { get; }
+        public ProjectPersistenceService Projects { get; }
+        public NovoProjetoUseCase NovoProjeto { get; }
+        public AbrirProjetoUseCase AbrirProjeto { get; }
+        public SalvarProjetoUseCase SalvarProjeto { get; }
+        public CriarItemProjetoUseCase CriarItemProjeto { get; }
+        public RenomearItemProjetoUseCase RenomearItemProjeto { get; }
+        public ExcluirItemProjetoUseCase ExcluirItemProjeto { get; }
+        public DuplicarItemProjetoUseCase DuplicarItemProjeto { get; }
+        public EditarPropriedadesVistaUseCase EditarPropriedadesVista { get; }
+        public VisualUpdateService VisualUpdates { get; }
+        public SelectionService Selection { get; }
+        public SelecionarElementosUseCase SelecionarElementos { get; }
+        public AtualizarPropriedadesSelecionadasUseCase AtualizarPropriedadesSelecionadas { get; }
+        public MoveService Move { get; }
+        public BarraResizeService BarraResize { get; }
+        public RotationService Rotation { get; }
+        public SnapService Snap { get; }
+        public NameService Names { get; }
+        public ConnectivityService Connectivity { get; }
+        public ElectricGraphBuilder ElectricGraph { get; }
+        public OperationalGraphStateBuilder OperationalState { get; }
+        public TopologyValidator Topology { get; }
+        public SimulationResultApplier SimulationResults { get; }
+        public SimulationPipeline Simulation { get; }
+        public SimulationExportService SimulationExport { get; }
+        public SimulationMessageBuilder SimulationMessages { get; }
+        public ExecutarSimulacaoUseCase ExecutarSimulacao { get; }
+        public TypePropertiesDialogService TypePropertiesDialogs { get; }
+        public DialogService Dialogs { get; }
+        public ElementGeometryService Geometry { get; }
+        public TerminalLayoutService TerminalLayout { get; }
+        public ElementGeometryUpdateService GeometryUpdates { get; }
+        public ElementRegistryService Elements { get; }
+        public TypeLibraryService Types { get; } = new TypeLibraryService();
+        public ElementoFactory ElementoFactory { get; }
+        public InserirElementoUseCase InserirElemento { get; }
+        public InserirCaboUseCase InserirCabo { get; }
+        public CopiarElementosUseCase CopiarElementos { get; }
+        public ColarElementosUseCase ColarElementos { get; }
+        public ExcluirElementoUseCase ExcluirElemento { get; }
+        public EditarPropriedadesUseCase EditarPropriedades { get; }
+        public MoverElementoUseCase MoverElemento { get; }
+        public RotacionarElementoUseCase RotacionarElemento { get; }
+        public RedimensionarBarraUseCase RedimensionarBarra { get; }
+        public EditarVerticesCaboUseCase EditarVerticesCabo { get; }
+        public AlterarUnidadesProjetoUseCase AlterarUnidadesProjeto { get; }
+
+        public TransactionScope BeginTransaction()
+        {
+            return Commands.BeginTransaction();
+        }
+
+        private void NotifySimulationResultViewModels()
+        {
+            if (Viewport == null)
+                return;
+
+            foreach (ElementoViewModel vm in Viewport.Elementos)
+            {
+                if (vm.Modelo is Cabo or Carga)
+                    vm.NotificarPropriedades("CorrenteLinha", "CorrenteFaseA", "CorrenteFaseB", "CorrenteFaseC");
+            }
+        }
+
+        private void OnDocumentoVistaAtivaAlterada()
+        {
+            AplicarCameraVistaAtiva();
+        }
+
+        private void OnCameraChanged(object? sender, PropertyChangedEventArgs e)
+        {
+            if (_aplicandoCameraVista)
+                return;
+
+            SalvarCameraVistaAtiva();
+        }
+
+        private void SalvarCameraVistaAtiva()
+        {
+            if (Viewport == null || Document.VistaAtiva == null)
+                return;
+
+            Document.VistaAtiva.CameraX = Viewport.Camera.Offset.X;
+            Document.VistaAtiva.CameraY = Viewport.Camera.Offset.Y;
+            Document.VistaAtiva.Zoom = Viewport.Camera.Zoom;
+        }
+
+        private void AplicarCameraVistaAtiva()
+        {
+            if (Viewport == null || Document.VistaAtiva == null)
+                return;
+
+            double cameraX = Document.VistaAtiva.CameraX;
+            double cameraY = Document.VistaAtiva.CameraY;
+            double zoom = Document.VistaAtiva.Zoom;
+
+            _aplicandoCameraVista = true;
+
+            try
+            {
+                Viewport.Camera.Offset = new Point(cameraX, cameraY);
+                Viewport.Camera.Zoom = zoom;
+            }
+            finally
+            {
+                _aplicandoCameraVista = false;
+            }
+        }
+
+        private void NotifyTextAnnotationTypeLibraryChanged()
+        {
+            if (Viewport == null)
+                return;
+
+            foreach (ElementoViewModel vm in Viewport.Elementos)
+            {
+                if (vm is TextoAnotativoViewModel texto)
+                    texto.AtualizarAposTipoAlterado();
+            }
+
+            RefreshProperties();
+            SceneQueries.Invalidate();
+        }
+
+        private SelecionarTool CriarSelecionarTool()
+        {
+            return new SelecionarTool(SceneQueries, Selection, SelectionBox, CableVertexEdit, LinhaEndpointEdit, RetanguloResize, CirculoResize, BarraResize, Move, MoveHud, AlignmentGuides, MoveConstraints, Rotation);
+        }
+
+        private MoverTool CriarMoverTool()
+        {
+            return new MoverTool(SceneQueries, Selection, SelectionBox, CableVertexEdit, LinhaEndpointEdit, RetanguloResize, CirculoResize, BarraResize, Move, MoveHud, AlignmentGuides, MoveConstraints, Rotation);
+        }
+
+        private AlinharTool CriarAlinharTool()
+        {
+            return new AlinharTool(Hover, AlignmentGuides, Commands, SceneQueries);
+        }
+
+        private InserirCaboTool CriarInserirCaboTool()
+        {
+            return new InserirCaboTool(Commands, ElementoFactory, InserirCabo, Snap, Connectivity, AlignmentGuides, Scene, SceneQueries, TerminalSnap, () => Tools.VoltarParaSelecao());
+        }
+
+        private InserirElementoGenericoTool CriarInserirElementoGenericoTool(ElementDefinition definition)
+        {
+            return new InserirElementoGenericoTool(definition, ElementoFactory, InserirElemento, Snap, Geometry, TerminalLayout, AlignmentGuides, Scene, SceneQueries, () => Tools.VoltarParaSelecao());
+        }
+
+        private InserirLinhaAnotativaTool CriarInserirLinhaAnotativaTool()
+        {
+            return new InserirLinhaAnotativaTool(Commands, Document, Names, ElementoFactory, Scene, SceneQueries, LinhaEndpointEdit, () => Tools.VoltarParaSelecao());
+        }
+
+        private InserirRetanguloAnotativoTool CriarInserirRetanguloAnotativoTool()
+        {
+            return new InserirRetanguloAnotativoTool(Commands, Document, Names, ElementoFactory, Scene, SceneQueries, () => Tools.VoltarParaSelecao());
+        }
+
+        private InserirCirculoAnotativoTool CriarInserirCirculoAnotativoTool()
+        {
+            return new InserirCirculoAnotativoTool(Commands, Document, Names, ElementoFactory, Scene, SceneQueries, () => Tools.VoltarParaSelecao());
+        }
+
+        private Point ObterDestinoColagem(IReadOnlyList<Elemento> copiados)
+        {
+            if (Input.PossuiUltimaPosicaoMouseMundo)
+                return Input.UltimaPosicaoMouseMundo;
+
+            if (Viewport != null)
+                return Viewport.ScreenToWorld(Viewport.CentroTela);
+
+            Point centro = ColarElementosUseCase.CalcularCentro(copiados);
+            return new Point(centro.X + ColarElementosUseCase.OffsetPadrao, centro.Y + ColarElementosUseCase.OffsetPadrao);
+        }
+
+        private void RefreshEditingHandles()
+        {
+            CableVertexEdit?.Refresh();
+            LinhaEndpointEdit?.Refresh();
+            RetanguloResize?.Refresh();
+            CirculoResize?.Refresh();
+        }
+
+        private void LimparEstadoTransitorioProjeto()
+        {
+            Selection.Limpar();
+            Hover.Clear();
+            CableVertexEdit.Clear();
+            LinhaEndpointEdit.Clear();
+            RetanguloResize.Clear();
+            CirculoResize.Clear();
+            TerminalSnap.Limpar();
+            SelectionBox.Visivel = false;
+            MoveHud.Visivel = false;
+            MoveHud.Reset();
+            SceneQueries.Invalidate();
+            Tools.VoltarParaSelecao();
+        }
+    }
+}
+
+
+
+====================================================================================================
+ARQUIVO: C:\Users\User\source\repos\lucasffxavier\Araci-front\ViewModels\ProjectBrowserViewModel.cs
+====================================================================================================
+
+using System;
+using System.Collections.Generic;
+using System.Collections.ObjectModel;
+using System.Collections.Specialized;
+using System.ComponentModel;
+using System.Linq;
+using System.Runtime.CompilerServices;
+using System.Windows.Input;
+using Araci.Applications.UseCases.Projeto;
+using Araci.Core.Documents;
+using Araci.ViewModels.Base;
+
+namespace Araci.ViewModels
+{
+    public sealed class ProjectBrowserViewModel
+    {
+        private readonly AraciDocument _document;
+        private readonly Action<Guid> _definirVistaAtiva;
+        private readonly RenomearItemProjetoUseCase? _renomearItemProjeto;
+        private readonly ExcluirItemProjetoUseCase? _excluirItemProjeto;
+        private readonly DuplicarItemProjetoUseCase? _duplicarItemProjeto;
+        private readonly Action<Guid>? _abrirPropriedadesVista;
+        private Guid? _selectedItemId;
+        private string? _selectedItemKind;
+
+        public ProjectBrowserViewModel(
+            AraciDocument document,
+            Action<Guid>? definirVistaAtiva = null,
+            RenomearItemProjetoUseCase? renomearItemProjeto = null,
+            ExcluirItemProjetoUseCase? excluirItemProjeto = null,
+            DuplicarItemProjetoUseCase? duplicarItemProjeto = null,
+            Action<Guid>? abrirPropriedadesVista = null)
+        {
+            _document = document;
+            _definirVistaAtiva = definirVistaAtiva ?? _document.DefinirVistaAtiva;
+            _renomearItemProjeto = renomearItemProjeto;
+            _excluirItemProjeto = excluirItemProjeto;
+            _duplicarItemProjeto = duplicarItemProjeto;
+            _abrirPropriedadesVista = abrirPropriedadesVista;
+            Secoes = new ObservableCollection<ProjectBrowserSectionViewModel>
+            {
+                new("Vistas"),
+                new("Tabelas"),
+                new("Pranchas")
+            };
+
+            AtualizarSecoes();
+
+            _document.Vistas.CollectionChanged += OnDocumentCollectionChanged;
+            _document.Tabelas.CollectionChanged += OnDocumentCollectionChanged;
+            _document.Pranchas.CollectionChanged += OnDocumentCollectionChanged;
+            _document.VistaAtivaAlterada += OnVistaAtivaAlterada;
+            _document.ItemProjetoRenomeado += OnItemProjetoRenomeado;
+            ExcluirSelecionadoCommand = new RelayCommand(ExecutarExcluirSelecionado);
+        }
+
+        public ObservableCollection<ProjectBrowserSectionViewModel> Secoes { get; }
+        public ICommand ExcluirSelecionadoCommand { get; }
+
+        private void OnDocumentCollectionChanged(object? sender, NotifyCollectionChangedEventArgs e)
+        {
+            AtualizarSecoes();
+        }
+
+        private void OnVistaAtivaAlterada()
+        {
+            foreach (ProjectBrowserSectionViewModel secao in Secoes)
+            {
+                foreach (ProjectBrowserItemViewModel item in secao.Itens)
+                    item.IsActiveView = item.Tipo == "Vista" && _document.VistaAtivaId == item.Id;
+            }
+        }
+
+        private void OnItemProjetoRenomeado()
+        {
+            AtualizarSecoes();
+        }
+
+        private void AtualizarSecoes()
+        {
+            AtualizarItens(Secoes[0], _document.Vistas.Select(v => CriarItem(v.Id, "Vista", v.Nome)));
+            AtualizarItens(Secoes[1], CriarItensTabela());
+            AtualizarItens(Secoes[2], CriarItensPrancha());
+        }
+
+        private IEnumerable<ProjectBrowserItemViewModel> CriarItensTabela()
+        {
+            if (_document.Tabelas.Count == 0)
+            {
+                yield return ProjectBrowserItemViewModel.CriarPlaceholder("Nenhuma tabela");
+                yield break;
+            }
+
+            foreach (ProjectTable tabela in _document.Tabelas)
+                yield return CriarItem(tabela.Id, "Tabela", tabela.Nome);
+        }
+
+        private IEnumerable<ProjectBrowserItemViewModel> CriarItensPrancha()
+        {
+            if (_document.Pranchas.Count == 0)
+            {
+                yield return ProjectBrowserItemViewModel.CriarPlaceholder("Nenhuma prancha");
+                yield break;
+            }
+
+            foreach (ProjectSheet prancha in _document.Pranchas)
+                yield return CriarItem(prancha.Id, "Prancha", FormatarPrancha(prancha), prancha.Nome);
+        }
+
+        private ProjectBrowserItemViewModel CriarItem(Guid id, string tipo, string nome, string? nomeEdicao = null)
+        {
+            var item = new ProjectBrowserItemViewModel(
+                id,
+                tipo,
+                nome,
+                nomeEdicao ?? nome,
+                true,
+                SelecionarItem,
+                RenomearItem,
+                ExcluirItem,
+                DuplicarItem,
+                AbrirPropriedadesItem)
+            {
+                IsActiveView = tipo == "Vista" && _document.VistaAtivaId == id
+            };
+
+            item.IsSelected = _selectedItemId == id && _selectedItemKind == tipo;
+            return item;
+        }
+
+        private void SelecionarItem(ProjectBrowserItemViewModel item)
+        {
+            if (!item.IsSelectable)
+                return;
+
+            _selectedItemId = item.Id;
+            _selectedItemKind = item.Tipo;
+
+            if (item.Tipo == "Vista")
+            {
+                _definirVistaAtiva(item.Id);
+                _abrirPropriedadesVista?.Invoke(item.Id);
+            }
+
+            foreach (ProjectBrowserSectionViewModel secao in Secoes)
+            {
+                foreach (ProjectBrowserItemViewModel atual in secao.Itens)
+                {
+                    atual.IsSelected = ReferenceEquals(atual, item);
+                    atual.IsActiveView = atual.Tipo == "Vista" && _document.VistaAtivaId == atual.Id;
+                }
+            }
+        }
+
+        private static void AtualizarItens(ProjectBrowserSectionViewModel secao, IEnumerable<ProjectBrowserItemViewModel> itens)
+        {
+            secao.Itens.Clear();
+
+            foreach (ProjectBrowserItemViewModel item in itens)
+                secao.Itens.Add(item);
+        }
+
+        private bool RenomearItem(ProjectBrowserItemViewModel item, string novoNome)
+        {
+            if (_renomearItemProjeto == null)
+                return false;
+
+            switch (item.Tipo)
+            {
+                case "Vista":
+                    return _renomearItemProjeto.RenomearVista(item.Id, novoNome);
+
+                case "Tabela":
+                    return _renomearItemProjeto.RenomearTabela(item.Id, novoNome);
+
+                case "Prancha":
+                    return _renomearItemProjeto.RenomearPrancha(item.Id, novoNome);
+
+                default:
+                    return false;
+            }
+        }
+
+        private bool ExcluirItem(ProjectBrowserItemViewModel item)
+        {
+            if (_excluirItemProjeto == null)
+                return false;
+
+            return item.Tipo switch
+            {
+                "Vista" => _excluirItemProjeto.ExcluirVista(item.Id),
+                "Tabela" => _excluirItemProjeto.ExcluirTabela(item.Id),
+                "Prancha" => _excluirItemProjeto.ExcluirPrancha(item.Id),
+                _ => false
+            };
+        }
+
+        private bool DuplicarItem(ProjectBrowserItemViewModel item)
+        {
+            if (_duplicarItemProjeto == null)
+                return false;
+
+            return item.Tipo switch
+            {
+                "Vista" => _duplicarItemProjeto.DuplicarVista(item.Id),
+                "Tabela" => _duplicarItemProjeto.DuplicarTabela(item.Id),
+                "Prancha" => _duplicarItemProjeto.DuplicarPrancha(item.Id),
+                _ => false
+            };
+        }
+
+        private void AbrirPropriedadesItem(ProjectBrowserItemViewModel item)
+        {
+            if (item.Tipo == "Vista")
+                _abrirPropriedadesVista?.Invoke(item.Id);
+        }
+
+        public bool ExcluirSelecionado()
+        {
+            ProjectBrowserItemViewModel? item = Secoes
+                .SelectMany(secao => secao.Itens)
+                .FirstOrDefault(atual =>
+                    atual.IsSelected &&
+                    atual.Id == _selectedItemId &&
+                    atual.Tipo == _selectedItemKind);
+
+            return item?.TentarExcluir() == true;
+        }
+
+        private void ExecutarExcluirSelecionado()
+        {
+            ExcluirSelecionado();
+        }
+
+        private static string FormatarPrancha(ProjectSheet prancha)
+        {
+            return string.IsNullOrWhiteSpace(prancha.Numero)
+                ? prancha.Nome
+                : $"{prancha.Numero} - {prancha.Nome}";
+        }
+    }
+
+    public sealed class ProjectBrowserSectionViewModel
+    {
+        public ProjectBrowserSectionViewModel(string titulo)
+        {
+            Titulo = titulo;
+            Itens = new ObservableCollection<ProjectBrowserItemViewModel>();
+        }
+
+        public string Titulo { get; }
+        public ObservableCollection<ProjectBrowserItemViewModel> Itens { get; }
+    }
+
+    public sealed class ProjectBrowserItemViewModel : INotifyPropertyChanged
+    {
+        private readonly Action<ProjectBrowserItemViewModel>? _selecionar;
+        private readonly Func<ProjectBrowserItemViewModel, string, bool>? _renomear;
+        private readonly Func<ProjectBrowserItemViewModel, bool>? _excluir;
+        private readonly Func<ProjectBrowserItemViewModel, bool>? _duplicar;
+        private readonly Action<ProjectBrowserItemViewModel>? _abrirPropriedades;
+        private bool _isSelected;
+        private bool _isActiveView;
+        private bool _isEditing;
+        private string _nome;
+        private string _nomeEdicao;
+        private string _textoEdicao;
+
+        public ProjectBrowserItemViewModel(
+            Guid id,
+            string tipo,
+            string nome,
+            string nomeEdicao,
+            bool isSelectable,
+            Action<ProjectBrowserItemViewModel>? selecionar,
+            Func<ProjectBrowserItemViewModel, string, bool>? renomear = null,
+            Func<ProjectBrowserItemViewModel, bool>? excluir = null,
+            Func<ProjectBrowserItemViewModel, bool>? duplicar = null,
+            Action<ProjectBrowserItemViewModel>? abrirPropriedades = null)
+        {
+            Id = id;
+            Tipo = tipo;
+            _nome = nome;
+            _nomeEdicao = nomeEdicao;
+            _textoEdicao = nomeEdicao;
+            IsSelectable = isSelectable;
+            _selecionar = selecionar;
+            _renomear = renomear;
+            _excluir = excluir;
+            _duplicar = duplicar;
+            _abrirPropriedades = abrirPropriedades;
+            SelecionarCommand = new RelayCommand(Selecionar, () => IsSelectable);
+            IniciarEdicaoCommand = new RelayCommand(IniciarEdicao, () => IsSelectable);
+            ConfirmarEdicaoCommand = new RelayCommand(ConfirmarEdicao);
+            CancelarEdicaoCommand = new RelayCommand(CancelarEdicao);
+            ExcluirCommand = new RelayCommand(Excluir, () => IsSelectable && _excluir != null);
+            DuplicarCommand = new RelayCommand(Duplicar, () => IsSelectable && _duplicar != null);
+            PropriedadesCommand = new RelayCommand(AbrirPropriedades, () => IsSelectable && Tipo == "Vista" && _abrirPropriedades != null);
+        }
+
+        public Guid Id { get; }
+        public string Tipo { get; }
+        public string Nome
+        {
+            get => _nome;
+            private set
+            {
+                if (_nome == value)
+                    return;
+
+                _nome = value;
+                OnPropertyChanged();
+            }
+        }
+
+        public bool IsSelectable { get; }
+        public ICommand SelecionarCommand { get; }
+        public ICommand IniciarEdicaoCommand { get; }
+        public ICommand ConfirmarEdicaoCommand { get; }
+        public ICommand CancelarEdicaoCommand { get; }
+        public ICommand ExcluirCommand { get; }
+        public ICommand DuplicarCommand { get; }
+        public ICommand PropriedadesCommand { get; }
+
+        public string TextoEdicao
+        {
+            get => _textoEdicao;
+            set
+            {
+                if (_textoEdicao == value)
+                    return;
+
+                _textoEdicao = value;
+                OnPropertyChanged();
+            }
+        }
+
+        public bool IsEditing
+        {
+            get => _isEditing;
+            set
+            {
+                if (_isEditing == value)
+                    return;
+
+                _isEditing = value;
+                OnPropertyChanged();
+            }
+        }
+
+        public bool IsActiveView
+        {
+            get => _isActiveView;
+            set
+            {
+                if (_isActiveView == value)
+                    return;
+
+                _isActiveView = value;
+                OnPropertyChanged();
+            }
+        }
+
+        public bool IsSelected
+        {
+            get => _isSelected;
+            set
+            {
+                if (_isSelected == value)
+                    return;
+
+                _isSelected = value;
+                OnPropertyChanged();
+            }
+        }
+
+        public static ProjectBrowserItemViewModel CriarPlaceholder(string nome)
+        {
+            return new ProjectBrowserItemViewModel(Guid.Empty, "Placeholder", nome, nome, false, null);
+        }
+
+        public void AtualizarNomeExibicao(string nome, string? nomeEdicao = null)
+        {
+            Nome = nome;
+            _nomeEdicao = nomeEdicao ?? nome;
+            TextoEdicao = _nomeEdicao;
+        }
+
+        private void Selecionar()
+        {
+            _selecionar?.Invoke(this);
+        }
+
+        private void IniciarEdicao()
+        {
+            if (!IsSelectable)
+                return;
+
+            TextoEdicao = _nomeEdicao;
+            IsEditing = true;
+        }
+
+        private void ConfirmarEdicao()
+        {
+            if (!IsEditing)
+                return;
+
+            string nomeAnterior = _nomeEdicao;
+
+            if (_renomear?.Invoke(this, TextoEdicao) != true)
+                TextoEdicao = nomeAnterior;
+
+            IsEditing = false;
+        }
+
+        private void CancelarEdicao()
+        {
+            TextoEdicao = _nomeEdicao;
+            IsEditing = false;
+        }
+
+        public bool TentarExcluir()
+        {
+            return _excluir?.Invoke(this) == true;
+        }
+
+        private void Excluir()
+        {
+            TentarExcluir();
+        }
+
+        private void Duplicar()
+        {
+            _duplicar?.Invoke(this);
+        }
+
+        private void AbrirPropriedades()
+        {
+            _abrirPropriedades?.Invoke(this);
+        }
+
+        public event PropertyChangedEventHandler? PropertyChanged;
+
+        private void OnPropertyChanged([CallerMemberName] string? propertyName = null)
+        {
+            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
+        }
+    }
+}
+
+
+
+====================================================================================================
 ARQUIVO: C:\Users\User\source\repos\lucasffxavier\Araci-front\ViewModels\ProjectViewPropertiesViewModel.cs
 ====================================================================================================
 
@@ -2224,6 +3416,16 @@ namespace Araci.ViewModels
             }
         }
 
+        public bool RegiaoRecorteVisivel
+        {
+            get => _vista.RegiaoRecorteVisivel;
+            set
+            {
+                if (_editarPropriedadesVista.AlterarRegiaoRecorteVisivel(_vista.Id, value))
+                    OnPropertyChanged();
+            }
+        }
+
         public event PropertyChangedEventHandler? PropertyChanged;
 
         private void OnItemProjetoRenomeado()
@@ -2239,6 +3441,7 @@ namespace Araci.ViewModels
             OnPropertyChanged(nameof(Escala));
             OnPropertyChanged(nameof(Disciplina));
             OnPropertyChanged(nameof(RecortarVista));
+            OnPropertyChanged(nameof(RegiaoRecorteVisivel));
         }
 
         private void OnPropertyChanged([CallerMemberName] string? propertyName = null)

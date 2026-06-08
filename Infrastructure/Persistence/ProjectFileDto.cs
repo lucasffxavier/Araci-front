@@ -39,6 +39,7 @@ namespace Araci.Infrastructure.Persistence
     {
         public Guid Id { get; set; }
         public string Nome { get; set; } = string.Empty;
+        public string Disciplina { get; set; } = "Eletrica";
     }
 
     public sealed class ProjectSheetDto

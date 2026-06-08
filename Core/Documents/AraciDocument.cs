@@ -26,6 +26,7 @@ namespace Araci.Core.Documents
         public event System.Action? VistaAtivaAlterada;
         public event System.Action? ItemProjetoRenomeado;
         public event System.Action<ProjectView>? PropriedadesVistaAlteradas;
+        public event System.Action<ProjectTable>? PropriedadesTabelaAlteradas;
 
         public IEnumerable<Elemento> ObterElementosDaVistaAtiva()
         {
@@ -114,7 +115,8 @@ namespace Araci.Core.Documents
         {
             return new ProjectTable
             {
-                Nome = CriarNomeUnico(origem?.Nome ?? "Tabela", Tabelas.Select(t => t.Nome))
+                Nome = CriarNomeUnico(origem?.Nome ?? "Tabela", Tabelas.Select(t => t.Nome)),
+                Disciplina = origem?.Disciplina ?? ProjectViewDiscipline.Eletrica
             };
         }
 
@@ -232,6 +234,14 @@ namespace Araci.Core.Documents
 
             tabela.Nome = nome;
             ItemProjetoRenomeado?.Invoke();
+        }
+
+        public void AtualizarPropriedadesTabela(ProjectTable tabela)
+        {
+            if (tabela == null || !Tabelas.Contains(tabela))
+                return;
+
+            PropriedadesTabelaAlteradas?.Invoke(tabela);
         }
 
         public void RenomearPrancha(ProjectSheet prancha, string nome)

@@ -20,6 +20,7 @@ namespace Araci.ViewModels
         private readonly ExcluirItemProjetoUseCase? _excluirItemProjeto;
         private readonly DuplicarItemProjetoUseCase? _duplicarItemProjeto;
         private readonly Action<Guid>? _abrirPropriedadesVista;
+        private readonly Action<Guid>? _abrirPropriedadesTabela;
         private Guid? _selectedItemId;
         private string? _selectedItemKind;
 
@@ -29,7 +30,8 @@ namespace Araci.ViewModels
             RenomearItemProjetoUseCase? renomearItemProjeto = null,
             ExcluirItemProjetoUseCase? excluirItemProjeto = null,
             DuplicarItemProjetoUseCase? duplicarItemProjeto = null,
-            Action<Guid>? abrirPropriedadesVista = null)
+            Action<Guid>? abrirPropriedadesVista = null,
+            Action<Guid>? abrirPropriedadesTabela = null)
         {
             _document = document;
             _definirVistaAtiva = definirVistaAtiva ?? _document.DefinirVistaAtiva;
@@ -37,6 +39,7 @@ namespace Araci.ViewModels
             _excluirItemProjeto = excluirItemProjeto;
             _duplicarItemProjeto = duplicarItemProjeto;
             _abrirPropriedadesVista = abrirPropriedadesVista;
+            _abrirPropriedadesTabela = abrirPropriedadesTabela;
             Secoes = new ObservableCollection<ProjectBrowserSectionViewModel>
             {
                 new("Vistas"),
@@ -141,6 +144,10 @@ namespace Araci.ViewModels
                 _definirVistaAtiva(item.Id);
                 _abrirPropriedadesVista?.Invoke(item.Id);
             }
+            else if (item.Tipo == "Tabela")
+            {
+                _abrirPropriedadesTabela?.Invoke(item.Id);
+            }
 
             foreach (ProjectBrowserSectionViewModel secao in Secoes)
             {
@@ -213,6 +220,8 @@ namespace Araci.ViewModels
         {
             if (item.Tipo == "Vista")
                 _abrirPropriedadesVista?.Invoke(item.Id);
+            else if (item.Tipo == "Tabela")
+                _abrirPropriedadesTabela?.Invoke(item.Id);
         }
 
         public bool ExcluirSelecionado()
@@ -295,7 +304,7 @@ namespace Araci.ViewModels
             CancelarEdicaoCommand = new RelayCommand(CancelarEdicao);
             ExcluirCommand = new RelayCommand(Excluir, () => IsSelectable && _excluir != null);
             DuplicarCommand = new RelayCommand(Duplicar, () => IsSelectable && _duplicar != null);
-            PropriedadesCommand = new RelayCommand(AbrirPropriedades, () => IsSelectable && Tipo == "Vista" && _abrirPropriedades != null);
+            PropriedadesCommand = new RelayCommand(AbrirPropriedades, () => IsSelectable && (Tipo == "Vista" || Tipo == "Tabela") && _abrirPropriedades != null);
         }
 
         public Guid Id { get; }
