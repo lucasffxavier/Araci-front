@@ -121,6 +121,14 @@ namespace Araci.Core.Documents
             GarantirVistaAtivaValida();
         }
 
+        public void DefinirVistaAtiva(Guid? vistaId)
+        {
+            if (vistaId.HasValue)
+                DefinirVistaAtiva(vistaId.Value);
+            else
+                GarantirVistaAtivaValida();
+        }
+
         private void GarantirVistaAtivaValida()
         {
             if (VistaAtivaId.HasValue && Vistas.Any(v => v.Id == VistaAtivaId.Value))

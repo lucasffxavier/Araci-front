@@ -112,10 +112,12 @@ namespace Araci.Applications.Projects
                 var vistas = _serializer.CreateProjectViews(dto);
                 var tabelas = _serializer.CreateProjectTables(dto);
                 var pranchas = _serializer.CreateProjectSheets(dto);
+                Guid? vistaAtivaId = _serializer.GetActiveViewId(dto);
                 var elementos = _serializer.CreateElements(dto);
 
                 _document.Limpar();
                 _document.SubstituirVistas(vistas);
+                _document.DefinirVistaAtiva(vistaAtivaId);
                 _document.SubstituirTabelas(tabelas);
                 _document.SubstituirPranchas(pranchas);
 

@@ -15,6 +15,7 @@ namespace Araci.Infrastructure.Persistence
         public string? Notes { get; set; }
         public ProjectUnitSettingsDto? Units { get; set; }
         public TypeLibrariesDto? TypeLibraries { get; set; }
+        public Guid? ActiveViewId { get; set; }
         public List<ProjectViewDto> Views { get; set; } = new();
         public List<ProjectTableDto> Tables { get; set; } = new();
         public List<ProjectSheetDto> Sheets { get; set; } = new();
@@ -25,6 +26,9 @@ namespace Araci.Infrastructure.Persistence
     {
         public Guid Id { get; set; }
         public string Nome { get; set; } = string.Empty;
+        public double CameraX { get; set; }
+        public double CameraY { get; set; }
+        public double Zoom { get; set; } = 1.0;
     }
 
     public sealed class ProjectTableDto

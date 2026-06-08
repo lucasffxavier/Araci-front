@@ -7,6 +7,7 @@ using System.Text.Json.Serialization;
 using System.Windows;
 using Araci.Applications.Abstractions;
 using Araci.Core.Documents;
+using Araci.Core.Viewport;
 using Araci.Models;
 using Araci.Models.Tipos;
 using Araci.Services;
@@ -64,6 +65,7 @@ namespace Araci.Infrastructure.Persistence
                 Notes = metadata.Notes,
                 Units = CreateUnitSettingsDto(units),
                 TypeLibraries = CreateTypeLibrariesDto(),
+                ActiveViewId = document.VistaAtivaId,
                 Views = document.Vistas
                     .Select(CriarProjectViewDto)
                     .ToList(),
@@ -171,6 +173,13 @@ namespace Araci.Infrastructure.Persistence
                 .Where(s => s != null)
                 .Cast<ProjectSheet>()
                 .ToList();
+        }
+
+        public Guid? GetActiveViewId(ProjectFileDto dto)
+        {
+            ArgumentNullException.ThrowIfNull(dto);
+
+            return dto.ActiveViewId;
         }
 
         public string Serialize(ProjectFileDto dto)
@@ -340,7 +349,10 @@ namespace Araci.Infrastructure.Persistence
             return new ProjectViewDto
             {
                 Id = vista.Id,
-                Nome = vista.Nome
+                Nome = vista.Nome,
+                CameraX = vista.CameraX,
+                CameraY = vista.CameraY,
+                Zoom = vista.Zoom
             };
         }
 
@@ -371,7 +383,10 @@ namespace Araci.Infrastructure.Persistence
             return new ProjectView
             {
                 Id = dto.Id == Guid.Empty ? Guid.NewGuid() : dto.Id,
-                Nome = dto.Nome
+                Nome = dto.Nome,
+                CameraX = NormalizarCoordenadaCamera(dto.CameraX),
+                CameraY = NormalizarCoordenadaCamera(dto.CameraY),
+                Zoom = NormalizarZoomVista(dto.Zoom)
             };
         }
 
@@ -602,6 +617,19 @@ namespace Araci.Infrastructure.Persistence
         private static double NormalizarCoordenada(double valor)
         {
             return double.IsNaN(valor) || double.IsInfinity(valor) ? 0.0 : valor;
+        }
+
+        private static double NormalizarCoordenadaCamera(double valor)
+        {
+            return double.IsNaN(valor) || double.IsInfinity(valor) ? 0.0 : valor;
+        }
+
+        private static double NormalizarZoomVista(double valor)
+        {
+            if (double.IsNaN(valor) || double.IsInfinity(valor) || valor <= 0)
+                return Camera.DefaultZoom;
+
+            return Math.Max(Camera.MinZoom, Math.Min(Camera.MaxZoom, valor));
         }
     }
 }
