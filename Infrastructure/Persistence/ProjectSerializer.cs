@@ -354,6 +354,7 @@ namespace Araci.Infrastructure.Persistence
                 Escala = vista.Escala,
                 Disciplina = vista.Disciplina.ToString(),
                 RecortarVista = vista.RecortarVista,
+                RegiaoRecorteVisivel = vista.RegiaoRecorteVisivel,
                 CameraX = vista.CameraX,
                 CameraY = vista.CameraY,
                 Zoom = vista.Zoom
@@ -391,6 +392,7 @@ namespace Araci.Infrastructure.Persistence
                 Escala = NormalizarTextoVista(dto.Escala, "1:100"),
                 Disciplina = ParseEnum(dto.Disciplina, ProjectViewDiscipline.Eletrica),
                 RecortarVista = dto.RecortarVista,
+                RegiaoRecorteVisivel = dto.RegiaoRecorteVisivel ?? true,
                 CameraX = NormalizarCoordenadaCamera(dto.CameraX),
                 CameraY = NormalizarCoordenadaCamera(dto.CameraY),
                 Zoom = NormalizarZoomVista(dto.Zoom)

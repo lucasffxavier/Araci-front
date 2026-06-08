@@ -103,6 +103,7 @@ namespace Araci.Core.Documents
                 Escala = origem?.Escala ?? "1:100",
                 Disciplina = origem?.Disciplina ?? ProjectViewDiscipline.Eletrica,
                 RecortarVista = origem?.RecortarVista ?? false,
+                RegiaoRecorteVisivel = origem?.RegiaoRecorteVisivel ?? true,
                 CameraX = origem?.CameraX ?? 0,
                 CameraY = origem?.CameraY ?? 0,
                 Zoom = origem?.Zoom ?? 1.0

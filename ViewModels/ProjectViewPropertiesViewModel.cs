@@ -85,6 +85,16 @@ namespace Araci.ViewModels
             }
         }
 
+        public bool RegiaoRecorteVisivel
+        {
+            get => _vista.RegiaoRecorteVisivel;
+            set
+            {
+                if (_editarPropriedadesVista.AlterarRegiaoRecorteVisivel(_vista.Id, value))
+                    OnPropertyChanged();
+            }
+        }
+
         public event PropertyChangedEventHandler? PropertyChanged;
 
         private void OnItemProjetoRenomeado()
@@ -100,6 +110,7 @@ namespace Araci.ViewModels
             OnPropertyChanged(nameof(Escala));
             OnPropertyChanged(nameof(Disciplina));
             OnPropertyChanged(nameof(RecortarVista));
+            OnPropertyChanged(nameof(RegiaoRecorteVisivel));
         }
 
         private void OnPropertyChanged([CallerMemberName] string? propertyName = null)

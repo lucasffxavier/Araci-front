@@ -33,6 +33,11 @@ namespace Araci.Applications.UseCases.Projeto
             return Alterar(id, v => v.RecortarVista, (v, valor) => v.RecortarVista = valor, recortarVista);
         }
 
+        public bool AlterarRegiaoRecorteVisivel(Guid id, bool regiaoRecorteVisivel)
+        {
+            return Alterar(id, v => v.RegiaoRecorteVisivel, (v, valor) => v.RegiaoRecorteVisivel = valor, regiaoRecorteVisivel);
+        }
+
         private bool Alterar<T>(
             Guid id,
             Func<ProjectView, T> obter,

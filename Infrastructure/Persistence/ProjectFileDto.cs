@@ -29,6 +29,7 @@ namespace Araci.Infrastructure.Persistence
         public string Escala { get; set; } = "1:100";
         public string Disciplina { get; set; } = "Eletrica";
         public bool RecortarVista { get; set; }
+        public bool? RegiaoRecorteVisivel { get; set; }
         public double CameraX { get; set; }
         public double CameraY { get; set; }
         public double Zoom { get; set; } = 1.0;
