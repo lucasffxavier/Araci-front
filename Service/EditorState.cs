@@ -13,6 +13,9 @@ namespace Araci.ViewModels
         private object?
             _elementoSelecionado;
 
+        private bool
+            _navegadorProjetoVisivel;
+
         public object?
             ElementoSelecionado
         {
@@ -24,6 +27,22 @@ namespace Araci.ViewModels
                     return;
 
                 _elementoSelecionado = value;
+
+                OnPropertyChanged();
+            }
+        }
+
+        public bool
+            NavegadorProjetoVisivel
+        {
+            get => _navegadorProjetoVisivel;
+
+            set
+            {
+                if (_navegadorProjetoVisivel == value)
+                    return;
+
+                _navegadorProjetoVisivel = value;
 
                 OnPropertyChanged();
             }

@@ -16,6 +16,12 @@ namespace Araci.Ribbon.Tabs
                 mainWindow.MostrarPropriedades();
         }
 
+        private void NavegadorButton_Click(object sender, RoutedEventArgs e)
+        {
+            if (Window.GetWindow(this) is MainWindow mainWindow)
+                mainWindow.AlternarNavegadorProjeto();
+        }
+
         private void UnidadesButton_Click(object sender, RoutedEventArgs e)
         {
             if (Window.GetWindow(this) is MainWindow mainWindow)

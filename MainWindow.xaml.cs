@@ -1,6 +1,7 @@
 using Araci.Services;
 using Araci.Properties;
 using Araci.ViewModels;
+using System.ComponentModel;
 using System.Windows;
 using System.Windows.Controls.Primitives;
 
@@ -9,6 +10,7 @@ namespace Araci
     public partial class MainWindow : Window
     {
         private readonly EditorContext _context;
+        private readonly GridLength _projectBrowserColumnWidth = new(260);
         private readonly GridLength _propertiesColumnWidth = new(320);
 
         public MainWindow()
@@ -16,8 +18,11 @@ namespace Araci
             InitializeComponent();
             _context = new EditorContext();
             UnitValueConverter.CurrentUnits = _context.Settings.Units;
+            ProjectBrowser.DataContext = new ProjectBrowserViewModel();
+            _context.Editor.PropertyChanged += OnEditorStatePropertyChanged;
             Viewport.Inicializar(_context);
             InicializarRibbon();
+            AtualizarVisibilidadeNavegadorProjeto();
         }
 
         private void InicializarRibbon()
@@ -51,6 +56,11 @@ namespace Araci
             PropertiesHost.Visibility = Visibility.Visible;
         }
 
+        public void AlternarNavegadorProjeto()
+        {
+            _context.Editor.NavegadorProjetoVisivel = !_context.Editor.NavegadorProjetoVisivel;
+        }
+
         public void MostrarConfiguracaoUnidades()
         {
             var viewModel = new UnitsSettingsViewModel(_context.Settings.Units);
@@ -70,6 +80,25 @@ namespace Araci
             PropertiesColumn.Width = new GridLength(0);
             PropertiesHost.Visibility = Visibility.Collapsed;
             FocarViewport();
+        }
+
+        private void OnEditorStatePropertyChanged(object? sender, PropertyChangedEventArgs e)
+        {
+            if (string.IsNullOrEmpty(e.PropertyName) || e.PropertyName == nameof(EditorState.NavegadorProjetoVisivel))
+                AtualizarVisibilidadeNavegadorProjeto();
+        }
+
+        private void AtualizarVisibilidadeNavegadorProjeto()
+        {
+            if (_context.Editor.NavegadorProjetoVisivel)
+            {
+                ProjectBrowserColumn.Width = _projectBrowserColumnWidth;
+                ProjectBrowser.Visibility = Visibility.Visible;
+                return;
+            }
+
+            ProjectBrowserColumn.Width = new GridLength(0);
+            ProjectBrowser.Visibility = Visibility.Collapsed;
         }
     }
 }
