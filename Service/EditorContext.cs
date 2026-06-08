@@ -105,6 +105,7 @@ namespace Araci.Services
             SalvarProjeto = new SalvarProjetoUseCase(Projects);
             CriarItemProjeto = new CriarItemProjetoUseCase(Document, Commands);
             RenomearItemProjeto = new RenomearItemProjetoUseCase(Document, Commands);
+            ExcluirItemProjeto = new ExcluirItemProjetoUseCase(Document, Commands);
 
             var moveServices = EditingComposition.CreateMoveServices(() => Viewport, () => Scene.Elementos, Settings, Connectivity, TerminalLayout, SceneQueries, VisualUpdates, Selection, GeometryUpdates, Commands);
             MoveHud = moveServices.MoveHud;
@@ -197,6 +198,7 @@ namespace Araci.Services
         public SalvarProjetoUseCase SalvarProjeto { get; }
         public CriarItemProjetoUseCase CriarItemProjeto { get; }
         public RenomearItemProjetoUseCase RenomearItemProjeto { get; }
+        public ExcluirItemProjetoUseCase ExcluirItemProjeto { get; }
         public VisualUpdateService VisualUpdates { get; }
         public SelectionService Selection { get; }
         public SelecionarElementosUseCase SelecionarElementos { get; }

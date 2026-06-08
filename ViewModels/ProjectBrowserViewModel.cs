@@ -17,17 +17,20 @@ namespace Araci.ViewModels
         private readonly AraciDocument _document;
         private readonly Action<Guid> _definirVistaAtiva;
         private readonly RenomearItemProjetoUseCase? _renomearItemProjeto;
+        private readonly ExcluirItemProjetoUseCase? _excluirItemProjeto;
         private Guid? _selectedItemId;
         private string? _selectedItemKind;
 
         public ProjectBrowserViewModel(
             AraciDocument document,
             Action<Guid>? definirVistaAtiva = null,
-            RenomearItemProjetoUseCase? renomearItemProjeto = null)
+            RenomearItemProjetoUseCase? renomearItemProjeto = null,
+            ExcluirItemProjetoUseCase? excluirItemProjeto = null)
         {
             _document = document;
             _definirVistaAtiva = definirVistaAtiva ?? _document.DefinirVistaAtiva;
             _renomearItemProjeto = renomearItemProjeto;
+            _excluirItemProjeto = excluirItemProjeto;
             Secoes = new ObservableCollection<ProjectBrowserSectionViewModel>
             {
                 new("Vistas"),
@@ -105,7 +108,8 @@ namespace Araci.ViewModels
                 nomeEdicao ?? nome,
                 true,
                 SelecionarItem,
-                RenomearItem)
+                RenomearItem,
+                ExcluirItem)
             {
                 IsActiveView = tipo == "Vista" && _document.VistaAtivaId == id
             };
@@ -164,6 +168,20 @@ namespace Araci.ViewModels
             }
         }
 
+        private bool ExcluirItem(ProjectBrowserItemViewModel item)
+        {
+            if (_excluirItemProjeto == null)
+                return false;
+
+            return item.Tipo switch
+            {
+                "Vista" => _excluirItemProjeto.ExcluirVista(item.Id),
+                "Tabela" => _excluirItemProjeto.ExcluirTabela(item.Id),
+                "Prancha" => _excluirItemProjeto.ExcluirPrancha(item.Id),
+                _ => false
+            };
+        }
+
         private static string FormatarPrancha(ProjectSheet prancha)
         {
             return string.IsNullOrWhiteSpace(prancha.Numero)
@@ -188,6 +206,7 @@ namespace Araci.ViewModels
     {
         private readonly Action<ProjectBrowserItemViewModel>? _selecionar;
         private readonly Func<ProjectBrowserItemViewModel, string, bool>? _renomear;
+        private readonly Func<ProjectBrowserItemViewModel, bool>? _excluir;
         private bool _isSelected;
         private bool _isActiveView;
         private bool _isEditing;
@@ -202,7 +221,8 @@ namespace Araci.ViewModels
             string nomeEdicao,
             bool isSelectable,
             Action<ProjectBrowserItemViewModel>? selecionar,
-            Func<ProjectBrowserItemViewModel, string, bool>? renomear = null)
+            Func<ProjectBrowserItemViewModel, string, bool>? renomear = null,
+            Func<ProjectBrowserItemViewModel, bool>? excluir = null)
         {
             Id = id;
             Tipo = tipo;
@@ -212,10 +232,12 @@ namespace Araci.ViewModels
             IsSelectable = isSelectable;
             _selecionar = selecionar;
             _renomear = renomear;
+            _excluir = excluir;
             SelecionarCommand = new RelayCommand(Selecionar, () => IsSelectable);
             IniciarEdicaoCommand = new RelayCommand(IniciarEdicao, () => IsSelectable);
             ConfirmarEdicaoCommand = new RelayCommand(ConfirmarEdicao);
             CancelarEdicaoCommand = new RelayCommand(CancelarEdicao);
+            ExcluirCommand = new RelayCommand(Excluir, () => IsSelectable && _excluir != null);
         }
 
         public Guid Id { get; }
@@ -238,6 +260,7 @@ namespace Araci.ViewModels
         public ICommand IniciarEdicaoCommand { get; }
         public ICommand ConfirmarEdicaoCommand { get; }
         public ICommand CancelarEdicaoCommand { get; }
+        public ICommand ExcluirCommand { get; }
 
         public string TextoEdicao
         {
@@ -334,6 +357,11 @@ namespace Araci.ViewModels
         {
             TextoEdicao = _nomeEdicao;
             IsEditing = false;
+        }
+
+        private void Excluir()
+        {
+            _excluir?.Invoke(this);
         }
 
         public event PropertyChangedEventHandler? PropertyChanged;

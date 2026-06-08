@@ -108,7 +108,20 @@ namespace Araci.Core.Documents
             if (vista == null || !Vistas.Contains(vista))
                 return;
 
+            if (Vistas.Count <= 1)
+                return;
+
             Vistas.Remove(vista);
+            GarantirVistaAtivaValida();
+        }
+
+        public void RestaurarVista(ProjectView vista, int indice)
+        {
+            if (vista == null || Vistas.Any(v => v.Id == vista.Id))
+                return;
+
+            int indiceSeguro = indice < 0 || indice > Vistas.Count ? Vistas.Count : indice;
+            Vistas.Insert(indiceSeguro, vista);
             GarantirVistaAtivaValida();
         }
 
@@ -128,6 +141,15 @@ namespace Araci.Core.Documents
             Tabelas.Remove(tabela);
         }
 
+        public void RestaurarTabela(ProjectTable tabela, int indice)
+        {
+            if (tabela == null || Tabelas.Any(t => t.Id == tabela.Id))
+                return;
+
+            int indiceSeguro = indice < 0 || indice > Tabelas.Count ? Tabelas.Count : indice;
+            Tabelas.Insert(indiceSeguro, tabela);
+        }
+
         public void AdicionarPrancha(ProjectSheet prancha)
         {
             if (prancha == null || Pranchas.Any(p => p.Id == prancha.Id))
@@ -142,6 +164,15 @@ namespace Araci.Core.Documents
                 return;
 
             Pranchas.Remove(prancha);
+        }
+
+        public void RestaurarPrancha(ProjectSheet prancha, int indice)
+        {
+            if (prancha == null || Pranchas.Any(p => p.Id == prancha.Id))
+                return;
+
+            int indiceSeguro = indice < 0 || indice > Pranchas.Count ? Pranchas.Count : indice;
+            Pranchas.Insert(indiceSeguro, prancha);
         }
 
         public void RenomearVista(ProjectView vista, string nome)
