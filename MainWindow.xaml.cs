@@ -84,7 +84,8 @@ namespace Araci
                 _context.Document,
                 tabela,
                 _context.RenomearItemProjeto,
-                _context.EditarPropriedadesTabela);
+                _context.EditarPropriedadesTabela,
+                _context.Dialogs);
 
             MostrarPropriedades();
         }
