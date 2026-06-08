@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using System.ComponentModel;
 using System.Linq;
 using System.Windows;
 using Araci.Applications.Abstractions;
@@ -43,6 +44,8 @@ namespace Araci.Services
 {
     public class EditorContext : IEditorSession
     {
+        private bool _aplicandoCameraVista;
+
         public EditorContext()
             : this(new EventBus())
         {
@@ -51,6 +54,7 @@ namespace Araci.Services
         public EditorContext(IEventBus eventBus)
         {
             Events = eventBus;
+            Document.VistaAtivaAlterada += OnDocumentoVistaAtivaAlterada;
 
             var core = EditorCoreComposition.Create(Document, Settings, Types);
             Scene = core.Scene;
@@ -151,7 +155,18 @@ namespace Araci.Services
 
         public void InicializarViewport(ViewportViewModel viewportViewModel)
         {
+            if (Viewport != null)
+                Viewport.Camera.PropertyChanged -= OnCameraChanged;
+
             Viewport = new ViewportService(viewportViewModel);
+            Viewport.Camera.PropertyChanged += OnCameraChanged;
+            AplicarCameraVistaAtiva();
+        }
+
+        public void DefinirVistaAtiva(Guid vistaId)
+        {
+            SalvarCameraVistaAtiva();
+            Document.DefinirVistaAtiva(vistaId);
         }
 
         public void RefreshProperties()
@@ -230,6 +245,51 @@ namespace Araci.Services
             {
                 if (vm.Modelo is Cabo or Carga)
                     vm.NotificarPropriedades("CorrenteLinha", "CorrenteFaseA", "CorrenteFaseB", "CorrenteFaseC");
+            }
+        }
+
+        private void OnDocumentoVistaAtivaAlterada()
+        {
+            AplicarCameraVistaAtiva();
+        }
+
+        private void OnCameraChanged(object? sender, PropertyChangedEventArgs e)
+        {
+            if (_aplicandoCameraVista)
+                return;
+
+            SalvarCameraVistaAtiva();
+        }
+
+        private void SalvarCameraVistaAtiva()
+        {
+            if (Viewport == null || Document.VistaAtiva == null)
+                return;
+
+            Document.VistaAtiva.CameraX = Viewport.Camera.Offset.X;
+            Document.VistaAtiva.CameraY = Viewport.Camera.Offset.Y;
+            Document.VistaAtiva.Zoom = Viewport.Camera.Zoom;
+        }
+
+        private void AplicarCameraVistaAtiva()
+        {
+            if (Viewport == null || Document.VistaAtiva == null)
+                return;
+
+            double cameraX = Document.VistaAtiva.CameraX;
+            double cameraY = Document.VistaAtiva.CameraY;
+            double zoom = Document.VistaAtiva.Zoom;
+
+            _aplicandoCameraVista = true;
+
+            try
+            {
+                Viewport.Camera.Offset = new Point(cameraX, cameraY);
+                Viewport.Camera.Zoom = zoom;
+            }
+            finally
+            {
+                _aplicandoCameraVista = false;
             }
         }
 

@@ -510,6 +510,7 @@ namespace Araci.Core.Documents
         public ObservableCollection<ProjectSheet> Pranchas { get; }
         public Guid? VistaAtivaId { get; private set; }
         public ProjectView? VistaAtiva => Vistas.FirstOrDefault(v => v.Id == VistaAtivaId);
+        public event System.Action? VistaAtivaAlterada;
 
         public ProjectView CriarNovaVista()
         {
@@ -570,9 +571,20 @@ namespace Araci.Core.Documents
 
         public void AdicionarElemento(Elemento elemento)
         {
+            AdicionarElemento(elemento, preservarVistaExistente: false);
+        }
+
+        public void AdicionarElementoPreservandoVista(Elemento elemento)
+        {
+            AdicionarElemento(elemento, preservarVistaExistente: true);
+        }
+
+        private void AdicionarElemento(Elemento elemento, bool preservarVistaExistente)
+        {
             if (Elementos.Contains(elemento))
                 return;
 
+            PrepararVistaElemento(elemento, preservarVistaExistente);
             Elementos.Add(elemento);
         }
 
@@ -597,13 +609,13 @@ namespace Araci.Core.Documents
         {
             var vista = new ProjectView { Nome = "Vista principal" };
             Vistas.Add(vista);
-            VistaAtivaId = vista.Id;
+            AtualizarVistaAtiva(vista.Id);
         }
 
         public void DefinirVistaAtiva(Guid vistaId)
         {
             if (Vistas.Any(v => v.Id == vistaId))
-                VistaAtivaId = vistaId;
+                AtualizarVistaAtiva(vistaId);
 
             GarantirVistaAtivaValida();
         }
@@ -624,7 +636,26 @@ namespace Araci.Core.Documents
             if (Vistas.Count == 0)
                 CriarVistaPadrao();
             else
-                VistaAtivaId = Vistas[0].Id;
+                AtualizarVistaAtiva(Vistas[0].Id);
+        }
+
+        private void AtualizarVistaAtiva(Guid? vistaId)
+        {
+            if (VistaAtivaId == vistaId)
+                return;
+
+            VistaAtivaId = vistaId;
+            VistaAtivaAlterada?.Invoke();
+        }
+
+        private void PrepararVistaElemento(Elemento elemento, bool preservarVistaExistente)
+        {
+            GarantirVistaAtivaValida();
+
+            if (preservarVistaExistente && elemento.ViewId.HasValue && Vistas.Any(v => v.Id == elemento.ViewId.Value))
+                return;
+
+            elemento.ViewId = VistaAtivaId;
         }
 
         private static string CriarNomeUnico(string prefixo, IEnumerable<string> nomesExistentes)
@@ -1465,6 +1496,7 @@ namespace Araci.ViewModels
             _document.Vistas.CollectionChanged += OnDocumentCollectionChanged;
             _document.Tabelas.CollectionChanged += OnDocumentCollectionChanged;
             _document.Pranchas.CollectionChanged += OnDocumentCollectionChanged;
+            _document.VistaAtivaAlterada += OnVistaAtivaAlterada;
         }
 
         public ObservableCollection<ProjectBrowserSectionViewModel> Secoes { get; }
@@ -1472,6 +1504,15 @@ namespace Araci.ViewModels
         private void OnDocumentCollectionChanged(object? sender, NotifyCollectionChangedEventArgs e)
         {
             AtualizarSecoes();
+        }
+
+        private void OnVistaAtivaAlterada()
+        {
+            foreach (ProjectBrowserSectionViewModel secao in Secoes)
+            {
+                foreach (ProjectBrowserItemViewModel item in secao.Itens)
+                    item.IsActiveView = item.Tipo == "Vista" && _document.VistaAtivaId == item.Id;
+            }
         }
 
         private void AtualizarSecoes()

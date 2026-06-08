@@ -14,12 +14,14 @@ namespace Araci.ViewModels
     public sealed class ProjectBrowserViewModel
     {
         private readonly AraciDocument _document;
+        private readonly Action<Guid> _definirVistaAtiva;
         private Guid? _selectedItemId;
         private string? _selectedItemKind;
 
-        public ProjectBrowserViewModel(AraciDocument document)
+        public ProjectBrowserViewModel(AraciDocument document, Action<Guid>? definirVistaAtiva = null)
         {
             _document = document;
+            _definirVistaAtiva = definirVistaAtiva ?? _document.DefinirVistaAtiva;
             Secoes = new ObservableCollection<ProjectBrowserSectionViewModel>
             {
                 new("Vistas"),
@@ -107,7 +109,7 @@ namespace Araci.ViewModels
             _selectedItemKind = item.Tipo;
 
             if (item.Tipo == "Vista")
-                _document.DefinirVistaAtiva(item.Id);
+                _definirVistaAtiva(item.Id);
 
             foreach (ProjectBrowserSectionViewModel secao in Secoes)
             {
