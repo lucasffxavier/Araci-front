@@ -24,7 +24,7 @@ namespace Araci.DTOs
             _connectivity = new ConnectivityService(api.Document);
             _graphBuilder = new ElectricGraphBuilder(api.Document);
             _topology = new TopologyValidator(api.Document, _connectivity, _graphBuilder);
-            _elementosOperacionais = api.Document.ObterElementosDaVistaAtiva().ToList();
+            _elementosOperacionais = ObterElementosOperacionais(api.Document);
         }
 
         public ParameterReader(EditorContext context)
@@ -58,12 +58,26 @@ namespace Araci.DTOs
             _connectivity = connectivity ?? throw new ArgumentNullException(nameof(connectivity));
             _topology = topology ?? throw new ArgumentNullException(nameof(topology));
             _graphBuilder = graphBuilder;
-            _elementosOperacionais = api.Document.ObterElementosDaVistaAtiva().ToList();
+            _elementosOperacionais = ObterElementosOperacionais(api.Document);
         }
 
         public TopologyValidationResult? ValidateTopology()
         {
             return _topology?.Validate();
+        }
+
+        private static IReadOnlyList<Elemento> ObterElementosOperacionais(AraciDocument document)
+        {
+            if (document.VistaAtivaId.HasValue && document.Vistas.Any(v => v.Id == document.VistaAtivaId.Value))
+            {
+                Guid vistaAtivaId = document.VistaAtivaId.Value;
+
+                return document.Elementos
+                    .Where(e => !e.ViewId.HasValue || e.ViewId == vistaAtivaId)
+                    .ToList();
+            }
+
+            return document.Elementos.ToList();
         }
 
         public IList<LoadData> GetLoads()

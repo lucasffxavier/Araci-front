@@ -75,8 +75,12 @@ namespace Araci.Applications.UseCases.Projeto
             List<ProjectTableElementCategory> categoriasAnteriores = NormalizarCategorias(tabela.CategoriasElementos);
             List<ProjectTableFieldSelection> camposNovos = NormalizarCampos(campos, categoriasNovas);
             List<ProjectTableFieldSelection> camposAnteriores = NormalizarCampos(tabela.CamposSelecionados, categoriasAnteriores);
+            List<ProjectTableFilterRule> filtrosNovos = NormalizarFiltros(tabela.Filtros, camposNovos);
+            List<ProjectTableFilterRule> filtrosAnteriores = NormalizarFiltros(tabela.Filtros, camposAnteriores);
 
-            if (categoriasAnteriores.SequenceEqual(categoriasNovas) && CamposIguais(camposAnteriores, camposNovos))
+            if (categoriasAnteriores.SequenceEqual(categoriasNovas) &&
+                CamposIguais(camposAnteriores, camposNovos) &&
+                FiltrosIguais(filtrosAnteriores, filtrosNovos))
                 return true;
 
             _commands.Execute(new UpdateProjectTableElementsCommand(
@@ -85,13 +89,16 @@ namespace Araci.Applications.UseCases.Projeto
                 categoriasAnteriores,
                 categoriasNovas,
                 camposAnteriores,
-                camposNovos));
+                camposNovos,
+                filtrosAnteriores,
+                filtrosNovos));
 
             return true;
         }
 
         public bool AlterarFiltrosTabela(
             Guid id,
+            Guid? filtroVistaId,
             ProjectTableFilterLogicalMode modo,
             IReadOnlyList<ProjectTableFilterRule> filtros)
         {
@@ -100,17 +107,23 @@ namespace Araci.Applications.UseCases.Projeto
             if (tabela == null)
                 return false;
 
+            Guid? filtroVistaNovo = NormalizarFiltroVista(filtroVistaId);
+            Guid? filtroVistaAnterior = NormalizarFiltroVista(tabela.FiltroVistaId);
             ProjectTableFilterLogicalMode modoNovo = NormalizarModoFiltro(modo);
             ProjectTableFilterLogicalMode modoAnterior = NormalizarModoFiltro(tabela.ModoFiltro);
             List<ProjectTableFilterRule> filtrosNovos = NormalizarFiltros(filtros, tabela.CamposSelecionados);
             List<ProjectTableFilterRule> filtrosAnteriores = NormalizarFiltros(tabela.Filtros, tabela.CamposSelecionados);
 
-            if (modoAnterior == modoNovo && FiltrosIguais(filtrosAnteriores, filtrosNovos))
+            if (filtroVistaAnterior == filtroVistaNovo &&
+                modoAnterior == modoNovo &&
+                FiltrosIguais(filtrosAnteriores, filtrosNovos))
                 return true;
 
             _commands.Execute(new UpdateProjectTableFiltersCommand(
                 _document,
                 tabela,
+                filtroVistaAnterior,
+                filtroVistaNovo,
                 modoAnterior,
                 modoNovo,
                 filtrosAnteriores,
@@ -174,6 +187,16 @@ namespace Araci.Applications.UseCases.Projeto
             return Enum.IsDefined(typeof(ProjectTableFilterLogicalMode), modo)
                 ? modo
                 : ProjectTableFilterLogicalMode.Todas;
+        }
+
+        private Guid? NormalizarFiltroVista(Guid? filtroVistaId)
+        {
+            if (!filtroVistaId.HasValue || filtroVistaId.Value == Guid.Empty)
+                return null;
+
+            return _document.Vistas.Any(v => v.Id == filtroVistaId.Value)
+                ? filtroVistaId
+                : null;
         }
 
         private static List<ProjectTableFilterRule> NormalizarFiltros(

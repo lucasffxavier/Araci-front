@@ -70,7 +70,7 @@ namespace Araci.Infrastructure.Persistence
                     .Select(CriarProjectViewDto)
                     .ToList(),
                 Tables = document.Tabelas
-                    .Select(CriarProjectTableDto)
+                    .Select(t => CriarProjectTableDto(t, document.Vistas.Select(v => v.Id)))
                     .ToList(),
                 Sheets = document.Pranchas
                     .Select(CriarProjectSheetDto)
@@ -158,7 +158,7 @@ namespace Araci.Infrastructure.Persistence
             ArgumentNullException.ThrowIfNull(dto);
 
             return dto.Tables
-                .Select(CriarProjectTable)
+                .Select(t => CriarProjectTable(t, dto.Views.Select(v => v.Id)))
                 .Where(t => t != null)
                 .Cast<ProjectTable>()
                 .ToList();
@@ -361,9 +361,10 @@ namespace Araci.Infrastructure.Persistence
             };
         }
 
-        private static ProjectTableDto CriarProjectTableDto(ProjectTable tabela)
+        private static ProjectTableDto CriarProjectTableDto(ProjectTable tabela, IEnumerable<Guid> vistasIds)
         {
             List<ProjectTableFieldSelection> campos = NormalizarProjectTableFields(tabela.CamposSelecionados, tabela.CategoriasElementos);
+            Guid? filtroVistaId = NormalizarProjectTableViewFilter(tabela.FiltroVistaId, vistasIds);
 
             return new ProjectTableDto
             {
@@ -383,6 +384,7 @@ namespace Araci.Infrastructure.Persistence
                         Ordem = c.Ordem
                     })
                     .ToList(),
+                FiltroVistaId = filtroVistaId,
                 ModoFiltro = tabela.ModoFiltro.ToString(),
                 Filtros = NormalizarProjectTableFilters(tabela.Filtros, campos)
                     .Select(f => new ProjectTableFilterRuleDto
@@ -427,7 +429,7 @@ namespace Araci.Infrastructure.Persistence
             };
         }
 
-        private static ProjectTable? CriarProjectTable(ProjectTableDto dto)
+        private static ProjectTable? CriarProjectTable(ProjectTableDto dto, IEnumerable<Guid> vistasIds)
         {
             if (string.IsNullOrWhiteSpace(dto.Nome))
                 return null;
@@ -442,6 +444,7 @@ namespace Araci.Infrastructure.Persistence
                 Disciplina = ParseEnum(dto.Disciplina, ProjectViewDiscipline.Eletrica),
                 CategoriasElementos = categorias,
                 CamposSelecionados = campos,
+                FiltroVistaId = NormalizarProjectTableViewFilter(dto.FiltroVistaId, vistasIds),
                 ModoFiltro = ParseEnum(dto.ModoFiltro, ProjectTableFilterLogicalMode.Todas),
                 Filtros = ParseProjectTableFilters(dto.Filtros, campos)
             };
@@ -756,6 +759,18 @@ namespace Araci.Infrastructure.Persistence
                     };
                 })
                 .ToList();
+        }
+
+        private static Guid? NormalizarProjectTableViewFilter(Guid? filtroVistaId, IEnumerable<Guid> vistasIds)
+        {
+            if (!filtroVistaId.HasValue || filtroVistaId.Value == Guid.Empty)
+                return null;
+
+            HashSet<Guid> vistasValidas = vistasIds.ToHashSet();
+
+            return vistasValidas.Contains(filtroVistaId.Value)
+                ? filtroVistaId
+                : null;
         }
 
         private static List<ProjectTableFilterRule> ParseProjectTableFilters(

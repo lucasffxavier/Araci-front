@@ -54,6 +54,7 @@ namespace Araci.Core.Documents
         public ProjectViewDiscipline Disciplina { get; set; } = ProjectViewDiscipline.Eletrica;
         public List<ProjectTableElementCategory> CategoriasElementos { get; set; } = new();
         public List<ProjectTableFieldSelection> CamposSelecionados { get; set; } = new();
+        public Guid? FiltroVistaId { get; set; }
         public ProjectTableFilterLogicalMode ModoFiltro { get; set; } = ProjectTableFilterLogicalMode.Todas;
         public List<ProjectTableFilterRule> Filtros { get; set; } = new();
     }

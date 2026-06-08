@@ -40,16 +40,18 @@ namespace Araci.Services.UI
 
         public FiltrosTabelaDialogResult? ShowFiltrosTabelaDialog(
             IReadOnlyList<ProjectTableFieldSelection> camposSelecionados,
+            IReadOnlyList<ProjectViewDialogOption> vistasDisponiveis,
+            Guid? filtroVistaId,
             ProjectTableFilterLogicalMode modo,
             IReadOnlyList<ProjectTableFilterRule> filtros)
         {
-            var window = new FiltrosTabelaWindow(camposSelecionados, modo, filtros)
+            var window = new FiltrosTabelaWindow(camposSelecionados, vistasDisponiveis, filtroVistaId, modo, filtros)
             {
                 Owner = Application.Current?.MainWindow
             };
 
             return window.ShowDialog() == true
-                ? new FiltrosTabelaDialogResult(window.ModoFiltro, window.Filtros)
+                ? new FiltrosTabelaDialogResult(window.FiltroVistaId, window.ModoFiltro, window.Filtros)
                 : null;
         }
 

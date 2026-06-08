@@ -18,6 +18,8 @@ namespace Araci.Applications.Abstractions
 
         FiltrosTabelaDialogResult? ShowFiltrosTabelaDialog(
             IReadOnlyList<ProjectTableFieldSelection> camposSelecionados,
+            IReadOnlyList<ProjectViewDialogOption> vistasDisponiveis,
+            Guid? filtroVistaId,
             ProjectTableFilterLogicalMode modo,
             IReadOnlyList<ProjectTableFilterRule> filtros);
 

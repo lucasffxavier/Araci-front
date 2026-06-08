@@ -64,6 +64,8 @@ namespace Araci.TechnicalChecks
                 ("Ordem de linhas segue ordem do Document", OrdemDeLinhasSegueDocument),
                 ("Persistencia preserva topologia simples", PersistenciaPreservaTopologiaSimples),
                 ("Persistencia preserva ramificacao", PersistenciaPreservaRamificacao),
+                ("Tabela remove filtros de campos removidos com undo redo", TabelaRemoveFiltrosCamposRemovidosComUndoRedo),
+                ("Excluir vista limpa filtro de vista da tabela com undo redo", ExcluirVistaLimpaFiltroTabelaComUndoRedo),
                 ("DTO permanece equivalente apos reload", DtoPermaneceEquivalenteAposReload),
                 ("IDs permanecem estaveis apos reload", IdsPermanecemEstaveisAposReload),
                 ("Builds repetidos apos reload nao alteram Document", BuildsRepetidosAposReloadNaoAlteramDocument),
@@ -4991,6 +4993,82 @@ namespace Araci.TechnicalChecks
             AssertEqual(load.Nome, dto.Lines[1].Barra2, $"{name}.LineSecundario.Barra2");
         }
 
+        private static void TabelaRemoveFiltrosCamposRemovidosComUndoRedo()
+        {
+            var document = new AraciDocument();
+            var commands = new Araci.Core.Commands.CommandManager();
+            var useCase = new EditarPropriedadesTabelaUseCase(document, commands);
+            ProjectTable tabela = document.CriarNovaTabela();
+
+            var campoNome = new ProjectTableFieldSelection { Categoria = ProjectTableElementCategory.Barras, CampoId = "Nome", NomeExibicao = "Nome", Ordem = 0 };
+            var campoTensao = new ProjectTableFieldSelection { Categoria = ProjectTableElementCategory.Barras, CampoId = "Tensao", NomeExibicao = "Tensao", Ordem = 1 };
+            tabela.CategoriasElementos = new List<ProjectTableElementCategory> { ProjectTableElementCategory.Barras };
+            tabela.CamposSelecionados = new List<ProjectTableFieldSelection> { campoNome, campoTensao };
+            tabela.Filtros = new List<ProjectTableFilterRule>
+            {
+                new() { Ordem = 0, Categoria = ProjectTableElementCategory.Barras, CampoId = "Nome", NomeExibicao = "Nome", Operador = ProjectTableFilterOperator.Contem, Valor = "A" },
+                new() { Ordem = 1, Categoria = ProjectTableElementCategory.Barras, CampoId = "Tensao", NomeExibicao = "Tensao", Operador = ProjectTableFilterOperator.IgualA, Valor = "13" }
+            };
+
+            bool alterado = useCase.AlterarElementosTabela(
+                tabela.Id,
+                tabela.CategoriasElementos,
+                new[] { campoNome });
+
+            Assert(alterado, "AlterarElementosTabela deveria retornar true.");
+            AssertEqual(1, tabela.Filtros.Count, "Tabela.Filtros.Count apos remover campo");
+            AssertEqual("Nome", tabela.Filtros[0].CampoId, "Tabela.Filtros[0].CampoId");
+            AssertEqual(ProjectTableFilterOperator.Contem, tabela.Filtros[0].Operador, "Tabela.Filtros[0].Operador");
+            AssertEqual("A", tabela.Filtros[0].Valor, "Tabela.Filtros[0].Valor");
+            AssertEqual(0, tabela.Filtros[0].Ordem, "Tabela.Filtros[0].Ordem");
+
+            commands.Undo();
+
+            AssertEqual(2, tabela.CamposSelecionados.Count, "Undo.CamposSelecionados.Count");
+            AssertEqual(2, tabela.Filtros.Count, "Undo.Filtros.Count");
+            AssertEqual("Tensao", tabela.Filtros[1].CampoId, "Undo.Filtros[1].CampoId");
+
+            commands.Redo();
+
+            AssertEqual(1, tabela.CamposSelecionados.Count, "Redo.CamposSelecionados.Count");
+            AssertEqual(1, tabela.Filtros.Count, "Redo.Filtros.Count");
+            AssertEqual("Nome", tabela.Filtros[0].CampoId, "Redo.Filtros[0].CampoId");
+        }
+
+        private static void ExcluirVistaLimpaFiltroTabelaComUndoRedo()
+        {
+            var document = new AraciDocument();
+            var commands = new Araci.Core.Commands.CommandManager();
+            var useCase = new ExcluirItemProjetoUseCase(document, commands);
+            ProjectView vistaA = document.Vistas[0];
+            ProjectView vistaB = document.CriarNovaVista();
+            ProjectTable tabelaAfetada = document.CriarNovaTabela();
+            ProjectTable tabelaOutraVista = document.CriarNovaTabela();
+            ProjectTable tabelaTodas = document.CriarNovaTabela();
+
+            tabelaAfetada.FiltroVistaId = vistaB.Id;
+            tabelaOutraVista.FiltroVistaId = vistaA.Id;
+            tabelaTodas.FiltroVistaId = null;
+
+            bool excluiu = useCase.ExcluirVista(vistaB.Id);
+
+            Assert(excluiu, "ExcluirVista deveria retornar true.");
+            Assert(!document.Vistas.Any(v => v.Id == vistaB.Id), "Vista B deveria ser removida.");
+            AssertEqual(null, tabelaAfetada.FiltroVistaId, "Tabela afetada deveria voltar para todas as vistas.");
+            AssertEqual(vistaA.Id, tabelaOutraVista.FiltroVistaId, "Tabela de outra vista nao deveria mudar.");
+            AssertEqual(null, tabelaTodas.FiltroVistaId, "Tabela sem filtro deveria continuar sem filtro.");
+
+            commands.Undo();
+
+            Assert(document.Vistas.Any(v => v.Id == vistaB.Id), "Undo deveria restaurar Vista B.");
+            AssertEqual(vistaB.Id, tabelaAfetada.FiltroVistaId, "Undo deveria restaurar filtro da Vista B.");
+
+            commands.Redo();
+
+            Assert(!document.Vistas.Any(v => v.Id == vistaB.Id), "Redo deveria remover Vista B novamente.");
+            AssertEqual(null, tabelaAfetada.FiltroVistaId, "Redo deveria limpar filtro da Vista B novamente.");
+        }
+
         private static ExecutarSimulacaoUseCase CriarExecutarSimulacaoUseCase(
             FakeSimulationPipeline pipeline,
             FakeDialogService dialogs)
@@ -5068,10 +5146,12 @@ namespace Araci.TechnicalChecks
 
             public FiltrosTabelaDialogResult? ShowFiltrosTabelaDialog(
                 IReadOnlyList<ProjectTableFieldSelection> camposSelecionados,
+                IReadOnlyList<ProjectViewDialogOption> vistasDisponiveis,
+                Guid? filtroVistaId,
                 ProjectTableFilterLogicalMode modo,
                 IReadOnlyList<ProjectTableFilterRule> filtros)
             {
-                return new FiltrosTabelaDialogResult(modo, filtros);
+                return new FiltrosTabelaDialogResult(filtroVistaId, modo, filtros);
             }
 
             public void ShowOrdenacaoTabelaDialog()

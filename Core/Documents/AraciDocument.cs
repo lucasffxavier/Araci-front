@@ -127,6 +127,7 @@ namespace Araci.Core.Documents
                         Ordem = c.Ordem
                     })
                     .ToList() ?? new List<ProjectTableFieldSelection>(),
+                FiltroVistaId = origem?.FiltroVistaId,
                 ModoFiltro = origem?.ModoFiltro ?? ProjectTableFilterLogicalMode.Todas,
                 Filtros = origem?.Filtros
                     .Select(f => new ProjectTableFilterRule

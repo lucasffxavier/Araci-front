@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.ComponentModel;
+using System.Linq;
 using System.Runtime.CompilerServices;
 using System.Windows.Input;
 using Araci.Applications.Abstractions;
@@ -119,10 +120,19 @@ namespace Araci.ViewModels
         private void MostrarFiltrosPlaceholder()
         {
             FiltrosTabelaDialogResult? resultado =
-                _dialogs.ShowFiltrosTabelaDialog(_tabela.CamposSelecionados, _tabela.ModoFiltro, _tabela.Filtros);
+                _dialogs.ShowFiltrosTabelaDialog(
+                    _tabela.CamposSelecionados,
+                    _document.Vistas.Select(v => new ProjectViewDialogOption(v.Id, v.Nome)).ToList(),
+                    _tabela.FiltroVistaId,
+                    _tabela.ModoFiltro,
+                    _tabela.Filtros);
 
             if (resultado != null)
-                _editarPropriedadesTabela.AlterarFiltrosTabela(_tabela.Id, resultado.Modo, resultado.Filtros);
+                _editarPropriedadesTabela.AlterarFiltrosTabela(
+                    _tabela.Id,
+                    resultado.FiltroVistaId,
+                    resultado.Modo,
+                    resultado.Filtros);
         }
 
         private void MostrarOrdenacaoPlaceholder()

@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Windows;
 using System.Windows.Controls;
+using Araci.Applications.Abstractions;
 using Araci.Core.Documents;
 
 namespace Araci.Properties
@@ -10,6 +11,7 @@ namespace Araci.Properties
     public partial class FiltrosTabelaWindow : Window
     {
         private readonly List<CampoFiltroItem> _campos;
+        private readonly List<ProjectViewDialogOption> _vistas;
         private readonly List<OperadorFiltroItem> _operadores;
         private readonly ComboBox[] _campoComboBoxes;
         private readonly ComboBox[] _operadorComboBoxes;
@@ -17,6 +19,8 @@ namespace Araci.Properties
 
         public FiltrosTabelaWindow(
             IReadOnlyList<ProjectTableFieldSelection> camposSelecionados,
+            IReadOnlyList<ProjectViewDialogOption> vistasDisponiveis,
+            Guid? filtroVistaId,
             ProjectTableFilterLogicalMode modo,
             IReadOnlyList<ProjectTableFilterRule> filtros)
         {
@@ -26,12 +30,14 @@ namespace Araci.Properties
                 .OrderBy(c => c.Ordem)
                 .Select(c => new CampoFiltroItem(c))
                 .ToList();
+            _vistas = CriarOpcoesVista(vistasDisponiveis);
 
             _operadores = CriarOperadores();
             _campoComboBoxes = new[] { Campo1ComboBox, Campo2ComboBox, Campo3ComboBox, Campo4ComboBox, Campo5ComboBox };
             _operadorComboBoxes = new[] { Operador1ComboBox, Operador2ComboBox, Operador3ComboBox, Operador4ComboBox, Operador5ComboBox };
             _valorTextBoxes = new[] { Valor1TextBox, Valor2TextBox, Valor3TextBox, Valor4TextBox, Valor5TextBox };
 
+            ConfigurarVistas(filtroVistaId);
             AplicarModo(modo);
             ConfigurarLinhas();
             AplicarFiltros(filtros);
@@ -39,10 +45,14 @@ namespace Araci.Properties
         }
 
         public ProjectTableFilterLogicalMode ModoFiltro { get; private set; } = ProjectTableFilterLogicalMode.Todas;
+        public Guid? FiltroVistaId { get; private set; }
         public IReadOnlyList<ProjectTableFilterRule> Filtros { get; private set; } = new List<ProjectTableFilterRule>();
 
         private void OkButton_Click(object sender, RoutedEventArgs e)
         {
+            FiltroVistaId = VistaComboBox.SelectedItem is ProjectViewDialogOption vista && vista.Id.HasValue
+                ? vista.Id
+                : null;
             ModoFiltro = QualquerRadioButton.IsChecked == true
                 ? ProjectTableFilterLogicalMode.Qualquer
                 : ProjectTableFilterLogicalMode.Todas;
@@ -62,6 +72,15 @@ namespace Araci.Properties
                 QualquerRadioButton.IsChecked = true;
             else
                 TodasRadioButton.IsChecked = true;
+        }
+
+        private void ConfigurarVistas(Guid? filtroVistaId)
+        {
+            VistaComboBox.ItemsSource = _vistas;
+            VistaComboBox.SelectedItem = _vistas.FirstOrDefault(v =>
+                v.Id.HasValue &&
+                filtroVistaId.HasValue &&
+                v.Id.Value == filtroVistaId.Value) ?? _vistas.First();
         }
 
         private void ConfigurarLinhas()
@@ -141,6 +160,20 @@ namespace Araci.Properties
                 new(ProjectTableFilterOperator.IgualA, "igual a"),
                 new(ProjectTableFilterOperator.DiferenteDe, "diferente de")
             };
+        }
+
+        private static List<ProjectViewDialogOption> CriarOpcoesVista(IReadOnlyList<ProjectViewDialogOption> vistasDisponiveis)
+        {
+            var opcoes = new List<ProjectViewDialogOption>
+            {
+                new(null, "Todas as vistas")
+            };
+
+            opcoes.AddRange(vistasDisponiveis
+                .Where(v => v.Id.HasValue && v.Id.Value != Guid.Empty)
+                .Select(v => new ProjectViewDialogOption(v.Id, string.IsNullOrWhiteSpace(v.Nome) ? "Vista sem nome" : v.Nome)));
+
+            return opcoes;
         }
 
         private static string ObterRotuloCategoria(ProjectTableElementCategory categoria)

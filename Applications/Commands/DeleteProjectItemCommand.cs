@@ -1,4 +1,6 @@
 using System;
+using System.Collections.Generic;
+using System.Linq;
 using Araci.Core.Documents;
 
 namespace Araci.Core.Commands
@@ -21,15 +23,25 @@ namespace Araci.Core.Commands
 
             int indice = document.Vistas.IndexOf(vista);
             Guid? vistaAtivaAnterior = document.VistaAtivaId;
+            IReadOnlyList<(ProjectTable Tabela, Guid? FiltroVistaId)> tabelasAfetadas = document.Tabelas
+                .Where(t => t.FiltroVistaId == vista.Id)
+                .Select(t => (t, t.FiltroVistaId))
+                .ToList();
 
             return new DeleteProjectItemCommand(
-                () => document.RemoverVista(vista),
+                () =>
+                {
+                    document.RemoverVista(vista);
+                    AplicarFiltroVista(tabelasAfetadas, null, document);
+                },
                 () =>
                 {
                     document.RestaurarVista(vista, indice);
 
                     if (vistaAtivaAnterior.HasValue)
                         document.DefinirVistaAtiva(vistaAtivaAnterior.Value);
+
+                    RestaurarFiltrosVista(tabelasAfetadas, document);
                 });
         }
 
@@ -70,6 +82,29 @@ namespace Araci.Core.Commands
         public void Redo()
         {
             Execute();
+        }
+
+        private static void AplicarFiltroVista(
+            IReadOnlyList<(ProjectTable Tabela, Guid? FiltroVistaId)> tabelas,
+            Guid? filtroVistaId,
+            AraciDocument document)
+        {
+            foreach ((ProjectTable tabela, _) in tabelas)
+            {
+                tabela.FiltroVistaId = filtroVistaId;
+                document.AtualizarPropriedadesTabela(tabela);
+            }
+        }
+
+        private static void RestaurarFiltrosVista(
+            IReadOnlyList<(ProjectTable Tabela, Guid? FiltroVistaId)> tabelas,
+            AraciDocument document)
+        {
+            foreach ((ProjectTable tabela, Guid? filtroVistaId) in tabelas)
+            {
+                tabela.FiltroVistaId = filtroVistaId;
+                document.AtualizarPropriedadesTabela(tabela);
+            }
         }
     }
 }
