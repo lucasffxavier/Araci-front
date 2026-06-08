@@ -42,6 +42,8 @@ namespace Araci.Infrastructure.Persistence
         public string Disciplina { get; set; } = "Eletrica";
         public List<string> CategoriasElementos { get; set; } = new();
         public List<ProjectTableFieldSelectionDto> CamposSelecionados { get; set; } = new();
+        public string ModoFiltro { get; set; } = "Todas";
+        public List<ProjectTableFilterRuleDto> Filtros { get; set; } = new();
     }
 
     public sealed class ProjectTableFieldSelectionDto
@@ -50,6 +52,16 @@ namespace Araci.Infrastructure.Persistence
         public string CampoId { get; set; } = string.Empty;
         public string NomeExibicao { get; set; } = string.Empty;
         public int Ordem { get; set; }
+    }
+
+    public sealed class ProjectTableFilterRuleDto
+    {
+        public int Ordem { get; set; }
+        public string Categoria { get; set; } = string.Empty;
+        public string CampoId { get; set; } = string.Empty;
+        public string NomeExibicao { get; set; } = string.Empty;
+        public string Operador { get; set; } = string.Empty;
+        public string Valor { get; set; } = string.Empty;
     }
 
     public sealed class ProjectSheetDto

@@ -363,6 +363,8 @@ namespace Araci.Infrastructure.Persistence
 
         private static ProjectTableDto CriarProjectTableDto(ProjectTable tabela)
         {
+            List<ProjectTableFieldSelection> campos = NormalizarProjectTableFields(tabela.CamposSelecionados, tabela.CategoriasElementos);
+
             return new ProjectTableDto
             {
                 Id = tabela.Id,
@@ -372,13 +374,25 @@ namespace Araci.Infrastructure.Persistence
                     .Distinct()
                     .Select(c => c.ToString())
                     .ToList(),
-                CamposSelecionados = NormalizarProjectTableFields(tabela.CamposSelecionados, tabela.CategoriasElementos)
+                CamposSelecionados = campos
                     .Select(c => new ProjectTableFieldSelectionDto
                     {
                         Categoria = c.Categoria.ToString(),
                         CampoId = c.CampoId,
                         NomeExibicao = c.NomeExibicao,
                         Ordem = c.Ordem
+                    })
+                    .ToList(),
+                ModoFiltro = tabela.ModoFiltro.ToString(),
+                Filtros = NormalizarProjectTableFilters(tabela.Filtros, campos)
+                    .Select(f => new ProjectTableFilterRuleDto
+                    {
+                        Ordem = f.Ordem,
+                        Categoria = f.Categoria.ToString(),
+                        CampoId = f.CampoId,
+                        NomeExibicao = f.NomeExibicao,
+                        Operador = f.Operador.ToString(),
+                        Valor = f.Valor
                     })
                     .ToList()
             };
@@ -418,13 +432,18 @@ namespace Araci.Infrastructure.Persistence
             if (string.IsNullOrWhiteSpace(dto.Nome))
                 return null;
 
+            List<ProjectTableElementCategory> categorias = ParseProjectTableElementCategories(dto.CategoriasElementos);
+            List<ProjectTableFieldSelection> campos = ParseProjectTableFields(dto.CamposSelecionados, categorias);
+
             return new ProjectTable
             {
                 Id = dto.Id == Guid.Empty ? Guid.NewGuid() : dto.Id,
                 Nome = dto.Nome,
                 Disciplina = ParseEnum(dto.Disciplina, ProjectViewDiscipline.Eletrica),
-                CategoriasElementos = ParseProjectTableElementCategories(dto.CategoriasElementos),
-                CamposSelecionados = ParseProjectTableFields(dto.CamposSelecionados, ParseProjectTableElementCategories(dto.CategoriasElementos))
+                CategoriasElementos = categorias,
+                CamposSelecionados = campos,
+                ModoFiltro = ParseEnum(dto.ModoFiltro, ProjectTableFilterLogicalMode.Todas),
+                Filtros = ParseProjectTableFilters(dto.Filtros, campos)
             };
         }
 
@@ -737,6 +756,69 @@ namespace Araci.Infrastructure.Persistence
                     };
                 })
                 .ToList();
+        }
+
+        private static List<ProjectTableFilterRule> ParseProjectTableFilters(
+            IEnumerable<ProjectTableFilterRuleDto>? valores,
+            IReadOnlyList<ProjectTableFieldSelection> camposSelecionados)
+        {
+            if (valores == null)
+                return new List<ProjectTableFilterRule>();
+
+            return NormalizarProjectTableFilters(
+                valores
+                    .Where(v => !string.IsNullOrWhiteSpace(v.CampoId))
+                    .Select(v => Enum.TryParse(v.Categoria, ignoreCase: true, out ProjectTableElementCategory categoria)
+                        ? new ProjectTableFilterRule
+                        {
+                            Ordem = v.Ordem,
+                            Categoria = categoria,
+                            CampoId = v.CampoId.Trim(),
+                            NomeExibicao = string.IsNullOrWhiteSpace(v.NomeExibicao) ? v.CampoId.Trim() : v.NomeExibicao.Trim(),
+                            Operador = ParseEnum(v.Operador, ProjectTableFilterOperator.Contem),
+                            Valor = v.Valor?.Trim() ?? string.Empty
+                        }
+                        : null)
+                    .Where(v => v != null)
+                    .Cast<ProjectTableFilterRule>(),
+                camposSelecionados);
+        }
+
+        private static List<ProjectTableFilterRule> NormalizarProjectTableFilters(
+            IEnumerable<ProjectTableFilterRule>? filtros,
+            IReadOnlyList<ProjectTableFieldSelection> camposSelecionados)
+        {
+            Dictionary<string, ProjectTableFieldSelection> camposPermitidos = camposSelecionados
+                .GroupBy(c => CriarChaveCampoTabela(c.Categoria, c.CampoId))
+                .ToDictionary(g => g.Key, g => g.First(), StringComparer.Ordinal);
+
+            return (filtros ?? Enumerable.Empty<ProjectTableFilterRule>())
+                .Where(f => !string.IsNullOrWhiteSpace(f.CampoId))
+                .OrderBy(f => f.Ordem)
+                .Select(f => new { Filtro = f, Chave = CriarChaveCampoTabela(f.Categoria, f.CampoId) })
+                .Where(item => camposPermitidos.ContainsKey(item.Chave))
+                .Take(5)
+                .Select((item, index) =>
+                {
+                    ProjectTableFieldSelection campo = camposPermitidos[item.Chave];
+                    return new ProjectTableFilterRule
+                    {
+                        Ordem = index,
+                        Categoria = campo.Categoria,
+                        CampoId = campo.CampoId,
+                        NomeExibicao = campo.NomeExibicao,
+                        Operador = Enum.IsDefined(typeof(ProjectTableFilterOperator), item.Filtro.Operador)
+                            ? item.Filtro.Operador
+                            : ProjectTableFilterOperator.Contem,
+                        Valor = item.Filtro.Valor?.Trim() ?? string.Empty
+                    };
+                })
+                .ToList();
+        }
+
+        private static string CriarChaveCampoTabela(ProjectTableElementCategory categoria, string campoId)
+        {
+            return $"{categoria}|{campoId.Trim()}";
         }
     }
 }

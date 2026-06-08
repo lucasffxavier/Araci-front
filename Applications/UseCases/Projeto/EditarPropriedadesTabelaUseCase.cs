@@ -90,6 +90,35 @@ namespace Araci.Applications.UseCases.Projeto
             return true;
         }
 
+        public bool AlterarFiltrosTabela(
+            Guid id,
+            ProjectTableFilterLogicalMode modo,
+            IReadOnlyList<ProjectTableFilterRule> filtros)
+        {
+            ProjectTable? tabela = _document.Tabelas.FirstOrDefault(t => t.Id == id);
+
+            if (tabela == null)
+                return false;
+
+            ProjectTableFilterLogicalMode modoNovo = NormalizarModoFiltro(modo);
+            ProjectTableFilterLogicalMode modoAnterior = NormalizarModoFiltro(tabela.ModoFiltro);
+            List<ProjectTableFilterRule> filtrosNovos = NormalizarFiltros(filtros, tabela.CamposSelecionados);
+            List<ProjectTableFilterRule> filtrosAnteriores = NormalizarFiltros(tabela.Filtros, tabela.CamposSelecionados);
+
+            if (modoAnterior == modoNovo && FiltrosIguais(filtrosAnteriores, filtrosNovos))
+                return true;
+
+            _commands.Execute(new UpdateProjectTableFiltersCommand(
+                _document,
+                tabela,
+                modoAnterior,
+                modoNovo,
+                filtrosAnteriores,
+                filtrosNovos));
+
+            return true;
+        }
+
         private static List<ProjectTableElementCategory> NormalizarCategorias(IEnumerable<ProjectTableElementCategory>? categorias)
         {
             return (categorias ?? Enumerable.Empty<ProjectTableElementCategory>())
@@ -138,6 +167,69 @@ namespace Araci.Applications.UseCases.Projeto
             }
 
             return true;
+        }
+
+        private static ProjectTableFilterLogicalMode NormalizarModoFiltro(ProjectTableFilterLogicalMode modo)
+        {
+            return Enum.IsDefined(typeof(ProjectTableFilterLogicalMode), modo)
+                ? modo
+                : ProjectTableFilterLogicalMode.Todas;
+        }
+
+        private static List<ProjectTableFilterRule> NormalizarFiltros(
+            IEnumerable<ProjectTableFilterRule>? filtros,
+            IReadOnlyList<ProjectTableFieldSelection> camposSelecionados)
+        {
+            Dictionary<string, ProjectTableFieldSelection> camposPermitidos = camposSelecionados
+                .GroupBy(c => CriarChaveCampo(c.Categoria, c.CampoId))
+                .ToDictionary(g => g.Key, g => g.First(), StringComparer.Ordinal);
+
+            return (filtros ?? Enumerable.Empty<ProjectTableFilterRule>())
+                .Where(f => !string.IsNullOrWhiteSpace(f.CampoId))
+                .OrderBy(f => f.Ordem)
+                .Select(f => new { Filtro = f, Chave = CriarChaveCampo(f.Categoria, f.CampoId) })
+                .Where(item => camposPermitidos.ContainsKey(item.Chave))
+                .Take(5)
+                .Select((item, index) =>
+                {
+                    ProjectTableFieldSelection campo = camposPermitidos[item.Chave];
+                    return new ProjectTableFilterRule
+                    {
+                        Ordem = index,
+                        Categoria = campo.Categoria,
+                        CampoId = campo.CampoId,
+                        NomeExibicao = campo.NomeExibicao,
+                        Operador = Enum.IsDefined(typeof(ProjectTableFilterOperator), item.Filtro.Operador)
+                            ? item.Filtro.Operador
+                            : ProjectTableFilterOperator.Contem,
+                        Valor = item.Filtro.Valor?.Trim() ?? string.Empty
+                    };
+                })
+                .ToList();
+        }
+
+        private static bool FiltrosIguais(IReadOnlyList<ProjectTableFilterRule> a, IReadOnlyList<ProjectTableFilterRule> b)
+        {
+            if (a.Count != b.Count)
+                return false;
+
+            for (int i = 0; i < a.Count; i++)
+            {
+                if (a[i].Ordem != b[i].Ordem ||
+                    a[i].Categoria != b[i].Categoria ||
+                    !string.Equals(a[i].CampoId, b[i].CampoId, StringComparison.Ordinal) ||
+                    !string.Equals(a[i].NomeExibicao, b[i].NomeExibicao, StringComparison.Ordinal) ||
+                    a[i].Operador != b[i].Operador ||
+                    !string.Equals(a[i].Valor, b[i].Valor, StringComparison.Ordinal))
+                    return false;
+            }
+
+            return true;
+        }
+
+        private static string CriarChaveCampo(ProjectTableElementCategory categoria, string campoId)
+        {
+            return $"{categoria}|{campoId.Trim()}";
         }
     }
 }

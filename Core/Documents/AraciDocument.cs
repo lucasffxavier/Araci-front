@@ -126,7 +126,19 @@ namespace Araci.Core.Documents
                         NomeExibicao = c.NomeExibicao,
                         Ordem = c.Ordem
                     })
-                    .ToList() ?? new List<ProjectTableFieldSelection>()
+                    .ToList() ?? new List<ProjectTableFieldSelection>(),
+                ModoFiltro = origem?.ModoFiltro ?? ProjectTableFilterLogicalMode.Todas,
+                Filtros = origem?.Filtros
+                    .Select(f => new ProjectTableFilterRule
+                    {
+                        Ordem = f.Ordem,
+                        Categoria = f.Categoria,
+                        CampoId = f.CampoId,
+                        NomeExibicao = f.NomeExibicao,
+                        Operador = f.Operador,
+                        Valor = f.Valor
+                    })
+                    .ToList() ?? new List<ProjectTableFilterRule>()
             };
         }
 

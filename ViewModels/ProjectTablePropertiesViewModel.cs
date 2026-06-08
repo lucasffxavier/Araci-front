@@ -118,14 +118,16 @@ namespace Araci.ViewModels
 
         private void MostrarFiltrosPlaceholder()
         {
-            _dialogs.ShowFiltrosTabelaDialog();
+            FiltrosTabelaDialogResult? resultado =
+                _dialogs.ShowFiltrosTabelaDialog(_tabela.CamposSelecionados, _tabela.ModoFiltro, _tabela.Filtros);
+
+            if (resultado != null)
+                _editarPropriedadesTabela.AlterarFiltrosTabela(_tabela.Id, resultado.Modo, resultado.Filtros);
         }
 
         private void MostrarOrdenacaoPlaceholder()
         {
-            _dialogs.ShowInfo(
-                "Ordenação",
-                "A configuração de ordenação da tabela será implementada em uma etapa futura.");
+            _dialogs.ShowOrdenacaoTabelaDialog();
         }
 
         private void MostrarExibicaoPlaceholder()

@@ -5066,7 +5066,15 @@ namespace Araci.TechnicalChecks
                 return new ElementosTabelaDialogResult(categorias, camposSelecionados);
             }
 
-            public void ShowFiltrosTabelaDialog()
+            public FiltrosTabelaDialogResult? ShowFiltrosTabelaDialog(
+                IReadOnlyList<ProjectTableFieldSelection> camposSelecionados,
+                ProjectTableFilterLogicalMode modo,
+                IReadOnlyList<ProjectTableFilterRule> filtros)
+            {
+                return new FiltrosTabelaDialogResult(modo, filtros);
+            }
+
+            public void ShowOrdenacaoTabelaDialog()
             {
             }
 

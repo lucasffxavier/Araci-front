@@ -16,7 +16,12 @@ namespace Araci.Applications.Abstractions
             IReadOnlyList<ProjectTableElementCategory> categorias,
             IReadOnlyList<ProjectTableFieldSelection> camposSelecionados);
 
-        void ShowFiltrosTabelaDialog();
+        FiltrosTabelaDialogResult? ShowFiltrosTabelaDialog(
+            IReadOnlyList<ProjectTableFieldSelection> camposSelecionados,
+            ProjectTableFilterLogicalMode modo,
+            IReadOnlyList<ProjectTableFilterRule> filtros);
+
+        void ShowOrdenacaoTabelaDialog();
 
         bool Confirm(string title, string message);
 

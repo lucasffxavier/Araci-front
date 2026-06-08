@@ -38,9 +38,24 @@ namespace Araci.Services.UI
                 : null;
         }
 
-        public void ShowFiltrosTabelaDialog()
+        public FiltrosTabelaDialogResult? ShowFiltrosTabelaDialog(
+            IReadOnlyList<ProjectTableFieldSelection> camposSelecionados,
+            ProjectTableFilterLogicalMode modo,
+            IReadOnlyList<ProjectTableFilterRule> filtros)
         {
-            var window = new FiltrosTabelaWindow
+            var window = new FiltrosTabelaWindow(camposSelecionados, modo, filtros)
+            {
+                Owner = Application.Current?.MainWindow
+            };
+
+            return window.ShowDialog() == true
+                ? new FiltrosTabelaDialogResult(window.ModoFiltro, window.Filtros)
+                : null;
+        }
+
+        public void ShowOrdenacaoTabelaDialog()
+        {
+            var window = new OrdenacaoTabelaWindow
             {
                 Owner = Application.Current?.MainWindow
             };
