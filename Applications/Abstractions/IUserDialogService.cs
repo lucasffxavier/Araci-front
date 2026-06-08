@@ -1,4 +1,6 @@
 using Araci.Services.Simulation;
+using Araci.Core.Documents;
+using System.Collections.Generic;
 
 namespace Araci.Applications.Abstractions
 {
@@ -10,7 +12,9 @@ namespace Araci.Applications.Abstractions
 
         void ShowError(string title, string message);
 
-        void ShowElementosTabelaPlaceholder();
+        ElementosTabelaDialogResult? ShowElementosTabelaDialog(
+            IReadOnlyList<ProjectTableElementCategory> categorias,
+            IReadOnlyList<ProjectTableFieldSelection> camposSelecionados);
 
         bool Confirm(string title, string message);
 

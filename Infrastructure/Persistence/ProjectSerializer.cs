@@ -367,7 +367,20 @@ namespace Araci.Infrastructure.Persistence
             {
                 Id = tabela.Id,
                 Nome = tabela.Nome,
-                Disciplina = tabela.Disciplina.ToString()
+                Disciplina = tabela.Disciplina.ToString(),
+                CategoriasElementos = tabela.CategoriasElementos
+                    .Distinct()
+                    .Select(c => c.ToString())
+                    .ToList(),
+                CamposSelecionados = NormalizarProjectTableFields(tabela.CamposSelecionados, tabela.CategoriasElementos)
+                    .Select(c => new ProjectTableFieldSelectionDto
+                    {
+                        Categoria = c.Categoria.ToString(),
+                        CampoId = c.CampoId,
+                        NomeExibicao = c.NomeExibicao,
+                        Ordem = c.Ordem
+                    })
+                    .ToList()
             };
         }
 
@@ -409,7 +422,9 @@ namespace Araci.Infrastructure.Persistence
             {
                 Id = dto.Id == Guid.Empty ? Guid.NewGuid() : dto.Id,
                 Nome = dto.Nome,
-                Disciplina = ParseEnum(dto.Disciplina, ProjectViewDiscipline.Eletrica)
+                Disciplina = ParseEnum(dto.Disciplina, ProjectViewDiscipline.Eletrica),
+                CategoriasElementos = ParseProjectTableElementCategories(dto.CategoriasElementos),
+                CamposSelecionados = ParseProjectTableFields(dto.CamposSelecionados, ParseProjectTableElementCategories(dto.CategoriasElementos))
             };
         }
 
@@ -655,6 +670,73 @@ namespace Araci.Infrastructure.Persistence
             return Enum.TryParse(valor, ignoreCase: true, out TEnum convertido)
                 ? convertido
                 : fallback;
+        }
+
+        private static List<ProjectTableElementCategory> ParseProjectTableElementCategories(IEnumerable<string>? valores)
+        {
+            if (valores == null)
+                return new List<ProjectTableElementCategory>();
+
+            return valores
+                .Select(valor => Enum.TryParse(valor, ignoreCase: true, out ProjectTableElementCategory categoria)
+                    ? (ProjectTableElementCategory?)categoria
+                    : null)
+                .Where(categoria => categoria.HasValue)
+                .Select(categoria => categoria!.Value)
+                .Distinct()
+                .OrderBy(categoria => categoria)
+                .ToList();
+        }
+
+        private static List<ProjectTableFieldSelection> ParseProjectTableFields(
+            IEnumerable<ProjectTableFieldSelectionDto>? valores,
+            IReadOnlyList<ProjectTableElementCategory> categorias)
+        {
+            if (valores == null)
+                return new List<ProjectTableFieldSelection>();
+
+            HashSet<ProjectTableElementCategory> categoriasPermitidas = categorias.ToHashSet();
+
+            return NormalizarProjectTableFields(
+                valores
+                    .Where(v => !string.IsNullOrWhiteSpace(v.CampoId))
+                    .Select(v => Enum.TryParse(v.Categoria, ignoreCase: true, out ProjectTableElementCategory categoria)
+                        ? new ProjectTableFieldSelection
+                        {
+                            Categoria = categoria,
+                            CampoId = v.CampoId.Trim(),
+                            NomeExibicao = string.IsNullOrWhiteSpace(v.NomeExibicao) ? v.CampoId.Trim() : v.NomeExibicao.Trim(),
+                            Ordem = v.Ordem
+                        }
+                        : null)
+                    .Where(v => v != null)
+                    .Cast<ProjectTableFieldSelection>(),
+                categoriasPermitidas);
+        }
+
+        private static List<ProjectTableFieldSelection> NormalizarProjectTableFields(
+            IEnumerable<ProjectTableFieldSelection>? campos,
+            IEnumerable<ProjectTableElementCategory> categorias)
+        {
+            HashSet<ProjectTableElementCategory> categoriasPermitidas = categorias.ToHashSet();
+
+            return (campos ?? Enumerable.Empty<ProjectTableFieldSelection>())
+                .Where(c => categoriasPermitidas.Contains(c.Categoria))
+                .Where(c => !string.IsNullOrWhiteSpace(c.CampoId))
+                .OrderBy(c => c.Ordem)
+                .GroupBy(c => new { c.Categoria, CampoId = c.CampoId.Trim() })
+                .Select((g, index) =>
+                {
+                    ProjectTableFieldSelection campo = g.First();
+                    return new ProjectTableFieldSelection
+                    {
+                        Categoria = campo.Categoria,
+                        CampoId = campo.CampoId.Trim(),
+                        NomeExibicao = string.IsNullOrWhiteSpace(campo.NomeExibicao) ? campo.CampoId.Trim() : campo.NomeExibicao.Trim(),
+                        Ordem = index
+                    };
+                })
+                .ToList();
         }
     }
 }

@@ -116,7 +116,17 @@ namespace Araci.Core.Documents
             return new ProjectTable
             {
                 Nome = CriarNomeUnico(origem?.Nome ?? "Tabela", Tabelas.Select(t => t.Nome)),
-                Disciplina = origem?.Disciplina ?? ProjectViewDiscipline.Eletrica
+                Disciplina = origem?.Disciplina ?? ProjectViewDiscipline.Eletrica,
+                CategoriasElementos = origem?.CategoriasElementos.ToList() ?? new List<ProjectTableElementCategory>(),
+                CamposSelecionados = origem?.CamposSelecionados
+                    .Select(c => new ProjectTableFieldSelection
+                    {
+                        Categoria = c.Categoria,
+                        CampoId = c.CampoId,
+                        NomeExibicao = c.NomeExibicao,
+                        Ordem = c.Ordem
+                    })
+                    .ToList() ?? new List<ProjectTableFieldSelection>()
             };
         }
 

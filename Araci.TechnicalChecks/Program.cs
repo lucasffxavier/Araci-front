@@ -5059,8 +5059,11 @@ namespace Araci.TechnicalChecks
             {
             }
 
-            public void ShowElementosTabelaPlaceholder()
+            public ElementosTabelaDialogResult? ShowElementosTabelaDialog(
+                IReadOnlyList<ProjectTableElementCategory> categorias,
+                IReadOnlyList<ProjectTableFieldSelection> camposSelecionados)
             {
+                return new ElementosTabelaDialogResult(categorias, camposSelecionados);
             }
 
             public bool Confirm(string title, string message)

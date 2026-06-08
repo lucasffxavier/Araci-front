@@ -106,7 +106,14 @@ namespace Araci.ViewModels
 
         private void MostrarElementosTabelaPlaceholder()
         {
-            _dialogs.ShowElementosTabelaPlaceholder();
+            ElementosTabelaDialogResult? resultado =
+                _dialogs.ShowElementosTabelaDialog(_tabela.CategoriasElementos, _tabela.CamposSelecionados);
+
+            if (resultado != null)
+                _editarPropriedadesTabela.AlterarElementosTabela(
+                    _tabela.Id,
+                    resultado.Categorias,
+                    resultado.CamposSelecionados);
         }
 
         private void MostrarFiltrosPlaceholder()

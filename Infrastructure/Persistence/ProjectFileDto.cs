@@ -40,6 +40,16 @@ namespace Araci.Infrastructure.Persistence
         public Guid Id { get; set; }
         public string Nome { get; set; } = string.Empty;
         public string Disciplina { get; set; } = "Eletrica";
+        public List<string> CategoriasElementos { get; set; } = new();
+        public List<ProjectTableFieldSelectionDto> CamposSelecionados { get; set; } = new();
+    }
+
+    public sealed class ProjectTableFieldSelectionDto
+    {
+        public string Categoria { get; set; } = string.Empty;
+        public string CampoId { get; set; } = string.Empty;
+        public string NomeExibicao { get; set; } = string.Empty;
+        public int Ordem { get; set; }
     }
 
     public sealed class ProjectSheetDto

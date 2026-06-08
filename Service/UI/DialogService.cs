@@ -1,6 +1,8 @@
 using Araci.Applications.Abstractions;
+using Araci.Core.Documents;
 using Araci.Properties;
 using Araci.Services.Simulation;
+using System.Collections.Generic;
 using System.Windows;
 
 namespace Araci.Services.UI
@@ -22,14 +24,18 @@ namespace Araci.Services.UI
             Show(title, message, MessageBoxImage.Error);
         }
 
-        public void ShowElementosTabelaPlaceholder()
+        public ElementosTabelaDialogResult? ShowElementosTabelaDialog(
+            IReadOnlyList<ProjectTableElementCategory> categorias,
+            IReadOnlyList<ProjectTableFieldSelection> camposSelecionados)
         {
-            var window = new ElementosTabelaWindow
+            var window = new ElementosTabelaWindow(categorias, camposSelecionados)
             {
                 Owner = Application.Current?.MainWindow
             };
 
-            window.ShowDialog();
+            return window.ShowDialog() == true
+                ? new ElementosTabelaDialogResult(window.CategoriasSelecionadas, window.CamposSelecionados)
+                : null;
         }
 
         public bool Confirm(string title, string message)
