@@ -81,17 +81,19 @@ namespace Araci.ViewModels
             }
 
             foreach (ProjectSheet prancha in _document.Pranchas)
-                yield return CriarItem(prancha.Id, "Prancha", FormatarPrancha(prancha));
+                yield return CriarItem(prancha.Id, "Prancha", FormatarPrancha(prancha), prancha.Nome);
         }
 
-        private ProjectBrowserItemViewModel CriarItem(Guid id, string tipo, string nome)
+        private ProjectBrowserItemViewModel CriarItem(Guid id, string tipo, string nome, string? nomeEdicao = null)
         {
             var item = new ProjectBrowserItemViewModel(
                 id,
                 tipo,
                 nome,
+                nomeEdicao ?? nome,
                 true,
-                SelecionarItem)
+                SelecionarItem,
+                RenomearItem)
             {
                 IsActiveView = tipo == "Vista" && _document.VistaAtivaId == id
             };
@@ -129,6 +131,74 @@ namespace Araci.ViewModels
                 secao.Itens.Add(item);
         }
 
+        private bool RenomearItem(ProjectBrowserItemViewModel item, string novoNome)
+        {
+            string nome = NormalizarNome(novoNome);
+
+            if (string.IsNullOrWhiteSpace(nome))
+                return false;
+
+            if (NomeDuplicado(item, nome))
+                return false;
+
+            switch (item.Tipo)
+            {
+                case "Vista":
+                    ProjectView? vista = _document.Vistas.FirstOrDefault(v => v.Id == item.Id);
+
+                    if (vista == null)
+                        return false;
+
+                    vista.Nome = nome;
+                    item.AtualizarNomeExibicao(vista.Nome);
+                    return true;
+
+                case "Tabela":
+                    ProjectTable? tabela = _document.Tabelas.FirstOrDefault(t => t.Id == item.Id);
+
+                    if (tabela == null)
+                        return false;
+
+                    tabela.Nome = nome;
+                    item.AtualizarNomeExibicao(tabela.Nome);
+                    return true;
+
+                case "Prancha":
+                    ProjectSheet? prancha = _document.Pranchas.FirstOrDefault(p => p.Id == item.Id);
+
+                    if (prancha == null)
+                        return false;
+
+                    prancha.Nome = nome;
+                    item.AtualizarNomeExibicao(FormatarPrancha(prancha), prancha.Nome);
+                    return true;
+
+                default:
+                    return false;
+            }
+        }
+
+        private bool NomeDuplicado(ProjectBrowserItemViewModel item, string nome)
+        {
+            return item.Tipo switch
+            {
+                "Vista" => _document.Vistas.Any(v => v.Id != item.Id && NomeIgual(v.Nome, nome)),
+                "Tabela" => _document.Tabelas.Any(t => t.Id != item.Id && NomeIgual(t.Nome, nome)),
+                "Prancha" => _document.Pranchas.Any(p => p.Id != item.Id && NomeIgual(p.Nome, nome)),
+                _ => false
+            };
+        }
+
+        private static string NormalizarNome(string nome)
+        {
+            return string.IsNullOrWhiteSpace(nome) ? string.Empty : nome.Trim();
+        }
+
+        private static bool NomeIgual(string atual, string novo)
+        {
+            return string.Equals(NormalizarNome(atual), novo, StringComparison.OrdinalIgnoreCase);
+        }
+
         private static string FormatarPrancha(ProjectSheet prancha)
         {
             return string.IsNullOrWhiteSpace(prancha.Numero)
@@ -152,24 +222,82 @@ namespace Araci.ViewModels
     public sealed class ProjectBrowserItemViewModel : INotifyPropertyChanged
     {
         private readonly Action<ProjectBrowserItemViewModel>? _selecionar;
+        private readonly Func<ProjectBrowserItemViewModel, string, bool>? _renomear;
         private bool _isSelected;
         private bool _isActiveView;
+        private bool _isEditing;
+        private string _nome;
+        private string _textoEdicao;
 
-        public ProjectBrowserItemViewModel(Guid id, string tipo, string nome, bool isSelectable, Action<ProjectBrowserItemViewModel>? selecionar)
+        public ProjectBrowserItemViewModel(
+            Guid id,
+            string tipo,
+            string nome,
+            string nomeEdicao,
+            bool isSelectable,
+            Action<ProjectBrowserItemViewModel>? selecionar,
+            Func<ProjectBrowserItemViewModel, string, bool>? renomear = null)
         {
             Id = id;
             Tipo = tipo;
-            Nome = nome;
+            _nome = nome;
+            _textoEdicao = nomeEdicao;
             IsSelectable = isSelectable;
             _selecionar = selecionar;
+            _renomear = renomear;
             SelecionarCommand = new RelayCommand(Selecionar, () => IsSelectable);
+            IniciarEdicaoCommand = new RelayCommand(IniciarEdicao, () => IsSelectable);
+            ConfirmarEdicaoCommand = new RelayCommand(ConfirmarEdicao);
+            CancelarEdicaoCommand = new RelayCommand(CancelarEdicao);
         }
 
         public Guid Id { get; }
         public string Tipo { get; }
-        public string Nome { get; }
+        public string Nome
+        {
+            get => _nome;
+            private set
+            {
+                if (_nome == value)
+                    return;
+
+                _nome = value;
+                OnPropertyChanged();
+            }
+        }
+
         public bool IsSelectable { get; }
         public ICommand SelecionarCommand { get; }
+        public ICommand IniciarEdicaoCommand { get; }
+        public ICommand ConfirmarEdicaoCommand { get; }
+        public ICommand CancelarEdicaoCommand { get; }
+
+        public string TextoEdicao
+        {
+            get => _textoEdicao;
+            set
+            {
+                if (_textoEdicao == value)
+                    return;
+
+                _textoEdicao = value;
+                OnPropertyChanged();
+            }
+        }
+
+        public bool IsEditing
+        {
+            get => _isEditing;
+            set
+            {
+                if (_isEditing == value)
+                    return;
+
+                _isEditing = value;
+                OnPropertyChanged();
+            }
+        }
+
         public bool IsActiveView
         {
             get => _isActiveView;
@@ -198,12 +326,46 @@ namespace Araci.ViewModels
 
         public static ProjectBrowserItemViewModel CriarPlaceholder(string nome)
         {
-            return new ProjectBrowserItemViewModel(Guid.Empty, "Placeholder", nome, false, null);
+            return new ProjectBrowserItemViewModel(Guid.Empty, "Placeholder", nome, nome, false, null);
+        }
+
+        public void AtualizarNomeExibicao(string nome, string? nomeEdicao = null)
+        {
+            Nome = nome;
+            TextoEdicao = nomeEdicao ?? nome;
         }
 
         private void Selecionar()
         {
             _selecionar?.Invoke(this);
+        }
+
+        private void IniciarEdicao()
+        {
+            if (!IsSelectable)
+                return;
+
+            TextoEdicao = Nome;
+            IsEditing = true;
+        }
+
+        private void ConfirmarEdicao()
+        {
+            if (!IsEditing)
+                return;
+
+            string nomeAnterior = Nome;
+
+            if (_renomear?.Invoke(this, TextoEdicao) != true)
+                TextoEdicao = nomeAnterior;
+
+            IsEditing = false;
+        }
+
+        private void CancelarEdicao()
+        {
+            TextoEdicao = Nome;
+            IsEditing = false;
         }
 
         public event PropertyChangedEventHandler? PropertyChanged;
