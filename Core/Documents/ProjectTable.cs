@@ -47,6 +47,20 @@ namespace Araci.Core.Documents
         public string Valor { get; set; } = string.Empty;
     }
 
+    public enum ProjectTableSortDirection
+    {
+        Crescente,
+        Decrescente
+    }
+
+    public class ProjectTableSorting
+    {
+        public ProjectTableElementCategory Categoria { get; set; }
+        public string CampoId { get; set; } = string.Empty;
+        public string NomeExibicao { get; set; } = string.Empty;
+        public ProjectTableSortDirection Direcao { get; set; } = ProjectTableSortDirection.Crescente;
+    }
+
     public class ProjectTable
     {
         public Guid Id { get; set; } = Guid.NewGuid();
@@ -57,5 +71,6 @@ namespace Araci.Core.Documents
         public Guid? FiltroVistaId { get; set; }
         public ProjectTableFilterLogicalMode ModoFiltro { get; set; } = ProjectTableFilterLogicalMode.Todas;
         public List<ProjectTableFilterRule> Filtros { get; set; } = new();
+        public ProjectTableSorting? Ordenacao { get; set; }
     }
 }

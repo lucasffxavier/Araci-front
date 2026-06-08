@@ -66,6 +66,9 @@ namespace Araci.TechnicalChecks
                 ("Persistencia preserva ramificacao", PersistenciaPreservaRamificacao),
                 ("Tabela remove filtros de campos removidos com undo redo", TabelaRemoveFiltrosCamposRemovidosComUndoRedo),
                 ("Excluir vista limpa filtro de vista da tabela com undo redo", ExcluirVistaLimpaFiltroTabelaComUndoRedo),
+                ("Tabela altera ordenacao com undo redo", TabelaAlteraOrdenacaoComUndoRedo),
+                ("Tabela limpa ordenacao ao remover campo ordenado", TabelaLimpaOrdenacaoAoRemoverCampoOrdenado),
+                ("Tabela duplica e persiste ordenacao", TabelaDuplicaEPersisteOrdenacao),
                 ("DTO permanece equivalente apos reload", DtoPermaneceEquivalenteAposReload),
                 ("IDs permanecem estaveis apos reload", IdsPermanecemEstaveisAposReload),
                 ("Builds repetidos apos reload nao alteram Document", BuildsRepetidosAposReloadNaoAlteramDocument),
@@ -5069,6 +5072,141 @@ namespace Araci.TechnicalChecks
             AssertEqual(null, tabelaAfetada.FiltroVistaId, "Redo deveria limpar filtro da Vista B novamente.");
         }
 
+        private static void TabelaAlteraOrdenacaoComUndoRedo()
+        {
+            var document = new AraciDocument();
+            var commands = new Araci.Core.Commands.CommandManager();
+            var useCase = new EditarPropriedadesTabelaUseCase(document, commands);
+            ProjectTable tabela = CriarTabelaComCampos(document);
+            ProjectTableFieldSelection campoNome = tabela.CamposSelecionados[0];
+
+            bool alterado = useCase.AlterarOrdenacaoTabela(
+                tabela.Id,
+                new ProjectTableSorting
+                {
+                    Categoria = campoNome.Categoria,
+                    CampoId = campoNome.CampoId,
+                    NomeExibicao = campoNome.NomeExibicao,
+                    Direcao = ProjectTableSortDirection.Decrescente
+                });
+
+            Assert(alterado, "AlterarOrdenacaoTabela deveria retornar true.");
+            Assert(tabela.Ordenacao != null, "Ordenacao deveria existir.");
+            AssertEqual("Nome", tabela.Ordenacao!.CampoId, "Ordenacao.CampoId");
+            AssertEqual(ProjectTableSortDirection.Decrescente, tabela.Ordenacao.Direcao, "Ordenacao.Direcao");
+
+            commands.Undo();
+            Assert(tabela.Ordenacao == null, "Undo deveria limpar ordenacao inicial.");
+
+            commands.Redo();
+            Assert(tabela.Ordenacao != null, "Redo deveria restaurar ordenacao.");
+            AssertEqual(ProjectTableSortDirection.Decrescente, tabela.Ordenacao!.Direcao, "Redo.Ordenacao.Direcao");
+        }
+
+        private static void TabelaLimpaOrdenacaoAoRemoverCampoOrdenado()
+        {
+            var document = new AraciDocument();
+            var commands = new Araci.Core.Commands.CommandManager();
+            var useCase = new EditarPropriedadesTabelaUseCase(document, commands);
+            ProjectTable tabela = CriarTabelaComCampos(document);
+            ProjectTableFieldSelection campoNome = tabela.CamposSelecionados[0];
+            ProjectTableFieldSelection campoTensao = tabela.CamposSelecionados[1];
+
+            tabela.Ordenacao = new ProjectTableSorting
+            {
+                Categoria = campoTensao.Categoria,
+                CampoId = campoTensao.CampoId,
+                NomeExibicao = campoTensao.NomeExibicao,
+                Direcao = ProjectTableSortDirection.Crescente
+            };
+
+            useCase.AlterarElementosTabela(
+                tabela.Id,
+                tabela.CategoriasElementos,
+                new[] { campoNome });
+
+            Assert(tabela.Ordenacao == null, "Ordenacao deveria ser limpa ao remover campo ordenado.");
+
+            commands.Undo();
+            Assert(tabela.Ordenacao != null, "Undo deveria restaurar ordenacao.");
+            AssertEqual("Tensao", tabela.Ordenacao!.CampoId, "Undo.Ordenacao.CampoId");
+
+            commands.Redo();
+            Assert(tabela.Ordenacao == null, "Redo deveria limpar ordenacao novamente.");
+        }
+
+        private static void TabelaDuplicaEPersisteOrdenacao()
+        {
+            var document = new AraciDocument();
+            ProjectTable tabela = CriarTabelaComCampos(document);
+            ProjectTableFieldSelection campoNome = tabela.CamposSelecionados[0];
+            tabela.Ordenacao = new ProjectTableSorting
+            {
+                Categoria = campoNome.Categoria,
+                CampoId = campoNome.CampoId,
+                NomeExibicao = campoNome.NomeExibicao,
+                Direcao = ProjectTableSortDirection.Decrescente
+            };
+
+            ProjectTable duplicata = document.CriarDuplicataTabela(tabela);
+
+            Assert(duplicata.Ordenacao != null, "Duplicata deveria copiar ordenacao.");
+            AssertEqual("Nome", duplicata.Ordenacao!.CampoId, "Duplicata.Ordenacao.CampoId");
+            AssertEqual(ProjectTableSortDirection.Decrescente, duplicata.Ordenacao.Direcao, "Duplicata.Ordenacao.Direcao");
+
+            string path = CreateTempProjectPath();
+
+            try
+            {
+                var context = new EditorContext();
+                ProjectTable persistentTable = context.Document.CriarNovaTabela();
+                persistentTable.CategoriasElementos = tabela.CategoriasElementos.ToList();
+                persistentTable.CamposSelecionados = tabela.CamposSelecionados
+                    .Select(c => new ProjectTableFieldSelection
+                    {
+                        Categoria = c.Categoria,
+                        CampoId = c.CampoId,
+                        NomeExibicao = c.NomeExibicao,
+                        Ordem = c.Ordem
+                    })
+                    .ToList();
+                persistentTable.Ordenacao = new ProjectTableSorting
+                {
+                    Categoria = campoNome.Categoria,
+                    CampoId = campoNome.CampoId,
+                    NomeExibicao = campoNome.NomeExibicao,
+                    Direcao = ProjectTableSortDirection.Decrescente
+                };
+
+                context.Projects.Salvar(path);
+
+                var loadedContext = new EditorContext();
+                loadedContext.Projects.Abrir(path);
+                ProjectTable loadedTable = loadedContext.Document.Tabelas.Single(t => t.Id == persistentTable.Id);
+
+                Assert(loadedTable.Ordenacao != null, "Reload deveria preservar ordenacao.");
+                AssertEqual("Nome", loadedTable.Ordenacao!.CampoId, "Reload.Ordenacao.CampoId");
+                AssertEqual(ProjectTableSortDirection.Decrescente, loadedTable.Ordenacao.Direcao, "Reload.Ordenacao.Direcao");
+            }
+            finally
+            {
+                DeleteIfExists(path);
+            }
+        }
+
+        private static ProjectTable CriarTabelaComCampos(AraciDocument document)
+        {
+            ProjectTable tabela = document.CriarNovaTabela();
+            tabela.CategoriasElementos = new List<ProjectTableElementCategory> { ProjectTableElementCategory.Barras };
+            tabela.CamposSelecionados = new List<ProjectTableFieldSelection>
+            {
+                new() { Categoria = ProjectTableElementCategory.Barras, CampoId = "Nome", NomeExibicao = "Nome", Ordem = 0 },
+                new() { Categoria = ProjectTableElementCategory.Barras, CampoId = "Tensao", NomeExibicao = "Tensao", Ordem = 1 }
+            };
+
+            return tabela;
+        }
+
         private static ExecutarSimulacaoUseCase CriarExecutarSimulacaoUseCase(
             FakeSimulationPipeline pipeline,
             FakeDialogService dialogs)
@@ -5154,8 +5292,11 @@ namespace Araci.TechnicalChecks
                 return new FiltrosTabelaDialogResult(filtroVistaId, modo, filtros);
             }
 
-            public void ShowOrdenacaoTabelaDialog()
+            public OrdenacaoTabelaDialogResult? ShowOrdenacaoTabelaDialog(
+                IReadOnlyList<ProjectTableFieldSelection> camposSelecionados,
+                ProjectTableSorting? ordenacao)
             {
+                return new OrdenacaoTabelaDialogResult(ordenacao);
             }
 
             public bool Confirm(string title, string message)

@@ -45,6 +45,7 @@ namespace Araci.Infrastructure.Persistence
         public Guid? FiltroVistaId { get; set; }
         public string ModoFiltro { get; set; } = "Todas";
         public List<ProjectTableFilterRuleDto> Filtros { get; set; } = new();
+        public ProjectTableSortingDto? Ordenacao { get; set; }
     }
 
     public sealed class ProjectTableFieldSelectionDto
@@ -63,6 +64,14 @@ namespace Araci.Infrastructure.Persistence
         public string NomeExibicao { get; set; } = string.Empty;
         public string Operador { get; set; } = string.Empty;
         public string Valor { get; set; } = string.Empty;
+    }
+
+    public sealed class ProjectTableSortingDto
+    {
+        public string Categoria { get; set; } = string.Empty;
+        public string CampoId { get; set; } = string.Empty;
+        public string NomeExibicao { get; set; } = string.Empty;
+        public string Direcao { get; set; } = string.Empty;
     }
 
     public sealed class ProjectSheetDto

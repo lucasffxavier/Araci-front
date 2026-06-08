@@ -139,7 +139,16 @@ namespace Araci.Core.Documents
                         Operador = f.Operador,
                         Valor = f.Valor
                     })
-                    .ToList() ?? new List<ProjectTableFilterRule>()
+                    .ToList() ?? new List<ProjectTableFilterRule>(),
+                Ordenacao = origem?.Ordenacao == null
+                    ? null
+                    : new ProjectTableSorting
+                    {
+                        Categoria = origem.Ordenacao.Categoria,
+                        CampoId = origem.Ordenacao.CampoId,
+                        NomeExibicao = origem.Ordenacao.NomeExibicao,
+                        Direcao = origem.Ordenacao.Direcao
+                    }
             };
         }
 

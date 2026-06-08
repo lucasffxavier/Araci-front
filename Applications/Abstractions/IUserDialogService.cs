@@ -23,7 +23,9 @@ namespace Araci.Applications.Abstractions
             ProjectTableFilterLogicalMode modo,
             IReadOnlyList<ProjectTableFilterRule> filtros);
 
-        void ShowOrdenacaoTabelaDialog();
+        OrdenacaoTabelaDialogResult? ShowOrdenacaoTabelaDialog(
+            IReadOnlyList<ProjectTableFieldSelection> camposSelecionados,
+            ProjectTableSorting? ordenacao);
 
         bool Confirm(string title, string message);
 

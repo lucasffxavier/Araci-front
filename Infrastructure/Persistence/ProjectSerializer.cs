@@ -365,6 +365,7 @@ namespace Araci.Infrastructure.Persistence
         {
             List<ProjectTableFieldSelection> campos = NormalizarProjectTableFields(tabela.CamposSelecionados, tabela.CategoriasElementos);
             Guid? filtroVistaId = NormalizarProjectTableViewFilter(tabela.FiltroVistaId, vistasIds);
+            ProjectTableSorting? ordenacao = NormalizarProjectTableSorting(tabela.Ordenacao, campos);
 
             return new ProjectTableDto
             {
@@ -396,7 +397,16 @@ namespace Araci.Infrastructure.Persistence
                         Operador = f.Operador.ToString(),
                         Valor = f.Valor
                     })
-                    .ToList()
+                    .ToList(),
+                Ordenacao = ordenacao == null
+                    ? null
+                    : new ProjectTableSortingDto
+                    {
+                        Categoria = ordenacao.Categoria.ToString(),
+                        CampoId = ordenacao.CampoId,
+                        NomeExibicao = ordenacao.NomeExibicao,
+                        Direcao = ordenacao.Direcao.ToString()
+                    }
             };
         }
 
@@ -446,7 +456,8 @@ namespace Araci.Infrastructure.Persistence
                 CamposSelecionados = campos,
                 FiltroVistaId = NormalizarProjectTableViewFilter(dto.FiltroVistaId, vistasIds),
                 ModoFiltro = ParseEnum(dto.ModoFiltro, ProjectTableFilterLogicalMode.Todas),
-                Filtros = ParseProjectTableFilters(dto.Filtros, campos)
+                Filtros = ParseProjectTableFilters(dto.Filtros, campos),
+                Ordenacao = ParseProjectTableSorting(dto.Ordenacao, campos)
             };
         }
 
@@ -829,6 +840,52 @@ namespace Araci.Infrastructure.Persistence
                     };
                 })
                 .ToList();
+        }
+
+        private static ProjectTableSorting? ParseProjectTableSorting(
+            ProjectTableSortingDto? dto,
+            IReadOnlyList<ProjectTableFieldSelection> camposSelecionados)
+        {
+            if (dto == null || string.IsNullOrWhiteSpace(dto.CampoId))
+                return null;
+
+            if (!Enum.TryParse(dto.Categoria, ignoreCase: true, out ProjectTableElementCategory categoria))
+                return null;
+
+            return NormalizarProjectTableSorting(
+                new ProjectTableSorting
+                {
+                    Categoria = categoria,
+                    CampoId = dto.CampoId.Trim(),
+                    NomeExibicao = string.IsNullOrWhiteSpace(dto.NomeExibicao) ? dto.CampoId.Trim() : dto.NomeExibicao.Trim(),
+                    Direcao = ParseEnum(dto.Direcao, ProjectTableSortDirection.Crescente)
+                },
+                camposSelecionados);
+        }
+
+        private static ProjectTableSorting? NormalizarProjectTableSorting(
+            ProjectTableSorting? ordenacao,
+            IReadOnlyList<ProjectTableFieldSelection> camposSelecionados)
+        {
+            if (ordenacao == null || string.IsNullOrWhiteSpace(ordenacao.CampoId))
+                return null;
+
+            string chave = CriarChaveCampoTabela(ordenacao.Categoria, ordenacao.CampoId);
+            ProjectTableFieldSelection? campo = camposSelecionados.FirstOrDefault(c =>
+                string.Equals(CriarChaveCampoTabela(c.Categoria, c.CampoId), chave, StringComparison.Ordinal));
+
+            if (campo == null)
+                return null;
+
+            return new ProjectTableSorting
+            {
+                Categoria = campo.Categoria,
+                CampoId = campo.CampoId,
+                NomeExibicao = campo.NomeExibicao,
+                Direcao = Enum.IsDefined(typeof(ProjectTableSortDirection), ordenacao.Direcao)
+                    ? ordenacao.Direcao
+                    : ProjectTableSortDirection.Crescente
+            };
         }
 
         private static string CriarChaveCampoTabela(ProjectTableElementCategory categoria, string campoId)

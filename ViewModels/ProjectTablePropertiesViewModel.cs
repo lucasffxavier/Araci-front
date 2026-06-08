@@ -137,7 +137,11 @@ namespace Araci.ViewModels
 
         private void MostrarOrdenacaoPlaceholder()
         {
-            _dialogs.ShowOrdenacaoTabelaDialog();
+            OrdenacaoTabelaDialogResult? resultado =
+                _dialogs.ShowOrdenacaoTabelaDialog(_tabela.CamposSelecionados, _tabela.Ordenacao);
+
+            if (resultado != null)
+                _editarPropriedadesTabela.AlterarOrdenacaoTabela(_tabela.Id, resultado.Ordenacao);
         }
 
         private void MostrarExibicaoPlaceholder()

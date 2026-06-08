@@ -77,10 +77,13 @@ namespace Araci.Applications.UseCases.Projeto
             List<ProjectTableFieldSelection> camposAnteriores = NormalizarCampos(tabela.CamposSelecionados, categoriasAnteriores);
             List<ProjectTableFilterRule> filtrosNovos = NormalizarFiltros(tabela.Filtros, camposNovos);
             List<ProjectTableFilterRule> filtrosAnteriores = NormalizarFiltros(tabela.Filtros, camposAnteriores);
+            ProjectTableSorting? ordenacaoNova = NormalizarOrdenacao(tabela.Ordenacao, camposNovos);
+            ProjectTableSorting? ordenacaoAnterior = NormalizarOrdenacao(tabela.Ordenacao, camposAnteriores);
 
             if (categoriasAnteriores.SequenceEqual(categoriasNovas) &&
                 CamposIguais(camposAnteriores, camposNovos) &&
-                FiltrosIguais(filtrosAnteriores, filtrosNovos))
+                FiltrosIguais(filtrosAnteriores, filtrosNovos) &&
+                OrdenacoesIguais(ordenacaoAnterior, ordenacaoNova))
                 return true;
 
             _commands.Execute(new UpdateProjectTableElementsCommand(
@@ -91,7 +94,31 @@ namespace Araci.Applications.UseCases.Projeto
                 camposAnteriores,
                 camposNovos,
                 filtrosAnteriores,
-                filtrosNovos));
+                filtrosNovos,
+                ordenacaoAnterior,
+                ordenacaoNova));
+
+            return true;
+        }
+
+        public bool AlterarOrdenacaoTabela(Guid id, ProjectTableSorting? ordenacao)
+        {
+            ProjectTable? tabela = _document.Tabelas.FirstOrDefault(t => t.Id == id);
+
+            if (tabela == null)
+                return false;
+
+            ProjectTableSorting? ordenacaoNova = NormalizarOrdenacao(ordenacao, tabela.CamposSelecionados);
+            ProjectTableSorting? ordenacaoAnterior = NormalizarOrdenacao(tabela.Ordenacao, tabela.CamposSelecionados);
+
+            if (OrdenacoesIguais(ordenacaoAnterior, ordenacaoNova))
+                return true;
+
+            _commands.Execute(new UpdateProjectTableSortingCommand(
+                _document,
+                tabela,
+                ordenacaoAnterior,
+                ordenacaoNova));
 
             return true;
         }
@@ -248,6 +275,45 @@ namespace Araci.Applications.UseCases.Projeto
             }
 
             return true;
+        }
+
+        private static ProjectTableSorting? NormalizarOrdenacao(
+            ProjectTableSorting? ordenacao,
+            IReadOnlyList<ProjectTableFieldSelection> camposSelecionados)
+        {
+            if (ordenacao == null || string.IsNullOrWhiteSpace(ordenacao.CampoId))
+                return null;
+
+            string chave = CriarChaveCampo(ordenacao.Categoria, ordenacao.CampoId);
+            ProjectTableFieldSelection? campo = camposSelecionados.FirstOrDefault(c =>
+                string.Equals(CriarChaveCampo(c.Categoria, c.CampoId), chave, StringComparison.Ordinal));
+
+            if (campo == null)
+                return null;
+
+            return new ProjectTableSorting
+            {
+                Categoria = campo.Categoria,
+                CampoId = campo.CampoId,
+                NomeExibicao = campo.NomeExibicao,
+                Direcao = Enum.IsDefined(typeof(ProjectTableSortDirection), ordenacao.Direcao)
+                    ? ordenacao.Direcao
+                    : ProjectTableSortDirection.Crescente
+            };
+        }
+
+        private static bool OrdenacoesIguais(ProjectTableSorting? a, ProjectTableSorting? b)
+        {
+            if (a == null && b == null)
+                return true;
+
+            if (a == null || b == null)
+                return false;
+
+            return a.Categoria == b.Categoria &&
+                string.Equals(a.CampoId, b.CampoId, StringComparison.Ordinal) &&
+                string.Equals(a.NomeExibicao, b.NomeExibicao, StringComparison.Ordinal) &&
+                a.Direcao == b.Direcao;
         }
 
         private static string CriarChaveCampo(ProjectTableElementCategory categoria, string campoId)

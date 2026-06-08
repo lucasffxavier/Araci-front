@@ -507,29 +507,303 @@ Araci-front
 
 
 ====================================================================================================
-ARQUIVO: C:\Users\User\source\repos\lucasffxavier\Araci-front\Applications\Simulation\CircuitDtoBuilder.cs
+ARQUIVO: C:\Users\User\source\repos\lucasffxavier\Araci-front\Applications\Abstractions\IUserDialogService.cs
+====================================================================================================
+
+using Araci.Services.Simulation;
+using Araci.Core.Documents;
+using System.Collections.Generic;
+
+namespace Araci.Applications.Abstractions
+{
+    public interface IUserDialogService
+    {
+        void ShowInfo(string title, string message);
+
+        void ShowWarning(string title, string message);
+
+        void ShowError(string title, string message);
+
+        ElementosTabelaDialogResult? ShowElementosTabelaDialog(
+            IReadOnlyList<ProjectTableElementCategory> categorias,
+            IReadOnlyList<ProjectTableFieldSelection> camposSelecionados);
+
+        FiltrosTabelaDialogResult? ShowFiltrosTabelaDialog(
+            IReadOnlyList<ProjectTableFieldSelection> camposSelecionados,
+            IReadOnlyList<ProjectViewDialogOption> vistasDisponiveis,
+            Guid? filtroVistaId,
+            ProjectTableFilterLogicalMode modo,
+            IReadOnlyList<ProjectTableFilterRule> filtros);
+
+        void ShowOrdenacaoTabelaDialog();
+
+        bool Confirm(string title, string message);
+
+        void Show(SimulationMessage message);
+    }
+}
+
+
+
+====================================================================================================
+ARQUIVO: C:\Users\User\source\repos\lucasffxavier\Araci-front\Applications\UseCases\Projeto\EditarPropriedadesTabelaUseCase.cs
 ====================================================================================================
 
 using System;
+using System.Collections.Generic;
+using System.Linq;
+using Araci.Applications.Abstractions;
+using Araci.Core.Commands;
 using Araci.Core.Documents;
-using Araci.DTOs;
 
-namespace Araci.Applications.Simulation
+namespace Araci.Applications.UseCases.Projeto
 {
-    public class CircuitDtoBuilder
+    public class EditarPropriedadesTabelaUseCase
     {
         private readonly AraciDocument _document;
+        private readonly ICommandHistory _commands;
 
-        public CircuitDtoBuilder(AraciDocument document)
+        public EditarPropriedadesTabelaUseCase(AraciDocument document, ICommandHistory commands)
         {
             _document = document ?? throw new ArgumentNullException(nameof(document));
+            _commands = commands ?? throw new ArgumentNullException(nameof(commands));
         }
 
-        public CircuitDto Build()
+        public bool AlterarDisciplina(Guid id, ProjectViewDiscipline disciplina)
         {
-            ParameterReader reader = new(_document);
-            CircuitBuilder builder = new(reader);
-            return builder.Build();
+            ProjectTable? tabela = _document.Tabelas.FirstOrDefault(t => t.Id == id);
+
+            if (tabela == null)
+                return false;
+
+            if (tabela.Disciplina == disciplina)
+                return true;
+
+            _commands.Execute(new UpdateProjectTablePropertyCommand<ProjectViewDiscipline>(
+                _document,
+                tabela,
+                (t, valor) => t.Disciplina = valor,
+                tabela.Disciplina,
+                disciplina));
+
+            return true;
+        }
+
+        public bool AlterarCategoriasElementos(Guid id, IReadOnlyList<ProjectTableElementCategory> categorias)
+        {
+            ProjectTable? tabela = _document.Tabelas.FirstOrDefault(t => t.Id == id);
+
+            if (tabela == null)
+                return false;
+
+            List<ProjectTableElementCategory> valorNovo = NormalizarCategorias(categorias);
+            List<ProjectTableElementCategory> valorAnterior = NormalizarCategorias(tabela.CategoriasElementos);
+
+            if (valorAnterior.SequenceEqual(valorNovo))
+                return true;
+
+            _commands.Execute(new UpdateProjectTablePropertyCommand<IReadOnlyList<ProjectTableElementCategory>>(
+                _document,
+                tabela,
+                (t, valor) => t.CategoriasElementos = valor.ToList(),
+                valorAnterior,
+                valorNovo));
+
+            return true;
+        }
+
+        public bool AlterarElementosTabela(
+            Guid id,
+            IReadOnlyList<ProjectTableElementCategory> categorias,
+            IReadOnlyList<ProjectTableFieldSelection> campos)
+        {
+            ProjectTable? tabela = _document.Tabelas.FirstOrDefault(t => t.Id == id);
+
+            if (tabela == null)
+                return false;
+
+            List<ProjectTableElementCategory> categoriasNovas = NormalizarCategorias(categorias);
+            List<ProjectTableElementCategory> categoriasAnteriores = NormalizarCategorias(tabela.CategoriasElementos);
+            List<ProjectTableFieldSelection> camposNovos = NormalizarCampos(campos, categoriasNovas);
+            List<ProjectTableFieldSelection> camposAnteriores = NormalizarCampos(tabela.CamposSelecionados, categoriasAnteriores);
+            List<ProjectTableFilterRule> filtrosNovos = NormalizarFiltros(tabela.Filtros, camposNovos);
+            List<ProjectTableFilterRule> filtrosAnteriores = NormalizarFiltros(tabela.Filtros, camposAnteriores);
+
+            if (categoriasAnteriores.SequenceEqual(categoriasNovas) &&
+                CamposIguais(camposAnteriores, camposNovos) &&
+                FiltrosIguais(filtrosAnteriores, filtrosNovos))
+                return true;
+
+            _commands.Execute(new UpdateProjectTableElementsCommand(
+                _document,
+                tabela,
+                categoriasAnteriores,
+                categoriasNovas,
+                camposAnteriores,
+                camposNovos,
+                filtrosAnteriores,
+                filtrosNovos));
+
+            return true;
+        }
+
+        public bool AlterarFiltrosTabela(
+            Guid id,
+            Guid? filtroVistaId,
+            ProjectTableFilterLogicalMode modo,
+            IReadOnlyList<ProjectTableFilterRule> filtros)
+        {
+            ProjectTable? tabela = _document.Tabelas.FirstOrDefault(t => t.Id == id);
+
+            if (tabela == null)
+                return false;
+
+            Guid? filtroVistaNovo = NormalizarFiltroVista(filtroVistaId);
+            Guid? filtroVistaAnterior = NormalizarFiltroVista(tabela.FiltroVistaId);
+            ProjectTableFilterLogicalMode modoNovo = NormalizarModoFiltro(modo);
+            ProjectTableFilterLogicalMode modoAnterior = NormalizarModoFiltro(tabela.ModoFiltro);
+            List<ProjectTableFilterRule> filtrosNovos = NormalizarFiltros(filtros, tabela.CamposSelecionados);
+            List<ProjectTableFilterRule> filtrosAnteriores = NormalizarFiltros(tabela.Filtros, tabela.CamposSelecionados);
+
+            if (filtroVistaAnterior == filtroVistaNovo &&
+                modoAnterior == modoNovo &&
+                FiltrosIguais(filtrosAnteriores, filtrosNovos))
+                return true;
+
+            _commands.Execute(new UpdateProjectTableFiltersCommand(
+                _document,
+                tabela,
+                filtroVistaAnterior,
+                filtroVistaNovo,
+                modoAnterior,
+                modoNovo,
+                filtrosAnteriores,
+                filtrosNovos));
+
+            return true;
+        }
+
+        private static List<ProjectTableElementCategory> NormalizarCategorias(IEnumerable<ProjectTableElementCategory>? categorias)
+        {
+            return (categorias ?? Enumerable.Empty<ProjectTableElementCategory>())
+                .Distinct()
+                .OrderBy(categoria => categoria)
+                .ToList();
+        }
+
+        private static List<ProjectTableFieldSelection> NormalizarCampos(
+            IEnumerable<ProjectTableFieldSelection>? campos,
+            IReadOnlyList<ProjectTableElementCategory> categorias)
+        {
+            HashSet<ProjectTableElementCategory> categoriasPermitidas = categorias.ToHashSet();
+
+            return (campos ?? Enumerable.Empty<ProjectTableFieldSelection>())
+                .Where(c => categoriasPermitidas.Contains(c.Categoria))
+                .Where(c => !string.IsNullOrWhiteSpace(c.CampoId))
+                .OrderBy(c => c.Ordem)
+                .GroupBy(c => new { c.Categoria, CampoId = c.CampoId.Trim() })
+                .Select((g, index) =>
+                {
+                    ProjectTableFieldSelection campo = g.First();
+                    return new ProjectTableFieldSelection
+                    {
+                        Categoria = campo.Categoria,
+                        CampoId = campo.CampoId.Trim(),
+                        NomeExibicao = string.IsNullOrWhiteSpace(campo.NomeExibicao) ? campo.CampoId.Trim() : campo.NomeExibicao.Trim(),
+                        Ordem = index
+                    };
+                })
+                .ToList();
+        }
+
+        private static bool CamposIguais(IReadOnlyList<ProjectTableFieldSelection> a, IReadOnlyList<ProjectTableFieldSelection> b)
+        {
+            if (a.Count != b.Count)
+                return false;
+
+            for (int i = 0; i < a.Count; i++)
+            {
+                if (a[i].Categoria != b[i].Categoria ||
+                    !string.Equals(a[i].CampoId, b[i].CampoId, StringComparison.Ordinal) ||
+                    !string.Equals(a[i].NomeExibicao, b[i].NomeExibicao, StringComparison.Ordinal) ||
+                    a[i].Ordem != b[i].Ordem)
+                    return false;
+            }
+
+            return true;
+        }
+
+        private static ProjectTableFilterLogicalMode NormalizarModoFiltro(ProjectTableFilterLogicalMode modo)
+        {
+            return Enum.IsDefined(typeof(ProjectTableFilterLogicalMode), modo)
+                ? modo
+                : ProjectTableFilterLogicalMode.Todas;
+        }
+
+        private Guid? NormalizarFiltroVista(Guid? filtroVistaId)
+        {
+            if (!filtroVistaId.HasValue || filtroVistaId.Value == Guid.Empty)
+                return null;
+
+            return _document.Vistas.Any(v => v.Id == filtroVistaId.Value)
+                ? filtroVistaId
+                : null;
+        }
+
+        private static List<ProjectTableFilterRule> NormalizarFiltros(
+            IEnumerable<ProjectTableFilterRule>? filtros,
+            IReadOnlyList<ProjectTableFieldSelection> camposSelecionados)
+        {
+            Dictionary<string, ProjectTableFieldSelection> camposPermitidos = camposSelecionados
+                .GroupBy(c => CriarChaveCampo(c.Categoria, c.CampoId))
+                .ToDictionary(g => g.Key, g => g.First(), StringComparer.Ordinal);
+
+            return (filtros ?? Enumerable.Empty<ProjectTableFilterRule>())
+                .Where(f => !string.IsNullOrWhiteSpace(f.CampoId))
+                .OrderBy(f => f.Ordem)
+                .Select(f => new { Filtro = f, Chave = CriarChaveCampo(f.Categoria, f.CampoId) })
+                .Where(item => camposPermitidos.ContainsKey(item.Chave))
+                .Take(5)
+                .Select((item, index) =>
+                {
+                    ProjectTableFieldSelection campo = camposPermitidos[item.Chave];
+                    return new ProjectTableFilterRule
+                    {
+                        Ordem = index,
+                        Categoria = campo.Categoria,
+                        CampoId = campo.CampoId,
+                        NomeExibicao = campo.NomeExibicao,
+                        Operador = Enum.IsDefined(typeof(ProjectTableFilterOperator), item.Filtro.Operador)
+                            ? item.Filtro.Operador
+                            : ProjectTableFilterOperator.Contem,
+                        Valor = item.Filtro.Valor?.Trim() ?? string.Empty
+                    };
+                })
+                .ToList();
+        }
+
+        private static bool FiltrosIguais(IReadOnlyList<ProjectTableFilterRule> a, IReadOnlyList<ProjectTableFilterRule> b)
+        {
+            if (a.Count != b.Count)
+                return false;
+
+            for (int i = 0; i < a.Count; i++)
+            {
+                if (a[i].Ordem != b[i].Ordem ||
+                    a[i].Categoria != b[i].Categoria ||
+                    !string.Equals(a[i].CampoId, b[i].CampoId, StringComparison.Ordinal) ||
+                    !string.Equals(a[i].NomeExibicao, b[i].NomeExibicao, StringComparison.Ordinal) ||
+                    a[i].Operador != b[i].Operador ||
+                    !string.Equals(a[i].Valor, b[i].Valor, StringComparison.Ordinal))
+                    return false;
+            }
+
+            return true;
+        }
+
+        private static string CriarChaveCampo(ProjectTableElementCategory categoria, string campoId)
+        {
+            return $"{categoria}|{campoId.Trim()}";
         }
     }
 }
@@ -6437,1127 +6711,1456 @@ namespace Araci.Core.Documents
 
 
 ====================================================================================================
-ARQUIVO: C:\Users\User\source\repos\lucasffxavier\Araci-front\DTOs\CircuitBuilder.cs
+ARQUIVO: C:\Users\User\source\repos\lucasffxavier\Araci-front\Core\Documents\ProjectTable.cs
 ====================================================================================================
 
 using System;
 using System.Collections.Generic;
-using System.Linq;
-using Araci.Services;
-using Araci.Services.Topology;
 
-namespace Araci.DTOs
+namespace Araci.Core.Documents
 {
-    public class CircuitBuilder
+    public enum ProjectTableElementCategory
     {
-        private const double DefaultBaseKv = 12.47;
-        private readonly ParameterReader _reader;
+        Barras,
+        Cabos,
+        Cargas,
+        Geradores,
+        Transformadores,
+        Sin
+    }
 
-        public CircuitBuilder(ParameterReader reader)
+    public class ProjectTableFieldSelection
+    {
+        public ProjectTableElementCategory Categoria { get; set; }
+        public string CampoId { get; set; } = string.Empty;
+        public string NomeExibicao { get; set; } = string.Empty;
+        public int Ordem { get; set; }
+    }
+
+    public enum ProjectTableFilterLogicalMode
+    {
+        Todas,
+        Qualquer
+    }
+
+    public enum ProjectTableFilterOperator
+    {
+        Contem,
+        NaoContem,
+        ComecaCom,
+        TerminaCom,
+        IgualA,
+        DiferenteDe
+    }
+
+    public class ProjectTableFilterRule
+    {
+        public int Ordem { get; set; }
+        public ProjectTableElementCategory Categoria { get; set; }
+        public string CampoId { get; set; } = string.Empty;
+        public string NomeExibicao { get; set; } = string.Empty;
+        public ProjectTableFilterOperator Operador { get; set; } = ProjectTableFilterOperator.Contem;
+        public string Valor { get; set; } = string.Empty;
+    }
+
+    public class ProjectTable
+    {
+        public Guid Id { get; set; } = Guid.NewGuid();
+        public string Nome { get; set; } = string.Empty;
+        public ProjectViewDiscipline Disciplina { get; set; } = ProjectViewDiscipline.Eletrica;
+        public List<ProjectTableElementCategory> CategoriasElementos { get; set; } = new();
+        public List<ProjectTableFieldSelection> CamposSelecionados { get; set; } = new();
+        public Guid? FiltroVistaId { get; set; }
+        public ProjectTableFilterLogicalMode ModoFiltro { get; set; } = ProjectTableFilterLogicalMode.Todas;
+        public List<ProjectTableFilterRule> Filtros { get; set; } = new();
+    }
+}
+
+
+
+====================================================================================================
+ARQUIVO: C:\Users\User\source\repos\lucasffxavier\Araci-front\Infrastructure\Persistence\ProjectFileDto.cs
+====================================================================================================
+
+using System;
+using System.Collections.Generic;
+using System.Text.Json;
+
+namespace Araci.Infrastructure.Persistence
+{
+    public sealed class ProjectFileDto
+    {
+        public int Version { get; set; }
+        public string? AppName { get; set; }
+        public string? ProjectName { get; set; }
+        public DateTimeOffset? CreatedAt { get; set; }
+        public DateTimeOffset? SavedAt { get; set; }
+        public string? Generator { get; set; }
+        public string? Notes { get; set; }
+        public ProjectUnitSettingsDto? Units { get; set; }
+        public TypeLibrariesDto? TypeLibraries { get; set; }
+        public Guid? ActiveViewId { get; set; }
+        public List<ProjectViewDto> Views { get; set; } = new();
+        public List<ProjectTableDto> Tables { get; set; } = new();
+        public List<ProjectSheetDto> Sheets { get; set; } = new();
+        public List<ElementDto> Elements { get; set; } = new();
+    }
+
+    public sealed class ProjectViewDto
+    {
+        public Guid Id { get; set; }
+        public string Nome { get; set; } = string.Empty;
+        public string Escala { get; set; } = "1:100";
+        public string Disciplina { get; set; } = "Eletrica";
+        public bool RecortarVista { get; set; }
+        public bool? RegiaoRecorteVisivel { get; set; }
+        public double CameraX { get; set; }
+        public double CameraY { get; set; }
+        public double Zoom { get; set; } = 1.0;
+    }
+
+    public sealed class ProjectTableDto
+    {
+        public Guid Id { get; set; }
+        public string Nome { get; set; } = string.Empty;
+        public string Disciplina { get; set; } = "Eletrica";
+        public List<string> CategoriasElementos { get; set; } = new();
+        public List<ProjectTableFieldSelectionDto> CamposSelecionados { get; set; } = new();
+        public Guid? FiltroVistaId { get; set; }
+        public string ModoFiltro { get; set; } = "Todas";
+        public List<ProjectTableFilterRuleDto> Filtros { get; set; } = new();
+    }
+
+    public sealed class ProjectTableFieldSelectionDto
+    {
+        public string Categoria { get; set; } = string.Empty;
+        public string CampoId { get; set; } = string.Empty;
+        public string NomeExibicao { get; set; } = string.Empty;
+        public int Ordem { get; set; }
+    }
+
+    public sealed class ProjectTableFilterRuleDto
+    {
+        public int Ordem { get; set; }
+        public string Categoria { get; set; } = string.Empty;
+        public string CampoId { get; set; } = string.Empty;
+        public string NomeExibicao { get; set; } = string.Empty;
+        public string Operador { get; set; } = string.Empty;
+        public string Valor { get; set; } = string.Empty;
+    }
+
+    public sealed class ProjectSheetDto
+    {
+        public Guid Id { get; set; }
+        public string Nome { get; set; } = string.Empty;
+        public string Numero { get; set; } = string.Empty;
+    }
+
+    public sealed class ProjectMetadataDto
+    {
+        public string AppName { get; set; } = ProjectSerializer.AppName;
+        public string ProjectName { get; set; } = ProjectSerializer.UntitledProjectName;
+        public DateTimeOffset? CreatedAt { get; set; }
+        public DateTimeOffset? SavedAt { get; set; }
+        public string Generator { get; set; } = ProjectSerializer.AppName;
+        public string? Notes { get; set; }
+
+        public static ProjectMetadataDto CreateNew(string projectName)
         {
-            _reader = reader ?? throw new ArgumentNullException(nameof(reader));
-        }
-
-        public CircuitDto Build()
-        {
-            ValidarTopologia();
-
-            IList<ParameterReader.ExternalSourceData> sins = _reader.GetSins();
-            IList<ParameterReader.GeneratorData> generators = _reader.GetGenerators();
-
-            ParameterReader.ExternalSourceData? slackSin = sins.FirstOrDefault();
-            ParameterReader.GeneratorData? slackGenerator = generators.FirstOrDefault();
-
-            if (slackSin == null && slackGenerator == null)
-                throw new InvalidOperationException("Nenhuma fonte slack encontrada no circuito.");
-
-            var dto = new CircuitDto
+            return new ProjectMetadataDto
             {
-                Loads = BuildLoads(),
-                Lines = BuildLines(),
-                Transformers = BuildTransformers(),
-                Generators = BuildGenerators(slackSin != null ? generators : generators.Skip(1)),
-                Slack = slackSin != null ? BuildSlack(slackSin) : BuildSlack(slackGenerator!)
+                AppName = ProjectSerializer.AppName,
+                ProjectName = string.IsNullOrWhiteSpace(projectName) ? ProjectSerializer.UntitledProjectName : projectName,
+                Generator = ProjectSerializer.AppName
             };
+        }
+    }
 
-            Validar(dto);
-            return dto;
+    public sealed class TypeLibrariesDto
+    {
+        public List<TextAnnotationTypeDto> TextAnnotationTypes { get; set; } = new();
+    }
+
+    public sealed class TextAnnotationTypeDto
+    {
+        public string NomeTipo { get; set; } = string.Empty;
+        public string Familia { get; set; } = string.Empty;
+        public string Categoria { get; set; } = string.Empty;
+        public string CorTexto { get; set; } = "#FF000000";
+        public string Fonte { get; set; } = "Arial";
+        public double AlturaTexto { get; set; } = 14.0;
+        public string AlinhamentoHorizontal { get; set; } = "Esquerda";
+        public string LeaderEstiloSeta { get; set; } = "Seta preenchida";
+        public string LeaderCor { get; set; } = "#FF000000";
+        public double LeaderEspessura { get; set; } = 1.2;
+        public double LeaderTamanhoSeta { get; set; } = 10.0;
+    }
+
+    public sealed class ElementDto
+    {
+        public string Kind { get; set; } = string.Empty;
+        public string? DomainRole { get; set; }
+        public Guid Id { get; set; }
+        public Guid? ViewId { get; set; }
+        public double X { get; set; }
+        public double Y { get; set; }
+        public double Rotation { get; set; }
+        public double Scale { get; set; } = 1;
+        public TypeRefDto? Type { get; set; }
+        public List<ParameterDto> Parameters { get; set; } = new();
+        public List<TerminalDto> Terminals { get; set; } = new();
+        public List<PointDto> Vertices { get; set; } = new();
+    }
+
+    public sealed class TypeRefDto
+    {
+        public string NomeTipo { get; set; } = string.Empty;
+        public string Familia { get; set; } = string.Empty;
+        public string Categoria { get; set; } = string.Empty;
+    }
+
+    public sealed class ParameterDto
+    {
+        public string Name { get; set; } = string.Empty;
+        public string Type { get; set; } = string.Empty;
+        public JsonElement Value { get; set; }
+    }
+
+    public sealed class TerminalDto
+    {
+        public string Id { get; set; } = string.Empty;
+        public double X { get; set; }
+        public double Y { get; set; }
+        public string? Barra { get; set; }
+    }
+
+    public sealed class PointDto
+    {
+        public double X { get; set; }
+        public double Y { get; set; }
+    }
+}
+
+
+
+====================================================================================================
+ARQUIVO: C:\Users\User\source\repos\lucasffxavier\Araci-front\Infrastructure\Persistence\ProjectSerializer.cs
+====================================================================================================
+
+using System;
+using System.Collections.Generic;
+using System.IO;
+using System.Linq;
+using System.Text.Json;
+using System.Text.Json.Serialization;
+using System.Windows;
+using Araci.Applications.Abstractions;
+using Araci.Core.Documents;
+using Araci.Core.Viewport;
+using Araci.Models;
+using Araci.Models.Tipos;
+using Araci.Services;
+using Araci.Services.Catalog;
+using Araci.Services.Geometry;
+using Araci.Services.Settings;
+
+namespace Araci.Infrastructure.Persistence
+{
+    public sealed class ProjectSerializer
+    {
+        public const int CurrentVersion = 1;
+        public const string AppName = "Araci Engine";
+        public const string UntitledProjectName = "Sem titulo";
+
+        private readonly ElementRegistryService _elements;
+        private readonly IElementModelFactory _modelFactory;
+        private readonly TerminalLayoutService _terminalLayout;
+        private readonly ElementGeometryService _geometry;
+        private readonly JsonSerializerOptions _jsonOptions = new()
+        {
+            WriteIndented = true,
+            DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull
+        };
+
+        public ProjectSerializer(
+            ElementRegistryService elements,
+            IElementModelFactory modelFactory,
+            TerminalLayoutService terminalLayout,
+            ElementGeometryService geometry)
+        {
+            _elements = elements ?? throw new ArgumentNullException(nameof(elements));
+            _modelFactory = modelFactory ?? throw new ArgumentNullException(nameof(modelFactory));
+            _terminalLayout = terminalLayout ?? throw new ArgumentNullException(nameof(terminalLayout));
+            _geometry = geometry ?? throw new ArgumentNullException(nameof(geometry));
         }
 
-        private IList<LoadDto> BuildLoads()
+        public ProjectFileDto CreateFileDto(
+            AraciDocument document,
+            ProjectMetadataDto metadata,
+            UnitDisplaySettings units)
         {
-            return _reader.GetLoads()
-                .Select(load => new LoadDto
-                {
-                    Id = load.Id,
-                    Nome = SafeName(load.Nome, "Carga"),
-                    Barra = SafeBus(load.Barra, load.Nome),
-                    Fases = SafePhases(load.Fases),
-                    R = load.R,
-                    X = load.X,
-                    PotenciaAtiva = load.PotenciaAtiva > 0 ? load.PotenciaAtiva : 800,
-                    PotenciaReativa = load.PotenciaReativa >= 0 ? load.PotenciaReativa : 300,
-                    Tensao = SafeKv(load.Tensao),
-                    Conexao = string.IsNullOrWhiteSpace(load.Conexao) ? "Wye" : load.Conexao,
-                    Modelo = load.Modelo > 0 ? load.Modelo : 1
-                })
+            ArgumentNullException.ThrowIfNull(document);
+            ArgumentNullException.ThrowIfNull(metadata);
+            ArgumentNullException.ThrowIfNull(units);
+
+            return new ProjectFileDto
+            {
+                Version = CurrentVersion,
+                AppName = metadata.AppName,
+                ProjectName = metadata.ProjectName,
+                CreatedAt = metadata.CreatedAt,
+                SavedAt = metadata.SavedAt,
+                Generator = metadata.Generator,
+                Notes = metadata.Notes,
+                Units = CreateUnitSettingsDto(units),
+                TypeLibraries = CreateTypeLibrariesDto(),
+                ActiveViewId = document.VistaAtivaId,
+                Views = document.Vistas
+                    .Select(CriarProjectViewDto)
+                    .ToList(),
+                Tables = document.Tabelas
+                    .Select(t => CriarProjectTableDto(t, document.Vistas.Select(v => v.Id)))
+                    .ToList(),
+                Sheets = document.Pranchas
+                    .Select(CriarProjectSheetDto)
+                    .ToList(),
+                Elements = document.Elementos
+                    .Select(CriarElementoDto)
+                    .ToList()
+            };
+        }
+
+        public ProjectUnitSettingsDto CreateUnitSettingsDto(UnitDisplaySettings units)
+        {
+            ArgumentNullException.ThrowIfNull(units);
+
+            return new ProjectUnitSettingsDto
+            {
+                Length = units.Length.ToString(),
+                Voltage = units.Voltage.ToString(),
+                Current = units.Current.ToString(),
+                ActivePower = units.ActivePower.ToString(),
+                ReactivePower = units.ReactivePower.ToString(),
+                ApparentPower = units.ApparentPower.ToString(),
+                Percent = units.Percent.ToString()
+            };
+        }
+
+        public void ApplyUnitSettings(ProjectUnitSettingsDto? dto, UnitDisplaySettings target)
+        {
+            ArgumentNullException.ThrowIfNull(target);
+
+            var defaults = new UnitDisplaySettings();
+
+            target.Length = ParseUnit(dto?.Length, UnitQuantityKind.Length, defaults.Length);
+            target.Voltage = ParseUnit(dto?.Voltage, UnitQuantityKind.Voltage, defaults.Voltage);
+            target.Current = ParseUnit(dto?.Current, UnitQuantityKind.Current, defaults.Current);
+            target.ActivePower = ParseUnit(dto?.ActivePower, UnitQuantityKind.ActivePower, defaults.ActivePower);
+            target.ReactivePower = ParseUnit(dto?.ReactivePower, UnitQuantityKind.ReactivePower, defaults.ReactivePower);
+            target.ApparentPower = ParseUnit(dto?.ApparentPower, UnitQuantityKind.ApparentPower, defaults.ApparentPower);
+            target.Percent = ParseUnit(dto?.Percent, UnitQuantityKind.Percent, defaults.Percent);
+        }
+
+        public void ApplyTypeLibraries(TypeLibrariesDto? dto)
+        {
+            IEnumerable<TextAnnotationTypeDto> textTypes = dto?.TextAnnotationTypes != null && dto.TextAnnotationTypes.Count > 0
+                ? dto.TextAnnotationTypes
+                : CreateDefaultTextAnnotationTypeDtos();
+
+            List<TipoTextoAnotativo> tipos = textTypes
+                .Select(CriarTipoTextoAnotativo)
+                .Where(t => !string.IsNullOrWhiteSpace(t.NomeTipo))
+                .GroupBy(CriarChaveTipo, StringComparer.OrdinalIgnoreCase)
+                .Select(g => g.Last())
+                .ToList();
+
+            if (tipos.Count == 0)
+                tipos = CreateDefaultTextAnnotationTypeDtos().Select(CriarTipoTextoAnotativo).ToList();
+
+            _elements.ReplaceTypes(ElementKinds.TextoAnotativo, tipos);
+        }
+
+        public IReadOnlyList<Elemento> CreateElements(ProjectFileDto dto)
+        {
+            ArgumentNullException.ThrowIfNull(dto);
+
+            return dto.Elements
+                .Select(CriarElemento)
+                .Where(e => e != null)
+                .Cast<Elemento>()
                 .ToList();
         }
 
-        private IList<LineDto> BuildLines()
+        public IReadOnlyList<ProjectView> CreateProjectViews(ProjectFileDto dto)
         {
-            return _reader.GetLines()
-                .Select(line =>
-                {
-                    double r1 = line.R1 > 0 ? line.R1 : 0.1;
-                    double x1 = line.X1 > 0 ? line.X1 : 0.2;
+            ArgumentNullException.ThrowIfNull(dto);
 
-                    return new LineDto
+            return dto.Views
+                .Select(CriarProjectView)
+                .Where(v => v != null)
+                .Cast<ProjectView>()
+                .ToList();
+        }
+
+        public IReadOnlyList<ProjectTable> CreateProjectTables(ProjectFileDto dto)
+        {
+            ArgumentNullException.ThrowIfNull(dto);
+
+            return dto.Tables
+                .Select(t => CriarProjectTable(t, dto.Views.Select(v => v.Id)))
+                .Where(t => t != null)
+                .Cast<ProjectTable>()
+                .ToList();
+        }
+
+        public IReadOnlyList<ProjectSheet> CreateProjectSheets(ProjectFileDto dto)
+        {
+            ArgumentNullException.ThrowIfNull(dto);
+
+            return dto.Sheets
+                .Select(CriarProjectSheet)
+                .Where(s => s != null)
+                .Cast<ProjectSheet>()
+                .ToList();
+        }
+
+        public Guid? GetActiveViewId(ProjectFileDto dto)
+        {
+            ArgumentNullException.ThrowIfNull(dto);
+
+            return dto.ActiveViewId;
+        }
+
+        public string Serialize(ProjectFileDto dto)
+        {
+            return JsonSerializer.Serialize(dto, _jsonOptions);
+        }
+
+        public ProjectFileDto Deserialize(string json)
+        {
+            return JsonSerializer.Deserialize<ProjectFileDto>(json, _jsonOptions)
+                ?? new ProjectFileDto();
+        }
+
+        public ProjectMetadataDto PrepareMetadataForSave(
+            ProjectMetadataDto currentMetadata,
+            string path,
+            DateTimeOffset savedAt)
+        {
+            ArgumentNullException.ThrowIfNull(currentMetadata);
+
+            string projectName = NomeProjetoParaSalvar(currentMetadata, path);
+
+            return new ProjectMetadataDto
+            {
+                AppName = AppName,
+                ProjectName = projectName,
+                CreatedAt = currentMetadata.CreatedAt ?? savedAt,
+                SavedAt = savedAt,
+                Generator = AppName,
+                Notes = currentMetadata.Notes
+            };
+        }
+
+        public ProjectMetadataDto CreateMetadataFromFile(ProjectFileDto dto, string path)
+        {
+            DateTimeOffset now = DateTimeOffset.UtcNow;
+            string projectName = string.IsNullOrWhiteSpace(dto.ProjectName)
+                ? Path.GetFileNameWithoutExtension(path)
+                : dto.ProjectName;
+
+            return new ProjectMetadataDto
+            {
+                AppName = string.IsNullOrWhiteSpace(dto.AppName) ? AppName : dto.AppName,
+                ProjectName = string.IsNullOrWhiteSpace(projectName) ? UntitledProjectName : projectName,
+                CreatedAt = dto.CreatedAt ?? dto.SavedAt ?? now,
+                SavedAt = dto.SavedAt ?? now,
+                Generator = string.IsNullOrWhiteSpace(dto.Generator) ? AppName : dto.Generator,
+                Notes = dto.Notes
+            };
+        }
+
+        public int GetVersion(ProjectFileDto dto)
+        {
+            return dto.Version <= 0 ? 1 : dto.Version;
+        }
+
+        private TypeLibrariesDto CreateTypeLibrariesDto()
+        {
+            return new TypeLibrariesDto
+            {
+                TextAnnotationTypes = _elements.GetTypes(ElementKinds.TextoAnotativo)
+                    .OfType<TipoTextoAnotativo>()
+                    .Select(CriarTextAnnotationTypeDto)
+                    .ToList()
+            };
+        }
+
+        private static IEnumerable<TextAnnotationTypeDto> CreateDefaultTextAnnotationTypeDtos()
+        {
+            yield return new TextAnnotationTypeDto { NomeTipo = "Texto padrão", Familia = "Anotações", Categoria = "Textos", CorTexto = "#FF000000", Fonte = "Arial", AlturaTexto = 14.0, AlinhamentoHorizontal = "Esquerda", LeaderEstiloSeta = "Seta preenchida", LeaderCor = "#FF000000", LeaderEspessura = 1.2, LeaderTamanhoSeta = 10.0 };
+            yield return new TextAnnotationTypeDto { NomeTipo = "Texto pequeno", Familia = "Anotações", Categoria = "Textos", CorTexto = "#FF000000", Fonte = "Arial", AlturaTexto = 10.0, AlinhamentoHorizontal = "Esquerda", LeaderEstiloSeta = "Seta preenchida", LeaderCor = "#FF000000", LeaderEspessura = 1.2, LeaderTamanhoSeta = 10.0 };
+            yield return new TextAnnotationTypeDto { NomeTipo = "Texto título", Familia = "Anotações", Categoria = "Textos", CorTexto = "#FF000000", Fonte = "Arial", AlturaTexto = 20.0, AlinhamentoHorizontal = "Centro", LeaderEstiloSeta = "Seta preenchida", LeaderCor = "#FF000000", LeaderEspessura = 1.2, LeaderTamanhoSeta = 10.0 };
+        }
+
+        private static TextAnnotationTypeDto CriarTextAnnotationTypeDto(TipoTextoAnotativo tipo)
+        {
+            return new TextAnnotationTypeDto
+            {
+                NomeTipo = tipo.NomeTipo,
+                Familia = tipo.Familia,
+                Categoria = tipo.Categoria,
+                CorTexto = tipo.CorTexto,
+                Fonte = tipo.Fonte,
+                AlturaTexto = tipo.AlturaTexto,
+                AlinhamentoHorizontal = tipo.AlinhamentoHorizontal,
+                LeaderEstiloSeta = tipo.LeaderEstiloSeta,
+                LeaderCor = tipo.LeaderCor,
+                LeaderEspessura = tipo.LeaderEspessura,
+                LeaderTamanhoSeta = tipo.LeaderTamanhoSeta
+            };
+        }
+
+        private static TipoTextoAnotativo CriarTipoTextoAnotativo(TextAnnotationTypeDto dto)
+        {
+            var tipo = new TipoTextoAnotativo
+            {
+                NomeTipo = string.IsNullOrWhiteSpace(dto.NomeTipo) ? "Texto padrão" : dto.NomeTipo.Trim(),
+                Familia = string.IsNullOrWhiteSpace(dto.Familia) ? "Anotações" : dto.Familia.Trim(),
+                Categoria = string.IsNullOrWhiteSpace(dto.Categoria) ? "Textos" : dto.Categoria.Trim()
+            };
+
+            tipo.CorTexto = dto.CorTexto;
+            tipo.Fonte = dto.Fonte;
+            tipo.AlturaTexto = dto.AlturaTexto;
+            tipo.AlinhamentoHorizontal = dto.AlinhamentoHorizontal;
+            tipo.LeaderEstiloSeta = dto.LeaderEstiloSeta;
+            tipo.LeaderCor = dto.LeaderCor;
+            tipo.LeaderEspessura = dto.LeaderEspessura;
+            tipo.LeaderTamanhoSeta = dto.LeaderTamanhoSeta;
+            return tipo;
+        }
+
+        private static string CriarChaveTipo(TipoTextoAnotativo tipo)
+        {
+            return $"{tipo.NomeTipo.Trim()}|{tipo.Familia.Trim()}|{tipo.Categoria.Trim()}";
+        }
+
+        private static UnitKind ParseUnit(string? value, UnitQuantityKind quantity, UnitKind fallback)
+        {
+            if (string.IsNullOrWhiteSpace(value))
+                return fallback;
+
+            if (!Enum.TryParse(value, ignoreCase: true, out UnitKind unit))
+                return fallback;
+
+            return UnitFormatter.GetQuantity(unit) == quantity ? unit : fallback;
+        }
+
+        private static string NomeProjetoParaSalvar(ProjectMetadataDto metadata, string path)
+        {
+            if (!string.IsNullOrWhiteSpace(metadata.ProjectName) &&
+                !string.Equals(metadata.ProjectName, UntitledProjectName, StringComparison.OrdinalIgnoreCase))
+            {
+                return metadata.ProjectName;
+            }
+
+            string name = Path.GetFileNameWithoutExtension(path);
+            return string.IsNullOrWhiteSpace(name) ? UntitledProjectName : name;
+        }
+
+        private ElementDto CriarElementoDto(Elemento elemento)
+        {
+            return new ElementDto
+            {
+                Kind = ObterKind(elemento),
+                DomainRole = elemento.DomainRole.ToString(),
+                Id = elemento.Id,
+                ViewId = elemento.ViewId,
+                X = elemento.PosicaoX,
+                Y = elemento.PosicaoY,
+                Rotation = elemento.Rotacao,
+                Scale = elemento.Escala,
+                Type = CriarTypeRef(elemento.Tipo),
+                Parameters = elemento.Parametros.Values
+                    .Select(CriarParameterDto)
+                    .ToList(),
+                Terminals = (elemento as ITerminalOwner)?.Terminais
+                    .Select(CriarTerminalDto)
+                    .ToList() ?? new List<TerminalDto>(),
+                Vertices = elemento is Cabo cabo
+                    ? cabo.Vertices.Select(CriarPointDto).ToList()
+                    : new List<PointDto>()
+            };
+        }
+
+        private static ProjectViewDto CriarProjectViewDto(ProjectView vista)
+        {
+            return new ProjectViewDto
+            {
+                Id = vista.Id,
+                Nome = vista.Nome,
+                Escala = vista.Escala,
+                Disciplina = vista.Disciplina.ToString(),
+                RecortarVista = vista.RecortarVista,
+                RegiaoRecorteVisivel = vista.RegiaoRecorteVisivel,
+                CameraX = vista.CameraX,
+                CameraY = vista.CameraY,
+                Zoom = vista.Zoom
+            };
+        }
+
+        private static ProjectTableDto CriarProjectTableDto(ProjectTable tabela, IEnumerable<Guid> vistasIds)
+        {
+            List<ProjectTableFieldSelection> campos = NormalizarProjectTableFields(tabela.CamposSelecionados, tabela.CategoriasElementos);
+            Guid? filtroVistaId = NormalizarProjectTableViewFilter(tabela.FiltroVistaId, vistasIds);
+
+            return new ProjectTableDto
+            {
+                Id = tabela.Id,
+                Nome = tabela.Nome,
+                Disciplina = tabela.Disciplina.ToString(),
+                CategoriasElementos = tabela.CategoriasElementos
+                    .Distinct()
+                    .Select(c => c.ToString())
+                    .ToList(),
+                CamposSelecionados = campos
+                    .Select(c => new ProjectTableFieldSelectionDto
                     {
-                        Id = line.Id,
-                        Nome = SafeName(line.Nome, "L1"),
-                        Barra1 = line.Barra1?.Trim() ?? string.Empty,
-                        Barra2 = line.Barra2?.Trim() ?? string.Empty,
-                        Fases = SafePhases(line.Fases),
-                        Comprimento = line.Comprimento > 0 ? line.Comprimento : 1,
-                        R1 = r1,
-                        X1 = x1,
-                        R0 = line.R0 > 0 ? line.R0 : 3 * r1,
-                        X0 = line.X0 > 0 ? line.X0 : 3 * x1,
-                        C1 = line.C1 > 0 ? line.C1 : 3.4,
-                        C0 = line.C0 > 0 ? line.C0 : 1.6
+                        Categoria = c.Categoria.ToString(),
+                        CampoId = c.CampoId,
+                        NomeExibicao = c.NomeExibicao,
+                        Ordem = c.Ordem
+                    })
+                    .ToList(),
+                FiltroVistaId = filtroVistaId,
+                ModoFiltro = tabela.ModoFiltro.ToString(),
+                Filtros = NormalizarProjectTableFilters(tabela.Filtros, campos)
+                    .Select(f => new ProjectTableFilterRuleDto
+                    {
+                        Ordem = f.Ordem,
+                        Categoria = f.Categoria.ToString(),
+                        CampoId = f.CampoId,
+                        NomeExibicao = f.NomeExibicao,
+                        Operador = f.Operador.ToString(),
+                        Valor = f.Valor
+                    })
+                    .ToList()
+            };
+        }
+
+        private static ProjectSheetDto CriarProjectSheetDto(ProjectSheet prancha)
+        {
+            return new ProjectSheetDto
+            {
+                Id = prancha.Id,
+                Nome = prancha.Nome,
+                Numero = prancha.Numero
+            };
+        }
+
+        private static ProjectView? CriarProjectView(ProjectViewDto dto)
+        {
+            if (string.IsNullOrWhiteSpace(dto.Nome))
+                return null;
+
+            return new ProjectView
+            {
+                Id = dto.Id == Guid.Empty ? Guid.NewGuid() : dto.Id,
+                Nome = dto.Nome,
+                Escala = NormalizarTextoVista(dto.Escala, "1:100"),
+                Disciplina = ParseEnum(dto.Disciplina, ProjectViewDiscipline.Eletrica),
+                RecortarVista = dto.RecortarVista,
+                RegiaoRecorteVisivel = dto.RegiaoRecorteVisivel ?? true,
+                CameraX = NormalizarCoordenadaCamera(dto.CameraX),
+                CameraY = NormalizarCoordenadaCamera(dto.CameraY),
+                Zoom = NormalizarZoomVista(dto.Zoom)
+            };
+        }
+
+        private static ProjectTable? CriarProjectTable(ProjectTableDto dto, IEnumerable<Guid> vistasIds)
+        {
+            if (string.IsNullOrWhiteSpace(dto.Nome))
+                return null;
+
+            List<ProjectTableElementCategory> categorias = ParseProjectTableElementCategories(dto.CategoriasElementos);
+            List<ProjectTableFieldSelection> campos = ParseProjectTableFields(dto.CamposSelecionados, categorias);
+
+            return new ProjectTable
+            {
+                Id = dto.Id == Guid.Empty ? Guid.NewGuid() : dto.Id,
+                Nome = dto.Nome,
+                Disciplina = ParseEnum(dto.Disciplina, ProjectViewDiscipline.Eletrica),
+                CategoriasElementos = categorias,
+                CamposSelecionados = campos,
+                FiltroVistaId = NormalizarProjectTableViewFilter(dto.FiltroVistaId, vistasIds),
+                ModoFiltro = ParseEnum(dto.ModoFiltro, ProjectTableFilterLogicalMode.Todas),
+                Filtros = ParseProjectTableFilters(dto.Filtros, campos)
+            };
+        }
+
+        private static ProjectSheet? CriarProjectSheet(ProjectSheetDto dto)
+        {
+            if (string.IsNullOrWhiteSpace(dto.Nome))
+                return null;
+
+            return new ProjectSheet
+            {
+                Id = dto.Id == Guid.Empty ? Guid.NewGuid() : dto.Id,
+                Nome = dto.Nome,
+                Numero = dto.Numero ?? string.Empty
+            };
+        }
+
+        private Elemento? CriarElemento(ElementDto dto)
+        {
+            Elemento? elemento = _modelFactory.CreateModel(dto.Kind);
+
+            if (elemento == null)
+                return null;
+
+            elemento.Id = dto.Id == Guid.Empty ? Guid.NewGuid() : dto.Id;
+            elemento.ViewId = dto.ViewId;
+            elemento.PosicaoX = NormalizarCoordenada(dto.X);
+            elemento.PosicaoY = NormalizarCoordenada(dto.Y);
+            elemento.Rotacao = NormalizarRotacao(dto.Rotation);
+            elemento.Escala = dto.Scale == 0 ? 1 : dto.Scale;
+            elemento.Tipo = ResolverTipo(dto.Kind, dto.Type);
+
+            AplicarParametros(elemento, dto.Parameters);
+            NormalizarParametros(elemento);
+            AplicarVertices(elemento, dto.Vertices);
+            _terminalLayout.AtualizarTerminais(elemento);
+            RestaurarTerminais(elemento, dto.Terminals);
+
+            return elemento;
+        }
+
+        private void AplicarParametros(Elemento elemento, IEnumerable<ParameterDto> parametros)
+        {
+            foreach (ParameterDto dto in parametros)
+            {
+                if (!elemento.PossuiParametro(dto.Name))
+                    continue;
+
+                Parameter parameter = elemento.Parametros[dto.Name];
+                parameter.ValorObjeto = ConverterValor(dto, parameter.Tipo);
+            }
+        }
+
+        private static void NormalizarParametros(Elemento elemento)
+        {
+            if (elemento is Barra barra)
+                barra.Altura = barra.Altura;
+
+            if (elemento is TextoAnotativo texto)
+                NormalizarTextoAnotativo(texto);
+        }
+
+        private static void NormalizarTextoAnotativo(TextoAnotativo texto)
+        {
+            texto.Texto = texto.Texto;
+            texto.LarguraCaixa = texto.LarguraCaixa;
+            texto.Rotacao = NormalizarRotacao(texto.Rotacao);
+            texto.LeaderAtivo = texto.LeaderAtivo;
+            texto.LeaderX = NormalizarCoordenada(texto.LeaderX);
+            texto.LeaderY = NormalizarCoordenada(texto.LeaderY);
+            texto.LeaderComCotovelo = texto.LeaderComCotovelo;
+            texto.LeaderCotoveloX = NormalizarCoordenada(texto.LeaderCotoveloX);
+            texto.LeaderCotoveloY = NormalizarCoordenada(texto.LeaderCotoveloY);
+            texto.LeaderCotoveloManual = texto.LeaderCotoveloManual;
+        }
+
+        private static object? ConverterValor(ParameterDto dto, Type destino)
+        {
+            if (dto.Value.ValueKind is JsonValueKind.Null or JsonValueKind.Undefined)
+                return null;
+
+            if (destino == typeof(string))
+                return dto.Value.ValueKind == JsonValueKind.String
+                    ? dto.Value.GetString() ?? string.Empty
+                    : dto.Value.ToString();
+
+            if (destino == typeof(int))
+                return dto.Value.ValueKind == JsonValueKind.Number && dto.Value.TryGetInt32(out int i)
+                    ? i
+                    : 0;
+
+            if (destino == typeof(double))
+                return dto.Value.ValueKind == JsonValueKind.Number && dto.Value.TryGetDouble(out double d)
+                    ? d
+                    : 0.0;
+
+            if (destino == typeof(bool))
+                return dto.Value.ValueKind == JsonValueKind.True || dto.Value.ValueKind == JsonValueKind.False
+                    ? dto.Value.GetBoolean()
+                    : false;
+
+            if (destino == typeof(Guid))
+                return dto.Value.ValueKind == JsonValueKind.String && dto.Value.TryGetGuid(out Guid guid)
+                    ? guid
+                    : Guid.Empty;
+
+            return dto.Value.ToString();
+        }
+
+        private void AplicarVertices(Elemento elemento, IEnumerable<PointDto> vertices)
+        {
+            if (elemento is not Cabo cabo)
+                return;
+
+            cabo.Vertices.Clear();
+
+            foreach (PointDto p in vertices)
+                cabo.Vertices.Add(new Point(p.X, p.Y));
+
+            cabo.PreviewPonto = null;
+
+            if (cabo.Vertices.Count > 0)
+                cabo.DefinirOrigem(cabo.Vertices[0]);
+
+            if (cabo.Vertices.Count > 1)
+                cabo.DefinirDestino(cabo.Vertices[^1]);
+        }
+
+        private void RestaurarTerminais(Elemento elemento, IEnumerable<TerminalDto> terminais)
+        {
+            if (elemento is not ITerminalOwner owner)
+                return;
+
+            Size tamanho = _geometry.ObterTamanho(elemento);
+
+            foreach (TerminalDto dto in terminais)
+            {
+                Terminal? terminal = owner.Terminais.FirstOrDefault(t =>
+                    string.Equals(t.Id, dto.Id, StringComparison.OrdinalIgnoreCase));
+
+                if (terminal == null)
+                    continue;
+
+                if (elemento is Cabo || tamanho.IsEmpty)
+                    terminal.DefinirPosicaoVisual(new Point(dto.X, dto.Y));
+                else
+                    terminal.DefinirPosicaoVisual(new Point(dto.X, dto.Y), tamanho.Width, tamanho.Height);
+
+                terminal.Barra = dto.Barra;
+            }
+        }
+
+        private TipoElemento? ResolverTipo(string kind, TypeRefDto? dto)
+        {
+            return _elements.ResolveType(
+                kind,
+                dto?.NomeTipo,
+                dto?.Familia,
+                dto?.Categoria);
+        }
+
+        private string ObterKind(Elemento elemento)
+        {
+            return _elements.GetKind(elemento);
+        }
+
+        private static TypeRefDto? CriarTypeRef(TipoElemento? tipo)
+        {
+            return tipo == null
+                ? null
+                : new TypeRefDto
+                {
+                    NomeTipo = tipo.NomeTipo,
+                    Familia = tipo.Familia,
+                    Categoria = tipo.Categoria
+                };
+        }
+
+        private static ParameterDto CriarParameterDto(Parameter parameter)
+        {
+            return new ParameterDto
+            {
+                Name = parameter.Nome,
+                Type = parameter.Tipo.FullName ?? parameter.Tipo.Name,
+                Value = JsonSerializer.SerializeToElement(parameter.ValorObjeto, parameter.Tipo)
+            };
+        }
+
+        private static TerminalDto CriarTerminalDto(Terminal terminal)
+        {
+            return new TerminalDto
+            {
+                Id = terminal.Id,
+                X = terminal.Posicao.X,
+                Y = terminal.Posicao.Y,
+                Barra = terminal.Barra
+            };
+        }
+
+        private static PointDto CriarPointDto(Point point)
+        {
+            return new PointDto { X = point.X, Y = point.Y };
+        }
+
+        private static double NormalizarRotacao(double valor)
+        {
+            if (double.IsNaN(valor) || double.IsInfinity(valor))
+                return 0;
+
+            double normalizada = valor % 360;
+
+            if (normalizada < 0)
+                normalizada += 360;
+
+            return normalizada >= 360 ? 0 : normalizada;
+        }
+
+        private static double NormalizarCoordenada(double valor)
+        {
+            return double.IsNaN(valor) || double.IsInfinity(valor) ? 0.0 : valor;
+        }
+
+        private static double NormalizarCoordenadaCamera(double valor)
+        {
+            return double.IsNaN(valor) || double.IsInfinity(valor) ? 0.0 : valor;
+        }
+
+        private static double NormalizarZoomVista(double valor)
+        {
+            if (double.IsNaN(valor) || double.IsInfinity(valor) || valor <= 0)
+                return Camera.DefaultZoom;
+
+            return Math.Max(Camera.MinZoom, Math.Min(Camera.MaxZoom, valor));
+        }
+
+        private static string NormalizarTextoVista(string? valor, string fallback)
+        {
+            return string.IsNullOrWhiteSpace(valor) ? fallback : valor.Trim();
+        }
+
+        private static TEnum ParseEnum<TEnum>(string? valor, TEnum fallback)
+            where TEnum : struct
+        {
+            return Enum.TryParse(valor, ignoreCase: true, out TEnum convertido)
+                ? convertido
+                : fallback;
+        }
+
+        private static List<ProjectTableElementCategory> ParseProjectTableElementCategories(IEnumerable<string>? valores)
+        {
+            if (valores == null)
+                return new List<ProjectTableElementCategory>();
+
+            return valores
+                .Select(valor => Enum.TryParse(valor, ignoreCase: true, out ProjectTableElementCategory categoria)
+                    ? (ProjectTableElementCategory?)categoria
+                    : null)
+                .Where(categoria => categoria.HasValue)
+                .Select(categoria => categoria!.Value)
+                .Distinct()
+                .OrderBy(categoria => categoria)
+                .ToList();
+        }
+
+        private static List<ProjectTableFieldSelection> ParseProjectTableFields(
+            IEnumerable<ProjectTableFieldSelectionDto>? valores,
+            IReadOnlyList<ProjectTableElementCategory> categorias)
+        {
+            if (valores == null)
+                return new List<ProjectTableFieldSelection>();
+
+            HashSet<ProjectTableElementCategory> categoriasPermitidas = categorias.ToHashSet();
+
+            return NormalizarProjectTableFields(
+                valores
+                    .Where(v => !string.IsNullOrWhiteSpace(v.CampoId))
+                    .Select(v => Enum.TryParse(v.Categoria, ignoreCase: true, out ProjectTableElementCategory categoria)
+                        ? new ProjectTableFieldSelection
+                        {
+                            Categoria = categoria,
+                            CampoId = v.CampoId.Trim(),
+                            NomeExibicao = string.IsNullOrWhiteSpace(v.NomeExibicao) ? v.CampoId.Trim() : v.NomeExibicao.Trim(),
+                            Ordem = v.Ordem
+                        }
+                        : null)
+                    .Where(v => v != null)
+                    .Cast<ProjectTableFieldSelection>(),
+                categoriasPermitidas);
+        }
+
+        private static List<ProjectTableFieldSelection> NormalizarProjectTableFields(
+            IEnumerable<ProjectTableFieldSelection>? campos,
+            IEnumerable<ProjectTableElementCategory> categorias)
+        {
+            HashSet<ProjectTableElementCategory> categoriasPermitidas = categorias.ToHashSet();
+
+            return (campos ?? Enumerable.Empty<ProjectTableFieldSelection>())
+                .Where(c => categoriasPermitidas.Contains(c.Categoria))
+                .Where(c => !string.IsNullOrWhiteSpace(c.CampoId))
+                .OrderBy(c => c.Ordem)
+                .GroupBy(c => new { c.Categoria, CampoId = c.CampoId.Trim() })
+                .Select((g, index) =>
+                {
+                    ProjectTableFieldSelection campo = g.First();
+                    return new ProjectTableFieldSelection
+                    {
+                        Categoria = campo.Categoria,
+                        CampoId = campo.CampoId.Trim(),
+                        NomeExibicao = string.IsNullOrWhiteSpace(campo.NomeExibicao) ? campo.CampoId.Trim() : campo.NomeExibicao.Trim(),
+                        Ordem = index
                     };
                 })
                 .ToList();
         }
 
-        private IList<TransformerDto> BuildTransformers()
+        private static Guid? NormalizarProjectTableViewFilter(Guid? filtroVistaId, IEnumerable<Guid> vistasIds)
         {
-            return _reader.GetTransformers()
-                .Select(transformer => new TransformerDto
+            if (!filtroVistaId.HasValue || filtroVistaId.Value == Guid.Empty)
+                return null;
+
+            HashSet<Guid> vistasValidas = vistasIds.ToHashSet();
+
+            return vistasValidas.Contains(filtroVistaId.Value)
+                ? filtroVistaId
+                : null;
+        }
+
+        private static List<ProjectTableFilterRule> ParseProjectTableFilters(
+            IEnumerable<ProjectTableFilterRuleDto>? valores,
+            IReadOnlyList<ProjectTableFieldSelection> camposSelecionados)
+        {
+            if (valores == null)
+                return new List<ProjectTableFilterRule>();
+
+            return NormalizarProjectTableFilters(
+                valores
+                    .Where(v => !string.IsNullOrWhiteSpace(v.CampoId))
+                    .Select(v => Enum.TryParse(v.Categoria, ignoreCase: true, out ProjectTableElementCategory categoria)
+                        ? new ProjectTableFilterRule
+                        {
+                            Ordem = v.Ordem,
+                            Categoria = categoria,
+                            CampoId = v.CampoId.Trim(),
+                            NomeExibicao = string.IsNullOrWhiteSpace(v.NomeExibicao) ? v.CampoId.Trim() : v.NomeExibicao.Trim(),
+                            Operador = ParseEnum(v.Operador, ProjectTableFilterOperator.Contem),
+                            Valor = v.Valor?.Trim() ?? string.Empty
+                        }
+                        : null)
+                    .Where(v => v != null)
+                    .Cast<ProjectTableFilterRule>(),
+                camposSelecionados);
+        }
+
+        private static List<ProjectTableFilterRule> NormalizarProjectTableFilters(
+            IEnumerable<ProjectTableFilterRule>? filtros,
+            IReadOnlyList<ProjectTableFieldSelection> camposSelecionados)
+        {
+            Dictionary<string, ProjectTableFieldSelection> camposPermitidos = camposSelecionados
+                .GroupBy(c => CriarChaveCampoTabela(c.Categoria, c.CampoId))
+                .ToDictionary(g => g.Key, g => g.First(), StringComparer.Ordinal);
+
+            return (filtros ?? Enumerable.Empty<ProjectTableFilterRule>())
+                .Where(f => !string.IsNullOrWhiteSpace(f.CampoId))
+                .OrderBy(f => f.Ordem)
+                .Select(f => new { Filtro = f, Chave = CriarChaveCampoTabela(f.Categoria, f.CampoId) })
+                .Where(item => camposPermitidos.ContainsKey(item.Chave))
+                .Take(5)
+                .Select((item, index) =>
                 {
-                    Id = transformer.Id,
-                    Nome = transformer.Nome,
-                    Fases = SafePhases(transformer.Fases),
-                    Enrolamentos = transformer.Enrolamentos > 0 ? transformer.Enrolamentos : 2,
-                    BarraPrimario = transformer.BarraPrimario?.Trim() ?? string.Empty,
-                    BarraSecundario = transformer.BarraSecundario?.Trim() ?? string.Empty,
-                    TensaoPrimarioKV = SafeKv(transformer.TensaoPrimarioKV),
-                    TensaoSecundarioKV = SafeKv(transformer.TensaoSecundarioKV),
-                    PotenciaKVA = transformer.PotenciaKVA > 0 ? transformer.PotenciaKVA : 500,
-                    RPercentual = transformer.RPercentual >= 0 ? transformer.RPercentual : 1,
-                    XPercentual = transformer.XPercentual >= 0 ? transformer.XPercentual : 5,
-                    LigacaoPrimario = string.IsNullOrWhiteSpace(transformer.LigacaoPrimario) ? "Wye" : transformer.LigacaoPrimario,
-                    LigacaoSecundario = string.IsNullOrWhiteSpace(transformer.LigacaoSecundario) ? "Wye" : transformer.LigacaoSecundario
+                    ProjectTableFieldSelection campo = camposPermitidos[item.Chave];
+                    return new ProjectTableFilterRule
+                    {
+                        Ordem = index,
+                        Categoria = campo.Categoria,
+                        CampoId = campo.CampoId,
+                        NomeExibicao = campo.NomeExibicao,
+                        Operador = Enum.IsDefined(typeof(ProjectTableFilterOperator), item.Filtro.Operador)
+                            ? item.Filtro.Operador
+                            : ProjectTableFilterOperator.Contem,
+                        Valor = item.Filtro.Valor?.Trim() ?? string.Empty
+                    };
                 })
                 .ToList();
         }
 
-        private static IList<GeneratorDto> BuildGenerators(IEnumerable<ParameterReader.GeneratorData> generators)
+        private static string CriarChaveCampoTabela(ProjectTableElementCategory categoria, string campoId)
         {
-            return generators
-                .Select(generator => new GeneratorDto
-                {
-                    Id = generator.Id,
-                    Nome = SafeName(generator.Nome, "Gerador"),
-                    Barra = SafeBus(generator.Barra, generator.Nome),
-                    Fases = SafePhases(generator.Fases),
-                    Tensao = SafeKv(generator.Tensao),
-                    Potencia = generator.Potencia > 0 ? generator.Potencia : 1000,
-                    FP = generator.FP > 0 ? generator.FP : 0.98
-                })
-                .ToList();
+            return $"{categoria}|{campoId.Trim()}";
+        }
+    }
+}
+
+
+
+====================================================================================================
+ARQUIVO: C:\Users\User\source\repos\lucasffxavier\Araci-front\Properties\OrdenacaoTabelaWindow.xaml
+====================================================================================================
+
+<Window x:Class="Araci.Properties.OrdenacaoTabelaWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Ordenação da tabela"
+        Width="560"
+        SizeToContent="Height"
+        ResizeMode="NoResize"
+        Background="#252526"
+        WindowStartupLocation="CenterOwner">
+    <Border Margin="10"
+            Padding="16"
+            BorderBrush="#F4F4F4"
+            BorderThickness="1"
+            Background="#252526">
+        <DockPanel LastChildFill="True">
+            <StackPanel DockPanel.Dock="Bottom"
+                        Orientation="Horizontal"
+                        HorizontalAlignment="Right"
+                        Margin="0,18,0,0">
+                <Button Content="OK"
+                        Width="90"
+                        Height="30"
+                        Margin="0,0,8,0"
+                        IsDefault="True"
+                        Click="OkButton_Click"/>
+                <Button Content="Cancelar"
+                        Width="90"
+                        Height="30"
+                        IsCancel="True"
+                        Click="CancelButton_Click"/>
+            </StackPanel>
+
+            <StackPanel>
+                <TextBlock Text="Ordenação da tabela"
+                           Foreground="#F4F4F4"
+                           FontSize="18"
+                           FontWeight="SemiBold"
+                           TextAlignment="Center"
+                           Margin="0,0,0,16"/>
+                <TextBlock Text="A ordenação permitirá definir a sequência das linhas da tabela. A configuração completa será implementada em uma etapa futura."
+                           Foreground="#DCDCDC"
+                           TextWrapping="Wrap"
+                           Margin="0,0,0,14"/>
+
+                <Border BorderBrush="#3A3A3A"
+                        BorderThickness="1"
+                        Padding="10"
+                        Background="#1E1E1E">
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="160"/>
+                        </Grid.ColumnDefinitions>
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="Auto"/>
+                        </Grid.RowDefinitions>
+
+                        <TextBlock Grid.Row="0" Grid.Column="0" Text="Campo" Foreground="#F4F4F4" FontWeight="SemiBold" Margin="0,0,12,8"/>
+                        <TextBlock Grid.Row="0" Grid.Column="1" Text="Direção" Foreground="#F4F4F4" FontWeight="SemiBold" Margin="0,0,0,8"/>
+
+                        <TextBlock Grid.Row="1" Grid.Column="0" Text="Nome" Foreground="#DCDCDC" Margin="0,0,12,6"/>
+                        <TextBlock Grid.Row="1" Grid.Column="1" Text="Crescente" Foreground="#DCDCDC" Margin="0,0,0,6"/>
+
+                        <TextBlock Grid.Row="2" Grid.Column="0" Text="Potência ativa" Foreground="#DCDCDC" Margin="0,0,12,6"/>
+                        <TextBlock Grid.Row="2" Grid.Column="1" Text="Decrescente" Foreground="#DCDCDC" Margin="0,0,0,6"/>
+
+                        <TextBlock Grid.Row="3" Grid.Column="0" Text="Tensão" Foreground="#DCDCDC" Margin="0,0,12,0"/>
+                        <TextBlock Grid.Row="3" Grid.Column="1" Text="Crescente" Foreground="#DCDCDC"/>
+                    </Grid>
+                </Border>
+            </StackPanel>
+        </DockPanel>
+    </Border>
+</Window>
+
+
+
+====================================================================================================
+ARQUIVO: C:\Users\User\source\repos\lucasffxavier\Araci-front\Properties\OrdenacaoTabelaWindow.xaml.cs
+====================================================================================================
+
+using System.Windows;
+
+namespace Araci.Properties
+{
+    public partial class OrdenacaoTabelaWindow : Window
+    {
+        public OrdenacaoTabelaWindow()
+        {
+            InitializeComponent();
         }
 
-        private static SlackDto BuildSlack(ParameterReader.GeneratorData generator)
+        private void OkButton_Click(object sender, RoutedEventArgs e)
         {
-            string nome = SafeName(generator.Nome, "GERADOR-001");
+            DialogResult = true;
+        }
 
-            return new SlackDto
+        private void CancelButton_Click(object sender, RoutedEventArgs e)
+        {
+            DialogResult = false;
+        }
+    }
+}
+
+
+
+====================================================================================================
+ARQUIVO: C:\Users\User\source\repos\lucasffxavier\Araci-front\Service\UI\DialogService.cs
+====================================================================================================
+
+using Araci.Applications.Abstractions;
+using Araci.Core.Documents;
+using Araci.Properties;
+using Araci.Services.Simulation;
+using System.Collections.Generic;
+using System.Windows;
+
+namespace Araci.Services.UI
+{
+    public class DialogService : IUserDialogService
+    {
+        public void ShowInfo(string title, string message)
+        {
+            Show(title, message, MessageBoxImage.Information);
+        }
+
+        public void ShowWarning(string title, string message)
+        {
+            Show(title, message, MessageBoxImage.Warning);
+        }
+
+        public void ShowError(string title, string message)
+        {
+            Show(title, message, MessageBoxImage.Error);
+        }
+
+        public ElementosTabelaDialogResult? ShowElementosTabelaDialog(
+            IReadOnlyList<ProjectTableElementCategory> categorias,
+            IReadOnlyList<ProjectTableFieldSelection> camposSelecionados)
+        {
+            var window = new ElementosTabelaWindow(categorias, camposSelecionados)
             {
-                Id = generator.Id,
-                Nome = nome,
-                Tensao = SafeKv(generator.Tensao),
-                Fases = SafePhases(generator.Fases),
-                Barra = SafeBus(generator.Barra, nome)
+                Owner = Application.Current?.MainWindow
             };
+
+            return window.ShowDialog() == true
+                ? new ElementosTabelaDialogResult(window.CategoriasSelecionadas, window.CamposSelecionados)
+                : null;
         }
 
-        private static SlackDto BuildSlack(ParameterReader.ExternalSourceData source)
+        public FiltrosTabelaDialogResult? ShowFiltrosTabelaDialog(
+            IReadOnlyList<ProjectTableFieldSelection> camposSelecionados,
+            IReadOnlyList<ProjectViewDialogOption> vistasDisponiveis,
+            Guid? filtroVistaId,
+            ProjectTableFilterLogicalMode modo,
+            IReadOnlyList<ProjectTableFilterRule> filtros)
         {
-            string nome = SafeName(source.Nome, "SIN-001");
-
-            return new SlackDto
+            var window = new FiltrosTabelaWindow(camposSelecionados, vistasDisponiveis, filtroVistaId, modo, filtros)
             {
-                Id = source.Id,
-                Nome = nome,
-                Tensao = SafeKv(source.Tensao),
-                Fases = SafePhases(source.Fases),
-                Barra = SafeBus(source.Barra, nome)
+                Owner = Application.Current?.MainWindow
             };
+
+            return window.ShowDialog() == true
+                ? new FiltrosTabelaDialogResult(window.FiltroVistaId, window.ModoFiltro, window.Filtros)
+                : null;
         }
 
-        private static void Validar(CircuitDto dto)
+        public void ShowOrdenacaoTabelaDialog()
         {
-            if (dto.Slack == null || string.IsNullOrWhiteSpace(dto.Slack.Barra))
-                throw new InvalidOperationException("Nenhuma fonte slack encontrada no circuito.");
-
-            foreach (LineDto line in dto.Lines)
+            var window = new OrdenacaoTabelaWindow
             {
-                if (string.IsNullOrWhiteSpace(line.Barra1) || string.IsNullOrWhiteSpace(line.Barra2))
-                    throw new InvalidOperationException($"Cabo '{line.Nome}' sem barra origem/destino definida.");
-            }
+                Owner = Application.Current?.MainWindow
+            };
+
+            window.ShowDialog();
         }
 
-        private void ValidarTopologia()
+        public bool Confirm(string title, string message)
         {
-            TopologyValidationResult? result = _reader.ValidateTopology();
+            MessageBoxResult result = MessageBox.Show(
+                message,
+                title,
+                MessageBoxButton.YesNo,
+                MessageBoxImage.Question);
 
-            if (result == null || result.IsValid)
+            return result == MessageBoxResult.Yes;
+        }
+
+        public void Show(SimulationMessage message)
+        {
+            if (message == null)
                 return;
 
-            throw new InvalidOperationException(
-                "Topologia invalida para simulacao:" +
-                Environment.NewLine +
-                result.FormatErrors());
+            MessageBox.Show(message.Text, message.Title, MessageBoxButton.OK, message.Icon);
         }
 
-        private static string SafeName(string value, string fallback)
+        private static void Show(string title, string message, MessageBoxImage icon)
         {
-            return string.IsNullOrWhiteSpace(value) ? fallback : value.Trim();
-        }
-
-        private static string SafeBus(string value, string fallback)
-        {
-            return string.IsNullOrWhiteSpace(value)
-                ? SafeName(fallback, "BARRA-001")
-                : value.Trim();
-        }
-
-        private static int SafePhases(int value)
-        {
-            return value > 0 ? value : 3;
-        }
-
-        private static double SafeKv(double value)
-        {
-            return value > 0 ? value : DefaultBaseKv;
+            MessageBox.Show(
+                message ?? string.Empty,
+                string.IsNullOrWhiteSpace(title) ? "Araci" : title,
+                MessageBoxButton.OK,
+                icon);
         }
     }
 }
 
 
+
 ====================================================================================================
-ARQUIVO: C:\Users\User\source\repos\lucasffxavier\Araci-front\DTOs\ParameterReader.cs
+ARQUIVO: C:\Users\User\source\repos\lucasffxavier\Araci-front\ViewModels\ProjectTablePropertiesViewModel.cs
 ====================================================================================================
 
-using System;
+﻿using System;
 using System.Collections.Generic;
-using System.Globalization;
+using System.ComponentModel;
 using System.Linq;
-using Araci.API;
+using System.Runtime.CompilerServices;
+using System.Windows.Input;
+using Araci.Applications.Abstractions;
+using Araci.Applications.UseCases.Projeto;
 using Araci.Core.Documents;
-using Araci.Models;
-using Araci.Services;
-using Araci.Services.Topology;
+using Araci.ViewModels.Base;
 
-namespace Araci.DTOs
+namespace Araci.ViewModels
 {
-    public class ParameterReader
+    public sealed class ProjectTablePropertiesViewModel : INotifyPropertyChanged
     {
-        private readonly CoreApi _api;
-        private readonly ConnectivityService? _connectivity;
-        private readonly TopologyValidator? _topology;
-        private readonly ElectricGraphBuilder? _graphBuilder;
-        private readonly IReadOnlyList<Elemento> _elementosOperacionais;
+        private readonly AraciDocument _document;
+        private readonly ProjectTable _tabela;
+        private readonly RenomearItemProjetoUseCase _renomearItemProjeto;
+        private readonly EditarPropriedadesTabelaUseCase _editarPropriedadesTabela;
+        private readonly IUserDialogService _dialogs;
 
-        public ParameterReader(CoreApi api)
+        public ProjectTablePropertiesViewModel(
+            AraciDocument document,
+            ProjectTable tabela,
+            RenomearItemProjetoUseCase renomearItemProjeto,
+            EditarPropriedadesTabelaUseCase editarPropriedadesTabela,
+            IUserDialogService dialogs)
         {
-            _api = api ?? throw new ArgumentNullException(nameof(api));
-            _connectivity = new ConnectivityService(api.Document);
-            _graphBuilder = new ElectricGraphBuilder(api.Document);
-            _topology = new TopologyValidator(api.Document, _connectivity, _graphBuilder);
-            _elementosOperacionais = api.Document.ObterElementosDaVistaAtiva().ToList();
+            _document = document ?? throw new ArgumentNullException(nameof(document));
+            _tabela = tabela ?? throw new ArgumentNullException(nameof(tabela));
+            _renomearItemProjeto = renomearItemProjeto ?? throw new ArgumentNullException(nameof(renomearItemProjeto));
+            _editarPropriedadesTabela = editarPropriedadesTabela ?? throw new ArgumentNullException(nameof(editarPropriedadesTabela));
+            _dialogs = dialogs ?? throw new ArgumentNullException(nameof(dialogs));
+            _document.ItemProjetoRenomeado += OnItemProjetoRenomeado;
+            _document.PropriedadesTabelaAlteradas += OnPropriedadesTabelaAlteradas;
+
+            ExportarCsvCommand = new RelayCommand(MostrarExportarCsvPlaceholder);
+            ElementosTabelaCommand = new RelayCommand(MostrarElementosTabelaPlaceholder);
+            FiltrosCommand = new RelayCommand(MostrarFiltrosPlaceholder);
+            OrdenacaoCommand = new RelayCommand(MostrarOrdenacaoPlaceholder);
+            ExibicaoCommand = new RelayCommand(MostrarExibicaoPlaceholder);
         }
 
-        public ParameterReader(EditorContext context)
-            : this(
-                new CoreApi(context),
-                new ConnectivityService(context.Document),
-                new TopologyValidator(
-                    context.Document,
-                    new ConnectivityService(context.Document),
-                    context.ElectricGraph),
-                context.ElectricGraph)
-        {
-        }
+        public string Titulo => "Tabela";
 
-        public ParameterReader(AraciDocument document)
-            : this(
-                new CoreApi(document),
-                new ConnectivityService(document),
-                new TopologyValidator(document),
-                new ElectricGraphBuilder(document))
-        {
-        }
-
-        private ParameterReader(
-            CoreApi api,
-            ConnectivityService connectivity,
-            TopologyValidator topology,
-            ElectricGraphBuilder? graphBuilder)
-        {
-            _api = api ?? throw new ArgumentNullException(nameof(api));
-            _connectivity = connectivity ?? throw new ArgumentNullException(nameof(connectivity));
-            _topology = topology ?? throw new ArgumentNullException(nameof(topology));
-            _graphBuilder = graphBuilder;
-            _elementosOperacionais = api.Document.ObterElementosDaVistaAtiva().ToList();
-        }
-
-        public TopologyValidationResult? ValidateTopology()
-        {
-            return _topology?.Validate();
-        }
-
-        public IList<LoadData> GetLoads()
-        {
-            ElectricGraph? graph = _graphBuilder?.Build();
-
-            return _elementosOperacionais.OfType<Carga>()
-                .Where(carga => carga.ParticipaDoGrafoEletrico)
-                .Select(carga => new LoadData
-                {
-                    Id = carga.Id.ToString(),
-                    Nome = ReadString(carga, "Nome"),
-                    Barra = ResolverBarraEquipamento(carga, graph),
-                    Fases = ReadInt(carga, "Fases"),
-                    R = ReadDouble(carga, "Carga resistencia", "Carga resistência"),
-                    X = ReadDouble(carga, "Carga reatancia", "Carga reatância"),
-                    PotenciaAtiva = ReadDouble(carga, "PotenciaAtiva"),
-                    PotenciaReativa = ReadDouble(carga, "PotenciaReativa"),
-                    Tensao = ReadKvWithDefault(carga, 12.47, "TensaoKV", "Tensao", "TensaoLinha"),
-                    Conexao = ReadString(carga, "Carga conexao", "Conexao"),
-                    Modelo = ReadInt(carga, "Carga modelo", "ModeloCarga", "Modelo")
-                })
-                .ToList();
-        }
-
-        public IList<LineData> GetLines()
-        {
-            ElectricGraph? graph = _graphBuilder?.Build();
-
-            return _elementosOperacionais.OfType<Cabo>()
-                .Where(cabo => cabo.ParticipaDoGrafoEletrico)
-                .Select(cabo => new LineData
-                {
-                    Id = cabo.Id.ToString(),
-                    Nome = ReadString(cabo, "Nome"),
-                    Barra1 = ResolverBus1(cabo, graph),
-                    Barra2 = ResolverBus2(cabo, graph),
-                    Fases = ReadInt(cabo, "Fases"),
-                    Comprimento = ReadDouble(cabo, "Comprimento"),
-                    R1 = ReadDouble(cabo, "R1", "Resistencia"),
-                    X1 = ReadDouble(cabo, "X1", "Reatancia"),
-                    R0 = ReadDouble(cabo, "R0"),
-                    X0 = ReadDouble(cabo, "X0"),
-                    C1 = ReadDouble(cabo, "C1"),
-                    C0 = ReadDouble(cabo, "C0")
-                })
-                .ToList();
-        }
-
-        public IList<TransformerData> GetTransformers()
-        {
-            return _elementosOperacionais.OfType<Transformador>()
-                .Where(transformador => transformador.ParticipaDoGrafoEletrico)
-                .Select(transformador => new TransformerData
-                {
-                    Id = transformador.Id.ToString(),
-                    Nome = ReadString(transformador, "Nome"),
-                    Fases = ReadIntWithDefault(transformador, 3, "Fases"),
-                    Enrolamentos = ReadIntWithDefault(transformador, 2, "Enrolamentos"),
-                    BarraPrimario = ResolverBarraTransformador(transformador, Transformador.TERMINAL_PRIMARIO),
-                    BarraSecundario = ResolverBarraTransformador(transformador, Transformador.TERMINAL_SECUNDARIO),
-                    TensaoPrimarioKV = ReadKvFromInstanceWithDefault(transformador, 13.8, "TensaoPrimarioKV", "TensaoPrimariaKV", "TensaoAltaKV", "TensaoATKV"),
-                    TensaoSecundarioKV = ReadKvFromInstanceWithDefault(transformador, 0.38, "TensaoSecundarioKV", "TensaoSecundariaKV", "TensaoBaixaKV", "TensaoBTKV"),
-                    PotenciaKVA = ReadPowerKvaFromInstance(transformador),
-                    RPercentual = ReadDoubleWithDefault(transformador, 1, "RPercentual", "ResistenciaPercentual", "PercentR"),
-                    XPercentual = ReadDoubleWithDefault(transformador, 5, "XPercentual", "ReatanciaPercentual", "PercentX"),
-                    LigacaoPrimario = ReadStringWithDefault(transformador, "Wye", "LigacaoPrimario", "LigacaoPrimaria", "ConexaoPrimario", "ConexaoPrimaria"),
-                    LigacaoSecundario = ReadStringWithDefault(transformador, "Wye", "LigacaoSecundario", "LigacaoSecundaria", "ConexaoSecundario", "ConexaoSecundaria")
-                })
-                .ToList();
-        }
-
-        private static double ReadPowerKvaFromInstance(Elemento elemento)
-        {
-            double aparente = ReadDoubleFrom(elemento.Parametros, "PotenciaAparente", "PotenciaAparenteKVA", "PotenciaKVA", "PotenciaNominalKVA");
-            return aparente > 0 ? aparente : 500;
-        }
-
-        private static double ReadKvFromInstanceWithDefault(Elemento elemento, double defaultValue, params string[] names)
-        {
-            double modelValue = ReadKvFrom(elemento.Parametros, names);
-            return modelValue > 0 ? modelValue : defaultValue;
-        }
-
-        public IList<GeneratorData> GetGenerators()
-        {
-            ElectricGraph? graph = _graphBuilder?.Build();
-
-            return _elementosOperacionais.OfType<Gerador>()
-                .Where(gerador => gerador.ParticipaDoGrafoEletrico)
-                .Select(gerador => new GeneratorData
-                {
-                    Id = gerador.Id.ToString(),
-                    Nome = ReadString(gerador, "Nome"),
-                    Barra = ResolverBarraEquipamento(gerador, graph),
-                    Fases = ReadIntWithDefault(gerador, 3, "Fases"),
-                    Tensao = ReadKvWithDefault(gerador, 12.47, "TensaoKV", "Tensao", "TensaoLinha"),
-                    Potencia = ReadPositiveDoubleByPriority(gerador, "PotenciaAtiva", "Potencia", "PotenciaAparente"),
-                    FP = ReadDoubleWithDefault(gerador, 0.98, "FP", "FatorPotencia")
-                })
-                .ToList();
-        }
-
-        public IList<ExternalSourceData> GetSins()
-        {
-            ElectricGraph? graph = _graphBuilder?.Build();
-
-            return _elementosOperacionais.OfType<Sin>()
-                .Where(sin => sin.ParticipaDoGrafoEletrico)
-                .Select(sin => new ExternalSourceData
-                {
-                    Id = sin.Id.ToString(),
-                    Nome = ReadString(sin, "Nome"),
-                    Barra = ResolverBarraEquipamento(sin, graph),
-                    Fases = ReadIntWithDefault(sin, 3, "Fases"),
-                    Tensao = ReadKvWithDefault(sin, 12.47, "TensaoKV", "Tensao", "TensaoLinha", "TensaoBaseKV"),
-                    PotenciaCurtoMVA = ReadDouble(sin, "PotenciaCurtoMVA", "PotenciaCurtoCircuitoMva"),
-                    RelacaoXR = ReadDouble(sin, "RelacaoXR", "X/R")
-                })
-                .ToList();
-        }
-
-        private IList<Elemento> GetElementsByTypeName(params string[] typeNames)
-        {
-            return _elementosOperacionais
-                .Where(elemento => typeNames.Any(typeName =>
-                    string.Equals(elemento.GetType().Name, typeName, StringComparison.OrdinalIgnoreCase) ||
-                    string.Equals(elemento.Tipo?.NomeTipo, typeName, StringComparison.OrdinalIgnoreCase)))
-                .ToList();
-        }
-
-        private string ResolverBus1(Cabo cabo)
-        {
-            return ResolverBusPorElementoETerminal(cabo.OrigemId, cabo.OrigemTerminalId) ??
-                _connectivity?.ResolverBus1Estrito(cabo) ??
-                string.Empty;
-        }
-
-        private string ResolverBus1(Cabo cabo, ElectricGraph? graph)
-        {
-            return ResolverBusPorGrafo(cabo, graph, origem: true) ?? ResolverBus1(cabo);
-        }
-
-        private string ResolverBus2(Cabo cabo)
-        {
-            return ResolverBusPorElementoETerminal(cabo.DestinoId, cabo.DestinoTerminalId) ??
-                _connectivity?.ResolverBus2Estrito(cabo) ??
-                string.Empty;
-        }
-
-        private string ResolverBus2(Cabo cabo, ElectricGraph? graph)
-        {
-            return ResolverBusPorGrafo(cabo, graph, origem: false) ?? ResolverBus2(cabo);
-        }
-
-        private static string? ResolverBusPorGrafo(
-            Cabo cabo,
-            ElectricGraph? graph,
-            bool origem)
-        {
-            ElectricGraphEdge? edge = graph?.FindEdgeByCable(cabo);
-
-            if (edge == null)
-                return null;
-
-            if (!edge.IsValid)
-                return string.Empty;
-
-            string elementId = origem ? edge.FromElementId : edge.ToElementId;
-            string terminalId = origem ? edge.FromTerminalId : edge.ToTerminalId;
-            ElectricGraphNode? node = graph?.FindNode(elementId);
-
-            return ResolverBarraPorTerminal(node?.SourceElement, terminalId) ??
-                node?.Name ??
-                string.Empty;
-        }
-
-        private string ResolverBarraEquipamento(ElementoEquipamento equipamento)
-        {
-            return _connectivity?.ResolverBusNameParaEquipamentoEstrito(equipamento) ?? string.Empty;
-        }
-
-        private string ResolverBarraEquipamento(
-            ElementoEquipamento equipamento,
-            ElectricGraph? graph)
-        {
-            return ResolverBarraPorGrafo(equipamento, graph) ??
-                ResolverBarraEquipamento(equipamento);
-        }
-
-        private static string? ResolverBarraPorGrafo(
-            ElementoEquipamento equipamento,
-            ElectricGraph? graph)
-        {
-            return graph?.FindNodeByElement(equipamento)?.Name;
-        }
-
-        private static string ResolverBarraTransformador(
-            Transformador transformador,
-            string terminalId)
-        {
-            return ResolverBarraTerminalTransformador(transformador, terminalId);
-        }
-
-        private string? ResolverBusPorElementoETerminal(string elementId, string terminalId)
-        {
-            Elemento? elemento = ObterElementoOperacionalPorId(elementId);
-            return ResolverBarraPorTerminal(elemento, terminalId);
-        }
-
-        private Elemento? ObterElementoOperacionalPorId(string elementId)
-        {
-            if (string.IsNullOrWhiteSpace(elementId))
-                return null;
-
-            return _elementosOperacionais.FirstOrDefault(e =>
-                string.Equals(e.Id.ToString(), elementId.Trim(), StringComparison.OrdinalIgnoreCase));
-        }
-
-        private static string? ResolverBarraPorTerminal(Elemento? elemento, string terminalId)
-        {
-            return elemento is Transformador transformador &&
-                EhTerminalTransformador(terminalId)
-                    ? ResolverBarraTerminalTransformador(transformador, terminalId)
-                    : null;
-        }
-
-        private static string ResolverBarraTerminalTransformador(
-            Transformador transformador,
-            string terminalId)
-        {
-            string nome = NomeBarramento(transformador);
-            string terminal = string.Equals(terminalId, Transformador.TERMINAL_PRIMARIO, StringComparison.OrdinalIgnoreCase)
-                ? Transformador.TERMINAL_PRIMARIO
-                : Transformador.TERMINAL_SECUNDARIO;
-
-            return $"{nome}_{terminal}";
-        }
-
-        private static bool EhTerminalTransformador(string terminalId)
-        {
-            return string.Equals(terminalId, Transformador.TERMINAL_PRIMARIO, StringComparison.OrdinalIgnoreCase) ||
-                string.Equals(terminalId, Transformador.TERMINAL_SECUNDARIO, StringComparison.OrdinalIgnoreCase);
-        }
-
-        private static string NomeBarramento(Elemento elemento)
-        {
-            if (!string.IsNullOrWhiteSpace(elemento.Nome))
-                return elemento.Nome.Trim();
-
-            string id = elemento.Id.ToString("N");
-            return id.Length >= 8 ? $"BUS-{id[..8]}" : $"BUS-{id}";
-        }
-
-        private static string ReadBarra(Elemento elemento, params string[] names)
-        {
-            string valor = ReadString(elemento, names);
-
-            if (!string.IsNullOrWhiteSpace(valor))
-                return valor;
-
-            if (elemento is ITerminalOwner owner)
-                return owner.Terminais.FirstOrDefault()?.Barra ?? string.Empty;
-
-            return string.Empty;
-        }
-
-        private static string ReadString(Elemento elemento, params string[] names)
-        {
-            return ReadValueAsString(elemento, names) ?? string.Empty;
-        }
-
-        private static int ReadInt(Elemento elemento, params string[] names)
-        {
-            return (int)ReadDouble(elemento, names);
-        }
-
-        private static double ReadDouble(Elemento elemento, params string[] names)
-        {
-            object? value = ReadValueObject(elemento, names);
-
-            if (value is double doubleValue)
-                return ElectricalValueParser.ToNumber(doubleValue);
-
-            if (value is int intValue)
-                return intValue;
-
-            if (value is string text)
-                return ElectricalValueParser.ToNumber(text);
-
-            return 0;
-        }
-
-        private static double ReadKv(Elemento elemento, params string[] names)
-        {
-            object? value = ReadValueObject(elemento, names);
-
-            if (value is double doubleValue)
-                return ElectricalValueParser.ToNumber(doubleValue);
-
-            if (value is int intValue)
-                return intValue;
-
-            if (value is string text)
-                return ElectricalValueParser.ToNumber(text);
-
-            return 0;
-        }
-
-        private static double ReadPowerKva(Elemento elemento)
-        {
-            double modelMva = ReadDoubleFrom(elemento.Parametros, "PotenciaMVA", "PotenciaNominalMVA");
-
-            if (modelMva > 0)
-                return modelMva * 1000;
-
-            double typeMva = elemento.Tipo == null
-                ? 0
-                : ReadDoubleFrom(elemento.Tipo.Parametros, "PotenciaMVA", "PotenciaNominalMVA");
-
-            if (typeMva > 0)
-                return typeMva * 1000;
-
-            double modelKva = ReadDoubleFrom(elemento.Parametros, "PotenciaKVA", "PotenciaNominalKVA");
-            double typeKva = elemento.Tipo == null
-                ? 0
-                : ReadDoubleFrom(elemento.Tipo.Parametros, "PotenciaKVA", "PotenciaNominalKVA");
-
-            if (modelKva > 0 && !NearlyEqual(modelKva, 500))
-                return modelKva;
-
-            if (typeKva > 0)
-                return typeKva;
-
-            return modelKva;
-        }
-
-        private static int ReadIntWithDefault(Elemento elemento, int defaultValue, params string[] names)
-        {
-            return (int)ReadDoubleWithDefault(elemento, defaultValue, names);
-        }
-
-        private static double ReadDoubleWithDefault(
-            Elemento elemento,
-            double defaultValue,
-            params string[] names)
-        {
-            double modelValue = ReadDoubleFrom(elemento.Parametros, names);
-            double typeValue = elemento.Tipo == null
-                ? 0
-                : ReadDoubleFrom(elemento.Tipo.Parametros, names);
-
-            if (modelValue > 0)
-                return modelValue;
-
-            if (typeValue > 0)
-                return typeValue;
-
-            return defaultValue;
-        }
-
-        private static double ReadPositiveDoubleByPriority(Elemento elemento, params string[] names)
-        {
-            double modelValue = ReadPositiveDoubleFrom(elemento.Parametros, names);
-
-            if (modelValue > 0)
-                return modelValue;
-
-            return elemento.Tipo == null
-                ? 0
-                : ReadPositiveDoubleFrom(elemento.Tipo.Parametros, names);
-        }
-
-        private static double ReadKvWithDefault(
-            Elemento elemento,
-            double defaultValue,
-            params string[] names)
-        {
-            double modelValue = ReadKvFrom(elemento.Parametros, names);
-            double typeValue = elemento.Tipo == null
-                ? 0
-                : ReadKvFrom(elemento.Tipo.Parametros, names);
-
-            if (modelValue > 0)
-                return modelValue;
-
-            if (typeValue > 0)
-                return typeValue;
-
-            return defaultValue;
-        }
-
-        private static string ReadStringWithDefault(
-            Elemento elemento,
-            string defaultValue,
-            params string[] names)
-        {
-            string modelValue = ReadStringFrom(elemento.Parametros, names);
-            string typeValue = elemento.Tipo == null
-                ? string.Empty
-                : ReadStringFrom(elemento.Tipo.Parametros, names);
-
-            if (!string.IsNullOrWhiteSpace(modelValue))
-                return modelValue;
-
-            if (!string.IsNullOrWhiteSpace(typeValue))
-                return typeValue;
-
-            return defaultValue;
-        }
-
-        private static string? ReadValueAsString(Elemento elemento, params string[] names)
-        {
-            object? value = ReadValueObject(elemento, names);
-
-            return value switch
+        public IReadOnlyList<ProjectViewDiscipline> Disciplinas { get; } =
+            new[]
             {
-                IFormattable formattable => formattable.ToString(null, CultureInfo.InvariantCulture),
-                _ => value?.ToString()
+                ProjectViewDiscipline.Coordenacao,
+                ProjectViewDiscipline.Eletrica,
+                ProjectViewDiscipline.Solar,
+                ProjectViewDiscipline.Eolica,
+                ProjectViewDiscipline.Distribuicao,
+                ProjectViewDiscipline.Subestacao
             };
-        }
 
-        private static object? ReadValueObject(Elemento elemento, params string[] names)
+        public ICommand ExportarCsvCommand { get; }
+        public ICommand ElementosTabelaCommand { get; }
+        public ICommand FiltrosCommand { get; }
+        public ICommand OrdenacaoCommand { get; }
+        public ICommand ExibicaoCommand { get; }
+
+        public string Nome
         {
-            foreach (string name in names)
+            get => _tabela.Nome;
+            set
             {
-                if (elemento.Parametros.TryGetValue(name, out Parameter? parametro))
-                    return parametro.ValorObjeto;
+                string anterior = _tabela.Nome;
+                bool renomeado = _renomearItemProjeto.RenomearTabela(_tabela.Id, value);
+
+                if (!renomeado || anterior != _tabela.Nome)
+                    OnPropertyChanged();
             }
+        }
 
-            foreach (string name in names)
+        public ProjectViewDiscipline Disciplina
+        {
+            get => _tabela.Disciplina;
+            set
             {
-                Parameter? parametro;
-                if (elemento.Tipo?.Parametros.TryGetValue(name, out parametro) == true)
-                    return parametro.ValorObjeto;
+                if (_editarPropriedadesTabela.AlterarDisciplina(_tabela.Id, value))
+                    OnPropertyChanged();
             }
-
-            return null;
         }
 
-        private static double ReadDoubleFrom(
-            IReadOnlyDictionary<string, Parameter> parametros,
-            params string[] names)
+        public event PropertyChangedEventHandler? PropertyChanged;
+
+        private void OnItemProjetoRenomeado()
         {
-            object? value = ReadValueObjectFrom(parametros, names);
-
-            if (value is double doubleValue)
-                return ElectricalValueParser.ToNumber(doubleValue);
-
-            if (value is int intValue)
-                return intValue;
-
-            if (value is string text)
-                return ElectricalValueParser.ToNumber(text);
-
-            return 0;
+            OnPropertyChanged(nameof(Nome));
         }
 
-        private static double ReadPositiveDoubleFrom(
-            IReadOnlyDictionary<string, Parameter> parametros,
-            params string[] names)
+        private void OnPropriedadesTabelaAlteradas(ProjectTable tabela)
         {
-            foreach (string name in names)
-            {
-                double value = ReadDoubleFrom(parametros, name);
+            if (tabela.Id != _tabela.Id)
+                return;
 
-                if (value > 0)
-                    return value;
-            }
-
-            return 0;
+            OnPropertyChanged(nameof(Disciplina));
         }
 
-        private static double ReadKvFrom(
-            IReadOnlyDictionary<string, Parameter> parametros,
-            params string[] names)
+        private void MostrarExportarCsvPlaceholder()
         {
-            object? value = ReadValueObjectFrom(parametros, names);
-
-            if (value is double doubleValue)
-                return ElectricalValueParser.ToNumber(doubleValue);
-
-            if (value is int intValue)
-                return intValue;
-
-            if (value is string text)
-                return ElectricalValueParser.ToNumber(text);
-
-            return 0;
+            _dialogs.ShowInfo(
+                "Exportar CSV",
+                "A exportação CSV será implementada em uma etapa futura.");
         }
 
-        private static string ReadStringFrom(
-            IReadOnlyDictionary<string, Parameter> parametros,
-            params string[] names)
+        private void MostrarElementosTabelaPlaceholder()
         {
-            object? value = ReadValueObjectFrom(parametros, names);
+            ElementosTabelaDialogResult? resultado =
+                _dialogs.ShowElementosTabelaDialog(_tabela.CategoriasElementos, _tabela.CamposSelecionados);
 
-            return value switch
-            {
-                IFormattable formattable => formattable.ToString(null, CultureInfo.InvariantCulture),
-                _ => value?.ToString() ?? string.Empty
-            };
+            if (resultado != null)
+                _editarPropriedadesTabela.AlterarElementosTabela(
+                    _tabela.Id,
+                    resultado.Categorias,
+                    resultado.CamposSelecionados);
         }
 
-        private static object? ReadValueObjectFrom(
-            IReadOnlyDictionary<string, Parameter> parametros,
-            params string[] names)
+        private void MostrarFiltrosPlaceholder()
         {
-            foreach (string name in names)
-            {
-                if (parametros.TryGetValue(name, out Parameter? parametro))
-                    return parametro.ValorObjeto;
-            }
+            FiltrosTabelaDialogResult? resultado =
+                _dialogs.ShowFiltrosTabelaDialog(
+                    _tabela.CamposSelecionados,
+                    _document.Vistas.Select(v => new ProjectViewDialogOption(v.Id, v.Nome)).ToList(),
+                    _tabela.FiltroVistaId,
+                    _tabela.ModoFiltro,
+                    _tabela.Filtros);
 
-            return null;
+            if (resultado != null)
+                _editarPropriedadesTabela.AlterarFiltrosTabela(
+                    _tabela.Id,
+                    resultado.FiltroVistaId,
+                    resultado.Modo,
+                    resultado.Filtros);
         }
 
-        private static bool NearlyEqual(double left, double right)
+        private void MostrarOrdenacaoPlaceholder()
         {
-            return Math.Abs(left - right) < 0.000001;
+            _dialogs.ShowOrdenacaoTabelaDialog();
         }
 
-        public class LoadData
+        private void MostrarExibicaoPlaceholder()
         {
-            public string Id { get; set; } = string.Empty;
-
-            public string Nome { get; set; } = string.Empty;
-
-            public string Barra { get; set; } = string.Empty;
-
-            public int Fases { get; set; }
-
-            public double R { get; set; }
-
-            public double X { get; set; }
-
-            public double PotenciaAtiva { get; set; }
-
-            public double PotenciaReativa { get; set; }
-
-            public double Tensao { get; set; }
-
-            public string Conexao { get; set; } = string.Empty;
-
-            public int Modelo { get; set; }
+            _dialogs.ShowInfo(
+                "Exibição",
+                "A configuração de exibição da tabela será implementada em uma etapa futura.");
         }
 
-        public class LineData
+        private void OnPropertyChanged([CallerMemberName] string? propertyName = null)
         {
-            public string Id { get; set; } = string.Empty;
-
-            public string Nome { get; set; } = string.Empty;
-
-            public string Barra1 { get; set; } = string.Empty;
-
-            public string Barra2 { get; set; } = string.Empty;
-
-            public int Fases { get; set; }
-
-            public double Comprimento { get; set; }
-
-            public double R1 { get; set; }
-
-            public double X1 { get; set; }
-
-            public double R0 { get; set; }
-
-            public double X0 { get; set; }
-
-            public double C1 { get; set; }
-
-            public double C0 { get; set; }
-        }
-
-        public class TransformerData
-        {
-            public string Id { get; set; } = string.Empty;
-
-            public string Nome { get; set; } = string.Empty;
-
-            public int Fases { get; set; }
-
-            public int Enrolamentos { get; set; }
-
-            public string BarraPrimario { get; set; } = string.Empty;
-
-            public string BarraSecundario { get; set; } = string.Empty;
-
-            public double TensaoPrimarioKV { get; set; }
-
-            public double TensaoSecundarioKV { get; set; }
-
-            public double PotenciaKVA { get; set; }
-
-            public double RPercentual { get; set; }
-
-            public double XPercentual { get; set; }
-
-            public string LigacaoPrimario { get; set; } = string.Empty;
-
-            public string LigacaoSecundario { get; set; } = string.Empty;
-        }
-
-        public class GeneratorData
-        {
-            public string Id { get; set; } = string.Empty;
-
-            public string Nome { get; set; } = string.Empty;
-
-            public string Barra { get; set; } = string.Empty;
-
-            public int Fases { get; set; }
-
-            public double Tensao { get; set; }
-
-            public double Potencia { get; set; }
-
-            public double FP { get; set; }
-        }
-
-        public class ExternalSourceData
-        {
-            public string Id { get; set; } = string.Empty;
-
-            public string Nome { get; set; } = string.Empty;
-
-            public string Barra { get; set; } = string.Empty;
-
-            public int Fases { get; set; }
-
-            public double Tensao { get; set; }
-
-            public double PotenciaCurtoMVA { get; set; }
-
-            public double RelacaoXR { get; set; }
-        }
-    }
-}
-
-
-
-====================================================================================================
-ARQUIVO: C:\Users\User\source\repos\lucasffxavier\Araci-front\Models\Gerador.cs
-====================================================================================================
-
-using System.Windows;
-using Araci.Models.Tipos;
-
-namespace Araci.Models
-{
-    public class Gerador : ElementoEquipamento
-    {
-        public const string PARAM_POTENCIA_APARENTE = "PotenciaAparente";
-        public const string PARAM_FATOR_POTENCIA = "FatorPotencia";
-
-        public TipoGerador TipoGerador => (TipoGerador)Tipo!;
-
-        public double PotenciaAparente
-        {
-            get => Obter<double>(PARAM_POTENCIA_APARENTE);
-            set => Definir(PARAM_POTENCIA_APARENTE, value);
-        }
-
-        public double FatorPotencia
-        {
-            get => Obter<double>(PARAM_FATOR_POTENCIA);
-            set => Definir(PARAM_FATOR_POTENCIA, value);
-        }
-
-        public Gerador()
-        {
-            DefinirParametro(new Parameter<double>(PARAM_POTENCIA_APARENTE, 0));
-            DefinirParametro(new Parameter<double>(PARAM_FATOR_POTENCIA, 0));
-
-            Nome = "GERADOR-001";
-            Barra = "GERADOR-001";
-            Alimentador = 1;
-            PotenciaAparente = 1020;
-            PotenciaAtiva = 1000;
-            PotenciaReativa = 203;
-            TensaoLinha = "12,47∠0°";
-            TensaoFaseA = "7,2∠0°";
-            TensaoFaseB = "7,2∠-120°";
-            TensaoFaseC = "7,2∠120°";
-            CorrenteLinha = "0∠0°";
-            CorrenteFaseA = "0∠0°";
-            CorrenteFaseB = "0∠-120°";
-            CorrenteFaseC = "0∠120°";
-
-            PosicaoX = 300;
-            PosicaoY = 200;
-        }
-
-        public void AtualizarTerminais(double largura, double altura)
-        {
-            var terminais = ObterTerminaisInternos();
-
-            if (terminais.Count < 4)
-            {
-                terminais.Clear();
-
-                for (int i = 0; i < 4; i++)
-                {
-                    terminais.Add(
-                        new Terminal(
-                            this,
-                            new Point(),
-                            IdTerminal(i),
-                            TerminalKind.Electrical,
-                            DirecaoTerminal(i))
-                        {
-                            Barra = Barra
-                        });
-                }
-            }
-
-            terminais[0].Barra = Barra;
-            terminais[0].DefinirPosicaoLocal(new Point(largura / 2, 0), largura, altura);
-            terminais[1].DefinirPosicaoLocal(new Point(largura / 2, altura), largura, altura);
-            terminais[2].DefinirPosicaoLocal(new Point(0, altura / 2), largura, altura);
-            terminais[3].DefinirPosicaoLocal(new Point(largura, altura / 2), largura, altura);
-        }
-
-        public override Elemento Clonar()
-        {
-            var clone = new Gerador();
-
-            CopiarEquipamentoPara(clone);
-
-            return clone;
-        }
-
-        private static string IdTerminal(int index)
-        {
-            return index switch
-            {
-                0 => "TOPO",
-                1 => "BASE",
-                2 => "ESQUERDA",
-                3 => "DIREITA",
-                _ => $"T{index + 1}"
-            };
-        }
-
-        private static TerminalDirection DirecaoTerminal(int index)
-        {
-            return index switch
-            {
-                0 => TerminalDirection.North,
-                1 => TerminalDirection.South,
-                2 => TerminalDirection.West,
-                3 => TerminalDirection.East,
-                _ => TerminalDirection.None
-            };
-        }
-    }
-}
-
-
-
-====================================================================================================
-ARQUIVO: C:\Users\User\source\repos\lucasffxavier\Araci-front\Models\Sin.cs
-====================================================================================================
-
-using System.Linq;
-using System.Windows;
-using Araci.Models.Tipos;
-
-namespace Araci.Models
-{
-    public class Sin : ElementoEquipamento
-    {
-        public const string TERMINAL_NORTE = "NORTE";
-        public const string TERMINAL_SUL = "SUL";
-        public const string TERMINAL_LESTE = "LESTE";
-        public const string TERMINAL_OESTE = "OESTE";
-
-        public TipoSin TipoSin => (TipoSin)Tipo!;
-
-        public Sin()
-        {
-            Nome = "SIN-001";
-            Barra = "SIN-001";
-            Alimentador = 1;
-            TensaoLinha = "12.47";
-            TensaoFaseA = "7.2";
-            TensaoFaseB = "7.2";
-            TensaoFaseC = "7.2";
-            CorrenteLinha = "0";
-            CorrenteFaseA = "0";
-            CorrenteFaseB = "0";
-            CorrenteFaseC = "0";
-
-            PosicaoX = 200;
-            PosicaoY = 160;
-        }
-
-        public void AtualizarTerminais(double largura, double altura)
-        {
-            var terminais = ObterTerminaisInternos();
-
-            if (!TerminaisPadraoPresentes())
-            {
-                terminais.Clear();
-                terminais.Add(new Terminal(this, new Point(), TERMINAL_NORTE, TerminalKind.Electrical, TerminalDirection.North));
-                terminais.Add(new Terminal(this, new Point(), TERMINAL_SUL, TerminalKind.Electrical, TerminalDirection.South));
-                terminais.Add(new Terminal(this, new Point(), TERMINAL_LESTE, TerminalKind.Electrical, TerminalDirection.East));
-                terminais.Add(new Terminal(this, new Point(), TERMINAL_OESTE, TerminalKind.Electrical, TerminalDirection.West));
-            }
-
-            AtualizarTerminal(TERMINAL_NORTE, new Point(largura / 2, 0), largura, altura);
-            AtualizarTerminal(TERMINAL_SUL, new Point(largura / 2, altura), largura, altura);
-            AtualizarTerminal(TERMINAL_LESTE, new Point(largura, altura / 2), largura, altura);
-            AtualizarTerminal(TERMINAL_OESTE, new Point(0, altura / 2), largura, altura);
-        }
-
-        private bool TerminaisPadraoPresentes()
-        {
-            var terminais = ObterTerminaisInternos();
-
-            return terminais.Count == 4 &&
-                terminais[0].Id == TERMINAL_NORTE &&
-                terminais[1].Id == TERMINAL_SUL &&
-                terminais[2].Id == TERMINAL_LESTE &&
-                terminais[3].Id == TERMINAL_OESTE;
-        }
-
-        private void AtualizarTerminal(string id, Point posicao, double largura, double altura)
-        {
-            var terminal = ObterTerminaisInternos().First(t => t.Id == id);
-            terminal.Barra = Barra;
-            terminal.DefinirPosicaoLocal(posicao, largura, altura);
-        }
-
-        public override Elemento Clonar()
-        {
-            var clone = new Sin();
-
-            CopiarEquipamentoPara(clone);
-
-            return clone;
+            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
         }
     }
 }

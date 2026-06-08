@@ -15,6 +15,8 @@ namespace Araci.Core.Commands
         private readonly IReadOnlyList<ProjectTableFieldSelection> _camposNovos;
         private readonly IReadOnlyList<ProjectTableFilterRule> _filtrosAnteriores;
         private readonly IReadOnlyList<ProjectTableFilterRule> _filtrosNovos;
+        private readonly ProjectTableSorting? _ordenacaoAnterior;
+        private readonly ProjectTableSorting? _ordenacaoNova;
 
         public UpdateProjectTableElementsCommand(
             AraciDocument document,
@@ -24,7 +26,9 @@ namespace Araci.Core.Commands
             IReadOnlyList<ProjectTableFieldSelection> camposAnteriores,
             IReadOnlyList<ProjectTableFieldSelection> camposNovos,
             IReadOnlyList<ProjectTableFilterRule> filtrosAnteriores,
-            IReadOnlyList<ProjectTableFilterRule> filtrosNovos)
+            IReadOnlyList<ProjectTableFilterRule> filtrosNovos,
+            ProjectTableSorting? ordenacaoAnterior,
+            ProjectTableSorting? ordenacaoNova)
         {
             _document = document ?? throw new ArgumentNullException(nameof(document));
             _tabela = tabela ?? throw new ArgumentNullException(nameof(tabela));
@@ -34,16 +38,18 @@ namespace Araci.Core.Commands
             _camposNovos = CopiarCampos(camposNovos);
             _filtrosAnteriores = CopiarFiltros(filtrosAnteriores);
             _filtrosNovos = CopiarFiltros(filtrosNovos);
+            _ordenacaoAnterior = CopiarOrdenacao(ordenacaoAnterior);
+            _ordenacaoNova = CopiarOrdenacao(ordenacaoNova);
         }
 
         public void Execute()
         {
-            Aplicar(_categoriasNovas, _camposNovos, _filtrosNovos);
+            Aplicar(_categoriasNovas, _camposNovos, _filtrosNovos, _ordenacaoNova);
         }
 
         public void Undo()
         {
-            Aplicar(_categoriasAnteriores, _camposAnteriores, _filtrosAnteriores);
+            Aplicar(_categoriasAnteriores, _camposAnteriores, _filtrosAnteriores, _ordenacaoAnterior);
         }
 
         public void Redo()
@@ -54,11 +60,13 @@ namespace Araci.Core.Commands
         private void Aplicar(
             IReadOnlyList<ProjectTableElementCategory> categorias,
             IReadOnlyList<ProjectTableFieldSelection> campos,
-            IReadOnlyList<ProjectTableFilterRule> filtros)
+            IReadOnlyList<ProjectTableFilterRule> filtros,
+            ProjectTableSorting? ordenacao)
         {
             _tabela.CategoriasElementos = categorias.ToList();
             _tabela.CamposSelecionados = CopiarCampos(campos).ToList();
             _tabela.Filtros = CopiarFiltros(filtros).ToList();
+            _tabela.Ordenacao = CopiarOrdenacao(ordenacao);
             _document.AtualizarPropriedadesTabela(_tabela);
         }
 
@@ -88,6 +96,19 @@ namespace Araci.Core.Commands
                     Valor = f.Valor
                 })
                 .ToList();
+        }
+
+        private static ProjectTableSorting? CopiarOrdenacao(ProjectTableSorting? ordenacao)
+        {
+            return ordenacao == null
+                ? null
+                : new ProjectTableSorting
+                {
+                    Categoria = ordenacao.Categoria,
+                    CampoId = ordenacao.CampoId,
+                    NomeExibicao = ordenacao.NomeExibicao,
+                    Direcao = ordenacao.Direcao
+                };
         }
     }
 }

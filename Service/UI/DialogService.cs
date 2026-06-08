@@ -55,14 +55,18 @@ namespace Araci.Services.UI
                 : null;
         }
 
-        public void ShowOrdenacaoTabelaDialog()
+        public OrdenacaoTabelaDialogResult? ShowOrdenacaoTabelaDialog(
+            IReadOnlyList<ProjectTableFieldSelection> camposSelecionados,
+            ProjectTableSorting? ordenacao)
         {
-            var window = new OrdenacaoTabelaWindow
+            var window = new OrdenacaoTabelaWindow(camposSelecionados, ordenacao)
             {
                 Owner = Application.Current?.MainWindow
             };
 
-            window.ShowDialog();
+            return window.ShowDialog() == true
+                ? new OrdenacaoTabelaDialogResult(window.Ordenacao)
+                : null;
         }
 
         public bool Confirm(string title, string message)
