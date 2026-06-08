@@ -38,6 +38,16 @@ namespace Araci.Services.UI
                 : null;
         }
 
+        public void ShowFiltrosTabelaDialog()
+        {
+            var window = new FiltrosTabelaWindow
+            {
+                Owner = Application.Current?.MainWindow
+            };
+
+            window.ShowDialog();
+        }
+
         public bool Confirm(string title, string message)
         {
             MessageBoxResult result = MessageBox.Show(

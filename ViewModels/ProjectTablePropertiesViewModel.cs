@@ -118,9 +118,7 @@ namespace Araci.ViewModels
 
         private void MostrarFiltrosPlaceholder()
         {
-            _dialogs.ShowInfo(
-                "Filtros",
-                "A configuração de filtros da tabela será implementada em uma etapa futura.");
+            _dialogs.ShowFiltrosTabelaDialog();
         }
 
         private void MostrarOrdenacaoPlaceholder()

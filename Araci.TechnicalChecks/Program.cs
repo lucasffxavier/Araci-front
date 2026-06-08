@@ -5066,6 +5066,10 @@ namespace Araci.TechnicalChecks
                 return new ElementosTabelaDialogResult(categorias, camposSelecionados);
             }
 
+            public void ShowFiltrosTabelaDialog()
+            {
+            }
+
             public bool Confirm(string title, string message)
             {
                 ConfirmChamadas++;
