@@ -50,6 +50,7 @@ namespace Araci.Applications.Scene
             _sceneQueries = sceneQueries ?? throw new ArgumentNullException(nameof(sceneQueries));
 
             _document.Elementos.CollectionChanged += OnDocumentElementosChanged;
+            _document.VistaAtivaAlterada += OnVistaAtivaAlterada;
             SincronizarComDocumento();
         }
 
@@ -83,7 +84,15 @@ namespace Araci.Applications.Scene
             LimparViewModels();
 
             foreach (Elemento modelo in _document.Elementos)
-                AdicionarViewModel(modelo);
+            {
+                if (PertenceAVistaAtiva(modelo))
+                    AdicionarViewModel(modelo);
+            }
+        }
+
+        private void OnVistaAtivaAlterada()
+        {
+            SincronizarComDocumento();
         }
 
         private void OnDocumentElementosChanged(object? sender, NotifyCollectionChangedEventArgs e)
@@ -109,6 +118,9 @@ namespace Araci.Applications.Scene
 
         private void AdicionarViewModel(Elemento modelo)
         {
+            if (!PertenceAVistaAtiva(modelo))
+                return;
+
             var vm = ObterOuCriarViewModel(modelo);
 
             if (vm == null || _scene.Elementos.Contains(vm))
@@ -153,6 +165,11 @@ namespace Araci.Applications.Scene
                 _viewModelsPorModelo[modelo] = vm;
 
             return vm;
+        }
+
+        private bool PertenceAVistaAtiva(Elemento modelo)
+        {
+            return modelo.ViewId.HasValue && modelo.ViewId == _document.VistaAtivaId;
         }
     }
 }

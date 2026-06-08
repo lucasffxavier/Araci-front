@@ -13,6 +13,7 @@ namespace Araci.Core.Commands
         private readonly NameService _names;
         private bool _inicializado;
         private string? _nomeFinal;
+        private Guid? _viewIdFinal;
 
         public AddElementoCommand(
             Elemento elemento,
@@ -28,6 +29,7 @@ namespace Araci.Core.Commands
         {
             PrepararPrimeiraExecucao();
             _document.AdicionarElemento(_elemento);
+            _viewIdFinal = _elemento.ViewId;
         }
 
         public void Undo()
@@ -38,7 +40,7 @@ namespace Araci.Core.Commands
         public void Redo()
         {
             RestaurarEstadoInicializado();
-            _document.AdicionarElemento(_elemento);
+            _document.AdicionarElementoPreservandoVista(_elemento);
         }
 
         private void PrepararPrimeiraExecucao()
@@ -51,6 +53,7 @@ namespace Araci.Core.Commands
 
             _names.GarantirNomeUnico(_elemento);
             _nomeFinal = _elemento.Nome;
+            _viewIdFinal = _elemento.ViewId;
             _inicializado = true;
         }
 
@@ -58,6 +61,8 @@ namespace Araci.Core.Commands
         {
             if (_nomeFinal != null)
                 _elemento.Nome = _nomeFinal;
+
+            _elemento.ViewId = _viewIdFinal;
         }
     }
 }

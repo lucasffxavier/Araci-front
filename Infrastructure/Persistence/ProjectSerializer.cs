@@ -327,6 +327,7 @@ namespace Araci.Infrastructure.Persistence
                 Kind = ObterKind(elemento),
                 DomainRole = elemento.DomainRole.ToString(),
                 Id = elemento.Id,
+                ViewId = elemento.ViewId,
                 X = elemento.PosicaoX,
                 Y = elemento.PosicaoY,
                 Rotation = elemento.Rotacao,
@@ -423,6 +424,7 @@ namespace Araci.Infrastructure.Persistence
                 return null;
 
             elemento.Id = dto.Id == Guid.Empty ? Guid.NewGuid() : dto.Id;
+            elemento.ViewId = dto.ViewId;
             elemento.PosicaoX = NormalizarCoordenada(dto.X);
             elemento.PosicaoY = NormalizarCoordenada(dto.Y);
             elemento.Rotacao = NormalizarRotacao(dto.Rotation);

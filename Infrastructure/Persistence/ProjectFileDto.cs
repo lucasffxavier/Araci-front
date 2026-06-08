@@ -89,6 +89,7 @@ namespace Araci.Infrastructure.Persistence
         public string Kind { get; set; } = string.Empty;
         public string? DomainRole { get; set; }
         public Guid Id { get; set; }
+        public Guid? ViewId { get; set; }
         public double X { get; set; }
         public double Y { get; set; }
         public double Rotation { get; set; }

@@ -32,6 +32,7 @@ namespace Araci.ViewModels
             _document.Vistas.CollectionChanged += OnDocumentCollectionChanged;
             _document.Tabelas.CollectionChanged += OnDocumentCollectionChanged;
             _document.Pranchas.CollectionChanged += OnDocumentCollectionChanged;
+            _document.VistaAtivaAlterada += OnVistaAtivaAlterada;
         }
 
         public ObservableCollection<ProjectBrowserSectionViewModel> Secoes { get; }
@@ -39,6 +40,15 @@ namespace Araci.ViewModels
         private void OnDocumentCollectionChanged(object? sender, NotifyCollectionChangedEventArgs e)
         {
             AtualizarSecoes();
+        }
+
+        private void OnVistaAtivaAlterada()
+        {
+            foreach (ProjectBrowserSectionViewModel secao in Secoes)
+            {
+                foreach (ProjectBrowserItemViewModel item in secao.Itens)
+                    item.IsActiveView = item.Tipo == "Vista" && _document.VistaAtivaId == item.Id;
+            }
         }
 
         private void AtualizarSecoes()

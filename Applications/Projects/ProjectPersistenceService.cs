@@ -122,7 +122,7 @@ namespace Araci.Applications.Projects
                 _document.SubstituirPranchas(pranchas);
 
                 foreach (Elemento elemento in elementos)
-                    _document.AdicionarElemento(elemento);
+                    _document.AdicionarElementoPreservandoVista(elemento);
 
                 _metadata = _serializer.CreateMetadataFromFile(dto, path);
                 _currentPath = path;

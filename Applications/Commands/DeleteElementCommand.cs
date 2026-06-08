@@ -27,7 +27,7 @@ namespace Araci.Core.Commands
 
         public void Undo()
         {
-            _document.AdicionarElemento(_elemento);
+            _document.AdicionarElementoPreservandoVista(_elemento);
         }
 
         public void Redo()

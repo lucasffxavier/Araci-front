@@ -19,6 +19,7 @@ namespace Araci.Models
         public double PosicaoX { get; set; }
         public double PosicaoY { get; set; }
         public Guid Id { get; set; } = Guid.NewGuid();
+        public Guid? ViewId { get; set; }
         public double Rotacao { get; set; }
         public double Escala { get; set; } = 1;
         public TipoElemento? Tipo { get; set; }
@@ -70,6 +71,7 @@ namespace Araci.Models
         protected void CopiarBasePara(Elemento destino)
         {
             destino.Id = Guid.NewGuid();
+            destino.ViewId = ViewId;
             destino.PosicaoX = PosicaoX;
             destino.PosicaoY = PosicaoY;
             destino.Rotacao = Rotacao;
