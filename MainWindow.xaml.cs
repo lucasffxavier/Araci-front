@@ -18,7 +18,7 @@ namespace Araci
             InitializeComponent();
             _context = new EditorContext();
             UnitValueConverter.CurrentUnits = _context.Settings.Units;
-            ProjectBrowser.DataContext = new ProjectBrowserViewModel();
+            ProjectBrowser.DataContext = new ProjectBrowserViewModel(_context.Document);
             _context.Editor.PropertyChanged += OnEditorStatePropertyChanged;
             Viewport.Inicializar(_context);
             InicializarRibbon();

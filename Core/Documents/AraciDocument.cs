@@ -8,9 +8,17 @@ namespace Araci.Core.Documents
         public AraciDocument()
         {
             Elementos = new ObservableCollection<Elemento>();
+            Vistas = new ObservableCollection<ProjectView>();
+            Tabelas = new ObservableCollection<ProjectTable>();
+            Pranchas = new ObservableCollection<ProjectSheet>();
+
+            CriarVistaPadrao();
         }
 
         public ObservableCollection<Elemento> Elementos { get; }
+        public ObservableCollection<ProjectView> Vistas { get; }
+        public ObservableCollection<ProjectTable> Tabelas { get; }
+        public ObservableCollection<ProjectSheet> Pranchas { get; }
 
         public void AdicionarElemento(Elemento elemento)
         {
@@ -31,6 +39,15 @@ namespace Araci.Core.Documents
         public void Limpar()
         {
             Elementos.Clear();
+            Vistas.Clear();
+            Tabelas.Clear();
+            Pranchas.Clear();
+            CriarVistaPadrao();
+        }
+
+        private void CriarVistaPadrao()
+        {
+            Vistas.Add(new ProjectView { Nome = "Vista principal" });
         }
     }
 }
