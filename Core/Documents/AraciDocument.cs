@@ -21,11 +21,14 @@ namespace Araci.Core.Documents
         public ObservableCollection<ProjectView> Vistas { get; }
         public ObservableCollection<ProjectTable> Tabelas { get; }
         public ObservableCollection<ProjectSheet> Pranchas { get; }
+        public Guid? VistaAtivaId { get; private set; }
+        public ProjectView? VistaAtiva => Vistas.FirstOrDefault(v => v.Id == VistaAtivaId);
 
         public ProjectView CriarNovaVista()
         {
             var vista = new ProjectView { Nome = CriarNomeUnico("Vista", Vistas.Select(v => v.Nome)) };
             Vistas.Add(vista);
+            GarantirVistaAtivaValida();
             return vista;
         }
 
@@ -58,6 +61,8 @@ namespace Araci.Core.Documents
 
             if (Vistas.Count == 0)
                 CriarVistaPadrao();
+
+            GarantirVistaAtivaValida();
         }
 
         public void SubstituirTabelas(IEnumerable<ProjectTable> tabelas)
@@ -103,7 +108,28 @@ namespace Araci.Core.Documents
 
         private void CriarVistaPadrao()
         {
-            Vistas.Add(new ProjectView { Nome = "Vista principal" });
+            var vista = new ProjectView { Nome = "Vista principal" };
+            Vistas.Add(vista);
+            VistaAtivaId = vista.Id;
+        }
+
+        public void DefinirVistaAtiva(Guid vistaId)
+        {
+            if (Vistas.Any(v => v.Id == vistaId))
+                VistaAtivaId = vistaId;
+
+            GarantirVistaAtivaValida();
+        }
+
+        private void GarantirVistaAtivaValida()
+        {
+            if (VistaAtivaId.HasValue && Vistas.Any(v => v.Id == VistaAtivaId.Value))
+                return;
+
+            if (Vistas.Count == 0)
+                CriarVistaPadrao();
+            else
+                VistaAtivaId = Vistas[0].Id;
         }
 
         private static string CriarNomeUnico(string prefixo, IEnumerable<string> nomesExistentes)

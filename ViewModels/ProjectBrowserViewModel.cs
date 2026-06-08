@@ -79,7 +79,10 @@ namespace Araci.ViewModels
                 tipo,
                 nome,
                 true,
-                SelecionarItem);
+                SelecionarItem)
+            {
+                IsActiveView = tipo == "Vista" && _document.VistaAtivaId == id
+            };
 
             item.IsSelected = _selectedItemId == id && _selectedItemKind == tipo;
             return item;
@@ -93,10 +96,16 @@ namespace Araci.ViewModels
             _selectedItemId = item.Id;
             _selectedItemKind = item.Tipo;
 
+            if (item.Tipo == "Vista")
+                _document.DefinirVistaAtiva(item.Id);
+
             foreach (ProjectBrowserSectionViewModel secao in Secoes)
             {
                 foreach (ProjectBrowserItemViewModel atual in secao.Itens)
+                {
                     atual.IsSelected = ReferenceEquals(atual, item);
+                    atual.IsActiveView = atual.Tipo == "Vista" && _document.VistaAtivaId == atual.Id;
+                }
             }
         }
 
@@ -132,6 +141,7 @@ namespace Araci.ViewModels
     {
         private readonly Action<ProjectBrowserItemViewModel>? _selecionar;
         private bool _isSelected;
+        private bool _isActiveView;
 
         public ProjectBrowserItemViewModel(Guid id, string tipo, string nome, bool isSelectable, Action<ProjectBrowserItemViewModel>? selecionar)
         {
@@ -148,6 +158,18 @@ namespace Araci.ViewModels
         public string Nome { get; }
         public bool IsSelectable { get; }
         public ICommand SelecionarCommand { get; }
+        public bool IsActiveView
+        {
+            get => _isActiveView;
+            set
+            {
+                if (_isActiveView == value)
+                    return;
+
+                _isActiveView = value;
+                OnPropertyChanged();
+            }
+        }
 
         public bool IsSelected
         {
