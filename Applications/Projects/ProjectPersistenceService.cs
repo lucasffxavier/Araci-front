@@ -109,9 +109,15 @@ namespace Araci.Applications.Projects
 
                 _serializer.ApplyUnitSettings(dto.Units, _settings.Units);
                 _serializer.ApplyTypeLibraries(dto.TypeLibraries);
+                var vistas = _serializer.CreateProjectViews(dto);
+                var tabelas = _serializer.CreateProjectTables(dto);
+                var pranchas = _serializer.CreateProjectSheets(dto);
                 var elementos = _serializer.CreateElements(dto);
 
                 _document.Limpar();
+                _document.SubstituirVistas(vistas);
+                _document.SubstituirTabelas(tabelas);
+                _document.SubstituirPranchas(pranchas);
 
                 foreach (Elemento elemento in elementos)
                     _document.AdicionarElemento(elemento);

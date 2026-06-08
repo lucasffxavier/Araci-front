@@ -61,6 +61,24 @@ namespace Araci
             _context.Editor.NavegadorProjetoVisivel = !_context.Editor.NavegadorProjetoVisivel;
         }
 
+        public void CriarNovaVistaProjeto()
+        {
+            _context.Document.CriarNovaVista();
+            MostrarNavegadorProjeto();
+        }
+
+        public void CriarNovaTabelaProjeto()
+        {
+            _context.Document.CriarNovaTabela();
+            MostrarNavegadorProjeto();
+        }
+
+        public void CriarNovaPranchaProjeto()
+        {
+            _context.Document.CriarNovaPrancha();
+            MostrarNavegadorProjeto();
+        }
+
         public void MostrarConfiguracaoUnidades()
         {
             var viewModel = new UnitsSettingsViewModel(_context.Settings.Units);
@@ -105,6 +123,11 @@ namespace Araci
 
             ProjectBrowserColumn.Width = new GridLength(0);
             ProjectBrowser.Visibility = Visibility.Collapsed;
+        }
+
+        private void MostrarNavegadorProjeto()
+        {
+            _context.Editor.NavegadorProjetoVisivel = true;
         }
     }
 }

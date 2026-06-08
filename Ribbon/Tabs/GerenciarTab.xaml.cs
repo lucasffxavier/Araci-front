@@ -22,6 +22,24 @@ namespace Araci.Ribbon.Tabs
                 mainWindow.AlternarNavegadorProjeto();
         }
 
+        private void NovaVistaButton_Click(object sender, RoutedEventArgs e)
+        {
+            if (Window.GetWindow(this) is MainWindow mainWindow)
+                mainWindow.CriarNovaVistaProjeto();
+        }
+
+        private void NovaTabelaButton_Click(object sender, RoutedEventArgs e)
+        {
+            if (Window.GetWindow(this) is MainWindow mainWindow)
+                mainWindow.CriarNovaTabelaProjeto();
+        }
+
+        private void NovaPranchaButton_Click(object sender, RoutedEventArgs e)
+        {
+            if (Window.GetWindow(this) is MainWindow mainWindow)
+                mainWindow.CriarNovaPranchaProjeto();
+        }
+
         private void UnidadesButton_Click(object sender, RoutedEventArgs e)
         {
             if (Window.GetWindow(this) is MainWindow mainWindow)

@@ -15,7 +15,29 @@ namespace Araci.Infrastructure.Persistence
         public string? Notes { get; set; }
         public ProjectUnitSettingsDto? Units { get; set; }
         public TypeLibrariesDto? TypeLibraries { get; set; }
+        public List<ProjectViewDto> Views { get; set; } = new();
+        public List<ProjectTableDto> Tables { get; set; } = new();
+        public List<ProjectSheetDto> Sheets { get; set; } = new();
         public List<ElementDto> Elements { get; set; } = new();
+    }
+
+    public sealed class ProjectViewDto
+    {
+        public Guid Id { get; set; }
+        public string Nome { get; set; } = string.Empty;
+    }
+
+    public sealed class ProjectTableDto
+    {
+        public Guid Id { get; set; }
+        public string Nome { get; set; } = string.Empty;
+    }
+
+    public sealed class ProjectSheetDto
+    {
+        public Guid Id { get; set; }
+        public string Nome { get; set; } = string.Empty;
+        public string Numero { get; set; } = string.Empty;
     }
 
     public sealed class ProjectMetadataDto

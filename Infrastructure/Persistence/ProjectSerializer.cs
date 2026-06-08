@@ -64,6 +64,15 @@ namespace Araci.Infrastructure.Persistence
                 Notes = metadata.Notes,
                 Units = CreateUnitSettingsDto(units),
                 TypeLibraries = CreateTypeLibrariesDto(),
+                Views = document.Vistas
+                    .Select(CriarProjectViewDto)
+                    .ToList(),
+                Tables = document.Tabelas
+                    .Select(CriarProjectTableDto)
+                    .ToList(),
+                Sheets = document.Pranchas
+                    .Select(CriarProjectSheetDto)
+                    .ToList(),
                 Elements = document.Elementos
                     .Select(CriarElementoDto)
                     .ToList()
@@ -128,6 +137,39 @@ namespace Araci.Infrastructure.Persistence
                 .Select(CriarElemento)
                 .Where(e => e != null)
                 .Cast<Elemento>()
+                .ToList();
+        }
+
+        public IReadOnlyList<ProjectView> CreateProjectViews(ProjectFileDto dto)
+        {
+            ArgumentNullException.ThrowIfNull(dto);
+
+            return dto.Views
+                .Select(CriarProjectView)
+                .Where(v => v != null)
+                .Cast<ProjectView>()
+                .ToList();
+        }
+
+        public IReadOnlyList<ProjectTable> CreateProjectTables(ProjectFileDto dto)
+        {
+            ArgumentNullException.ThrowIfNull(dto);
+
+            return dto.Tables
+                .Select(CriarProjectTable)
+                .Where(t => t != null)
+                .Cast<ProjectTable>()
+                .ToList();
+        }
+
+        public IReadOnlyList<ProjectSheet> CreateProjectSheets(ProjectFileDto dto)
+        {
+            ArgumentNullException.ThrowIfNull(dto);
+
+            return dto.Sheets
+                .Select(CriarProjectSheet)
+                .Where(s => s != null)
+                .Cast<ProjectSheet>()
                 .ToList();
         }
 
@@ -290,6 +332,71 @@ namespace Araci.Infrastructure.Persistence
                 Vertices = elemento is Cabo cabo
                     ? cabo.Vertices.Select(CriarPointDto).ToList()
                     : new List<PointDto>()
+            };
+        }
+
+        private static ProjectViewDto CriarProjectViewDto(ProjectView vista)
+        {
+            return new ProjectViewDto
+            {
+                Id = vista.Id,
+                Nome = vista.Nome
+            };
+        }
+
+        private static ProjectTableDto CriarProjectTableDto(ProjectTable tabela)
+        {
+            return new ProjectTableDto
+            {
+                Id = tabela.Id,
+                Nome = tabela.Nome
+            };
+        }
+
+        private static ProjectSheetDto CriarProjectSheetDto(ProjectSheet prancha)
+        {
+            return new ProjectSheetDto
+            {
+                Id = prancha.Id,
+                Nome = prancha.Nome,
+                Numero = prancha.Numero
+            };
+        }
+
+        private static ProjectView? CriarProjectView(ProjectViewDto dto)
+        {
+            if (string.IsNullOrWhiteSpace(dto.Nome))
+                return null;
+
+            return new ProjectView
+            {
+                Id = dto.Id == Guid.Empty ? Guid.NewGuid() : dto.Id,
+                Nome = dto.Nome
+            };
+        }
+
+        private static ProjectTable? CriarProjectTable(ProjectTableDto dto)
+        {
+            if (string.IsNullOrWhiteSpace(dto.Nome))
+                return null;
+
+            return new ProjectTable
+            {
+                Id = dto.Id == Guid.Empty ? Guid.NewGuid() : dto.Id,
+                Nome = dto.Nome
+            };
+        }
+
+        private static ProjectSheet? CriarProjectSheet(ProjectSheetDto dto)
+        {
+            if (string.IsNullOrWhiteSpace(dto.Nome))
+                return null;
+
+            return new ProjectSheet
+            {
+                Id = dto.Id == Guid.Empty ? Guid.NewGuid() : dto.Id,
+                Nome = dto.Nome,
+                Numero = dto.Numero ?? string.Empty
             };
         }
 
