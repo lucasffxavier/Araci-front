@@ -5059,6 +5059,10 @@ namespace Araci.TechnicalChecks
             {
             }
 
+            public void ShowElementosTabelaPlaceholder()
+            {
+            }
+
             public bool Confirm(string title, string message)
             {
                 ConfirmChamadas++;

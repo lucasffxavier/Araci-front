@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.ComponentModel;
 using System.Runtime.CompilerServices;
@@ -106,9 +106,7 @@ namespace Araci.ViewModels
 
         private void MostrarElementosTabelaPlaceholder()
         {
-            _dialogs.ShowInfo(
-                "Elementos da tabela",
-                "A configuração dos elementos da tabela será implementada em uma etapa futura.");
+            _dialogs.ShowElementosTabelaPlaceholder();
         }
 
         private void MostrarFiltrosPlaceholder()

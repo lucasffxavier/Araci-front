@@ -10,6 +10,8 @@ namespace Araci.Applications.Abstractions
 
         void ShowError(string title, string message);
 
+        void ShowElementosTabelaPlaceholder();
+
         bool Confirm(string title, string message);
 
         void Show(SimulationMessage message);

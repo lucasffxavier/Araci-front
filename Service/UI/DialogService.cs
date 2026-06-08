@@ -1,4 +1,5 @@
 using Araci.Applications.Abstractions;
+using Araci.Properties;
 using Araci.Services.Simulation;
 using System.Windows;
 
@@ -19,6 +20,16 @@ namespace Araci.Services.UI
         public void ShowError(string title, string message)
         {
             Show(title, message, MessageBoxImage.Error);
+        }
+
+        public void ShowElementosTabelaPlaceholder()
+        {
+            var window = new ElementosTabelaWindow
+            {
+                Owner = Application.Current?.MainWindow
+            };
+
+            window.ShowDialog();
         }
 
         public bool Confirm(string title, string message)
