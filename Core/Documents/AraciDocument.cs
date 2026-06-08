@@ -24,6 +24,7 @@ namespace Araci.Core.Documents
         public Guid? VistaAtivaId { get; private set; }
         public ProjectView? VistaAtiva => Vistas.FirstOrDefault(v => v.Id == VistaAtivaId);
         public event System.Action? VistaAtivaAlterada;
+        public event System.Action? ItemProjetoRenomeado;
 
         public IEnumerable<Elemento> ObterElementosDaVistaAtiva()
         {
@@ -54,30 +55,120 @@ namespace Araci.Core.Documents
 
         public ProjectView CriarNovaVista()
         {
-            var vista = new ProjectView { Nome = CriarNomeUnico("Vista", Vistas.Select(v => v.Nome)) };
-            Vistas.Add(vista);
-            GarantirVistaAtivaValida();
+            ProjectView vista = CriarModeloNovaVista();
+            AdicionarVista(vista);
             return vista;
         }
 
         public ProjectTable CriarNovaTabela()
         {
-            var tabela = new ProjectTable { Nome = CriarNomeUnico("Tabela", Tabelas.Select(t => t.Nome)) };
-            Tabelas.Add(tabela);
+            ProjectTable tabela = CriarModeloNovaTabela();
+            AdicionarTabela(tabela);
             return tabela;
         }
 
         public ProjectSheet CriarNovaPrancha()
         {
+            ProjectSheet prancha = CriarModeloNovaPrancha();
+            AdicionarPrancha(prancha);
+            return prancha;
+        }
+
+        public ProjectView CriarModeloNovaVista()
+        {
+            return new ProjectView { Nome = CriarNomeUnico("Vista", Vistas.Select(v => v.Nome)) };
+        }
+
+        public ProjectTable CriarModeloNovaTabela()
+        {
+            return new ProjectTable { Nome = CriarNomeUnico("Tabela", Tabelas.Select(t => t.Nome)) };
+        }
+
+        public ProjectSheet CriarModeloNovaPrancha()
+        {
             int indice = CriarIndiceUnico("Prancha", Pranchas.Select(p => p.Nome));
-            var prancha = new ProjectSheet
+            return new ProjectSheet
             {
                 Nome = $"Prancha {indice}",
                 Numero = $"A{indice:000}"
             };
+        }
+
+        public void AdicionarVista(ProjectView vista)
+        {
+            if (vista == null || Vistas.Any(v => v.Id == vista.Id))
+                return;
+
+            Vistas.Add(vista);
+            GarantirVistaAtivaValida();
+        }
+
+        public void RemoverVista(ProjectView vista)
+        {
+            if (vista == null || !Vistas.Contains(vista))
+                return;
+
+            Vistas.Remove(vista);
+            GarantirVistaAtivaValida();
+        }
+
+        public void AdicionarTabela(ProjectTable tabela)
+        {
+            if (tabela == null || Tabelas.Any(t => t.Id == tabela.Id))
+                return;
+
+            Tabelas.Add(tabela);
+        }
+
+        public void RemoverTabela(ProjectTable tabela)
+        {
+            if (tabela == null || !Tabelas.Contains(tabela))
+                return;
+
+            Tabelas.Remove(tabela);
+        }
+
+        public void AdicionarPrancha(ProjectSheet prancha)
+        {
+            if (prancha == null || Pranchas.Any(p => p.Id == prancha.Id))
+                return;
 
             Pranchas.Add(prancha);
-            return prancha;
+        }
+
+        public void RemoverPrancha(ProjectSheet prancha)
+        {
+            if (prancha == null || !Pranchas.Contains(prancha))
+                return;
+
+            Pranchas.Remove(prancha);
+        }
+
+        public void RenomearVista(ProjectView vista, string nome)
+        {
+            if (vista == null || !Vistas.Contains(vista))
+                return;
+
+            vista.Nome = nome;
+            ItemProjetoRenomeado?.Invoke();
+        }
+
+        public void RenomearTabela(ProjectTable tabela, string nome)
+        {
+            if (tabela == null || !Tabelas.Contains(tabela))
+                return;
+
+            tabela.Nome = nome;
+            ItemProjetoRenomeado?.Invoke();
+        }
+
+        public void RenomearPrancha(ProjectSheet prancha, string nome)
+        {
+            if (prancha == null || !Pranchas.Contains(prancha))
+                return;
+
+            prancha.Nome = nome;
+            ItemProjetoRenomeado?.Invoke();
         }
 
         public void SubstituirVistas(IEnumerable<ProjectView> vistas)

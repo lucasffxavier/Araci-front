@@ -6,6 +6,7 @@ using System.ComponentModel;
 using System.Linq;
 using System.Runtime.CompilerServices;
 using System.Windows.Input;
+using Araci.Applications.UseCases.Projeto;
 using Araci.Core.Documents;
 using Araci.ViewModels.Base;
 
@@ -15,13 +16,18 @@ namespace Araci.ViewModels
     {
         private readonly AraciDocument _document;
         private readonly Action<Guid> _definirVistaAtiva;
+        private readonly RenomearItemProjetoUseCase? _renomearItemProjeto;
         private Guid? _selectedItemId;
         private string? _selectedItemKind;
 
-        public ProjectBrowserViewModel(AraciDocument document, Action<Guid>? definirVistaAtiva = null)
+        public ProjectBrowserViewModel(
+            AraciDocument document,
+            Action<Guid>? definirVistaAtiva = null,
+            RenomearItemProjetoUseCase? renomearItemProjeto = null)
         {
             _document = document;
             _definirVistaAtiva = definirVistaAtiva ?? _document.DefinirVistaAtiva;
+            _renomearItemProjeto = renomearItemProjeto;
             Secoes = new ObservableCollection<ProjectBrowserSectionViewModel>
             {
                 new("Vistas"),
@@ -35,6 +41,7 @@ namespace Araci.ViewModels
             _document.Tabelas.CollectionChanged += OnDocumentCollectionChanged;
             _document.Pranchas.CollectionChanged += OnDocumentCollectionChanged;
             _document.VistaAtivaAlterada += OnVistaAtivaAlterada;
+            _document.ItemProjetoRenomeado += OnItemProjetoRenomeado;
         }
 
         public ObservableCollection<ProjectBrowserSectionViewModel> Secoes { get; }
@@ -51,6 +58,11 @@ namespace Araci.ViewModels
                 foreach (ProjectBrowserItemViewModel item in secao.Itens)
                     item.IsActiveView = item.Tipo == "Vista" && _document.VistaAtivaId == item.Id;
             }
+        }
+
+        private void OnItemProjetoRenomeado()
+        {
+            AtualizarSecoes();
         }
 
         private void AtualizarSecoes()
@@ -133,70 +145,23 @@ namespace Araci.ViewModels
 
         private bool RenomearItem(ProjectBrowserItemViewModel item, string novoNome)
         {
-            string nome = NormalizarNome(novoNome);
-
-            if (string.IsNullOrWhiteSpace(nome))
-                return false;
-
-            if (NomeDuplicado(item, nome))
+            if (_renomearItemProjeto == null)
                 return false;
 
             switch (item.Tipo)
             {
                 case "Vista":
-                    ProjectView? vista = _document.Vistas.FirstOrDefault(v => v.Id == item.Id);
-
-                    if (vista == null)
-                        return false;
-
-                    vista.Nome = nome;
-                    item.AtualizarNomeExibicao(vista.Nome);
-                    return true;
+                    return _renomearItemProjeto.RenomearVista(item.Id, novoNome);
 
                 case "Tabela":
-                    ProjectTable? tabela = _document.Tabelas.FirstOrDefault(t => t.Id == item.Id);
-
-                    if (tabela == null)
-                        return false;
-
-                    tabela.Nome = nome;
-                    item.AtualizarNomeExibicao(tabela.Nome);
-                    return true;
+                    return _renomearItemProjeto.RenomearTabela(item.Id, novoNome);
 
                 case "Prancha":
-                    ProjectSheet? prancha = _document.Pranchas.FirstOrDefault(p => p.Id == item.Id);
-
-                    if (prancha == null)
-                        return false;
-
-                    prancha.Nome = nome;
-                    item.AtualizarNomeExibicao(FormatarPrancha(prancha), prancha.Nome);
-                    return true;
+                    return _renomearItemProjeto.RenomearPrancha(item.Id, novoNome);
 
                 default:
                     return false;
             }
-        }
-
-        private bool NomeDuplicado(ProjectBrowserItemViewModel item, string nome)
-        {
-            return item.Tipo switch
-            {
-                "Vista" => _document.Vistas.Any(v => v.Id != item.Id && NomeIgual(v.Nome, nome)),
-                "Tabela" => _document.Tabelas.Any(t => t.Id != item.Id && NomeIgual(t.Nome, nome)),
-                "Prancha" => _document.Pranchas.Any(p => p.Id != item.Id && NomeIgual(p.Nome, nome)),
-                _ => false
-            };
-        }
-
-        private static string NormalizarNome(string nome)
-        {
-            return string.IsNullOrWhiteSpace(nome) ? string.Empty : nome.Trim();
-        }
-
-        private static bool NomeIgual(string atual, string novo)
-        {
-            return string.Equals(NormalizarNome(atual), novo, StringComparison.OrdinalIgnoreCase);
         }
 
         private static string FormatarPrancha(ProjectSheet prancha)
@@ -227,6 +192,7 @@ namespace Araci.ViewModels
         private bool _isActiveView;
         private bool _isEditing;
         private string _nome;
+        private string _nomeEdicao;
         private string _textoEdicao;
 
         public ProjectBrowserItemViewModel(
@@ -241,6 +207,7 @@ namespace Araci.ViewModels
             Id = id;
             Tipo = tipo;
             _nome = nome;
+            _nomeEdicao = nomeEdicao;
             _textoEdicao = nomeEdicao;
             IsSelectable = isSelectable;
             _selecionar = selecionar;
@@ -332,7 +299,8 @@ namespace Araci.ViewModels
         public void AtualizarNomeExibicao(string nome, string? nomeEdicao = null)
         {
             Nome = nome;
-            TextoEdicao = nomeEdicao ?? nome;
+            _nomeEdicao = nomeEdicao ?? nome;
+            TextoEdicao = _nomeEdicao;
         }
 
         private void Selecionar()
@@ -345,7 +313,7 @@ namespace Araci.ViewModels
             if (!IsSelectable)
                 return;
 
-            TextoEdicao = Nome;
+            TextoEdicao = _nomeEdicao;
             IsEditing = true;
         }
 
@@ -354,7 +322,7 @@ namespace Araci.ViewModels
             if (!IsEditing)
                 return;
 
-            string nomeAnterior = Nome;
+            string nomeAnterior = _nomeEdicao;
 
             if (_renomear?.Invoke(this, TextoEdicao) != true)
                 TextoEdicao = nomeAnterior;
@@ -364,7 +332,7 @@ namespace Araci.ViewModels
 
         private void CancelarEdicao()
         {
-            TextoEdicao = Nome;
+            TextoEdicao = _nomeEdicao;
             IsEditing = false;
         }
 

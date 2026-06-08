@@ -18,7 +18,7 @@ namespace Araci
             InitializeComponent();
             _context = new EditorContext();
             UnitValueConverter.CurrentUnits = _context.Settings.Units;
-            ProjectBrowser.DataContext = new ProjectBrowserViewModel(_context.Document, _context.DefinirVistaAtiva);
+            ProjectBrowser.DataContext = new ProjectBrowserViewModel(_context.Document, _context.DefinirVistaAtiva, _context.RenomearItemProjeto);
             _context.Editor.PropertyChanged += OnEditorStatePropertyChanged;
             Viewport.Inicializar(_context);
             InicializarRibbon();
@@ -63,19 +63,19 @@ namespace Araci
 
         public void CriarNovaVistaProjeto()
         {
-            _context.Document.CriarNovaVista();
+            _context.CriarItemProjeto.CriarVista();
             MostrarNavegadorProjeto();
         }
 
         public void CriarNovaTabelaProjeto()
         {
-            _context.Document.CriarNovaTabela();
+            _context.CriarItemProjeto.CriarTabela();
             MostrarNavegadorProjeto();
         }
 
         public void CriarNovaPranchaProjeto()
         {
-            _context.Document.CriarNovaPrancha();
+            _context.CriarItemProjeto.CriarPrancha();
             MostrarNavegadorProjeto();
         }
 
