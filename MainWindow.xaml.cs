@@ -82,6 +82,12 @@ namespace Araci
             FocarViewport();
         }
 
+        private void OnProjectBrowserCloseRequested(object sender, RoutedEventArgs e)
+        {
+            _context.Editor.NavegadorProjetoVisivel = false;
+            FocarViewport();
+        }
+
         private void OnEditorStatePropertyChanged(object? sender, PropertyChangedEventArgs e)
         {
             if (string.IsNullOrEmpty(e.PropertyName) || e.PropertyName == nameof(EditorState.NavegadorProjetoVisivel))
