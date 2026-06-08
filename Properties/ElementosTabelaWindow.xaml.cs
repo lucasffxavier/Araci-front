@@ -74,30 +74,49 @@ namespace Araci.Properties
 
         private void AdicionarCampo_Click(object sender, RoutedEventArgs e)
         {
-            if (CamposDisponiveisListBox.SelectedItem is not CampoDisponivelItem item)
+            List<CampoDisponivelItem> itens = CamposDisponiveisListBox.SelectedItems
+                .OfType<CampoDisponivelItem>()
+                .ToList();
+
+            if (itens.Count == 0)
                 return;
 
-            if (_camposSelecionados.Any(c => c.Campo.Categoria == item.Categoria && c.Campo.CampoId == item.CampoId))
-                return;
-
-            _camposSelecionados.Add(new CampoSelecionadoItem(new ProjectTableFieldSelection
+            foreach (CampoDisponivelItem item in itens)
             {
-                Categoria = item.Categoria,
-                CampoId = item.CampoId,
-                NomeExibicao = item.NomeExibicao,
-                Ordem = _camposSelecionados.Count
-            }));
+                if (_camposSelecionados.Any(c => c.Campo.Categoria == item.Categoria && c.Campo.CampoId == item.CampoId))
+                    continue;
+
+                _camposSelecionados.Add(new CampoSelecionadoItem(new ProjectTableFieldSelection
+                {
+                    Categoria = item.Categoria,
+                    CampoId = item.CampoId,
+                    NomeExibicao = item.NomeExibicao,
+                    Ordem = _camposSelecionados.Count
+                }));
+            }
 
             AtualizarCamposSelecionados();
+            AtualizarCamposDisponiveis();
         }
 
         private void RemoverCampo_Click(object sender, RoutedEventArgs e)
         {
-            if (CamposSelecionadosListBox.SelectedItem is not CampoSelecionadoItem item)
+            List<CampoSelecionadoItem> itens = CamposSelecionadosListBox.SelectedItems
+                .OfType<CampoSelecionadoItem>()
+                .ToList();
+
+            if (itens.Count == 0)
                 return;
 
-            int index = _camposSelecionados.IndexOf(item);
-            _camposSelecionados.Remove(item);
+            int index = itens
+                .Select(item => _camposSelecionados.IndexOf(item))
+                .Where(i => i >= 0)
+                .DefaultIfEmpty(-1)
+                .Min();
+
+            foreach (CampoSelecionadoItem item in itens)
+                _camposSelecionados.Remove(item);
+
             AtualizarCamposSelecionados(Math.Min(index, _camposSelecionados.Count - 1));
             AtualizarCamposDisponiveis();
         }
@@ -114,6 +133,9 @@ namespace Araci.Properties
 
         private void MoverCampoSelecionado(int delta)
         {
+            if (CamposSelecionadosListBox.SelectedItems.Count != 1)
+                return;
+
             if (CamposSelecionadosListBox.SelectedItem is not CampoSelecionadoItem item)
                 return;
 
