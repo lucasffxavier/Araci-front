@@ -45,9 +45,11 @@ namespace Araci.ViewModels
             _document.Pranchas.CollectionChanged += OnDocumentCollectionChanged;
             _document.VistaAtivaAlterada += OnVistaAtivaAlterada;
             _document.ItemProjetoRenomeado += OnItemProjetoRenomeado;
+            ExcluirSelecionadoCommand = new RelayCommand(ExecutarExcluirSelecionado);
         }
 
         public ObservableCollection<ProjectBrowserSectionViewModel> Secoes { get; }
+        public ICommand ExcluirSelecionadoCommand { get; }
 
         private void OnDocumentCollectionChanged(object? sender, NotifyCollectionChangedEventArgs e)
         {
@@ -180,6 +182,23 @@ namespace Araci.ViewModels
                 "Prancha" => _excluirItemProjeto.ExcluirPrancha(item.Id),
                 _ => false
             };
+        }
+
+        public bool ExcluirSelecionado()
+        {
+            ProjectBrowserItemViewModel? item = Secoes
+                .SelectMany(secao => secao.Itens)
+                .FirstOrDefault(atual =>
+                    atual.IsSelected &&
+                    atual.Id == _selectedItemId &&
+                    atual.Tipo == _selectedItemKind);
+
+            return item?.TentarExcluir() == true;
+        }
+
+        private void ExecutarExcluirSelecionado()
+        {
+            ExcluirSelecionado();
         }
 
         private static string FormatarPrancha(ProjectSheet prancha)
@@ -359,9 +378,14 @@ namespace Araci.ViewModels
             IsEditing = false;
         }
 
+        public bool TentarExcluir()
+        {
+            return _excluir?.Invoke(this) == true;
+        }
+
         private void Excluir()
         {
-            _excluir?.Invoke(this);
+            TentarExcluir();
         }
 
         public event PropertyChangedEventHandler? PropertyChanged;

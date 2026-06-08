@@ -29,6 +29,15 @@ namespace Araci.Views
             RaiseEvent(new RoutedEventArgs(CloseRequestedEvent));
         }
 
+        private void OnProjectBrowserPreviewKeyDown(object sender, KeyEventArgs e)
+        {
+            if (e.Key != Key.Delete || e.OriginalSource is TextBox)
+                return;
+
+            if (DataContext is ProjectBrowserViewModel viewModel && viewModel.ExcluirSelecionado())
+                e.Handled = true;
+        }
+
         private void OnItemMouseDoubleClick(object sender, MouseButtonEventArgs e)
         {
             if (sender is Button { DataContext: ProjectBrowserItemViewModel item } &&
