@@ -28,7 +28,9 @@ namespace Araci.Services.Topology
 
         public ElectricGraph Build()
         {
-            var nodes = _document.Elementos
+            var elementos = _document.ObterElementosDaVistaAtiva().ToList();
+
+            var nodes = elementos
                 .Where(IsNodeElement)
                 .Select(CreateNode)
                 .ToList();
@@ -37,7 +39,7 @@ namespace Araci.Services.Topology
                 n => n.ElementId,
                 StringComparer.OrdinalIgnoreCase);
 
-            var edges = BuildEdges(nodeById);
+            var edges = BuildEdges(elementos, nodeById);
 
             return new ElectricGraph(nodes, edges);
         }
@@ -69,12 +71,13 @@ namespace Araci.Services.Topology
         }
 
         private IReadOnlyList<ElectricGraphEdge> BuildEdges(
+            IEnumerable<Elemento> elementos,
             IReadOnlyDictionary<string, ElectricGraphNode> nodeById)
         {
             var edges = new List<ElectricGraphEdge>();
             var usedPairs = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 
-            foreach (Cabo cabo in _document.Elementos.OfType<Cabo>().Where(c => c.ParticipaDoGrafoEletrico))
+            foreach (Cabo cabo in elementos.OfType<Cabo>().Where(c => c.ParticipaDoGrafoEletrico))
                 edges.Add(CreateEdge(cabo, nodeById, usedPairs));
 
             return edges;

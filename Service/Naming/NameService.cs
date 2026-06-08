@@ -56,7 +56,7 @@ namespace Araci.Services.Naming
             if (string.IsNullOrWhiteSpace(normalizado))
                 return false;
 
-            return _document.Elementos.Any(e =>
+            return _document.ObterElementosDaVistaDoElementoOuAtiva(elementoAtual).Any(e =>
                 !ReferenceEquals(e, elementoAtual) &&
                 string.Equals(e.Nome, normalizado, StringComparison.OrdinalIgnoreCase));
         }

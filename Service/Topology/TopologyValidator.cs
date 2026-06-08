@@ -70,19 +70,19 @@ namespace Araci.Services.Topology
             foreach (ElementoEquipamento equipamento in ElementosEletricos().OfType<ElementoEquipamento>())
             {
                 if (!string.IsNullOrWhiteSpace(equipamento.BarraId) &&
-                    _connectivity.ObterElementoPorId(equipamento.BarraId) == null)
+                    ObterElementoAtivoPorId(equipamento.BarraId) == null)
                 {
                     result.AddError($"Equipamento '{Nome(equipamento)}' com BarraId invalido: {equipamento.BarraId}.");
                 }
             }
 
-            foreach (Carga carga in _document.Elementos.OfType<Carga>().Where(c => c.ParticipaDoGrafoEletrico))
+            foreach (Carga carga in ElementosEletricos().OfType<Carga>())
             {
                 if (!TemConexaoTopologica(carga))
                     result.AddError($"Carga '{Nome(carga)}' sem conexao topologica utilizavel por Id.");
             }
 
-            foreach (Gerador gerador in _document.Elementos.OfType<Gerador>().Where(g => g.ParticipaDoGrafoEletrico))
+            foreach (Gerador gerador in ElementosEletricos().OfType<Gerador>())
             {
                 if (!TemConexaoTopologica(gerador))
                     result.AddError($"Gerador '{Nome(gerador)}' sem conexao topologica utilizavel por Id.");
@@ -104,7 +104,7 @@ namespace Araci.Services.Topology
         private bool TemConexaoTopologica(ElementoEquipamento equipamento)
         {
             if (!string.IsNullOrWhiteSpace(equipamento.BarraId) &&
-                _connectivity.ObterElementoPorId(equipamento.BarraId) != null)
+                ObterElementoAtivoPorId(equipamento.BarraId) != null)
             {
                 return true;
             }
@@ -117,7 +117,16 @@ namespace Araci.Services.Topology
 
         private IEnumerable<Elemento> ElementosEletricos()
         {
-            return _document.Elementos.Where(e => e.ParticipaDoGrafoEletrico);
+            return _document.ObterElementosDaVistaAtiva().Where(e => e.ParticipaDoGrafoEletrico);
+        }
+
+        private Elemento? ObterElementoAtivoPorId(string id)
+        {
+            if (string.IsNullOrWhiteSpace(id))
+                return null;
+
+            return _document.ObterElementosDaVistaAtiva().FirstOrDefault(e =>
+                string.Equals(e.Id.ToString(), id.Trim(), StringComparison.OrdinalIgnoreCase));
         }
 
         private static string Nome(Elemento elemento)

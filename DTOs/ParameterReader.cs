@@ -16,11 +16,15 @@ namespace Araci.DTOs
         private readonly ConnectivityService? _connectivity;
         private readonly TopologyValidator? _topology;
         private readonly ElectricGraphBuilder? _graphBuilder;
+        private readonly IReadOnlyList<Elemento> _elementosOperacionais;
 
         public ParameterReader(CoreApi api)
         {
             _api = api ?? throw new ArgumentNullException(nameof(api));
             _connectivity = new ConnectivityService(api.Document);
+            _graphBuilder = new ElectricGraphBuilder(api.Document);
+            _topology = new TopologyValidator(api.Document, _connectivity, _graphBuilder);
+            _elementosOperacionais = api.Document.ObterElementosDaVistaAtiva().ToList();
         }
 
         public ParameterReader(EditorContext context)
@@ -54,6 +58,7 @@ namespace Araci.DTOs
             _connectivity = connectivity ?? throw new ArgumentNullException(nameof(connectivity));
             _topology = topology ?? throw new ArgumentNullException(nameof(topology));
             _graphBuilder = graphBuilder;
+            _elementosOperacionais = api.Document.ObterElementosDaVistaAtiva().ToList();
         }
 
         public TopologyValidationResult? ValidateTopology()
@@ -65,7 +70,7 @@ namespace Araci.DTOs
         {
             ElectricGraph? graph = _graphBuilder?.Build();
 
-            return _api.ObterElementos<Carga>()
+            return _elementosOperacionais.OfType<Carga>()
                 .Where(carga => carga.ParticipaDoGrafoEletrico)
                 .Select(carga => new LoadData
                 {
@@ -88,7 +93,7 @@ namespace Araci.DTOs
         {
             ElectricGraph? graph = _graphBuilder?.Build();
 
-            return _api.ObterElementos<Cabo>()
+            return _elementosOperacionais.OfType<Cabo>()
                 .Where(cabo => cabo.ParticipaDoGrafoEletrico)
                 .Select(cabo => new LineData
                 {
@@ -110,7 +115,7 @@ namespace Araci.DTOs
 
         public IList<TransformerData> GetTransformers()
         {
-            return _api.ObterElementos<Transformador>()
+            return _elementosOperacionais.OfType<Transformador>()
                 .Where(transformador => transformador.ParticipaDoGrafoEletrico)
                 .Select(transformador => new TransformerData
                 {
@@ -147,7 +152,7 @@ namespace Araci.DTOs
         {
             ElectricGraph? graph = _graphBuilder?.Build();
 
-            return _api.ObterElementos<Gerador>()
+            return _elementosOperacionais.OfType<Gerador>()
                 .Where(gerador => gerador.ParticipaDoGrafoEletrico)
                 .Select(gerador => new GeneratorData
                 {
@@ -166,7 +171,7 @@ namespace Araci.DTOs
         {
             ElectricGraph? graph = _graphBuilder?.Build();
 
-            return _api.ObterElementos<Sin>()
+            return _elementosOperacionais.OfType<Sin>()
                 .Where(sin => sin.ParticipaDoGrafoEletrico)
                 .Select(sin => new ExternalSourceData
                 {
@@ -183,7 +188,7 @@ namespace Araci.DTOs
 
         private IList<Elemento> GetElementsByTypeName(params string[] typeNames)
         {
-            return _api.ObterElementos()
+            return _elementosOperacionais
                 .Where(elemento => typeNames.Any(typeName =>
                     string.Equals(elemento.GetType().Name, typeName, StringComparison.OrdinalIgnoreCase) ||
                     string.Equals(elemento.Tipo?.NomeTipo, typeName, StringComparison.OrdinalIgnoreCase)))
@@ -265,8 +270,17 @@ namespace Araci.DTOs
 
         private string? ResolverBusPorElementoETerminal(string elementId, string terminalId)
         {
-            Elemento? elemento = _connectivity?.ObterElementoPorId(elementId);
+            Elemento? elemento = ObterElementoOperacionalPorId(elementId);
             return ResolverBarraPorTerminal(elemento, terminalId);
+        }
+
+        private Elemento? ObterElementoOperacionalPorId(string elementId)
+        {
+            if (string.IsNullOrWhiteSpace(elementId))
+                return null;
+
+            return _elementosOperacionais.FirstOrDefault(e =>
+                string.Equals(e.Id.ToString(), elementId.Trim(), StringComparison.OrdinalIgnoreCase));
         }
 
         private static string? ResolverBarraPorTerminal(Elemento? elemento, string terminalId)

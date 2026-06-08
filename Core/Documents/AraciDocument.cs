@@ -25,6 +25,33 @@ namespace Araci.Core.Documents
         public ProjectView? VistaAtiva => Vistas.FirstOrDefault(v => v.Id == VistaAtivaId);
         public event System.Action? VistaAtivaAlterada;
 
+        public IEnumerable<Elemento> ObterElementosDaVistaAtiva()
+        {
+            return VistaAtivaId.HasValue && Vistas.Any(v => v.Id == VistaAtivaId.Value)
+                ? ObterElementosDaVista(VistaAtivaId.Value)
+                : Enumerable.Empty<Elemento>();
+        }
+
+        public IEnumerable<Elemento> ObterElementosDaVista(Guid vistaId)
+        {
+            return Elementos.Where(e => e.ViewId == vistaId);
+        }
+
+        public IEnumerable<Elemento> ObterElementosDaVistaDoElementoOuAtiva(Elemento? elemento)
+        {
+            return elemento?.ViewId.HasValue == true && Vistas.Any(v => v.Id == elemento.ViewId.Value)
+                ? ObterElementosDaVista(elemento.ViewId.Value)
+                : ObterElementosDaVistaAtiva();
+        }
+
+        public bool PertenceAVistaAtiva(Elemento? elemento)
+        {
+            return elemento != null &&
+                VistaAtivaId.HasValue &&
+                Vistas.Any(v => v.Id == VistaAtivaId.Value) &&
+                elemento.ViewId == VistaAtivaId.Value;
+        }
+
         public ProjectView CriarNovaVista()
         {
             var vista = new ProjectView { Nome = CriarNomeUnico("Vista", Vistas.Select(v => v.Nome)) };

@@ -28,7 +28,7 @@ namespace Araci.Services.Simulation
 
             foreach (LineResultDto lineResult in resultado.Lines)
             {
-                Cabo? cabo = _document.Elementos
+                Cabo? cabo = _document.ObterElementosDaVistaAtiva()
                     .OfType<Cabo>()
                     .FirstOrDefault(c => string.Equals(c.Id.ToString(), lineResult.Id, StringComparison.OrdinalIgnoreCase));
 
@@ -38,7 +38,7 @@ namespace Araci.Services.Simulation
 
             foreach (LoadResultDto loadResult in resultado.Loads)
             {
-                Carga? carga = _document.Elementos
+                Carga? carga = _document.ObterElementosDaVistaAtiva()
                     .OfType<Carga>()
                     .FirstOrDefault(c => string.Equals(c.Id.ToString(), loadResult.Id, StringComparison.OrdinalIgnoreCase));
 

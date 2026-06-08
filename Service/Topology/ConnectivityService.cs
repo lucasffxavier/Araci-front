@@ -21,8 +21,7 @@ namespace Araci.Services.Topology
             if (string.IsNullOrWhiteSpace(id))
                 return null;
 
-            return _document.Elementos.FirstOrDefault(e =>
-                string.Equals(e.Id.ToString(), id.Trim(), StringComparison.OrdinalIgnoreCase));
+            return ObterElementoPorIdNaVistaAtiva(id);
         }
 
         public Terminal? ObterTerminal(TerminalEndpoint endpoint)
@@ -45,7 +44,7 @@ namespace Araci.Services.Topology
 
         public string ResolverBusNamePorId(string id)
         {
-            Elemento? elemento = ObterElementoPorId(id);
+            Elemento? elemento = ObterElementoPorIdNaVistaAtiva(id);
             return elemento == null ? string.Empty : ResolverBusName(elemento);
         }
 
@@ -54,7 +53,7 @@ namespace Araci.Services.Topology
             if (string.IsNullOrWhiteSpace(id))
                 throw new InvalidOperationException($"{contexto} sem Id de conexao.");
 
-            Elemento? elemento = ObterElementoPorId(id);
+            Elemento? elemento = ObterElementoPorIdNaVistaAtiva(id);
 
             if (elemento == null)
                 throw new InvalidOperationException($"{contexto} aponta para Id inexistente: {id}.");
@@ -66,7 +65,7 @@ namespace Araci.Services.Topology
         {
             if (!string.IsNullOrWhiteSpace(equipamento.BarraId))
             {
-                string busPorId = ResolverBusNamePorId(equipamento.BarraId);
+                string busPorId = ResolverBusNamePorIdNaVista(equipamento.BarraId, equipamento);
 
                 if (!string.IsNullOrWhiteSpace(busPorId))
                     return busPorId;
@@ -81,7 +80,7 @@ namespace Araci.Services.Topology
         public string ResolverBusNameParaEquipamentoEstrito(ElementoEquipamento equipamento)
         {
             if (!string.IsNullOrWhiteSpace(equipamento.BarraId))
-                return ResolverBusNamePorIdEstrito(equipamento.BarraId, $"Equipamento '{ResolverBusName(equipamento)}'");
+                return ResolverBusNamePorIdEstritoNaVista(equipamento.BarraId, $"Equipamento '{ResolverBusName(equipamento)}'", equipamento);
 
             return ResolverBusName(equipamento);
         }
@@ -90,7 +89,7 @@ namespace Araci.Services.Topology
         {
             if (!string.IsNullOrWhiteSpace(cabo.OrigemId))
             {
-                string busPorId = ResolverBusNamePorId(cabo.OrigemId);
+                string busPorId = ResolverBusNamePorIdNaVista(cabo.OrigemId, cabo);
 
                 if (!string.IsNullOrWhiteSpace(busPorId))
                     return busPorId;
@@ -101,14 +100,14 @@ namespace Araci.Services.Topology
 
         public string ResolverBus1Estrito(Cabo cabo)
         {
-            return ResolverBusNamePorIdEstrito(cabo.OrigemId, $"Cabo '{ResolverBusName(cabo)}' origem");
+            return ResolverBusNamePorIdEstritoNaVista(cabo.OrigemId, $"Cabo '{ResolverBusName(cabo)}' origem", cabo);
         }
 
         public string ResolverBus2(Cabo cabo)
         {
             if (!string.IsNullOrWhiteSpace(cabo.DestinoId))
             {
-                string busPorId = ResolverBusNamePorId(cabo.DestinoId);
+                string busPorId = ResolverBusNamePorIdNaVista(cabo.DestinoId, cabo);
 
                 if (!string.IsNullOrWhiteSpace(busPorId))
                     return busPorId;
@@ -119,14 +118,14 @@ namespace Araci.Services.Topology
 
         public string ResolverBus2Estrito(Cabo cabo)
         {
-            return ResolverBusNamePorIdEstrito(cabo.DestinoId, $"Cabo '{ResolverBusName(cabo)}' destino");
+            return ResolverBusNamePorIdEstritoNaVista(cabo.DestinoId, $"Cabo '{ResolverBusName(cabo)}' destino", cabo);
         }
 
         public IReadOnlyList<Cabo> ObterCabosConectados(Elemento elemento)
         {
             string id = elemento.Id.ToString();
 
-            return _document.Elementos
+            return _document.ObterElementosDaVistaDoElementoOuAtiva(elemento)
                 .OfType<Cabo>()
                 .Where(c =>
                     string.Equals(c.OrigemId, id, StringComparison.OrdinalIgnoreCase) ||
@@ -162,7 +161,7 @@ namespace Araci.Services.Topology
             if (!endpoint.IsComplete)
                 return Array.Empty<Cabo>();
 
-            return _document.Elementos
+            return _document.ObterElementosDaVistaAtiva()
                 .OfType<Cabo>()
                 .Where(c => c.OrigemEndpoint == endpoint || c.DestinoEndpoint == endpoint)
                 .ToList();
@@ -257,16 +256,59 @@ namespace Araci.Services.Topology
             if (!endpoint.IsComplete)
                 return false;
 
-            return _document.Elementos.OfType<Cabo>().Any(c =>
+            return ObterCabosDoEscopo(caboAtual).Any(c =>
                 !ReferenceEquals(c, caboAtual) &&
                 (c.OrigemEndpoint == endpoint || c.DestinoEndpoint == endpoint));
         }
 
         private bool ExisteCaboDuplicado(Cabo? caboAtual, TerminalEndpoint origem, TerminalEndpoint destino)
         {
-            return _document.Elementos.OfType<Cabo>().Any(c =>
+            return ObterCabosDoEscopo(caboAtual).Any(c =>
                 !ReferenceEquals(c, caboAtual) &&
                 MesmoParDeTerminais(origem, destino, c.OrigemEndpoint, c.DestinoEndpoint));
+        }
+
+        private Elemento? ObterElementoPorIdNaVistaAtiva(string id)
+        {
+            return ObterElementoPorId(_document.ObterElementosDaVistaAtiva(), id);
+        }
+
+        private Elemento? ObterElementoPorIdNaVistaDoElemento(Elemento referencia, string id)
+        {
+            return ObterElementoPorId(_document.ObterElementosDaVistaDoElementoOuAtiva(referencia), id);
+        }
+
+        private static Elemento? ObterElementoPorId(IEnumerable<Elemento> elementos, string id)
+        {
+            if (string.IsNullOrWhiteSpace(id))
+                return null;
+
+            return elementos.FirstOrDefault(e =>
+                string.Equals(e.Id.ToString(), id.Trim(), StringComparison.OrdinalIgnoreCase));
+        }
+
+        private string ResolverBusNamePorIdNaVista(string id, Elemento referencia)
+        {
+            Elemento? elemento = ObterElementoPorIdNaVistaDoElemento(referencia, id);
+            return elemento == null ? string.Empty : ResolverBusName(elemento);
+        }
+
+        private string ResolverBusNamePorIdEstritoNaVista(string id, string contexto, Elemento referencia)
+        {
+            if (string.IsNullOrWhiteSpace(id))
+                throw new InvalidOperationException($"{contexto} sem Id de conexao.");
+
+            Elemento? elemento = ObterElementoPorIdNaVistaDoElemento(referencia, id);
+
+            if (elemento == null)
+                throw new InvalidOperationException($"{contexto} aponta para Id inexistente: {id}.");
+
+            return ResolverBusName(elemento);
+        }
+
+        private IEnumerable<Cabo> ObterCabosDoEscopo(Cabo? caboAtual)
+        {
+            return _document.ObterElementosDaVistaDoElementoOuAtiva(caboAtual).OfType<Cabo>();
         }
 
         private static bool MesmoParDeTerminais(TerminalEndpoint origemA, TerminalEndpoint destinoA, TerminalEndpoint origemB, TerminalEndpoint destinoB)
