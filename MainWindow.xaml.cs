@@ -2,6 +2,7 @@ using Araci.Services;
 using Araci.Properties;
 using Araci.ViewModels;
 using System.ComponentModel;
+using System.Linq;
 using System.Windows;
 using System.Windows.Controls.Primitives;
 
@@ -18,7 +19,7 @@ namespace Araci
             InitializeComponent();
             _context = new EditorContext();
             UnitValueConverter.CurrentUnits = _context.Settings.Units;
-            ProjectBrowser.DataContext = new ProjectBrowserViewModel(_context.Document, _context.DefinirVistaAtiva, _context.RenomearItemProjeto, _context.ExcluirItemProjeto, _context.DuplicarItemProjeto);
+            ProjectBrowser.DataContext = new ProjectBrowserViewModel(_context.Document, _context.DefinirVistaAtiva, _context.RenomearItemProjeto, _context.ExcluirItemProjeto, _context.DuplicarItemProjeto, MostrarPropriedadesVista);
             _context.Editor.PropertyChanged += OnEditorStatePropertyChanged;
             Viewport.Inicializar(_context);
             InicializarRibbon();
@@ -54,6 +55,22 @@ namespace Araci
         {
             PropertiesColumn.Width = _propertiesColumnWidth;
             PropertiesHost.Visibility = Visibility.Visible;
+        }
+
+        public void MostrarPropriedadesVista(System.Guid vistaId)
+        {
+            Core.Documents.ProjectView? vista = _context.Document.Vistas.FirstOrDefault(v => v.Id == vistaId);
+
+            if (vista == null)
+                return;
+
+            _context.Editor.ElementoSelecionado = new ProjectViewPropertiesViewModel(
+                _context.Document,
+                vista,
+                _context.RenomearItemProjeto,
+                _context.EditarPropriedadesVista);
+
+            MostrarPropriedades();
         }
 
         public void AlternarNavegadorProjeto()

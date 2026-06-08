@@ -25,6 +25,7 @@ namespace Araci.Core.Documents
         public ProjectView? VistaAtiva => Vistas.FirstOrDefault(v => v.Id == VistaAtivaId);
         public event System.Action? VistaAtivaAlterada;
         public event System.Action? ItemProjetoRenomeado;
+        public event System.Action<ProjectView>? PropriedadesVistaAlteradas;
 
         public IEnumerable<Elemento> ObterElementosDaVistaAtiva()
         {
@@ -99,6 +100,9 @@ namespace Araci.Core.Documents
             return new ProjectView
             {
                 Nome = CriarNomeUnico(origem?.Nome ?? "Vista", Vistas.Select(v => v.Nome)),
+                Escala = origem?.Escala ?? "1:100",
+                Disciplina = origem?.Disciplina ?? ProjectViewDiscipline.Eletrica,
+                RecortarVista = origem?.RecortarVista ?? false,
                 CameraX = origem?.CameraX ?? 0,
                 CameraY = origem?.CameraY ?? 0,
                 Zoom = origem?.Zoom ?? 1.0
@@ -210,6 +214,14 @@ namespace Araci.Core.Documents
 
             vista.Nome = nome;
             ItemProjetoRenomeado?.Invoke();
+        }
+
+        public void AtualizarPropriedadesVista(ProjectView vista)
+        {
+            if (vista == null || !Vistas.Contains(vista))
+                return;
+
+            PropriedadesVistaAlteradas?.Invoke(vista);
         }
 
         public void RenomearTabela(ProjectTable tabela, string nome)

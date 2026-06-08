@@ -351,6 +351,9 @@ namespace Araci.Infrastructure.Persistence
             {
                 Id = vista.Id,
                 Nome = vista.Nome,
+                Escala = vista.Escala,
+                Disciplina = vista.Disciplina.ToString(),
+                RecortarVista = vista.RecortarVista,
                 CameraX = vista.CameraX,
                 CameraY = vista.CameraY,
                 Zoom = vista.Zoom
@@ -385,6 +388,9 @@ namespace Araci.Infrastructure.Persistence
             {
                 Id = dto.Id == Guid.Empty ? Guid.NewGuid() : dto.Id,
                 Nome = dto.Nome,
+                Escala = NormalizarTextoVista(dto.Escala, "1:100"),
+                Disciplina = ParseEnum(dto.Disciplina, ProjectViewDiscipline.Eletrica),
+                RecortarVista = dto.RecortarVista,
                 CameraX = NormalizarCoordenadaCamera(dto.CameraX),
                 CameraY = NormalizarCoordenadaCamera(dto.CameraY),
                 Zoom = NormalizarZoomVista(dto.Zoom)
@@ -632,6 +638,19 @@ namespace Araci.Infrastructure.Persistence
                 return Camera.DefaultZoom;
 
             return Math.Max(Camera.MinZoom, Math.Min(Camera.MaxZoom, valor));
+        }
+
+        private static string NormalizarTextoVista(string? valor, string fallback)
+        {
+            return string.IsNullOrWhiteSpace(valor) ? fallback : valor.Trim();
+        }
+
+        private static TEnum ParseEnum<TEnum>(string? valor, TEnum fallback)
+            where TEnum : struct
+        {
+            return Enum.TryParse(valor, ignoreCase: true, out TEnum convertido)
+                ? convertido
+                : fallback;
         }
     }
 }
