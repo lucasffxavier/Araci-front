@@ -46,6 +46,7 @@ namespace Araci.ViewModels
             _removerTabelaDaPrancha = removerTabelaDaPrancha;
             _dividirTabelaNaPrancha = dividirTabelaNaPrancha;
             TableInstances = new ObservableCollection<ProjectSheetTableInstanceViewModel>();
+            _document.PropriedadesPranchaAlteradas += OnPropriedadesPranchaAlteradas;
             Refresh();
         }
 
@@ -55,8 +56,8 @@ namespace Araci.ViewModels
         public bool HasEmptyMessage => !string.IsNullOrWhiteSpace(EmptyMessage);
         public Guid? SelectedInstanceId => _selectedInstanceId;
         public bool HasSelectedInstance => _selectedInstanceId.HasValue;
-        public double SheetWidth => MoverTabelaNaPranchaUseCase.LarguraPadraoPrancha;
-        public double SheetHeight => MoverTabelaNaPranchaUseCase.AlturaPadraoPrancha;
+        public double SheetWidth => _sheet.LarguraFolha;
+        public double SheetHeight => _sheet.AlturaFolha;
         public double SheetOriginOffsetX => WorkspaceMargin;
         public double SheetOriginOffsetY => WorkspaceMargin;
         public double MinimumWorkspaceWidth => SheetWidth + WorkspaceMargin * 2;
@@ -392,6 +393,18 @@ namespace Araci.ViewModels
         {
             OnPropertyChanged(nameof(SelectedInstanceId));
             OnPropertyChanged(nameof(HasSelectedInstance));
+        }
+
+        private void OnPropriedadesPranchaAlteradas(ProjectSheet prancha)
+        {
+            if (prancha.Id != SheetId)
+                return;
+
+            OnPropertyChanged(nameof(SheetWidth));
+            OnPropertyChanged(nameof(SheetHeight));
+            OnPropertyChanged(nameof(MinimumWorkspaceWidth));
+            OnPropertyChanged(nameof(MinimumWorkspaceHeight));
+            Refresh();
         }
 
         private void OnPropertyChanged([CallerMemberName] string? propertyName = null)

@@ -27,7 +27,7 @@ namespace Araci
             InitializeComponent();
             _context = new EditorContext();
             UnitValueConverter.CurrentUnits = _context.Settings.Units;
-            ProjectBrowser.DataContext = new ProjectBrowserViewModel(_context.Document, _context.DefinirVistaAtiva, _context.RenomearItemProjeto, _context.ExcluirItemProjeto, _context.DuplicarItemProjeto, MostrarTabela, MostrarPrancha, MostrarPropriedadesVista, MostrarPropriedadesTabela);
+            ProjectBrowser.DataContext = new ProjectBrowserViewModel(_context.Document, _context.DefinirVistaAtiva, _context.RenomearItemProjeto, _context.ExcluirItemProjeto, _context.DuplicarItemProjeto, MostrarTabela, MostrarPrancha, MostrarPropriedadesVista, MostrarPropriedadesTabela, MostrarPropriedadesPrancha);
             _context.Editor.PropertyChanged += OnEditorStatePropertyChanged;
             _context.Document.PropriedadesTabelaAlteradas += OnPropriedadesTabelaAlteradas;
             _context.Document.ItemProjetoRenomeado += OnItemProjetoRenomeado;
@@ -101,6 +101,22 @@ namespace Araci
                 _context.EditarPropriedadesTabela,
                 _context.ExportarTabela,
                 _context.Dialogs);
+
+            MostrarPropriedades();
+        }
+
+        public void MostrarPropriedadesPrancha(System.Guid pranchaId)
+        {
+            ProjectSheet? prancha = _context.Document.Pranchas.FirstOrDefault(p => p.Id == pranchaId);
+
+            if (prancha == null)
+                return;
+
+            _context.Editor.ElementoSelecionado = new ProjectSheetPropertiesViewModel(
+                _context.Document,
+                prancha,
+                _context.RenomearItemProjeto,
+                _context.EditarPropriedadesPrancha);
 
             MostrarPropriedades();
         }

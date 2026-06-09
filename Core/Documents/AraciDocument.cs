@@ -27,6 +27,7 @@ namespace Araci.Core.Documents
         public event System.Action? ItemProjetoRenomeado;
         public event System.Action<ProjectView>? PropriedadesVistaAlteradas;
         public event System.Action<ProjectTable>? PropriedadesTabelaAlteradas;
+        public event System.Action<ProjectSheet>? PropriedadesPranchaAlteradas;
 
         public IEnumerable<Elemento> ObterElementosDaVistaAtiva()
         {
@@ -159,6 +160,10 @@ namespace Araci.Core.Documents
             {
                 Nome = CriarNomeUnico(origem?.Nome ?? "Prancha", Pranchas.Select(p => p.Nome)),
                 Numero = CriarNumeroPranchaUnico(),
+                FormatoFolha = origem?.FormatoFolha ?? ProjectSheetFormat.A1,
+                OrientacaoFolha = origem?.OrientacaoFolha ?? ProjectSheetOrientation.Paisagem,
+                LarguraFolha = origem?.LarguraFolha ?? ProjectSheet.DefaultWidth,
+                AlturaFolha = origem?.AlturaFolha ?? ProjectSheet.DefaultHeight,
                 Tabelas = origem?.Tabelas
                     .Where(i => i != null)
                     .Select(i => i.CriarCopia(gerarNovoId: true))
@@ -287,6 +292,15 @@ namespace Araci.Core.Documents
                 return;
 
             prancha.Nome = nome;
+            ItemProjetoRenomeado?.Invoke();
+        }
+
+        public void AtualizarPropriedadesPrancha(ProjectSheet prancha)
+        {
+            if (prancha == null || !Pranchas.Contains(prancha))
+                return;
+
+            PropriedadesPranchaAlteradas?.Invoke(prancha);
             ItemProjetoRenomeado?.Invoke();
         }
 

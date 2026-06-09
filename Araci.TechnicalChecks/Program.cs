@@ -94,11 +94,15 @@ namespace Araci.TechnicalChecks
                 ("Tabela CSV use case avisa sem tabela", TabelaCsvUseCaseAvisaSemTabela),
                 ("Tabela CSV use case mostra erro de escrita", TabelaCsvUseCaseMostraErroDeEscrita),
                 ("Prancha nova inicia sem instancias de tabela", PranchaNovaIniciaSemInstanciasTabela),
+                ("ProjectSheet possui defaults validos de folha", ProjectSheetPossuiDefaultsValidosFolha),
                 ("Prancha persiste instancia de tabela", PranchaPersisteInstanciaTabela),
+                ("Persistencia preserva propriedades da prancha", PersistenciaPreservaPropriedadesPrancha),
                 ("Prancha duplica instancias de tabela com copia profunda", PranchaDuplicaInstanciasTabelaComCopiaProfunda),
                 ("Excluir tabela limpa instancias em pranchas com undo redo", ExcluirTabelaLimpaInstanciasPranchaComUndoRedo),
                 ("Prancha carrega arquivo antigo sem instancias", PranchaCarregaArquivoAntigoSemInstancias),
+                ("Arquivo antigo sem propriedades de prancha usa defaults", ArquivoAntigoSemPropriedadesPranchaUsaDefaults),
                 ("Prancha ignora instancia orfa no load", PranchaIgnoraInstanciaOrfaNoLoad),
+                ("Editar propriedades prancha undo redo", EditarPropriedadesPranchaUndoRedo),
                 ("Inserir tabela na prancha cria instancia undo redo", InserirTabelaNaPranchaCriaInstanciaUndoRedo),
                 ("Inserir tabela na prancha ignora ids invalidos", InserirTabelaNaPranchaIgnoraIdsInvalidos),
                 ("Inserir tabela na prancha multiplas instancias independentes", InserirTabelaNaPranchaMultiplasInstanciasIndependentes),
@@ -124,6 +128,7 @@ namespace Araci.TechnicalChecks
                 ("ProjectSheetViewModel limpa selecao", ProjectSheetViewModelLimpaSelecao),
                 ("ProjectSheetViewModel refresh preserva selecao existente", ProjectSheetViewModelRefreshPreservaSelecaoExistente),
                 ("ProjectSheetViewModel refresh remove selecao inexistente", ProjectSheetViewModelRefreshRemoveSelecaoInexistente),
+                ("ProjectSheetViewModel usa dimensoes da prancha", ProjectSheetViewModelUsaDimensoesPrancha),
                 ("ProjectSheetView possui superficie de prancha", ProjectSheetViewPossuiSuperficiePrancha),
                 ("ProjectSheetViewModel permite instancia fora da folha", ProjectSheetViewModelPermiteInstanciaForaDaFolha),
                 ("ProjectSheetViewModel mantem workspace estavel durante preview negativo", ProjectSheetViewModelMantemWorkspaceEstavelDurantePreviewNegativo),
@@ -134,6 +139,8 @@ namespace Araci.TechnicalChecks
                 ("ProjectSheetView possui estilos visuais basicos de tabela", ProjectSheetViewPossuiEstilosVisuaisBasicosTabela),
                 ("ProjectSheetTableInstanceViewModel expoe dimensoes tabulares basicas", ProjectSheetTableInstanceViewModelExpoeDimensoesTabularesBasicas),
                 ("ProjectSheetView usa bindings para dimensoes tabulares", ProjectSheetViewUsaBindingsDimensoesTabulares),
+                ("ProjectSheetView mantem bindings dimensoes folha", ProjectSheetViewMantemBindingsDimensoesFolha),
+                ("ProjectSheetPropertiesViewModel expoe propriedades editaveis", ProjectSheetPropertiesViewModelExpoePropriedadesEditaveis),
                 ("Dividir tabela na prancha cria instancia independente", DividirTabelaNaPranchaCriaInstanciaIndependente),
                 ("Dividir tabela na prancha undo redo", DividirTabelaNaPranchaUndoRedo),
                 ("ProjectSheetViewModel recorta linhas por faixa da instancia", ProjectSheetViewModelRecortaLinhasPorFaixaInstancia),
@@ -5637,6 +5644,27 @@ namespace Araci.TechnicalChecks
             AssertEqual(0, tabelas.Count, "ProjectSheet.Tabelas.Count inicial");
         }
 
+        private static void ProjectSheetPossuiDefaultsValidosFolha()
+        {
+            var prancha = new ProjectSheet();
+
+            AssertEqual(ProjectSheetFormat.A1, prancha.FormatoFolha, "ProjectSheet.FormatoFolha padrao");
+            AssertEqual(ProjectSheetOrientation.Paisagem, prancha.OrientacaoFolha, "ProjectSheet.OrientacaoFolha padrao");
+            AssertEqual(ProjectSheet.DefaultWidth, prancha.LarguraFolha, "ProjectSheet.LarguraFolha padrao");
+            AssertEqual(ProjectSheet.DefaultHeight, prancha.AlturaFolha, "ProjectSheet.AlturaFolha padrao");
+
+            prancha.LarguraFolha = double.NaN;
+            prancha.AlturaFolha = double.PositiveInfinity;
+
+            AssertEqual(ProjectSheet.DefaultWidth, prancha.LarguraFolha, "ProjectSheet.LarguraFolha invalida usa fallback");
+            AssertEqual(ProjectSheet.DefaultHeight, prancha.AlturaFolha, "ProjectSheet.AlturaFolha invalida usa fallback");
+
+            (double larguraA3Retrato, double alturaA3Retrato) = ProjectSheet.ObterDimensoesFormato(ProjectSheetFormat.A3, ProjectSheetOrientation.Retrato);
+
+            AssertEqual(397, larguraA3Retrato, "A3 retrato largura");
+            AssertEqual(561, alturaA3Retrato, "A3 retrato altura");
+        }
+
         private static void PranchaPersisteInstanciaTabela()
         {
             var document = new AraciDocument();
@@ -5688,6 +5716,49 @@ namespace Araci.TechnicalChecks
             AssertEqual(95, instance.Height, "Reload instancia Height");
             AssertEqual(4, instance.RowStartIndex, "Reload instancia RowStartIndex");
             AssertEqual(7, instance.RowCount, "Reload instancia RowCount");
+        }
+
+        private static void PersistenciaPreservaPropriedadesPrancha()
+        {
+            var serializer = CriarProjectSerializerTeste();
+            var document = new AraciDocument();
+            ProjectTable tabela = document.CriarNovaTabela();
+            ProjectSheet prancha = document.CriarNovaPrancha();
+            prancha.Numero = "EL-101";
+            prancha.Nome = "Distribuicao geral";
+            prancha.FormatoFolha = ProjectSheetFormat.Personalizado;
+            prancha.OrientacaoFolha = ProjectSheetOrientation.Retrato;
+            prancha.LarguraFolha = 640;
+            prancha.AlturaFolha = 900;
+            prancha.Tabelas.Add(new ProjectSheetTableInstance
+            {
+                TableId = tabela.Id,
+                RowStartIndex = 2,
+                RowCount = 3
+            });
+
+            EditorContext context = new();
+            ProjectFileDto dto = serializer.CreateFileDto(document, ProjectMetadataDto.CreateNew("Prancha propriedades"), context.Settings.Units);
+            ProjectSheetDto sheetDto = dto.Sheets.Single(s => s.Id == prancha.Id);
+            string json = serializer.Serialize(dto);
+            ProjectFileDto reloadedDto = serializer.Deserialize(json);
+            IReadOnlyList<ProjectTable> tabelas = serializer.CreateProjectTables(reloadedDto);
+            ProjectSheet reloaded = serializer.CreateProjectSheets(reloadedDto, tabelas.Select(t => t.Id)).Single(s => s.Id == prancha.Id);
+
+            AssertEqual("EL-101", sheetDto.Numero, "DTO prancha Numero");
+            AssertEqual("Distribuicao geral", sheetDto.Nome, "DTO prancha Nome");
+            AssertEqual(ProjectSheetFormat.Personalizado.ToString(), sheetDto.FormatoFolha, "DTO prancha FormatoFolha");
+            AssertEqual(ProjectSheetOrientation.Retrato.ToString(), sheetDto.OrientacaoFolha, "DTO prancha OrientacaoFolha");
+            AssertEqual(640, sheetDto.LarguraFolha ?? 0, "DTO prancha LarguraFolha");
+            AssertEqual(900, sheetDto.AlturaFolha ?? 0, "DTO prancha AlturaFolha");
+            AssertEqual("EL-101", reloaded.Numero, "Reload prancha Numero");
+            AssertEqual("Distribuicao geral", reloaded.Nome, "Reload prancha Nome");
+            AssertEqual(ProjectSheetFormat.Personalizado, reloaded.FormatoFolha, "Reload prancha FormatoFolha");
+            AssertEqual(ProjectSheetOrientation.Retrato, reloaded.OrientacaoFolha, "Reload prancha OrientacaoFolha");
+            AssertEqual(640, reloaded.LarguraFolha, "Reload prancha LarguraFolha");
+            AssertEqual(900, reloaded.AlturaFolha, "Reload prancha AlturaFolha");
+            AssertEqual(2, reloaded.Tabelas.Single().RowStartIndex, "Reload preserva RowStartIndex");
+            AssertEqual(3, reloaded.Tabelas.Single().RowCount, "Reload preserva RowCount");
         }
 
         private static void PranchaDuplicaInstanciasTabelaComCopiaProfunda()
@@ -5786,6 +5857,32 @@ namespace Araci.TechnicalChecks
             AssertEqual(0, tabelas.Count, "Prancha antiga Tabelas.Count");
         }
 
+        private static void ArquivoAntigoSemPropriedadesPranchaUsaDefaults()
+        {
+            var serializer = CriarProjectSerializerTeste();
+            Guid sheetId = Guid.NewGuid();
+            string json = $$"""
+            {
+              "Version": 1,
+              "Sheets": [
+                {
+                  "Id": "{{sheetId}}",
+                  "Nome": "Prancha antiga",
+                  "Numero": "A001"
+                }
+              ]
+            }
+            """;
+
+            ProjectFileDto dto = serializer.Deserialize(json);
+            ProjectSheet prancha = serializer.CreateProjectSheets(dto, Array.Empty<Guid>()).Single();
+
+            AssertEqual(ProjectSheetFormat.A1, prancha.FormatoFolha, "Prancha antiga FormatoFolha default");
+            AssertEqual(ProjectSheetOrientation.Paisagem, prancha.OrientacaoFolha, "Prancha antiga OrientacaoFolha default");
+            AssertEqual(ProjectSheet.DefaultWidth, prancha.LarguraFolha, "Prancha antiga LarguraFolha default");
+            AssertEqual(ProjectSheet.DefaultHeight, prancha.AlturaFolha, "Prancha antiga AlturaFolha default");
+        }
+
         private static void PranchaIgnoraInstanciaOrfaNoLoad()
         {
             var serializer = CriarProjectSerializerTeste();
@@ -5819,6 +5916,76 @@ namespace Araci.TechnicalChecks
 
             AssertEqual(1, prancha.Tabelas.Count, "Instancias validas apos ignorar orfas");
             AssertEqual(tabelaValidaId, prancha.Tabelas[0].TableId, "Instancia valida TableId");
+        }
+
+        private static void EditarPropriedadesPranchaUndoRedo()
+        {
+            var document = new AraciDocument();
+            ProjectSheet prancha = document.CriarNovaPrancha();
+            var commands = new Araci.Core.Commands.CommandManager();
+            var useCase = new EditarPropriedadesPranchaUseCase(document, commands);
+
+            bool alterouNumero = useCase.AlterarNumero(prancha.Id, " EL-101 ");
+
+            Assert(alterouNumero, "AlterarNumero deveria retornar true.");
+            AssertEqual("EL-101", prancha.Numero, "Numero alterado");
+
+            commands.Undo();
+
+            AssertEqual("A001", prancha.Numero, "Undo numero");
+
+            commands.Redo();
+
+            AssertEqual("EL-101", prancha.Numero, "Redo numero");
+
+            bool alterouFormato = useCase.AlterarFormato(prancha.Id, ProjectSheetFormat.A3);
+
+            Assert(alterouFormato, "AlterarFormato deveria retornar true.");
+            AssertEqual(ProjectSheetFormat.A3, prancha.FormatoFolha, "Formato alterado");
+            AssertEqual(ProjectSheetOrientation.Paisagem, prancha.OrientacaoFolha, "Orientacao mantida");
+            AssertEqual(561, prancha.LarguraFolha, "A3 paisagem largura");
+            AssertEqual(397, prancha.AlturaFolha, "A3 paisagem altura");
+
+            commands.Undo();
+
+            AssertEqual(ProjectSheetFormat.A1, prancha.FormatoFolha, "Undo formato");
+            AssertEqual(ProjectSheet.DefaultWidth, prancha.LarguraFolha, "Undo formato largura");
+            AssertEqual(ProjectSheet.DefaultHeight, prancha.AlturaFolha, "Undo formato altura");
+
+            bool alterouOrientacao = useCase.AlterarOrientacao(prancha.Id, ProjectSheetOrientation.Retrato);
+
+            Assert(alterouOrientacao, "AlterarOrientacao deveria retornar true.");
+            AssertEqual(ProjectSheetOrientation.Retrato, prancha.OrientacaoFolha, "Orientacao alterada");
+            AssertEqual(794, prancha.LarguraFolha, "A1 retrato largura");
+            AssertEqual(1122, prancha.AlturaFolha, "A1 retrato altura");
+
+            commands.Undo();
+
+            AssertEqual(ProjectSheetOrientation.Paisagem, prancha.OrientacaoFolha, "Undo orientacao");
+            AssertEqual(ProjectSheet.DefaultWidth, prancha.LarguraFolha, "Undo orientacao largura");
+            AssertEqual(ProjectSheet.DefaultHeight, prancha.AlturaFolha, "Undo orientacao altura");
+
+            bool alterouLargura = useCase.AlterarLargura(prancha.Id, 700);
+
+            Assert(alterouLargura, "AlterarLargura deveria retornar true.");
+            AssertEqual(ProjectSheetFormat.Personalizado, prancha.FormatoFolha, "Largura manual torna formato personalizado");
+            AssertEqual(700, prancha.LarguraFolha, "Largura manual");
+
+            commands.Undo();
+
+            AssertEqual(ProjectSheetFormat.A1, prancha.FormatoFolha, "Undo largura formato");
+            AssertEqual(ProjectSheet.DefaultWidth, prancha.LarguraFolha, "Undo largura");
+
+            bool alterouAltura = useCase.AlterarAltura(prancha.Id, 500);
+
+            Assert(alterouAltura, "AlterarAltura deveria retornar true.");
+            AssertEqual(ProjectSheetFormat.Personalizado, prancha.FormatoFolha, "Altura manual torna formato personalizado");
+            AssertEqual(500, prancha.AlturaFolha, "Altura manual");
+
+            commands.Undo();
+
+            AssertEqual(ProjectSheetFormat.A1, prancha.FormatoFolha, "Undo altura formato");
+            AssertEqual(ProjectSheet.DefaultHeight, prancha.AlturaFolha, "Undo altura");
         }
 
         private static void InserirTabelaNaPranchaCriaInstanciaUndoRedo()
@@ -6302,6 +6469,29 @@ namespace Araci.TechnicalChecks
             AssertEqual(0, viewModel.TableInstances.Count, "Refresh apos remover instancia Count");
         }
 
+        private static void ProjectSheetViewModelUsaDimensoesPrancha()
+        {
+            var document = new AraciDocument();
+            ProjectSheet prancha = document.CriarNovaPrancha();
+            prancha.FormatoFolha = ProjectSheetFormat.Personalizado;
+            prancha.LarguraFolha = 700;
+            prancha.AlturaFolha = 500;
+            var commands = new Araci.Core.Commands.CommandManager();
+            var editar = new EditarPropriedadesPranchaUseCase(document, commands);
+            var viewModel = new ProjectSheetViewModel(document, prancha);
+
+            AssertEqual(700, viewModel.SheetWidth, "ProjectSheetViewModel.SheetWidth inicial");
+            AssertEqual(500, viewModel.SheetHeight, "ProjectSheetViewModel.SheetHeight inicial");
+            AssertEqual(700 + viewModel.SheetOriginOffsetX * 2, viewModel.MinimumWorkspaceWidth, "ProjectSheetViewModel MinimumWorkspaceWidth inicial");
+            AssertEqual(500 + viewModel.SheetOriginOffsetY * 2, viewModel.MinimumWorkspaceHeight, "ProjectSheetViewModel MinimumWorkspaceHeight inicial");
+
+            bool alterou = editar.AlterarFormato(prancha.Id, ProjectSheetFormat.A4);
+
+            Assert(alterou, "AlterarFormato deveria atualizar prancha observada.");
+            AssertEqual(397, viewModel.SheetWidth, "ProjectSheetViewModel.SheetWidth apos formato");
+            AssertEqual(280, viewModel.SheetHeight, "ProjectSheetViewModel.SheetHeight apos formato");
+        }
+
         private static void ProjectSheetViewPossuiSuperficiePrancha()
         {
             RunSta(() =>
@@ -6500,6 +6690,48 @@ namespace Araci.TechnicalChecks
             Assert(!xaml.Contains("<Setter Property=\"Width\" Value=\"112\"/>", StringComparison.Ordinal), "SheetTableHeaderCellStyle/BodyCellStyle nao deveriam fixar largura principal em XAML.");
             Assert(!xaml.Contains("<Setter Property=\"Height\" Value=\"26\"/>", StringComparison.Ordinal), "SheetTableHeaderCellStyle nao deveria fixar altura principal em XAML.");
             Assert(!xaml.Contains("<Setter Property=\"Height\" Value=\"24\"/>", StringComparison.Ordinal), "SheetTableBodyCellStyle nao deveria fixar altura principal em XAML.");
+        }
+
+        private static void ProjectSheetViewMantemBindingsDimensoesFolha()
+        {
+            string xaml = File.ReadAllText(FindProjectFile("Views/ProjectSheetView.xaml"), Encoding.UTF8);
+            string propertiesXaml = File.ReadAllText(FindProjectFile("Properties/PropertiesHostView.xaml"), Encoding.UTF8);
+
+            AssertContains(xaml, "Width=\"{Binding SheetWidth}\"", "ProjectSheetView deveria vincular largura da folha ao ViewModel.");
+            AssertContains(xaml, "Height=\"{Binding SheetHeight}\"", "ProjectSheetView deveria vincular altura da folha ao ViewModel.");
+            AssertContains(propertiesXaml, "ProjectSheetPropertiesViewModel", "PropertiesHostView deveria possuir template para propriedades da prancha.");
+            AssertContains(propertiesXaml, "SelectedItem=\"{Binding FormatoFolha", "Template da prancha deveria editar formato.");
+            AssertContains(propertiesXaml, "SelectedItem=\"{Binding OrientacaoFolha", "Template da prancha deveria editar orientacao.");
+            AssertContains(propertiesXaml, "Text=\"{Binding LarguraFolha", "Template da prancha deveria editar largura.");
+            AssertContains(propertiesXaml, "Text=\"{Binding AlturaFolha", "Template da prancha deveria editar altura.");
+        }
+
+        private static void ProjectSheetPropertiesViewModelExpoePropriedadesEditaveis()
+        {
+            var document = new AraciDocument();
+            ProjectSheet prancha = document.CriarNovaPrancha();
+            var commands = new Araci.Core.Commands.CommandManager();
+            var renomear = new RenomearItemProjetoUseCase(document, commands);
+            var editar = new EditarPropriedadesPranchaUseCase(document, commands);
+            var viewModel = new ProjectSheetPropertiesViewModel(document, prancha, renomear, editar);
+
+            viewModel.Numero = " EL-200 ";
+            viewModel.Nome = " Prancha editada ";
+            viewModel.FormatoFolha = ProjectSheetFormat.A2;
+            viewModel.OrientacaoFolha = ProjectSheetOrientation.Retrato;
+            viewModel.LarguraFolha = 620;
+            viewModel.AlturaFolha = 880;
+
+            Assert(viewModel.Formatos.Contains(ProjectSheetFormat.A0), "ProjectSheetPropertiesViewModel deveria expor formatos padrao.");
+            Assert(viewModel.Formatos.Contains(ProjectSheetFormat.Personalizado), "ProjectSheetPropertiesViewModel deveria expor formato personalizado.");
+            Assert(viewModel.Orientacoes.Contains(ProjectSheetOrientation.Paisagem), "ProjectSheetPropertiesViewModel deveria expor paisagem.");
+            Assert(viewModel.Orientacoes.Contains(ProjectSheetOrientation.Retrato), "ProjectSheetPropertiesViewModel deveria expor retrato.");
+            AssertEqual("EL-200", prancha.Numero, "ProjectSheetPropertiesViewModel Numero");
+            AssertEqual("Prancha editada", prancha.Nome, "ProjectSheetPropertiesViewModel Nome");
+            AssertEqual(ProjectSheetFormat.Personalizado, prancha.FormatoFolha, "ProjectSheetPropertiesViewModel dimensao manual formato");
+            AssertEqual(ProjectSheetOrientation.Retrato, prancha.OrientacaoFolha, "ProjectSheetPropertiesViewModel Orientacao");
+            AssertEqual(620, prancha.LarguraFolha, "ProjectSheetPropertiesViewModel LarguraFolha");
+            AssertEqual(880, prancha.AlturaFolha, "ProjectSheetPropertiesViewModel AlturaFolha");
         }
 
         private static void DividirTabelaNaPranchaCriaInstanciaIndependente()

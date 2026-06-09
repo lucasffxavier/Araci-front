@@ -425,6 +425,10 @@ namespace Araci.Infrastructure.Persistence
                 Id = prancha.Id,
                 Nome = prancha.Nome,
                 Numero = prancha.Numero,
+                FormatoFolha = prancha.FormatoFolha.ToString(),
+                OrientacaoFolha = prancha.OrientacaoFolha.ToString(),
+                LarguraFolha = prancha.LarguraFolha,
+                AlturaFolha = prancha.AlturaFolha,
                 Tabelas = (prancha.Tabelas ?? new List<ProjectSheetTableInstance>())
                     .Where(i => i != null && i.IsValid && tabelasValidas.Contains(i.TableId))
                     .Select(i => new ProjectSheetTableInstanceDto
@@ -495,6 +499,10 @@ namespace Araci.Infrastructure.Persistence
                 Id = dto.Id == Guid.Empty ? Guid.NewGuid() : dto.Id,
                 Nome = dto.Nome,
                 Numero = dto.Numero ?? string.Empty,
+                FormatoFolha = ParseEnum(dto.FormatoFolha, ProjectSheetFormat.A1),
+                OrientacaoFolha = ParseEnum(dto.OrientacaoFolha, ProjectSheetOrientation.Paisagem),
+                LarguraFolha = NormalizarDimensaoFolha(dto.LarguraFolha, ProjectSheet.DefaultWidth),
+                AlturaFolha = NormalizarDimensaoFolha(dto.AlturaFolha, ProjectSheet.DefaultHeight),
                 Tabelas = ParseProjectSheetTableInstances(dto.Tabelas, tabelasValidas)
             };
         }
@@ -739,6 +747,14 @@ namespace Araci.Infrastructure.Persistence
                 return Camera.DefaultZoom;
 
             return Math.Max(Camera.MinZoom, Math.Min(Camera.MaxZoom, valor));
+        }
+
+        private static double NormalizarDimensaoFolha(double? valor, double fallback)
+        {
+            if (!valor.HasValue || double.IsNaN(valor.Value) || double.IsInfinity(valor.Value) || valor.Value < ProjectSheet.MinDimension)
+                return fallback;
+
+            return valor.Value;
         }
 
         private static string NormalizarTextoVista(string? valor, string fallback)

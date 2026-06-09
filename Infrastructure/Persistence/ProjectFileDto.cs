@@ -81,6 +81,10 @@ namespace Araci.Infrastructure.Persistence
         public Guid Id { get; set; }
         public string Nome { get; set; } = string.Empty;
         public string Numero { get; set; } = string.Empty;
+        public string FormatoFolha { get; set; } = string.Empty;
+        public string OrientacaoFolha { get; set; } = string.Empty;
+        public double? LarguraFolha { get; set; }
+        public double? AlturaFolha { get; set; }
         public List<ProjectSheetTableInstanceDto> Tabelas { get; set; } = new();
     }
 
