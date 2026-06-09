@@ -100,6 +100,12 @@ Araci-front
 │   │   ├── ElementoViewModelFactory.cs
 │   │   └── ElementViewModelFactoryContext.cs
 │   ├── Projects
+│   │   ├── Tables
+│   │   │   ├── ProjectTableDataBuilder.cs
+│   │   │   ├── ProjectTableDataCell.cs
+│   │   │   ├── ProjectTableDataColumn.cs
+│   │   │   ├── ProjectTableDataResult.cs
+│   │   │   └── ProjectTableDataRow.cs
 │   │   └── ProjectPersistenceService.cs
 │   ├── Scene
 │   │   └── DocumentSceneSyncService.cs
@@ -509,580 +515,537 @@ Araci-front
 
 
 ====================================================================================================
-ARQUIVO: C:\Users\User\source\repos\lucasffxavier\Araci-front\Applications\Abstractions\IUserDialogService.cs
-====================================================================================================
-
-using Araci.Services.Simulation;
-using Araci.Core.Documents;
-using System.Collections.Generic;
-
-namespace Araci.Applications.Abstractions
-{
-    public interface IUserDialogService
-    {
-        void ShowInfo(string title, string message);
-
-        void ShowWarning(string title, string message);
-
-        void ShowError(string title, string message);
-
-        ElementosTabelaDialogResult? ShowElementosTabelaDialog(
-            IReadOnlyList<ProjectTableElementCategory> categorias,
-            IReadOnlyList<ProjectTableFieldSelection> camposSelecionados);
-
-        FiltrosTabelaDialogResult? ShowFiltrosTabelaDialog(
-            IReadOnlyList<ProjectTableFieldSelection> camposSelecionados,
-            IReadOnlyList<ProjectViewDialogOption> vistasDisponiveis,
-            Guid? filtroVistaId,
-            ProjectTableFilterLogicalMode modo,
-            IReadOnlyList<ProjectTableFilterRule> filtros);
-
-        OrdenacaoTabelaDialogResult? ShowOrdenacaoTabelaDialog(
-            IReadOnlyList<ProjectTableFieldSelection> camposSelecionados,
-            ProjectTableSorting? ordenacao);
-
-        bool Confirm(string title, string message);
-
-        void Show(SimulationMessage message);
-    }
-}
-
-
-
-====================================================================================================
-ARQUIVO: C:\Users\User\source\repos\lucasffxavier\Araci-front\Applications\Abstractions\OrdenacaoTabelaDialogResult.cs
-====================================================================================================
-
-using Araci.Core.Documents;
-
-namespace Araci.Applications.Abstractions
-{
-    public sealed class OrdenacaoTabelaDialogResult
-    {
-        public OrdenacaoTabelaDialogResult(ProjectTableSorting? ordenacao)
-        {
-            Ordenacao = ordenacao;
-        }
-
-        public ProjectTableSorting? Ordenacao { get; }
-    }
-}
-
-
-
-====================================================================================================
-ARQUIVO: C:\Users\User\source\repos\lucasffxavier\Araci-front\Applications\Commands\UpdateProjectTableElementsCommand.cs
+ARQUIVO: C:\Users\User\source\repos\lucasffxavier\Araci-front\Applications\Projects\Tables\ProjectTableDataBuilder.cs
 ====================================================================================================
 
 using System;
 using System.Collections.Generic;
+using System.Globalization;
 using System.Linq;
 using Araci.Core.Documents;
+using Araci.Models;
 
-namespace Araci.Core.Commands
+namespace Araci.Applications.Projects.Tables
 {
-    public class UpdateProjectTableElementsCommand : IUndoableCommand
+    public sealed class ProjectTableDataBuilder
     {
-        private readonly AraciDocument _document;
-        private readonly ProjectTable _tabela;
-        private readonly IReadOnlyList<ProjectTableElementCategory> _categoriasAnteriores;
-        private readonly IReadOnlyList<ProjectTableElementCategory> _categoriasNovas;
-        private readonly IReadOnlyList<ProjectTableFieldSelection> _camposAnteriores;
-        private readonly IReadOnlyList<ProjectTableFieldSelection> _camposNovos;
-        private readonly IReadOnlyList<ProjectTableFilterRule> _filtrosAnteriores;
-        private readonly IReadOnlyList<ProjectTableFilterRule> _filtrosNovos;
-        private readonly ProjectTableSorting? _ordenacaoAnterior;
-        private readonly ProjectTableSorting? _ordenacaoNova;
-
-        public UpdateProjectTableElementsCommand(
-            AraciDocument document,
-            ProjectTable tabela,
-            IReadOnlyList<ProjectTableElementCategory> categoriasAnteriores,
-            IReadOnlyList<ProjectTableElementCategory> categoriasNovas,
-            IReadOnlyList<ProjectTableFieldSelection> camposAnteriores,
-            IReadOnlyList<ProjectTableFieldSelection> camposNovos,
-            IReadOnlyList<ProjectTableFilterRule> filtrosAnteriores,
-            IReadOnlyList<ProjectTableFilterRule> filtrosNovos,
-            ProjectTableSorting? ordenacaoAnterior,
-            ProjectTableSorting? ordenacaoNova)
+        public ProjectTableDataResult Build(AraciDocument document, ProjectTable table)
         {
-            _document = document ?? throw new ArgumentNullException(nameof(document));
-            _tabela = tabela ?? throw new ArgumentNullException(nameof(tabela));
-            _categoriasAnteriores = categoriasAnteriores.ToList();
-            _categoriasNovas = categoriasNovas.ToList();
-            _camposAnteriores = CopiarCampos(camposAnteriores);
-            _camposNovos = CopiarCampos(camposNovos);
-            _filtrosAnteriores = CopiarFiltros(filtrosAnteriores);
-            _filtrosNovos = CopiarFiltros(filtrosNovos);
-            _ordenacaoAnterior = CopiarOrdenacao(ordenacaoAnterior);
-            _ordenacaoNova = CopiarOrdenacao(ordenacaoNova);
-        }
+            ArgumentNullException.ThrowIfNull(document);
+            ArgumentNullException.ThrowIfNull(table);
 
-        public void Execute()
-        {
-            Aplicar(_categoriasNovas, _camposNovos, _filtrosNovos, _ordenacaoNova);
-        }
+            List<ProjectTableDataColumn> columns = CriarColunas(table);
 
-        public void Undo()
-        {
-            Aplicar(_categoriasAnteriores, _camposAnteriores, _filtrosAnteriores, _ordenacaoAnterior);
-        }
+            if (columns.Count == 0 || table.CategoriasElementos.Count == 0)
+                return new ProjectTableDataResult(columns, new List<ProjectTableDataRow>());
 
-        public void Redo()
-        {
-            Execute();
-        }
+            HashSet<ProjectTableElementCategory> categorias = table.CategoriasElementos.ToHashSet();
+            Guid? filtroVistaId = ObterFiltroVistaValido(document, table.FiltroVistaId);
 
-        private void Aplicar(
-            IReadOnlyList<ProjectTableElementCategory> categorias,
-            IReadOnlyList<ProjectTableFieldSelection> campos,
-            IReadOnlyList<ProjectTableFilterRule> filtros,
-            ProjectTableSorting? ordenacao)
-        {
-            _tabela.CategoriasElementos = categorias.ToList();
-            _tabela.CamposSelecionados = CopiarCampos(campos).ToList();
-            _tabela.Filtros = CopiarFiltros(filtros).ToList();
-            _tabela.Ordenacao = CopiarOrdenacao(ordenacao);
-            _document.AtualizarPropriedadesTabela(_tabela);
-        }
-
-        private static IReadOnlyList<ProjectTableFieldSelection> CopiarCampos(IReadOnlyList<ProjectTableFieldSelection> campos)
-        {
-            return campos
-                .Select(c => new ProjectTableFieldSelection
-                {
-                    Categoria = c.Categoria,
-                    CampoId = c.CampoId,
-                    NomeExibicao = c.NomeExibicao,
-                    Ordem = c.Ordem
-                })
+            List<RowBuildData> rows = document.Elementos
+                .Select((elemento, index) => new { Elemento = elemento, Index = index, Categoria = ObterCategoria(elemento) })
+                .Where(item => item.Categoria.HasValue && categorias.Contains(item.Categoria.Value))
+                .Where(item => PassaFiltroVista(item.Elemento, filtroVistaId))
+                .Select(item => CriarLinha(item.Elemento, item.Categoria!.Value, item.Index, columns))
+                .Where(row => PassaFiltros(row, table))
                 .ToList();
+
+            rows = OrdenarLinhas(rows, table, columns);
+
+            return new ProjectTableDataResult(
+                columns,
+                rows.Select(row => row.Row).ToList());
         }
 
-        private static IReadOnlyList<ProjectTableFilterRule> CopiarFiltros(IReadOnlyList<ProjectTableFilterRule> filtros)
+        private static List<ProjectTableDataColumn> CriarColunas(ProjectTable table)
         {
-            return filtros
-                .Select(f => new ProjectTableFilterRule
-                {
-                    Ordem = f.Ordem,
-                    Categoria = f.Categoria,
-                    CampoId = f.CampoId,
-                    NomeExibicao = f.NomeExibicao,
-                    Operador = f.Operador,
-                    Valor = f.Valor
-                })
-                .ToList();
-        }
-
-        private static ProjectTableSorting? CopiarOrdenacao(ProjectTableSorting? ordenacao)
-        {
-            return ordenacao == null
-                ? null
-                : new ProjectTableSorting
-                {
-                    Categoria = ordenacao.Categoria,
-                    CampoId = ordenacao.CampoId,
-                    NomeExibicao = ordenacao.NomeExibicao,
-                    Direcao = ordenacao.Direcao
-                };
-        }
-    }
-}
-
-
-
-====================================================================================================
-ARQUIVO: C:\Users\User\source\repos\lucasffxavier\Araci-front\Applications\Commands\UpdateProjectTableSortingCommand.cs
-====================================================================================================
-
-using System;
-using Araci.Core.Documents;
-
-namespace Araci.Core.Commands
-{
-    public class UpdateProjectTableSortingCommand : IUndoableCommand
-    {
-        private readonly AraciDocument _document;
-        private readonly ProjectTable _tabela;
-        private readonly ProjectTableSorting? _ordenacaoAnterior;
-        private readonly ProjectTableSorting? _ordenacaoNova;
-
-        public UpdateProjectTableSortingCommand(
-            AraciDocument document,
-            ProjectTable tabela,
-            ProjectTableSorting? ordenacaoAnterior,
-            ProjectTableSorting? ordenacaoNova)
-        {
-            _document = document ?? throw new ArgumentNullException(nameof(document));
-            _tabela = tabela ?? throw new ArgumentNullException(nameof(tabela));
-            _ordenacaoAnterior = CopiarOrdenacao(ordenacaoAnterior);
-            _ordenacaoNova = CopiarOrdenacao(ordenacaoNova);
-        }
-
-        public void Execute()
-        {
-            Aplicar(_ordenacaoNova);
-        }
-
-        public void Undo()
-        {
-            Aplicar(_ordenacaoAnterior);
-        }
-
-        public void Redo()
-        {
-            Execute();
-        }
-
-        private void Aplicar(ProjectTableSorting? ordenacao)
-        {
-            _tabela.Ordenacao = CopiarOrdenacao(ordenacao);
-            _document.AtualizarPropriedadesTabela(_tabela);
-        }
-
-        private static ProjectTableSorting? CopiarOrdenacao(ProjectTableSorting? ordenacao)
-        {
-            return ordenacao == null
-                ? null
-                : new ProjectTableSorting
-                {
-                    Categoria = ordenacao.Categoria,
-                    CampoId = ordenacao.CampoId,
-                    NomeExibicao = ordenacao.NomeExibicao,
-                    Direcao = ordenacao.Direcao
-                };
-        }
-    }
-}
-
-
-
-====================================================================================================
-ARQUIVO: C:\Users\User\source\repos\lucasffxavier\Araci-front\Applications\UseCases\Projeto\EditarPropriedadesTabelaUseCase.cs
-====================================================================================================
-
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using Araci.Applications.Abstractions;
-using Araci.Core.Commands;
-using Araci.Core.Documents;
-
-namespace Araci.Applications.UseCases.Projeto
-{
-    public class EditarPropriedadesTabelaUseCase
-    {
-        private readonly AraciDocument _document;
-        private readonly ICommandHistory _commands;
-
-        public EditarPropriedadesTabelaUseCase(AraciDocument document, ICommandHistory commands)
-        {
-            _document = document ?? throw new ArgumentNullException(nameof(document));
-            _commands = commands ?? throw new ArgumentNullException(nameof(commands));
-        }
-
-        public bool AlterarDisciplina(Guid id, ProjectViewDiscipline disciplina)
-        {
-            ProjectTable? tabela = _document.Tabelas.FirstOrDefault(t => t.Id == id);
-
-            if (tabela == null)
-                return false;
-
-            if (tabela.Disciplina == disciplina)
-                return true;
-
-            _commands.Execute(new UpdateProjectTablePropertyCommand<ProjectViewDiscipline>(
-                _document,
-                tabela,
-                (t, valor) => t.Disciplina = valor,
-                tabela.Disciplina,
-                disciplina));
-
-            return true;
-        }
-
-        public bool AlterarCategoriasElementos(Guid id, IReadOnlyList<ProjectTableElementCategory> categorias)
-        {
-            ProjectTable? tabela = _document.Tabelas.FirstOrDefault(t => t.Id == id);
-
-            if (tabela == null)
-                return false;
-
-            List<ProjectTableElementCategory> valorNovo = NormalizarCategorias(categorias);
-            List<ProjectTableElementCategory> valorAnterior = NormalizarCategorias(tabela.CategoriasElementos);
-
-            if (valorAnterior.SequenceEqual(valorNovo))
-                return true;
-
-            _commands.Execute(new UpdateProjectTablePropertyCommand<IReadOnlyList<ProjectTableElementCategory>>(
-                _document,
-                tabela,
-                (t, valor) => t.CategoriasElementos = valor.ToList(),
-                valorAnterior,
-                valorNovo));
-
-            return true;
-        }
-
-        public bool AlterarElementosTabela(
-            Guid id,
-            IReadOnlyList<ProjectTableElementCategory> categorias,
-            IReadOnlyList<ProjectTableFieldSelection> campos)
-        {
-            ProjectTable? tabela = _document.Tabelas.FirstOrDefault(t => t.Id == id);
-
-            if (tabela == null)
-                return false;
-
-            List<ProjectTableElementCategory> categoriasNovas = NormalizarCategorias(categorias);
-            List<ProjectTableElementCategory> categoriasAnteriores = NormalizarCategorias(tabela.CategoriasElementos);
-            List<ProjectTableFieldSelection> camposNovos = NormalizarCampos(campos, categoriasNovas);
-            List<ProjectTableFieldSelection> camposAnteriores = NormalizarCampos(tabela.CamposSelecionados, categoriasAnteriores);
-            List<ProjectTableFilterRule> filtrosNovos = NormalizarFiltros(tabela.Filtros, camposNovos);
-            List<ProjectTableFilterRule> filtrosAnteriores = NormalizarFiltros(tabela.Filtros, camposAnteriores);
-            ProjectTableSorting? ordenacaoNova = NormalizarOrdenacao(tabela.Ordenacao, camposNovos);
-            ProjectTableSorting? ordenacaoAnterior = NormalizarOrdenacao(tabela.Ordenacao, camposAnteriores);
-
-            if (categoriasAnteriores.SequenceEqual(categoriasNovas) &&
-                CamposIguais(camposAnteriores, camposNovos) &&
-                FiltrosIguais(filtrosAnteriores, filtrosNovos) &&
-                OrdenacoesIguais(ordenacaoAnterior, ordenacaoNova))
-                return true;
-
-            _commands.Execute(new UpdateProjectTableElementsCommand(
-                _document,
-                tabela,
-                categoriasAnteriores,
-                categoriasNovas,
-                camposAnteriores,
-                camposNovos,
-                filtrosAnteriores,
-                filtrosNovos,
-                ordenacaoAnterior,
-                ordenacaoNova));
-
-            return true;
-        }
-
-        public bool AlterarOrdenacaoTabela(Guid id, ProjectTableSorting? ordenacao)
-        {
-            ProjectTable? tabela = _document.Tabelas.FirstOrDefault(t => t.Id == id);
-
-            if (tabela == null)
-                return false;
-
-            ProjectTableSorting? ordenacaoNova = NormalizarOrdenacao(ordenacao, tabela.CamposSelecionados);
-            ProjectTableSorting? ordenacaoAnterior = NormalizarOrdenacao(tabela.Ordenacao, tabela.CamposSelecionados);
-
-            if (OrdenacoesIguais(ordenacaoAnterior, ordenacaoNova))
-                return true;
-
-            _commands.Execute(new UpdateProjectTableSortingCommand(
-                _document,
-                tabela,
-                ordenacaoAnterior,
-                ordenacaoNova));
-
-            return true;
-        }
-
-        public bool AlterarFiltrosTabela(
-            Guid id,
-            Guid? filtroVistaId,
-            ProjectTableFilterLogicalMode modo,
-            IReadOnlyList<ProjectTableFilterRule> filtros)
-        {
-            ProjectTable? tabela = _document.Tabelas.FirstOrDefault(t => t.Id == id);
-
-            if (tabela == null)
-                return false;
-
-            Guid? filtroVistaNovo = NormalizarFiltroVista(filtroVistaId);
-            Guid? filtroVistaAnterior = NormalizarFiltroVista(tabela.FiltroVistaId);
-            ProjectTableFilterLogicalMode modoNovo = NormalizarModoFiltro(modo);
-            ProjectTableFilterLogicalMode modoAnterior = NormalizarModoFiltro(tabela.ModoFiltro);
-            List<ProjectTableFilterRule> filtrosNovos = NormalizarFiltros(filtros, tabela.CamposSelecionados);
-            List<ProjectTableFilterRule> filtrosAnteriores = NormalizarFiltros(tabela.Filtros, tabela.CamposSelecionados);
-
-            if (filtroVistaAnterior == filtroVistaNovo &&
-                modoAnterior == modoNovo &&
-                FiltrosIguais(filtrosAnteriores, filtrosNovos))
-                return true;
-
-            _commands.Execute(new UpdateProjectTableFiltersCommand(
-                _document,
-                tabela,
-                filtroVistaAnterior,
-                filtroVistaNovo,
-                modoAnterior,
-                modoNovo,
-                filtrosAnteriores,
-                filtrosNovos));
-
-            return true;
-        }
-
-        private static List<ProjectTableElementCategory> NormalizarCategorias(IEnumerable<ProjectTableElementCategory>? categorias)
-        {
-            return (categorias ?? Enumerable.Empty<ProjectTableElementCategory>())
-                .Distinct()
-                .OrderBy(categoria => categoria)
-                .ToList();
-        }
-
-        private static List<ProjectTableFieldSelection> NormalizarCampos(
-            IEnumerable<ProjectTableFieldSelection>? campos,
-            IReadOnlyList<ProjectTableElementCategory> categorias)
-        {
-            HashSet<ProjectTableElementCategory> categoriasPermitidas = categorias.ToHashSet();
-
-            return (campos ?? Enumerable.Empty<ProjectTableFieldSelection>())
-                .Where(c => categoriasPermitidas.Contains(c.Categoria))
+            return (table.CamposSelecionados ?? new List<ProjectTableFieldSelection>())
                 .Where(c => !string.IsNullOrWhiteSpace(c.CampoId))
                 .OrderBy(c => c.Ordem)
-                .GroupBy(c => new { c.Categoria, CampoId = c.CampoId.Trim() })
+                .GroupBy(c => CriarChaveCampo(c.Categoria, c.CampoId))
                 .Select((g, index) =>
                 {
                     ProjectTableFieldSelection campo = g.First();
-                    return new ProjectTableFieldSelection
-                    {
-                        Categoria = campo.Categoria,
-                        CampoId = campo.CampoId.Trim(),
-                        NomeExibicao = string.IsNullOrWhiteSpace(campo.NomeExibicao) ? campo.CampoId.Trim() : campo.NomeExibicao.Trim(),
-                        Ordem = index
-                    };
+                    string campoId = campo.CampoId.Trim();
+                    return new ProjectTableDataColumn(
+                        campo.Categoria,
+                        campoId,
+                        string.IsNullOrWhiteSpace(campo.NomeExibicao) ? campoId : campo.NomeExibicao.Trim(),
+                        index);
                 })
                 .ToList();
         }
 
-        private static bool CamposIguais(IReadOnlyList<ProjectTableFieldSelection> a, IReadOnlyList<ProjectTableFieldSelection> b)
-        {
-            if (a.Count != b.Count)
-                return false;
-
-            for (int i = 0; i < a.Count; i++)
-            {
-                if (a[i].Categoria != b[i].Categoria ||
-                    !string.Equals(a[i].CampoId, b[i].CampoId, StringComparison.Ordinal) ||
-                    !string.Equals(a[i].NomeExibicao, b[i].NomeExibicao, StringComparison.Ordinal) ||
-                    a[i].Ordem != b[i].Ordem)
-                    return false;
-            }
-
-            return true;
-        }
-
-        private static ProjectTableFilterLogicalMode NormalizarModoFiltro(ProjectTableFilterLogicalMode modo)
-        {
-            return Enum.IsDefined(typeof(ProjectTableFilterLogicalMode), modo)
-                ? modo
-                : ProjectTableFilterLogicalMode.Todas;
-        }
-
-        private Guid? NormalizarFiltroVista(Guid? filtroVistaId)
+        private static Guid? ObterFiltroVistaValido(AraciDocument document, Guid? filtroVistaId)
         {
             if (!filtroVistaId.HasValue || filtroVistaId.Value == Guid.Empty)
                 return null;
 
-            return _document.Vistas.Any(v => v.Id == filtroVistaId.Value)
+            return document.Vistas.Any(v => v.Id == filtroVistaId.Value)
                 ? filtroVistaId
                 : null;
         }
 
+        private static bool PassaFiltroVista(Elemento elemento, Guid? filtroVistaId)
+        {
+            return !filtroVistaId.HasValue || elemento.ViewId == filtroVistaId.Value;
+        }
+
+        private static RowBuildData CriarLinha(
+            Elemento elemento,
+            ProjectTableElementCategory categoria,
+            int documentIndex,
+            IReadOnlyList<ProjectTableDataColumn> columns)
+        {
+            List<ProjectTableDataCell> cells = columns
+                .Select(column =>
+                {
+                    object? valor = ExtrairValor(elemento, categoria, column);
+                    return new ProjectTableDataCell(
+                        column.Categoria,
+                        column.CampoId,
+                        column.NomeExibicao,
+                        valor,
+                        FormatarValor(valor));
+                })
+                .ToList();
+
+            var row = new ProjectTableDataRow(
+                elemento.Id,
+                elemento.Nome,
+                categoria,
+                cells);
+
+            return new RowBuildData(elemento, documentIndex, row);
+        }
+
+        private static bool PassaFiltros(RowBuildData row, ProjectTable table)
+        {
+            List<ProjectTableFilterRule> filtros = NormalizarFiltros(table.Filtros, row.Row.Cells);
+
+            if (filtros.Count == 0)
+                return true;
+
+            return table.ModoFiltro == ProjectTableFilterLogicalMode.Qualquer
+                ? filtros.Any(f => AvaliarFiltro(row, f))
+                : filtros.All(f => AvaliarFiltro(row, f));
+        }
+
         private static List<ProjectTableFilterRule> NormalizarFiltros(
             IEnumerable<ProjectTableFilterRule>? filtros,
-            IReadOnlyList<ProjectTableFieldSelection> camposSelecionados)
+            IReadOnlyList<ProjectTableDataCell> cells)
         {
-            Dictionary<string, ProjectTableFieldSelection> camposPermitidos = camposSelecionados
-                .GroupBy(c => CriarChaveCampo(c.Categoria, c.CampoId))
-                .ToDictionary(g => g.Key, g => g.First(), StringComparer.Ordinal);
+            HashSet<string> campos = cells
+                .Select(c => CriarChaveCampo(c.Categoria, c.CampoId))
+                .ToHashSet(StringComparer.Ordinal);
 
             return (filtros ?? Enumerable.Empty<ProjectTableFilterRule>())
                 .Where(f => !string.IsNullOrWhiteSpace(f.CampoId))
                 .OrderBy(f => f.Ordem)
-                .Select(f => new { Filtro = f, Chave = CriarChaveCampo(f.Categoria, f.CampoId) })
-                .Where(item => camposPermitidos.ContainsKey(item.Chave))
+                .Where(f => campos.Contains(CriarChaveCampo(f.Categoria, f.CampoId)))
                 .Take(5)
-                .Select((item, index) =>
-                {
-                    ProjectTableFieldSelection campo = camposPermitidos[item.Chave];
-                    return new ProjectTableFilterRule
-                    {
-                        Ordem = index,
-                        Categoria = campo.Categoria,
-                        CampoId = campo.CampoId,
-                        NomeExibicao = campo.NomeExibicao,
-                        Operador = Enum.IsDefined(typeof(ProjectTableFilterOperator), item.Filtro.Operador)
-                            ? item.Filtro.Operador
-                            : ProjectTableFilterOperator.Contem,
-                        Valor = item.Filtro.Valor?.Trim() ?? string.Empty
-                    };
-                })
                 .ToList();
         }
 
-        private static bool FiltrosIguais(IReadOnlyList<ProjectTableFilterRule> a, IReadOnlyList<ProjectTableFilterRule> b)
+        private static bool AvaliarFiltro(RowBuildData row, ProjectTableFilterRule filtro)
         {
-            if (a.Count != b.Count)
+            ProjectTableDataCell? cell = ObterCell(row, filtro.Categoria, filtro.CampoId);
+
+            if (cell == null)
                 return false;
 
-            for (int i = 0; i < a.Count; i++)
+            string valorFiltro = filtro.Valor?.Trim() ?? string.Empty;
+            string display = cell.DisplayValue ?? string.Empty;
+
+            if (filtro.Operador is ProjectTableFilterOperator.IgualA or ProjectTableFilterOperator.DiferenteDe &&
+                TentarConverterNumero(cell.RawValue, out double numeroCelula) &&
+                TentarConverterNumero(valorFiltro, out double numeroFiltro))
             {
-                if (a[i].Ordem != b[i].Ordem ||
-                    a[i].Categoria != b[i].Categoria ||
-                    !string.Equals(a[i].CampoId, b[i].CampoId, StringComparison.Ordinal) ||
-                    !string.Equals(a[i].NomeExibicao, b[i].NomeExibicao, StringComparison.Ordinal) ||
-                    a[i].Operador != b[i].Operador ||
-                    !string.Equals(a[i].Valor, b[i].Valor, StringComparison.Ordinal))
-                    return false;
+                bool igualNumero = Math.Abs(numeroCelula - numeroFiltro) < 0.0000001;
+                return filtro.Operador == ProjectTableFilterOperator.IgualA ? igualNumero : !igualNumero;
             }
 
-            return true;
+            int comparacao = string.Compare(display, valorFiltro, StringComparison.OrdinalIgnoreCase);
+            bool resultado = filtro.Operador switch
+            {
+                ProjectTableFilterOperator.Contem => display.Contains(valorFiltro, StringComparison.OrdinalIgnoreCase),
+                ProjectTableFilterOperator.NaoContem => !display.Contains(valorFiltro, StringComparison.OrdinalIgnoreCase),
+                ProjectTableFilterOperator.ComecaCom => display.StartsWith(valorFiltro, StringComparison.OrdinalIgnoreCase),
+                ProjectTableFilterOperator.TerminaCom => display.EndsWith(valorFiltro, StringComparison.OrdinalIgnoreCase),
+                ProjectTableFilterOperator.IgualA => comparacao == 0,
+                ProjectTableFilterOperator.DiferenteDe => comparacao != 0,
+                _ => display.Contains(valorFiltro, StringComparison.OrdinalIgnoreCase)
+            };
+
+            return resultado;
         }
 
-        private static ProjectTableSorting? NormalizarOrdenacao(
-            ProjectTableSorting? ordenacao,
-            IReadOnlyList<ProjectTableFieldSelection> camposSelecionados)
+        private static List<RowBuildData> OrdenarLinhas(
+            List<RowBuildData> rows,
+            ProjectTable table,
+            IReadOnlyList<ProjectTableDataColumn> columns)
         {
-            if (ordenacao == null || string.IsNullOrWhiteSpace(ordenacao.CampoId))
-                return null;
+            List<ProjectTableSorting> ordenacoes = NormalizarOrdenacoes(table.Ordenacoes, columns);
 
-            string chave = CriarChaveCampo(ordenacao.Categoria, ordenacao.CampoId);
-            ProjectTableFieldSelection? campo = camposSelecionados.FirstOrDefault(c =>
-                string.Equals(CriarChaveCampo(c.Categoria, c.CampoId), chave, StringComparison.Ordinal));
+            if (ordenacoes.Count == 0)
+                return rows.OrderBy(row => row.DocumentIndex).ToList();
 
-            if (campo == null)
-                return null;
+            return rows
+                .OrderBy(row => row, new RowBuildDataComparer(ordenacoes))
+                .ToList();
+        }
 
-            return new ProjectTableSorting
+        private static List<ProjectTableSorting> NormalizarOrdenacoes(
+            IEnumerable<ProjectTableSorting>? ordenacoes,
+            IReadOnlyList<ProjectTableDataColumn> columns)
+        {
+            HashSet<string> campos = columns
+                .Select(c => CriarChaveCampo(c.Categoria, c.CampoId))
+                .ToHashSet(StringComparer.Ordinal);
+
+            var chavesUsadas = new HashSet<string>(StringComparer.Ordinal);
+            var resultado = new List<ProjectTableSorting>();
+
+            foreach (ProjectTableSorting ordenacao in (ordenacoes ?? Enumerable.Empty<ProjectTableSorting>())
+                .Where(o => !string.IsNullOrWhiteSpace(o.CampoId))
+                .OrderBy(o => o.Ordem))
             {
-                Categoria = campo.Categoria,
-                CampoId = campo.CampoId,
-                NomeExibicao = campo.NomeExibicao,
-                Direcao = Enum.IsDefined(typeof(ProjectTableSortDirection), ordenacao.Direcao)
-                    ? ordenacao.Direcao
-                    : ProjectTableSortDirection.Crescente
+                string chave = CriarChaveCampo(ordenacao.Categoria, ordenacao.CampoId);
+
+                if (!campos.Contains(chave) || !chavesUsadas.Add(chave))
+                    continue;
+
+                resultado.Add(new ProjectTableSorting
+                {
+                    Ordem = resultado.Count,
+                    Categoria = ordenacao.Categoria,
+                    CampoId = ordenacao.CampoId.Trim(),
+                    NomeExibicao = ordenacao.NomeExibicao,
+                    Direcao = Enum.IsDefined(typeof(ProjectTableSortDirection), ordenacao.Direcao)
+                        ? ordenacao.Direcao
+                        : ProjectTableSortDirection.Crescente
+                });
+
+                if (resultado.Count == 5)
+                    break;
+            }
+
+            return resultado;
+        }
+
+        private static object? ExtrairValor(
+            Elemento elemento,
+            ProjectTableElementCategory categoriaElemento,
+            ProjectTableDataColumn column)
+        {
+            if (categoriaElemento != column.Categoria)
+                return null;
+
+            string campoId = column.CampoId.Trim();
+
+            if (string.Equals(campoId, Elemento.PARAM_NOME, StringComparison.Ordinal))
+                return elemento.Nome;
+
+            if (string.Equals(campoId, "Tipo", StringComparison.Ordinal))
+                return elemento.Tipo?.NomeTipo ?? string.Empty;
+
+            string? parametro = ObterParametroAlias(categoriaElemento, campoId);
+
+            if (parametro != null && elemento.Parametros.TryGetValue(parametro, out Parameter? aliasParameter))
+                return aliasParameter.ValorObjeto;
+
+            return elemento.Parametros.TryGetValue(campoId, out Parameter? parameter)
+                ? parameter.ValorObjeto
+                : null;
+        }
+
+        private static string? ObterParametroAlias(ProjectTableElementCategory categoria, string campoId)
+        {
+            return categoria switch
+            {
+                ProjectTableElementCategory.Barras when campoId == "TensaoNominal" => Barra.PARAM_TENSAO,
+                ProjectTableElementCategory.Cabos when campoId == "Corrente" => Cabo.PARAM_CORRENTE_LINHA,
+                ProjectTableElementCategory.Cargas when campoId == "Tensao" => ElementoEquipamento.PARAM_TENSAO_LINHA,
+                ProjectTableElementCategory.Geradores when campoId == "Tensao" => ElementoEquipamento.PARAM_TENSAO_LINHA,
+                ProjectTableElementCategory.Transformadores when campoId == "PotenciaNominal" => Transformador.PARAM_POTENCIA_APARENTE,
+                ProjectTableElementCategory.Transformadores when campoId == "TensaoPrimaria" => Transformador.PARAM_TENSAO_PRIMARIO_KV,
+                ProjectTableElementCategory.Transformadores when campoId == "TensaoSecundaria" => Transformador.PARAM_TENSAO_SECUNDARIO_KV,
+                ProjectTableElementCategory.Sin when campoId == "Tensao" => ElementoEquipamento.PARAM_TENSAO_LINHA,
+                _ => null
             };
         }
 
-        private static bool OrdenacoesIguais(ProjectTableSorting? a, ProjectTableSorting? b)
+        private static ProjectTableElementCategory? ObterCategoria(Elemento elemento)
         {
-            if (a == null && b == null)
-                return true;
+            return elemento switch
+            {
+                Barra => ProjectTableElementCategory.Barras,
+                Cabo => ProjectTableElementCategory.Cabos,
+                Carga => ProjectTableElementCategory.Cargas,
+                Gerador => ProjectTableElementCategory.Geradores,
+                Transformador => ProjectTableElementCategory.Transformadores,
+                Sin => ProjectTableElementCategory.Sin,
+                _ => null
+            };
+        }
 
-            if (a == null || b == null)
+        private static ProjectTableDataCell? ObterCell(
+            RowBuildData row,
+            ProjectTableElementCategory categoria,
+            string campoId)
+        {
+            string chave = CriarChaveCampo(categoria, campoId);
+            return row.Row.Cells.FirstOrDefault(c =>
+                string.Equals(CriarChaveCampo(c.Categoria, c.CampoId), chave, StringComparison.Ordinal));
+        }
+
+        private static int CompararValores(object? a, object? b, bool decrescente)
+        {
+            bool vazioA = ValorVazio(a);
+            bool vazioB = ValorVazio(b);
+
+            if (vazioA && vazioB)
+                return 0;
+
+            if (vazioA)
+                return 1;
+
+            if (vazioB)
+                return -1;
+
+            int comparacao;
+
+            if (TentarConverterNumero(a, out double numeroA) &&
+                TentarConverterNumero(b, out double numeroB))
+                comparacao = numeroA.CompareTo(numeroB);
+            else
+                comparacao = string.Compare(FormatarValor(a), FormatarValor(b), StringComparison.OrdinalIgnoreCase);
+
+            return decrescente ? -comparacao : comparacao;
+        }
+
+        private static bool ValorVazio(object? valor)
+        {
+            return valor == null || valor is string texto && string.IsNullOrWhiteSpace(texto);
+        }
+
+        private static bool TentarConverterNumero(object? valor, out double numero)
+        {
+            numero = 0;
+
+            if (valor == null)
                 return false;
 
-            return a.Categoria == b.Categoria &&
-                string.Equals(a.CampoId, b.CampoId, StringComparison.Ordinal) &&
-                string.Equals(a.NomeExibicao, b.NomeExibicao, StringComparison.Ordinal) &&
-                a.Direcao == b.Direcao;
+            if (valor is double d)
+            {
+                numero = d;
+                return true;
+            }
+
+            if (valor is int i)
+            {
+                numero = i;
+                return true;
+            }
+
+            string texto = Convert.ToString(valor, CultureInfo.InvariantCulture)?.Trim() ?? string.Empty;
+
+            return double.TryParse(texto, NumberStyles.Float, CultureInfo.InvariantCulture, out numero) ||
+                double.TryParse(texto, NumberStyles.Float, CultureInfo.GetCultureInfo("pt-BR"), out numero);
+        }
+
+        private static string FormatarValor(object? valor)
+        {
+            return valor switch
+            {
+                null => string.Empty,
+                double d => d.ToString(CultureInfo.InvariantCulture),
+                float f => f.ToString(CultureInfo.InvariantCulture),
+                decimal m => m.ToString(CultureInfo.InvariantCulture),
+                _ => Convert.ToString(valor, CultureInfo.InvariantCulture) ?? string.Empty
+            };
         }
 
         private static string CriarChaveCampo(ProjectTableElementCategory categoria, string campoId)
         {
             return $"{categoria}|{campoId.Trim()}";
         }
+
+        private sealed class RowBuildData
+        {
+            public RowBuildData(Elemento elemento, int documentIndex, ProjectTableDataRow row)
+            {
+                Elemento = elemento;
+                DocumentIndex = documentIndex;
+                Row = row;
+            }
+
+            public Elemento Elemento { get; }
+            public int DocumentIndex { get; }
+            public ProjectTableDataRow Row { get; }
+        }
+
+        private sealed class RowBuildDataComparer : IComparer<RowBuildData>
+        {
+            private readonly IReadOnlyList<ProjectTableSorting> _ordenacoes;
+
+            public RowBuildDataComparer(IReadOnlyList<ProjectTableSorting> ordenacoes)
+            {
+                _ordenacoes = ordenacoes;
+            }
+
+            public int Compare(RowBuildData? x, RowBuildData? y)
+            {
+                if (ReferenceEquals(x, y))
+                    return 0;
+
+                if (x == null)
+                    return 1;
+
+                if (y == null)
+                    return -1;
+
+                foreach (ProjectTableSorting ordenacao in _ordenacoes)
+                {
+                    ProjectTableDataCell? cellX = ObterCell(x, ordenacao.Categoria, ordenacao.CampoId);
+                    ProjectTableDataCell? cellY = ObterCell(y, ordenacao.Categoria, ordenacao.CampoId);
+                    int comparacao = CompararValores(
+                        cellX?.RawValue,
+                        cellY?.RawValue,
+                        ordenacao.Direcao == ProjectTableSortDirection.Decrescente);
+
+                    if (comparacao == 0)
+                        continue;
+
+                    return comparacao;
+                }
+
+                return x.DocumentIndex.CompareTo(y.DocumentIndex);
+            }
+        }
+    }
+}
+
+
+
+====================================================================================================
+ARQUIVO: C:\Users\User\source\repos\lucasffxavier\Araci-front\Applications\Projects\Tables\ProjectTableDataCell.cs
+====================================================================================================
+
+using Araci.Core.Documents;
+
+namespace Araci.Applications.Projects.Tables
+{
+    public sealed class ProjectTableDataCell
+    {
+        public ProjectTableDataCell(
+            ProjectTableElementCategory categoria,
+            string campoId,
+            string nomeExibicao,
+            object? rawValue,
+            string displayValue)
+        {
+            Categoria = categoria;
+            CampoId = campoId;
+            NomeExibicao = nomeExibicao;
+            RawValue = rawValue;
+            DisplayValue = displayValue;
+        }
+
+        public ProjectTableElementCategory Categoria { get; }
+        public string CampoId { get; }
+        public string NomeExibicao { get; }
+        public object? RawValue { get; }
+        public string DisplayValue { get; }
+    }
+}
+
+
+
+====================================================================================================
+ARQUIVO: C:\Users\User\source\repos\lucasffxavier\Araci-front\Applications\Projects\Tables\ProjectTableDataColumn.cs
+====================================================================================================
+
+using Araci.Core.Documents;
+
+namespace Araci.Applications.Projects.Tables
+{
+    public sealed class ProjectTableDataColumn
+    {
+        public ProjectTableDataColumn(
+            ProjectTableElementCategory categoria,
+            string campoId,
+            string nomeExibicao,
+            int ordem)
+        {
+            Categoria = categoria;
+            CampoId = campoId;
+            NomeExibicao = nomeExibicao;
+            Ordem = ordem;
+        }
+
+        public ProjectTableElementCategory Categoria { get; }
+        public string CampoId { get; }
+        public string NomeExibicao { get; }
+        public int Ordem { get; }
+    }
+}
+
+
+
+====================================================================================================
+ARQUIVO: C:\Users\User\source\repos\lucasffxavier\Araci-front\Applications\Projects\Tables\ProjectTableDataResult.cs
+====================================================================================================
+
+using System.Collections.Generic;
+
+namespace Araci.Applications.Projects.Tables
+{
+    public sealed class ProjectTableDataResult
+    {
+        public ProjectTableDataResult(
+            IReadOnlyList<ProjectTableDataColumn> columns,
+            IReadOnlyList<ProjectTableDataRow> rows)
+        {
+            Columns = columns;
+            Rows = rows;
+        }
+
+        public IReadOnlyList<ProjectTableDataColumn> Columns { get; }
+        public IReadOnlyList<ProjectTableDataRow> Rows { get; }
+    }
+}
+
+
+
+====================================================================================================
+ARQUIVO: C:\Users\User\source\repos\lucasffxavier\Araci-front\Applications\Projects\Tables\ProjectTableDataRow.cs
+====================================================================================================
+
+using System;
+using System.Collections.Generic;
+using Araci.Core.Documents;
+
+namespace Araci.Applications.Projects.Tables
+{
+    public sealed class ProjectTableDataRow
+    {
+        public ProjectTableDataRow(
+            Guid elementoId,
+            string elementoNome,
+            ProjectTableElementCategory categoria,
+            IReadOnlyList<ProjectTableDataCell> cells)
+        {
+            ElementoId = elementoId;
+            ElementoNome = elementoNome;
+            Categoria = categoria;
+            Cells = cells;
+        }
+
+        public Guid ElementoId { get; }
+        public string ElementoNome { get; }
+        public ProjectTableElementCategory Categoria { get; }
+        public IReadOnlyList<ProjectTableDataCell> Cells { get; }
     }
 }
 
@@ -1108,6 +1071,7 @@ using Araci.Applications.Analisar.FluxoDeCorrente;
 using Araci.Applications.Diagrama;
 using Araci.Applications.Editar.Base;
 using Araci.Applications.Factories;
+using Araci.Applications.Projects.Tables;
 using Araci.Applications.UseCases.Analise;
 using Araci.Applications.UseCases.Editar;
 using Araci.Applications.UseCases.Projeto;
@@ -1160,9 +1124,22 @@ namespace Araci.TechnicalChecks
                 ("Persistencia preserva ramificacao", PersistenciaPreservaRamificacao),
                 ("Tabela remove filtros de campos removidos com undo redo", TabelaRemoveFiltrosCamposRemovidosComUndoRedo),
                 ("Excluir vista limpa filtro de vista da tabela com undo redo", ExcluirVistaLimpaFiltroTabelaComUndoRedo),
-                ("Tabela altera ordenacao com undo redo", TabelaAlteraOrdenacaoComUndoRedo),
-                ("Tabela limpa ordenacao ao remover campo ordenado", TabelaLimpaOrdenacaoAoRemoverCampoOrdenado),
-                ("Tabela duplica e persiste ordenacao", TabelaDuplicaEPersisteOrdenacao),
+                ("Tabela altera multiplas ordenacoes com undo redo", TabelaAlteraMultiplasOrdenacoesComUndoRedo),
+                ("Tabela limita ordenacao a cinco regras", TabelaLimitaOrdenacaoACincoRegras),
+                ("Tabela remove ordenacoes duplicadas", TabelaRemoveOrdenacoesDuplicadas),
+                ("Tabela limpa apenas ordenacao de campo removido", TabelaLimpaApenasOrdenacaoDeCampoRemovido),
+                ("Tabela duplica e persiste multiplas ordenacoes", TabelaDuplicaEPersisteMultiplasOrdenacoes),
+                ("Tabela converte ordenacao unica legada", TabelaConverteOrdenacaoUnicaLegada),
+                ("Tabela data builder gera colunas por campos selecionados", TabelaDataBuilderGeraColunasPorCamposSelecionados),
+                ("Tabela data builder gera linhas por categorias", TabelaDataBuilderGeraLinhasPorCategorias),
+                ("Tabela data builder respeita filtro de vista", TabelaDataBuilderRespeitaFiltroVista),
+                ("Tabela data builder aplica filtro todas", TabelaDataBuilderAplicaFiltroTodas),
+                ("Tabela data builder aplica filtro qualquer", TabelaDataBuilderAplicaFiltroQualquer),
+                ("Tabela data builder aplica ordenacao multipla", TabelaDataBuilderAplicaOrdenacaoMultipla),
+                ("Tabela data builder sem ordenacao preserva ordem", TabelaDataBuilderSemOrdenacaoPreservaOrdem),
+                ("Tabela data builder ignora ordenacao invalida sem alterar tabela", TabelaDataBuilderIgnoraOrdenacaoInvalidaSemAlterarTabela),
+                ("Tabela data builder geracao repetida read only", TabelaDataBuilderGeracaoRepetidaReadOnly),
+                ("Tabela data builder ignora categoria nao selecionada", TabelaDataBuilderIgnoraCategoriaNaoSelecionada),
                 ("DTO permanece equivalente apos reload", DtoPermaneceEquivalenteAposReload),
                 ("IDs permanecem estaveis apos reload", IdsPermanecemEstaveisAposReload),
                 ("Builds repetidos apos reload nao alteram Document", BuildsRepetidosAposReloadNaoAlteramDocument),
@@ -6166,87 +6143,104 @@ namespace Araci.TechnicalChecks
             AssertEqual(null, tabelaAfetada.FiltroVistaId, "Redo deveria limpar filtro da Vista B novamente.");
         }
 
-        private static void TabelaAlteraOrdenacaoComUndoRedo()
+        private static void TabelaAlteraMultiplasOrdenacoesComUndoRedo()
         {
             var document = new AraciDocument();
             var commands = new Araci.Core.Commands.CommandManager();
             var useCase = new EditarPropriedadesTabelaUseCase(document, commands);
             ProjectTable tabela = CriarTabelaComCampos(document);
-            ProjectTableFieldSelection campoNome = tabela.CamposSelecionados[0];
 
             bool alterado = useCase.AlterarOrdenacaoTabela(
                 tabela.Id,
-                new ProjectTableSorting
-                {
-                    Categoria = campoNome.Categoria,
-                    CampoId = campoNome.CampoId,
-                    NomeExibicao = campoNome.NomeExibicao,
-                    Direcao = ProjectTableSortDirection.Decrescente
-                });
+                CriarOrdenacoes(tabela, "Tensao", "Nome"));
 
             Assert(alterado, "AlterarOrdenacaoTabela deveria retornar true.");
-            Assert(tabela.Ordenacao != null, "Ordenacao deveria existir.");
-            AssertEqual("Nome", tabela.Ordenacao!.CampoId, "Ordenacao.CampoId");
-            AssertEqual(ProjectTableSortDirection.Decrescente, tabela.Ordenacao.Direcao, "Ordenacao.Direcao");
+            AssertEqual(2, tabela.Ordenacoes.Count, "Ordenacoes.Count");
+            AssertEqual("Tensao", tabela.Ordenacoes[0].CampoId, "Ordenacoes[0].CampoId");
+            AssertEqual("Nome", tabela.Ordenacoes[1].CampoId, "Ordenacoes[1].CampoId");
+            AssertEqual(0, tabela.Ordenacoes[0].Ordem, "Ordenacoes[0].Ordem");
+            AssertEqual(1, tabela.Ordenacoes[1].Ordem, "Ordenacoes[1].Ordem");
 
             commands.Undo();
-            Assert(tabela.Ordenacao == null, "Undo deveria limpar ordenacao inicial.");
+            AssertEqual(0, tabela.Ordenacoes.Count, "Undo deveria limpar ordenacao inicial.");
 
             commands.Redo();
-            Assert(tabela.Ordenacao != null, "Redo deveria restaurar ordenacao.");
-            AssertEqual(ProjectTableSortDirection.Decrescente, tabela.Ordenacao!.Direcao, "Redo.Ordenacao.Direcao");
+            AssertEqual(2, tabela.Ordenacoes.Count, "Redo deveria restaurar ordenacoes.");
+            AssertEqual("Nome", tabela.Ordenacoes[1].CampoId, "Redo.Ordenacoes[1].CampoId");
         }
 
-        private static void TabelaLimpaOrdenacaoAoRemoverCampoOrdenado()
+        private static void TabelaLimitaOrdenacaoACincoRegras()
         {
             var document = new AraciDocument();
             var commands = new Araci.Core.Commands.CommandManager();
             var useCase = new EditarPropriedadesTabelaUseCase(document, commands);
             ProjectTable tabela = CriarTabelaComCampos(document);
-            ProjectTableFieldSelection campoNome = tabela.CamposSelecionados[0];
-            ProjectTableFieldSelection campoTensao = tabela.CamposSelecionados[1];
 
-            tabela.Ordenacao = new ProjectTableSorting
-            {
-                Categoria = campoTensao.Categoria,
-                CampoId = campoTensao.CampoId,
-                NomeExibicao = campoTensao.NomeExibicao,
-                Direcao = ProjectTableSortDirection.Crescente
-            };
+            useCase.AlterarOrdenacaoTabela(
+                tabela.Id,
+                CriarOrdenacoes(tabela, "Nome", "Tensao", "Corrente", "PotenciaAtiva", "Tipo", "Comprimento"));
+
+            AssertEqual(5, tabela.Ordenacoes.Count, "Ordenacoes deveria ser limitada a cinco regras.");
+            AssertEqual("Tipo", tabela.Ordenacoes[4].CampoId, "Quinta regra preservada.");
+            Assert(tabela.Ordenacoes.Select((o, index) => o.Ordem == index).All(ok => ok), "Ordenacoes deveriam ser reindexadas.");
+        }
+
+        private static void TabelaRemoveOrdenacoesDuplicadas()
+        {
+            var document = new AraciDocument();
+            var commands = new Araci.Core.Commands.CommandManager();
+            var useCase = new EditarPropriedadesTabelaUseCase(document, commands);
+            ProjectTable tabela = CriarTabelaComCampos(document);
+
+            useCase.AlterarOrdenacaoTabela(
+                tabela.Id,
+                CriarOrdenacoes(tabela, "Nome", "Tensao", "Nome", "Corrente"));
+
+            AssertEqual(3, tabela.Ordenacoes.Count, "Duplicidade deveria ser removida.");
+            AssertEqual("Nome", tabela.Ordenacoes[0].CampoId, "Primeira ocorrencia duplicada deveria ser preservada.");
+            AssertEqual("Tensao", tabela.Ordenacoes[1].CampoId, "Ordem apos remover duplicidade.");
+            AssertEqual("Corrente", tabela.Ordenacoes[2].CampoId, "Regra valida posterior deveria ser preservada.");
+        }
+
+        private static void TabelaLimpaApenasOrdenacaoDeCampoRemovido()
+        {
+            var document = new AraciDocument();
+            var commands = new Araci.Core.Commands.CommandManager();
+            var useCase = new EditarPropriedadesTabelaUseCase(document, commands);
+            ProjectTable tabela = CriarTabelaComCampos(document);
+            tabela.Ordenacoes = CriarOrdenacoes(tabela, "Nome", "Tensao", "Corrente").ToList();
 
             useCase.AlterarElementosTabela(
                 tabela.Id,
                 tabela.CategoriasElementos,
-                new[] { campoNome });
+                tabela.CamposSelecionados.Where(c => c.CampoId != "Tensao").ToList());
 
-            Assert(tabela.Ordenacao == null, "Ordenacao deveria ser limpa ao remover campo ordenado.");
+            AssertEqual(2, tabela.Ordenacoes.Count, "Apenas uma ordenacao deveria ser removida.");
+            AssertEqual("Nome", tabela.Ordenacoes[0].CampoId, "Ordenacao valida anterior preservada.");
+            AssertEqual("Corrente", tabela.Ordenacoes[1].CampoId, "Ordenacao valida posterior preservada.");
+            AssertEqual(1, tabela.Ordenacoes[1].Ordem, "Ordenacao remanescente deveria ser reindexada.");
 
             commands.Undo();
-            Assert(tabela.Ordenacao != null, "Undo deveria restaurar ordenacao.");
-            AssertEqual("Tensao", tabela.Ordenacao!.CampoId, "Undo.Ordenacao.CampoId");
+            AssertEqual(3, tabela.Ordenacoes.Count, "Undo deveria restaurar todas as ordenacoes.");
+            AssertEqual("Tensao", tabela.Ordenacoes[1].CampoId, "Undo.Ordenacoes[1].CampoId");
 
             commands.Redo();
-            Assert(tabela.Ordenacao == null, "Redo deveria limpar ordenacao novamente.");
+            AssertEqual(2, tabela.Ordenacoes.Count, "Redo deveria remover novamente apenas a regra invalida.");
+            Assert(tabela.Ordenacoes.All(o => o.CampoId != "Tensao"), "Redo nao deveria manter regra do campo removido.");
         }
 
-        private static void TabelaDuplicaEPersisteOrdenacao()
+        private static void TabelaDuplicaEPersisteMultiplasOrdenacoes()
         {
             var document = new AraciDocument();
             ProjectTable tabela = CriarTabelaComCampos(document);
-            ProjectTableFieldSelection campoNome = tabela.CamposSelecionados[0];
-            tabela.Ordenacao = new ProjectTableSorting
-            {
-                Categoria = campoNome.Categoria,
-                CampoId = campoNome.CampoId,
-                NomeExibicao = campoNome.NomeExibicao,
-                Direcao = ProjectTableSortDirection.Decrescente
-            };
+            tabela.Ordenacoes = CriarOrdenacoes(tabela, "Nome", "Tensao", "Corrente").ToList();
 
             ProjectTable duplicata = document.CriarDuplicataTabela(tabela);
 
-            Assert(duplicata.Ordenacao != null, "Duplicata deveria copiar ordenacao.");
-            AssertEqual("Nome", duplicata.Ordenacao!.CampoId, "Duplicata.Ordenacao.CampoId");
-            AssertEqual(ProjectTableSortDirection.Decrescente, duplicata.Ordenacao.Direcao, "Duplicata.Ordenacao.Direcao");
+            AssertEqual(3, duplicata.Ordenacoes.Count, "Duplicata deveria copiar ordenacoes.");
+            AssertEqual("Tensao", duplicata.Ordenacoes[1].CampoId, "Duplicata.Ordenacoes[1].CampoId");
+            duplicata.Ordenacoes[1].CampoId = "Alterado";
+            AssertEqual("Tensao", tabela.Ordenacoes[1].CampoId, "Duplicata deveria usar copia profunda.");
 
             string path = CreateTempProjectPath();
 
@@ -6255,22 +6249,8 @@ namespace Araci.TechnicalChecks
                 var context = new EditorContext();
                 ProjectTable persistentTable = context.Document.CriarNovaTabela();
                 persistentTable.CategoriasElementos = tabela.CategoriasElementos.ToList();
-                persistentTable.CamposSelecionados = tabela.CamposSelecionados
-                    .Select(c => new ProjectTableFieldSelection
-                    {
-                        Categoria = c.Categoria,
-                        CampoId = c.CampoId,
-                        NomeExibicao = c.NomeExibicao,
-                        Ordem = c.Ordem
-                    })
-                    .ToList();
-                persistentTable.Ordenacao = new ProjectTableSorting
-                {
-                    Categoria = campoNome.Categoria,
-                    CampoId = campoNome.CampoId,
-                    NomeExibicao = campoNome.NomeExibicao,
-                    Direcao = ProjectTableSortDirection.Decrescente
-                };
+                persistentTable.CamposSelecionados = CopiarCamposTabela(tabela.CamposSelecionados).ToList();
+                persistentTable.Ordenacoes = CriarOrdenacoes(tabela, "Nome", "Tensao", "Corrente").ToList();
 
                 context.Projects.Salvar(path);
 
@@ -6278,14 +6258,212 @@ namespace Araci.TechnicalChecks
                 loadedContext.Projects.Abrir(path);
                 ProjectTable loadedTable = loadedContext.Document.Tabelas.Single(t => t.Id == persistentTable.Id);
 
-                Assert(loadedTable.Ordenacao != null, "Reload deveria preservar ordenacao.");
-                AssertEqual("Nome", loadedTable.Ordenacao!.CampoId, "Reload.Ordenacao.CampoId");
-                AssertEqual(ProjectTableSortDirection.Decrescente, loadedTable.Ordenacao.Direcao, "Reload.Ordenacao.Direcao");
+                AssertEqual(3, loadedTable.Ordenacoes.Count, "Reload deveria preservar multiplas ordenacoes.");
+                AssertEqual("Nome", loadedTable.Ordenacoes[0].CampoId, "Reload.Ordenacoes[0].CampoId");
+                AssertEqual("Corrente", loadedTable.Ordenacoes[2].CampoId, "Reload.Ordenacoes[2].CampoId");
             }
             finally
             {
                 DeleteIfExists(path);
             }
+        }
+
+        private static void TabelaConverteOrdenacaoUnicaLegada()
+        {
+            var dto = new ProjectFileDto
+            {
+                Version = ProjectSerializer.CurrentVersion,
+                AppName = ProjectSerializer.AppName,
+                ProjectName = "Tabela legada",
+                CreatedAt = DateTimeOffset.UtcNow,
+                SavedAt = DateTimeOffset.UtcNow,
+                Tables =
+                {
+                    new ProjectTableDto
+                    {
+                        Id = Guid.NewGuid(),
+                        Nome = "Tabela legada",
+                        CategoriasElementos = { ProjectTableElementCategory.Barras.ToString() },
+                        CamposSelecionados =
+                        {
+                            new ProjectTableFieldSelectionDto
+                            {
+                                Categoria = ProjectTableElementCategory.Barras.ToString(),
+                                CampoId = "Nome",
+                                NomeExibicao = "Nome",
+                                Ordem = 0
+                            }
+                        },
+                        Ordenacao = new ProjectTableSortingDto
+                        {
+                            Categoria = ProjectTableElementCategory.Barras.ToString(),
+                            CampoId = "Nome",
+                            NomeExibicao = "Nome",
+                            Direcao = ProjectTableSortDirection.Decrescente.ToString()
+                        }
+                    }
+                }
+            };
+
+            string path = CreateTempProjectPath();
+
+            try
+            {
+                File.WriteAllText(path, JsonSerializer.Serialize(dto));
+
+                var context = new EditorContext();
+                context.Projects.Abrir(path);
+                ProjectTable tabela = context.Document.Tabelas.Single();
+
+                AssertEqual(1, tabela.Ordenacoes.Count, "Ordenacao unica legada deveria virar lista com uma regra.");
+                AssertEqual("Nome", tabela.Ordenacoes[0].CampoId, "Ordenacao legada CampoId.");
+                AssertEqual(ProjectTableSortDirection.Decrescente, tabela.Ordenacoes[0].Direcao, "Ordenacao legada Direcao.");
+            }
+            finally
+            {
+                DeleteIfExists(path);
+            }
+        }
+
+        private static void TabelaDataBuilderGeraColunasPorCamposSelecionados()
+        {
+            AraciDocument document = CriarDocumentoTabelaDados();
+            ProjectTable tabela = CriarTabelaDadosCarga(document);
+
+            ProjectTableDataResult result = new ProjectTableDataBuilder().Build(document, tabela);
+
+            AssertEqual(3, result.Columns.Count, "Columns.Count");
+            AssertEqual("Nome", result.Columns[0].CampoId, "Columns[0].CampoId");
+            AssertEqual("PotenciaAtiva", result.Columns[1].CampoId, "Columns[1].CampoId");
+            AssertEqual("Tensao", result.Columns[2].CampoId, "Columns[2].CampoId");
+        }
+
+        private static void TabelaDataBuilderGeraLinhasPorCategorias()
+        {
+            AraciDocument document = CriarDocumentoTabelaDados();
+            ProjectTable tabela = CriarTabelaDadosCarga(document);
+
+            ProjectTableDataResult result = new ProjectTableDataBuilder().Build(document, tabela);
+
+            AssertEqual(3, result.Rows.Count, "Rows.Count");
+            Assert(result.Rows.All(r => r.Categoria == ProjectTableElementCategory.Cargas), "Todas as linhas deveriam ser Cargas.");
+        }
+
+        private static void TabelaDataBuilderRespeitaFiltroVista()
+        {
+            AraciDocument document = CriarDocumentoTabelaDados();
+            ProjectTable tabela = CriarTabelaDadosCarga(document);
+            ProjectView vistaB = document.Vistas.Single(v => v.Nome == "Vista filtro");
+            tabela.FiltroVistaId = vistaB.Id;
+
+            ProjectTableDataResult result = new ProjectTableDataBuilder().Build(document, tabela);
+
+            AssertEqual(1, result.Rows.Count, "FiltroVista Rows.Count");
+            AssertEqual("Carga B", result.Rows[0].ElementoNome, "FiltroVista ElementoNome");
+        }
+
+        private static void TabelaDataBuilderAplicaFiltroTodas()
+        {
+            AraciDocument document = CriarDocumentoTabelaDados();
+            ProjectTable tabela = CriarTabelaDadosCarga(document);
+            tabela.ModoFiltro = ProjectTableFilterLogicalMode.Todas;
+            tabela.Filtros = new List<ProjectTableFilterRule>
+            {
+                new() { Ordem = 0, Categoria = ProjectTableElementCategory.Cargas, CampoId = "Nome", NomeExibicao = "Nome", Operador = ProjectTableFilterOperator.Contem, Valor = "Carga" },
+                new() { Ordem = 1, Categoria = ProjectTableElementCategory.Cargas, CampoId = "PotenciaAtiva", NomeExibicao = "Potencia ativa", Operador = ProjectTableFilterOperator.IgualA, Valor = "800" }
+            };
+
+            ProjectTableDataResult result = new ProjectTableDataBuilder().Build(document, tabela);
+
+            AssertEqual(1, result.Rows.Count, "Filtro Todas Rows.Count");
+            AssertEqual("Carga B", result.Rows[0].ElementoNome, "Filtro Todas ElementoNome");
+        }
+
+        private static void TabelaDataBuilderAplicaFiltroQualquer()
+        {
+            AraciDocument document = CriarDocumentoTabelaDados();
+            ProjectTable tabela = CriarTabelaDadosCarga(document);
+            tabela.ModoFiltro = ProjectTableFilterLogicalMode.Qualquer;
+            tabela.Filtros = new List<ProjectTableFilterRule>
+            {
+                new() { Ordem = 0, Categoria = ProjectTableElementCategory.Cargas, CampoId = "Nome", NomeExibicao = "Nome", Operador = ProjectTableFilterOperator.IgualA, Valor = "Carga C" },
+                new() { Ordem = 1, Categoria = ProjectTableElementCategory.Cargas, CampoId = "PotenciaAtiva", NomeExibicao = "Potencia ativa", Operador = ProjectTableFilterOperator.IgualA, Valor = "800" }
+            };
+
+            ProjectTableDataResult result = new ProjectTableDataBuilder().Build(document, tabela);
+
+            AssertEqual(2, result.Rows.Count, "Filtro Qualquer Rows.Count");
+            Assert(result.Rows.Any(r => r.ElementoNome == "Carga B"), "Filtro Qualquer deveria incluir Carga B.");
+            Assert(result.Rows.Any(r => r.ElementoNome == "Carga C"), "Filtro Qualquer deveria incluir Carga C.");
+        }
+
+        private static void TabelaDataBuilderAplicaOrdenacaoMultipla()
+        {
+            AraciDocument document = CriarDocumentoTabelaDados();
+            ProjectTable tabela = CriarTabelaDadosCarga(document);
+            tabela.Ordenacoes = new List<ProjectTableSorting>
+            {
+                new() { Ordem = 0, Categoria = ProjectTableElementCategory.Cargas, CampoId = "PotenciaAtiva", NomeExibicao = "Potencia ativa", Direcao = ProjectTableSortDirection.Crescente },
+                new() { Ordem = 1, Categoria = ProjectTableElementCategory.Cargas, CampoId = "Nome", NomeExibicao = "Nome", Direcao = ProjectTableSortDirection.Decrescente }
+            };
+
+            ProjectTableDataResult result = new ProjectTableDataBuilder().Build(document, tabela);
+
+            AssertEqual("Carga C", result.Rows[0].ElementoNome, "Ordenacao Rows[0]");
+            AssertEqual("Carga A", result.Rows[1].ElementoNome, "Ordenacao Rows[1]");
+            AssertEqual("Carga B", result.Rows[2].ElementoNome, "Ordenacao Rows[2]");
+        }
+
+        private static void TabelaDataBuilderSemOrdenacaoPreservaOrdem()
+        {
+            AraciDocument document = CriarDocumentoTabelaDados();
+            ProjectTable tabela = CriarTabelaDadosCarga(document);
+
+            ProjectTableDataResult result = new ProjectTableDataBuilder().Build(document, tabela);
+
+            AssertEqual("Carga A", result.Rows[0].ElementoNome, "Sem ordenacao Rows[0]");
+            AssertEqual("Carga B", result.Rows[1].ElementoNome, "Sem ordenacao Rows[1]");
+            AssertEqual("Carga C", result.Rows[2].ElementoNome, "Sem ordenacao Rows[2]");
+        }
+
+        private static void TabelaDataBuilderIgnoraOrdenacaoInvalidaSemAlterarTabela()
+        {
+            AraciDocument document = CriarDocumentoTabelaDados();
+            ProjectTable tabela = CriarTabelaDadosCarga(document);
+            tabela.Ordenacoes = new List<ProjectTableSorting>
+            {
+                new() { Ordem = 0, Categoria = ProjectTableElementCategory.Cargas, CampoId = "CampoInexistente", NomeExibicao = "Campo inexistente", Direcao = ProjectTableSortDirection.Decrescente }
+            };
+
+            ProjectTableDataResult result = new ProjectTableDataBuilder().Build(document, tabela);
+
+            AssertEqual("Carga A", result.Rows[0].ElementoNome, "Ordenacao invalida deveria preservar ordem.");
+            AssertEqual(1, tabela.Ordenacoes.Count, "Builder nao deveria alterar Ordenacoes.");
+            AssertEqual("CampoInexistente", tabela.Ordenacoes[0].CampoId, "Builder nao deveria normalizar ProjectTable.");
+        }
+
+        private static void TabelaDataBuilderGeracaoRepetidaReadOnly()
+        {
+            AraciDocument document = CriarDocumentoTabelaDados();
+            ProjectTable tabela = CriarTabelaDadosCarga(document);
+            string assinaturaAntes = CriarAssinaturaTabelaDados(document, tabela);
+            var builder = new ProjectTableDataBuilder();
+
+            builder.Build(document, tabela);
+            builder.Build(document, tabela);
+
+            string assinaturaDepois = CriarAssinaturaTabelaDados(document, tabela);
+            AssertEqual(assinaturaAntes, assinaturaDepois, "Geracao da tabela deveria ser read-only.");
+        }
+
+        private static void TabelaDataBuilderIgnoraCategoriaNaoSelecionada()
+        {
+            AraciDocument document = CriarDocumentoTabelaDados();
+            ProjectTable tabela = CriarTabelaDadosCarga(document);
+
+            ProjectTableDataResult result = new ProjectTableDataBuilder().Build(document, tabela);
+
+            Assert(result.Rows.All(r => r.ElementoNome != "Gerador A"), "Categoria nao selecionada nao deveria aparecer.");
         }
 
         private static ProjectTable CriarTabelaComCampos(AraciDocument document)
@@ -6295,10 +6473,121 @@ namespace Araci.TechnicalChecks
             tabela.CamposSelecionados = new List<ProjectTableFieldSelection>
             {
                 new() { Categoria = ProjectTableElementCategory.Barras, CampoId = "Nome", NomeExibicao = "Nome", Ordem = 0 },
-                new() { Categoria = ProjectTableElementCategory.Barras, CampoId = "Tensao", NomeExibicao = "Tensao", Ordem = 1 }
+                new() { Categoria = ProjectTableElementCategory.Barras, CampoId = "Tensao", NomeExibicao = "Tensao", Ordem = 1 },
+                new() { Categoria = ProjectTableElementCategory.Barras, CampoId = "Corrente", NomeExibicao = "Corrente", Ordem = 2 },
+                new() { Categoria = ProjectTableElementCategory.Barras, CampoId = "PotenciaAtiva", NomeExibicao = "Potencia ativa", Ordem = 3 },
+                new() { Categoria = ProjectTableElementCategory.Barras, CampoId = "Tipo", NomeExibicao = "Tipo", Ordem = 4 },
+                new() { Categoria = ProjectTableElementCategory.Barras, CampoId = "Comprimento", NomeExibicao = "Comprimento", Ordem = 5 }
             };
 
             return tabela;
+        }
+
+        private static AraciDocument CriarDocumentoTabelaDados()
+        {
+            var document = new AraciDocument();
+            ProjectView vistaA = document.Vistas[0];
+            ProjectView vistaB = document.CriarNovaVista();
+            vistaB.Nome = "Vista filtro";
+
+            document.Elementos.Add(new Carga
+            {
+                Nome = "Carga A",
+                PotenciaAtiva = 500,
+                TensaoLinha = "13.8",
+                ViewId = vistaA.Id
+            });
+            document.Elementos.Add(new Carga
+            {
+                Nome = "Carga B",
+                PotenciaAtiva = 800,
+                TensaoLinha = "13.8",
+                ViewId = vistaB.Id
+            });
+            document.Elementos.Add(new Carga
+            {
+                Nome = "Carga C",
+                PotenciaAtiva = 500,
+                TensaoLinha = "0.38",
+                ViewId = vistaA.Id
+            });
+            document.Elementos.Add(new Gerador
+            {
+                Nome = "Gerador A",
+                PotenciaAtiva = 1000,
+                TensaoLinha = "13.8",
+                ViewId = vistaA.Id
+            });
+
+            return document;
+        }
+
+        private static ProjectTable CriarTabelaDadosCarga(AraciDocument document)
+        {
+            ProjectTable tabela = document.CriarNovaTabela();
+            tabela.CategoriasElementos = new List<ProjectTableElementCategory>
+            {
+                ProjectTableElementCategory.Cargas
+            };
+            tabela.CamposSelecionados = new List<ProjectTableFieldSelection>
+            {
+                new() { Categoria = ProjectTableElementCategory.Cargas, CampoId = "Nome", NomeExibicao = "Nome", Ordem = 0 },
+                new() { Categoria = ProjectTableElementCategory.Cargas, CampoId = "PotenciaAtiva", NomeExibicao = "Potencia ativa", Ordem = 1 },
+                new() { Categoria = ProjectTableElementCategory.Cargas, CampoId = "Tensao", NomeExibicao = "Tensao", Ordem = 2 }
+            };
+
+            return tabela;
+        }
+
+        private static string CriarAssinaturaTabelaDados(AraciDocument document, ProjectTable tabela)
+        {
+            string elementos = string.Join(
+                ";",
+                document.Elementos.Select(e => $"{e.Id}:{e.Nome}:{e.ViewId}:{e.PosicaoX}:{e.PosicaoY}"));
+            string campos = string.Join(
+                ";",
+                tabela.CamposSelecionados.Select(c => $"{c.Ordem}:{c.Categoria}:{c.CampoId}:{c.NomeExibicao}"));
+            string filtros = string.Join(
+                ";",
+                tabela.Filtros.Select(f => $"{f.Ordem}:{f.Categoria}:{f.CampoId}:{f.Operador}:{f.Valor}"));
+            string ordenacoes = string.Join(
+                ";",
+                tabela.Ordenacoes.Select(o => $"{o.Ordem}:{o.Categoria}:{o.CampoId}:{o.Direcao}"));
+
+            return $"{document.Elementos.Count}|{elementos}|{tabela.FiltroVistaId}|{tabela.ModoFiltro}|{campos}|{filtros}|{ordenacoes}";
+        }
+
+        private static IReadOnlyList<ProjectTableSorting> CriarOrdenacoes(ProjectTable tabela, params string[] campoIds)
+        {
+            return campoIds
+                .Select((campoId, index) =>
+                {
+                    ProjectTableFieldSelection campo = tabela.CamposSelecionados.Single(c => c.CampoId == campoId);
+                    return new ProjectTableSorting
+                    {
+                        Ordem = index,
+                        Categoria = campo.Categoria,
+                        CampoId = campo.CampoId,
+                        NomeExibicao = campo.NomeExibicao,
+                        Direcao = index % 2 == 0
+                            ? ProjectTableSortDirection.Crescente
+                            : ProjectTableSortDirection.Decrescente
+                    };
+                })
+                .ToList();
+        }
+
+        private static IReadOnlyList<ProjectTableFieldSelection> CopiarCamposTabela(IReadOnlyList<ProjectTableFieldSelection> campos)
+        {
+            return campos
+                .Select(c => new ProjectTableFieldSelection
+                {
+                    Categoria = c.Categoria,
+                    CampoId = c.CampoId,
+                    NomeExibicao = c.NomeExibicao,
+                    Ordem = c.Ordem
+                })
+                .ToList();
         }
 
         private static ExecutarSimulacaoUseCase CriarExecutarSimulacaoUseCase(
@@ -6388,9 +6677,9 @@ namespace Araci.TechnicalChecks
 
             public OrdenacaoTabelaDialogResult? ShowOrdenacaoTabelaDialog(
                 IReadOnlyList<ProjectTableFieldSelection> camposSelecionados,
-                ProjectTableSorting? ordenacao)
+                IReadOnlyList<ProjectTableSorting> ordenacoes)
             {
-                return new OrdenacaoTabelaDialogResult(ordenacao);
+                return new OrdenacaoTabelaDialogResult(ordenacoes);
             }
 
             public bool Confirm(string title, string message)
@@ -6701,1818 +6990,224 @@ namespace Araci.TechnicalChecks
 
 
 ====================================================================================================
-ARQUIVO: C:\Users\User\source\repos\lucasffxavier\Araci-front\Core\Documents\AraciDocument.cs
+ARQUIVO: C:\Users\User\source\repos\lucasffxavier\Araci-front\MainWindow.xaml
 ====================================================================================================
 
-using System.Collections.Generic;
-using System.Collections.ObjectModel;
-using System.Linq;
-using Araci.Models;
-
-namespace Araci.Core.Documents
-{
-    public class AraciDocument
-    {
-        public AraciDocument()
-        {
-            Elementos = new ObservableCollection<Elemento>();
-            Vistas = new ObservableCollection<ProjectView>();
-            Tabelas = new ObservableCollection<ProjectTable>();
-            Pranchas = new ObservableCollection<ProjectSheet>();
-
-            CriarVistaPadrao();
-        }
-
-        public ObservableCollection<Elemento> Elementos { get; }
-        public ObservableCollection<ProjectView> Vistas { get; }
-        public ObservableCollection<ProjectTable> Tabelas { get; }
-        public ObservableCollection<ProjectSheet> Pranchas { get; }
-        public Guid? VistaAtivaId { get; private set; }
-        public ProjectView? VistaAtiva => Vistas.FirstOrDefault(v => v.Id == VistaAtivaId);
-        public event System.Action? VistaAtivaAlterada;
-        public event System.Action? ItemProjetoRenomeado;
-        public event System.Action<ProjectView>? PropriedadesVistaAlteradas;
-        public event System.Action<ProjectTable>? PropriedadesTabelaAlteradas;
-
-        public IEnumerable<Elemento> ObterElementosDaVistaAtiva()
-        {
-            return VistaAtivaId.HasValue && Vistas.Any(v => v.Id == VistaAtivaId.Value)
-                ? ObterElementosDaVista(VistaAtivaId.Value)
-                : Enumerable.Empty<Elemento>();
-        }
-
-        public IEnumerable<Elemento> ObterElementosDaVista(Guid vistaId)
-        {
-            return Elementos.Where(e => e.ViewId == vistaId);
-        }
-
-        public IEnumerable<Elemento> ObterElementosDaVistaDoElementoOuAtiva(Elemento? elemento)
-        {
-            return elemento?.ViewId.HasValue == true && Vistas.Any(v => v.Id == elemento.ViewId.Value)
-                ? ObterElementosDaVista(elemento.ViewId.Value)
-                : ObterElementosDaVistaAtiva();
-        }
-
-        public bool PertenceAVistaAtiva(Elemento? elemento)
-        {
-            return elemento != null &&
-                VistaAtivaId.HasValue &&
-                Vistas.Any(v => v.Id == VistaAtivaId.Value) &&
-                elemento.ViewId == VistaAtivaId.Value;
-        }
-
-        public ProjectView CriarNovaVista()
-        {
-            ProjectView vista = CriarModeloNovaVista();
-            AdicionarVista(vista);
-            return vista;
-        }
-
-        public ProjectTable CriarNovaTabela()
-        {
-            ProjectTable tabela = CriarModeloNovaTabela();
-            AdicionarTabela(tabela);
-            return tabela;
-        }
-
-        public ProjectSheet CriarNovaPrancha()
-        {
-            ProjectSheet prancha = CriarModeloNovaPrancha();
-            AdicionarPrancha(prancha);
-            return prancha;
-        }
-
-        public ProjectView CriarModeloNovaVista()
-        {
-            return new ProjectView { Nome = CriarNomeUnico("Vista", Vistas.Select(v => v.Nome)) };
-        }
-
-        public ProjectTable CriarModeloNovaTabela()
-        {
-            return new ProjectTable { Nome = CriarNomeUnico("Tabela", Tabelas.Select(t => t.Nome)) };
-        }
-
-        public ProjectSheet CriarModeloNovaPrancha()
-        {
-            int indice = CriarIndiceUnico("Prancha", Pranchas.Select(p => p.Nome));
-            return new ProjectSheet
-            {
-                Nome = $"Prancha {indice}",
-                Numero = $"A{indice:000}"
-            };
-        }
-
-        public ProjectView CriarDuplicataVista(ProjectView origem)
-        {
-            return new ProjectView
-            {
-                Nome = CriarNomeUnico(origem?.Nome ?? "Vista", Vistas.Select(v => v.Nome)),
-                Escala = origem?.Escala ?? "1:100",
-                Disciplina = origem?.Disciplina ?? ProjectViewDiscipline.Eletrica,
-                RecortarVista = origem?.RecortarVista ?? false,
-                RegiaoRecorteVisivel = origem?.RegiaoRecorteVisivel ?? true,
-                CameraX = origem?.CameraX ?? 0,
-                CameraY = origem?.CameraY ?? 0,
-                Zoom = origem?.Zoom ?? 1.0
-            };
-        }
-
-        public ProjectTable CriarDuplicataTabela(ProjectTable origem)
-        {
-            return new ProjectTable
-            {
-                Nome = CriarNomeUnico(origem?.Nome ?? "Tabela", Tabelas.Select(t => t.Nome)),
-                Disciplina = origem?.Disciplina ?? ProjectViewDiscipline.Eletrica,
-                CategoriasElementos = origem?.CategoriasElementos.ToList() ?? new List<ProjectTableElementCategory>(),
-                CamposSelecionados = origem?.CamposSelecionados
-                    .Select(c => new ProjectTableFieldSelection
-                    {
-                        Categoria = c.Categoria,
-                        CampoId = c.CampoId,
-                        NomeExibicao = c.NomeExibicao,
-                        Ordem = c.Ordem
-                    })
-                    .ToList() ?? new List<ProjectTableFieldSelection>(),
-                FiltroVistaId = origem?.FiltroVistaId,
-                ModoFiltro = origem?.ModoFiltro ?? ProjectTableFilterLogicalMode.Todas,
-                Filtros = origem?.Filtros
-                    .Select(f => new ProjectTableFilterRule
-                    {
-                        Ordem = f.Ordem,
-                        Categoria = f.Categoria,
-                        CampoId = f.CampoId,
-                        NomeExibicao = f.NomeExibicao,
-                        Operador = f.Operador,
-                        Valor = f.Valor
-                    })
-                    .ToList() ?? new List<ProjectTableFilterRule>(),
-                Ordenacao = origem?.Ordenacao == null
-                    ? null
-                    : new ProjectTableSorting
-                    {
-                        Categoria = origem.Ordenacao.Categoria,
-                        CampoId = origem.Ordenacao.CampoId,
-                        NomeExibicao = origem.Ordenacao.NomeExibicao,
-                        Direcao = origem.Ordenacao.Direcao
-                    }
-            };
-        }
-
-        public ProjectSheet CriarDuplicataPrancha(ProjectSheet origem)
-        {
-            return new ProjectSheet
-            {
-                Nome = CriarNomeUnico(origem?.Nome ?? "Prancha", Pranchas.Select(p => p.Nome)),
-                Numero = CriarNumeroPranchaUnico()
-            };
-        }
-
-        public void AdicionarVista(ProjectView vista)
-        {
-            if (vista == null || Vistas.Any(v => v.Id == vista.Id))
-                return;
-
-            Vistas.Add(vista);
-            GarantirVistaAtivaValida();
-        }
-
-        public void RemoverVista(ProjectView vista)
-        {
-            if (vista == null || !Vistas.Contains(vista))
-                return;
-
-            if (Vistas.Count <= 1)
-                return;
-
-            Vistas.Remove(vista);
-            GarantirVistaAtivaValida();
-        }
-
-        public void RestaurarVista(ProjectView vista, int indice)
-        {
-            if (vista == null || Vistas.Any(v => v.Id == vista.Id))
-                return;
-
-            int indiceSeguro = indice < 0 || indice > Vistas.Count ? Vistas.Count : indice;
-            Vistas.Insert(indiceSeguro, vista);
-            GarantirVistaAtivaValida();
-        }
-
-        public void AdicionarTabela(ProjectTable tabela)
-        {
-            if (tabela == null || Tabelas.Any(t => t.Id == tabela.Id))
-                return;
-
-            Tabelas.Add(tabela);
-        }
-
-        public void RemoverTabela(ProjectTable tabela)
-        {
-            if (tabela == null || !Tabelas.Contains(tabela))
-                return;
-
-            Tabelas.Remove(tabela);
-        }
-
-        public void RestaurarTabela(ProjectTable tabela, int indice)
-        {
-            if (tabela == null || Tabelas.Any(t => t.Id == tabela.Id))
-                return;
-
-            int indiceSeguro = indice < 0 || indice > Tabelas.Count ? Tabelas.Count : indice;
-            Tabelas.Insert(indiceSeguro, tabela);
-        }
-
-        public void AdicionarPrancha(ProjectSheet prancha)
-        {
-            if (prancha == null || Pranchas.Any(p => p.Id == prancha.Id))
-                return;
-
-            Pranchas.Add(prancha);
-        }
-
-        public void RemoverPrancha(ProjectSheet prancha)
-        {
-            if (prancha == null || !Pranchas.Contains(prancha))
-                return;
-
-            Pranchas.Remove(prancha);
-        }
-
-        public void RestaurarPrancha(ProjectSheet prancha, int indice)
-        {
-            if (prancha == null || Pranchas.Any(p => p.Id == prancha.Id))
-                return;
-
-            int indiceSeguro = indice < 0 || indice > Pranchas.Count ? Pranchas.Count : indice;
-            Pranchas.Insert(indiceSeguro, prancha);
-        }
-
-        public void RenomearVista(ProjectView vista, string nome)
-        {
-            if (vista == null || !Vistas.Contains(vista))
-                return;
-
-            vista.Nome = nome;
-            ItemProjetoRenomeado?.Invoke();
-        }
-
-        public void AtualizarPropriedadesVista(ProjectView vista)
-        {
-            if (vista == null || !Vistas.Contains(vista))
-                return;
-
-            PropriedadesVistaAlteradas?.Invoke(vista);
-        }
-
-        public void RenomearTabela(ProjectTable tabela, string nome)
-        {
-            if (tabela == null || !Tabelas.Contains(tabela))
-                return;
-
-            tabela.Nome = nome;
-            ItemProjetoRenomeado?.Invoke();
-        }
-
-        public void AtualizarPropriedadesTabela(ProjectTable tabela)
-        {
-            if (tabela == null || !Tabelas.Contains(tabela))
-                return;
-
-            PropriedadesTabelaAlteradas?.Invoke(tabela);
-        }
-
-        public void RenomearPrancha(ProjectSheet prancha, string nome)
-        {
-            if (prancha == null || !Pranchas.Contains(prancha))
-                return;
-
-            prancha.Nome = nome;
-            ItemProjetoRenomeado?.Invoke();
-        }
-
-        public void SubstituirVistas(IEnumerable<ProjectView> vistas)
-        {
-            Vistas.Clear();
-
-            foreach (ProjectView vista in vistas.Where(v => v != null && !string.IsNullOrWhiteSpace(v.Nome)))
-                Vistas.Add(vista);
-
-            if (Vistas.Count == 0)
-                CriarVistaPadrao();
-
-            GarantirVistaAtivaValida();
-        }
-
-        public void SubstituirTabelas(IEnumerable<ProjectTable> tabelas)
-        {
-            Tabelas.Clear();
-
-            foreach (ProjectTable tabela in tabelas.Where(t => t != null && !string.IsNullOrWhiteSpace(t.Nome)))
-                Tabelas.Add(tabela);
-        }
-
-        public void SubstituirPranchas(IEnumerable<ProjectSheet> pranchas)
-        {
-            Pranchas.Clear();
-
-            foreach (ProjectSheet prancha in pranchas.Where(p => p != null && !string.IsNullOrWhiteSpace(p.Nome)))
-                Pranchas.Add(prancha);
-        }
-
-        public void AdicionarElemento(Elemento elemento)
-        {
-            AdicionarElemento(elemento, preservarVistaExistente: false);
-        }
-
-        public void AdicionarElementoPreservandoVista(Elemento elemento)
-        {
-            AdicionarElemento(elemento, preservarVistaExistente: true);
-        }
-
-        private void AdicionarElemento(Elemento elemento, bool preservarVistaExistente)
-        {
-            if (Elementos.Contains(elemento))
-                return;
-
-            PrepararVistaElemento(elemento, preservarVistaExistente);
-            Elementos.Add(elemento);
-        }
-
-        public void RemoverElemento(Elemento elemento)
-        {
-            if (!Elementos.Contains(elemento))
-                return;
-
-            Elementos.Remove(elemento);
-        }
-
-        public void Limpar()
-        {
-            Elementos.Clear();
-            Vistas.Clear();
-            Tabelas.Clear();
-            Pranchas.Clear();
-            CriarVistaPadrao();
-        }
-
-        private void CriarVistaPadrao()
-        {
-            var vista = new ProjectView { Nome = "Vista principal" };
-            Vistas.Add(vista);
-            AtualizarVistaAtiva(vista.Id);
-        }
-
-        public void DefinirVistaAtiva(Guid vistaId)
-        {
-            if (Vistas.Any(v => v.Id == vistaId))
-                AtualizarVistaAtiva(vistaId);
-
-            GarantirVistaAtivaValida();
-        }
-
-        public void DefinirVistaAtiva(Guid? vistaId)
-        {
-            if (vistaId.HasValue)
-                DefinirVistaAtiva(vistaId.Value);
-            else
-                GarantirVistaAtivaValida();
-        }
-
-        private void GarantirVistaAtivaValida()
-        {
-            if (VistaAtivaId.HasValue && Vistas.Any(v => v.Id == VistaAtivaId.Value))
-                return;
-
-            if (Vistas.Count == 0)
-                CriarVistaPadrao();
-            else
-                AtualizarVistaAtiva(Vistas[0].Id);
-        }
-
-        private void AtualizarVistaAtiva(Guid? vistaId)
-        {
-            if (VistaAtivaId == vistaId)
-                return;
-
-            VistaAtivaId = vistaId;
-            VistaAtivaAlterada?.Invoke();
-        }
-
-        private void PrepararVistaElemento(Elemento elemento, bool preservarVistaExistente)
-        {
-            GarantirVistaAtivaValida();
-
-            if (preservarVistaExistente && elemento.ViewId.HasValue && Vistas.Any(v => v.Id == elemento.ViewId.Value))
-                return;
-
-            elemento.ViewId = VistaAtivaId;
-        }
-
-        private static string CriarNomeUnico(string prefixo, IEnumerable<string> nomesExistentes)
-        {
-            return $"{prefixo} {CriarIndiceUnico(prefixo, nomesExistentes)}";
-        }
-
-        private static int CriarIndiceUnico(string prefixo, IEnumerable<string> nomesExistentes)
-        {
-            int indice = 1;
-
-            while (nomesExistentes.Contains($"{prefixo} {indice}"))
-                indice++;
-
-            return indice;
-        }
-
-        private string CriarNumeroPranchaUnico()
-        {
-            int indice = 1;
-
-            while (Pranchas.Any(p => p.Numero == $"A{indice:000}"))
-                indice++;
-
-            return $"A{indice:000}";
-        }
-    }
-}
-
-
-
-====================================================================================================
-ARQUIVO: C:\Users\User\source\repos\lucasffxavier\Araci-front\Core\Documents\ProjectTable.cs
-====================================================================================================
-
-using System;
-using System.Collections.Generic;
-
-namespace Araci.Core.Documents
-{
-    public enum ProjectTableElementCategory
-    {
-        Barras,
-        Cabos,
-        Cargas,
-        Geradores,
-        Transformadores,
-        Sin
-    }
-
-    public class ProjectTableFieldSelection
-    {
-        public ProjectTableElementCategory Categoria { get; set; }
-        public string CampoId { get; set; } = string.Empty;
-        public string NomeExibicao { get; set; } = string.Empty;
-        public int Ordem { get; set; }
-    }
-
-    public enum ProjectTableFilterLogicalMode
-    {
-        Todas,
-        Qualquer
-    }
-
-    public enum ProjectTableFilterOperator
-    {
-        Contem,
-        NaoContem,
-        ComecaCom,
-        TerminaCom,
-        IgualA,
-        DiferenteDe
-    }
-
-    public class ProjectTableFilterRule
-    {
-        public int Ordem { get; set; }
-        public ProjectTableElementCategory Categoria { get; set; }
-        public string CampoId { get; set; } = string.Empty;
-        public string NomeExibicao { get; set; } = string.Empty;
-        public ProjectTableFilterOperator Operador { get; set; } = ProjectTableFilterOperator.Contem;
-        public string Valor { get; set; } = string.Empty;
-    }
-
-    public enum ProjectTableSortDirection
-    {
-        Crescente,
-        Decrescente
-    }
-
-    public class ProjectTableSorting
-    {
-        public ProjectTableElementCategory Categoria { get; set; }
-        public string CampoId { get; set; } = string.Empty;
-        public string NomeExibicao { get; set; } = string.Empty;
-        public ProjectTableSortDirection Direcao { get; set; } = ProjectTableSortDirection.Crescente;
-    }
-
-    public class ProjectTable
-    {
-        public Guid Id { get; set; } = Guid.NewGuid();
-        public string Nome { get; set; } = string.Empty;
-        public ProjectViewDiscipline Disciplina { get; set; } = ProjectViewDiscipline.Eletrica;
-        public List<ProjectTableElementCategory> CategoriasElementos { get; set; } = new();
-        public List<ProjectTableFieldSelection> CamposSelecionados { get; set; } = new();
-        public Guid? FiltroVistaId { get; set; }
-        public ProjectTableFilterLogicalMode ModoFiltro { get; set; } = ProjectTableFilterLogicalMode.Todas;
-        public List<ProjectTableFilterRule> Filtros { get; set; } = new();
-        public ProjectTableSorting? Ordenacao { get; set; }
-    }
-}
-
-
-
-====================================================================================================
-ARQUIVO: C:\Users\User\source\repos\lucasffxavier\Araci-front\Infrastructure\Persistence\ProjectFileDto.cs
-====================================================================================================
-
-using System;
-using System.Collections.Generic;
-using System.Text.Json;
-
-namespace Araci.Infrastructure.Persistence
-{
-    public sealed class ProjectFileDto
-    {
-        public int Version { get; set; }
-        public string? AppName { get; set; }
-        public string? ProjectName { get; set; }
-        public DateTimeOffset? CreatedAt { get; set; }
-        public DateTimeOffset? SavedAt { get; set; }
-        public string? Generator { get; set; }
-        public string? Notes { get; set; }
-        public ProjectUnitSettingsDto? Units { get; set; }
-        public TypeLibrariesDto? TypeLibraries { get; set; }
-        public Guid? ActiveViewId { get; set; }
-        public List<ProjectViewDto> Views { get; set; } = new();
-        public List<ProjectTableDto> Tables { get; set; } = new();
-        public List<ProjectSheetDto> Sheets { get; set; } = new();
-        public List<ElementDto> Elements { get; set; } = new();
-    }
-
-    public sealed class ProjectViewDto
-    {
-        public Guid Id { get; set; }
-        public string Nome { get; set; } = string.Empty;
-        public string Escala { get; set; } = "1:100";
-        public string Disciplina { get; set; } = "Eletrica";
-        public bool RecortarVista { get; set; }
-        public bool? RegiaoRecorteVisivel { get; set; }
-        public double CameraX { get; set; }
-        public double CameraY { get; set; }
-        public double Zoom { get; set; } = 1.0;
-    }
-
-    public sealed class ProjectTableDto
-    {
-        public Guid Id { get; set; }
-        public string Nome { get; set; } = string.Empty;
-        public string Disciplina { get; set; } = "Eletrica";
-        public List<string> CategoriasElementos { get; set; } = new();
-        public List<ProjectTableFieldSelectionDto> CamposSelecionados { get; set; } = new();
-        public Guid? FiltroVistaId { get; set; }
-        public string ModoFiltro { get; set; } = "Todas";
-        public List<ProjectTableFilterRuleDto> Filtros { get; set; } = new();
-        public ProjectTableSortingDto? Ordenacao { get; set; }
-    }
-
-    public sealed class ProjectTableFieldSelectionDto
-    {
-        public string Categoria { get; set; } = string.Empty;
-        public string CampoId { get; set; } = string.Empty;
-        public string NomeExibicao { get; set; } = string.Empty;
-        public int Ordem { get; set; }
-    }
-
-    public sealed class ProjectTableFilterRuleDto
-    {
-        public int Ordem { get; set; }
-        public string Categoria { get; set; } = string.Empty;
-        public string CampoId { get; set; } = string.Empty;
-        public string NomeExibicao { get; set; } = string.Empty;
-        public string Operador { get; set; } = string.Empty;
-        public string Valor { get; set; } = string.Empty;
-    }
-
-    public sealed class ProjectTableSortingDto
-    {
-        public string Categoria { get; set; } = string.Empty;
-        public string CampoId { get; set; } = string.Empty;
-        public string NomeExibicao { get; set; } = string.Empty;
-        public string Direcao { get; set; } = string.Empty;
-    }
-
-    public sealed class ProjectSheetDto
-    {
-        public Guid Id { get; set; }
-        public string Nome { get; set; } = string.Empty;
-        public string Numero { get; set; } = string.Empty;
-    }
-
-    public sealed class ProjectMetadataDto
-    {
-        public string AppName { get; set; } = ProjectSerializer.AppName;
-        public string ProjectName { get; set; } = ProjectSerializer.UntitledProjectName;
-        public DateTimeOffset? CreatedAt { get; set; }
-        public DateTimeOffset? SavedAt { get; set; }
-        public string Generator { get; set; } = ProjectSerializer.AppName;
-        public string? Notes { get; set; }
-
-        public static ProjectMetadataDto CreateNew(string projectName)
-        {
-            return new ProjectMetadataDto
-            {
-                AppName = ProjectSerializer.AppName,
-                ProjectName = string.IsNullOrWhiteSpace(projectName) ? ProjectSerializer.UntitledProjectName : projectName,
-                Generator = ProjectSerializer.AppName
-            };
-        }
-    }
-
-    public sealed class TypeLibrariesDto
-    {
-        public List<TextAnnotationTypeDto> TextAnnotationTypes { get; set; } = new();
-    }
-
-    public sealed class TextAnnotationTypeDto
-    {
-        public string NomeTipo { get; set; } = string.Empty;
-        public string Familia { get; set; } = string.Empty;
-        public string Categoria { get; set; } = string.Empty;
-        public string CorTexto { get; set; } = "#FF000000";
-        public string Fonte { get; set; } = "Arial";
-        public double AlturaTexto { get; set; } = 14.0;
-        public string AlinhamentoHorizontal { get; set; } = "Esquerda";
-        public string LeaderEstiloSeta { get; set; } = "Seta preenchida";
-        public string LeaderCor { get; set; } = "#FF000000";
-        public double LeaderEspessura { get; set; } = 1.2;
-        public double LeaderTamanhoSeta { get; set; } = 10.0;
-    }
-
-    public sealed class ElementDto
-    {
-        public string Kind { get; set; } = string.Empty;
-        public string? DomainRole { get; set; }
-        public Guid Id { get; set; }
-        public Guid? ViewId { get; set; }
-        public double X { get; set; }
-        public double Y { get; set; }
-        public double Rotation { get; set; }
-        public double Scale { get; set; } = 1;
-        public TypeRefDto? Type { get; set; }
-        public List<ParameterDto> Parameters { get; set; } = new();
-        public List<TerminalDto> Terminals { get; set; } = new();
-        public List<PointDto> Vertices { get; set; } = new();
-    }
-
-    public sealed class TypeRefDto
-    {
-        public string NomeTipo { get; set; } = string.Empty;
-        public string Familia { get; set; } = string.Empty;
-        public string Categoria { get; set; } = string.Empty;
-    }
-
-    public sealed class ParameterDto
-    {
-        public string Name { get; set; } = string.Empty;
-        public string Type { get; set; } = string.Empty;
-        public JsonElement Value { get; set; }
-    }
-
-    public sealed class TerminalDto
-    {
-        public string Id { get; set; } = string.Empty;
-        public double X { get; set; }
-        public double Y { get; set; }
-        public string? Barra { get; set; }
-    }
-
-    public sealed class PointDto
-    {
-        public double X { get; set; }
-        public double Y { get; set; }
-    }
-}
-
-
-
-====================================================================================================
-ARQUIVO: C:\Users\User\source\repos\lucasffxavier\Araci-front\Infrastructure\Persistence\ProjectSerializer.cs
-====================================================================================================
-
-using System;
-using System.Collections.Generic;
-using System.IO;
-using System.Linq;
-using System.Text.Json;
-using System.Text.Json.Serialization;
-using System.Windows;
-using Araci.Applications.Abstractions;
-using Araci.Core.Documents;
-using Araci.Core.Viewport;
-using Araci.Models;
-using Araci.Models.Tipos;
-using Araci.Services;
-using Araci.Services.Catalog;
-using Araci.Services.Geometry;
-using Araci.Services.Settings;
-
-namespace Araci.Infrastructure.Persistence
-{
-    public sealed class ProjectSerializer
-    {
-        public const int CurrentVersion = 1;
-        public const string AppName = "Araci Engine";
-        public const string UntitledProjectName = "Sem titulo";
-
-        private readonly ElementRegistryService _elements;
-        private readonly IElementModelFactory _modelFactory;
-        private readonly TerminalLayoutService _terminalLayout;
-        private readonly ElementGeometryService _geometry;
-        private readonly JsonSerializerOptions _jsonOptions = new()
-        {
-            WriteIndented = true,
-            DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull
-        };
-
-        public ProjectSerializer(
-            ElementRegistryService elements,
-            IElementModelFactory modelFactory,
-            TerminalLayoutService terminalLayout,
-            ElementGeometryService geometry)
-        {
-            _elements = elements ?? throw new ArgumentNullException(nameof(elements));
-            _modelFactory = modelFactory ?? throw new ArgumentNullException(nameof(modelFactory));
-            _terminalLayout = terminalLayout ?? throw new ArgumentNullException(nameof(terminalLayout));
-            _geometry = geometry ?? throw new ArgumentNullException(nameof(geometry));
-        }
-
-        public ProjectFileDto CreateFileDto(
-            AraciDocument document,
-            ProjectMetadataDto metadata,
-            UnitDisplaySettings units)
-        {
-            ArgumentNullException.ThrowIfNull(document);
-            ArgumentNullException.ThrowIfNull(metadata);
-            ArgumentNullException.ThrowIfNull(units);
-
-            return new ProjectFileDto
-            {
-                Version = CurrentVersion,
-                AppName = metadata.AppName,
-                ProjectName = metadata.ProjectName,
-                CreatedAt = metadata.CreatedAt,
-                SavedAt = metadata.SavedAt,
-                Generator = metadata.Generator,
-                Notes = metadata.Notes,
-                Units = CreateUnitSettingsDto(units),
-                TypeLibraries = CreateTypeLibrariesDto(),
-                ActiveViewId = document.VistaAtivaId,
-                Views = document.Vistas
-                    .Select(CriarProjectViewDto)
-                    .ToList(),
-                Tables = document.Tabelas
-                    .Select(t => CriarProjectTableDto(t, document.Vistas.Select(v => v.Id)))
-                    .ToList(),
-                Sheets = document.Pranchas
-                    .Select(CriarProjectSheetDto)
-                    .ToList(),
-                Elements = document.Elementos
-                    .Select(CriarElementoDto)
-                    .ToList()
-            };
-        }
-
-        public ProjectUnitSettingsDto CreateUnitSettingsDto(UnitDisplaySettings units)
-        {
-            ArgumentNullException.ThrowIfNull(units);
-
-            return new ProjectUnitSettingsDto
-            {
-                Length = units.Length.ToString(),
-                Voltage = units.Voltage.ToString(),
-                Current = units.Current.ToString(),
-                ActivePower = units.ActivePower.ToString(),
-                ReactivePower = units.ReactivePower.ToString(),
-                ApparentPower = units.ApparentPower.ToString(),
-                Percent = units.Percent.ToString()
-            };
-        }
-
-        public void ApplyUnitSettings(ProjectUnitSettingsDto? dto, UnitDisplaySettings target)
-        {
-            ArgumentNullException.ThrowIfNull(target);
-
-            var defaults = new UnitDisplaySettings();
-
-            target.Length = ParseUnit(dto?.Length, UnitQuantityKind.Length, defaults.Length);
-            target.Voltage = ParseUnit(dto?.Voltage, UnitQuantityKind.Voltage, defaults.Voltage);
-            target.Current = ParseUnit(dto?.Current, UnitQuantityKind.Current, defaults.Current);
-            target.ActivePower = ParseUnit(dto?.ActivePower, UnitQuantityKind.ActivePower, defaults.ActivePower);
-            target.ReactivePower = ParseUnit(dto?.ReactivePower, UnitQuantityKind.ReactivePower, defaults.ReactivePower);
-            target.ApparentPower = ParseUnit(dto?.ApparentPower, UnitQuantityKind.ApparentPower, defaults.ApparentPower);
-            target.Percent = ParseUnit(dto?.Percent, UnitQuantityKind.Percent, defaults.Percent);
-        }
-
-        public void ApplyTypeLibraries(TypeLibrariesDto? dto)
-        {
-            IEnumerable<TextAnnotationTypeDto> textTypes = dto?.TextAnnotationTypes != null && dto.TextAnnotationTypes.Count > 0
-                ? dto.TextAnnotationTypes
-                : CreateDefaultTextAnnotationTypeDtos();
-
-            List<TipoTextoAnotativo> tipos = textTypes
-                .Select(CriarTipoTextoAnotativo)
-                .Where(t => !string.IsNullOrWhiteSpace(t.NomeTipo))
-                .GroupBy(CriarChaveTipo, StringComparer.OrdinalIgnoreCase)
-                .Select(g => g.Last())
-                .ToList();
-
-            if (tipos.Count == 0)
-                tipos = CreateDefaultTextAnnotationTypeDtos().Select(CriarTipoTextoAnotativo).ToList();
-
-            _elements.ReplaceTypes(ElementKinds.TextoAnotativo, tipos);
-        }
-
-        public IReadOnlyList<Elemento> CreateElements(ProjectFileDto dto)
-        {
-            ArgumentNullException.ThrowIfNull(dto);
-
-            return dto.Elements
-                .Select(CriarElemento)
-                .Where(e => e != null)
-                .Cast<Elemento>()
-                .ToList();
-        }
-
-        public IReadOnlyList<ProjectView> CreateProjectViews(ProjectFileDto dto)
-        {
-            ArgumentNullException.ThrowIfNull(dto);
-
-            return dto.Views
-                .Select(CriarProjectView)
-                .Where(v => v != null)
-                .Cast<ProjectView>()
-                .ToList();
-        }
-
-        public IReadOnlyList<ProjectTable> CreateProjectTables(ProjectFileDto dto)
-        {
-            ArgumentNullException.ThrowIfNull(dto);
-
-            return dto.Tables
-                .Select(t => CriarProjectTable(t, dto.Views.Select(v => v.Id)))
-                .Where(t => t != null)
-                .Cast<ProjectTable>()
-                .ToList();
-        }
-
-        public IReadOnlyList<ProjectSheet> CreateProjectSheets(ProjectFileDto dto)
-        {
-            ArgumentNullException.ThrowIfNull(dto);
-
-            return dto.Sheets
-                .Select(CriarProjectSheet)
-                .Where(s => s != null)
-                .Cast<ProjectSheet>()
-                .ToList();
-        }
-
-        public Guid? GetActiveViewId(ProjectFileDto dto)
-        {
-            ArgumentNullException.ThrowIfNull(dto);
-
-            return dto.ActiveViewId;
-        }
-
-        public string Serialize(ProjectFileDto dto)
-        {
-            return JsonSerializer.Serialize(dto, _jsonOptions);
-        }
-
-        public ProjectFileDto Deserialize(string json)
-        {
-            return JsonSerializer.Deserialize<ProjectFileDto>(json, _jsonOptions)
-                ?? new ProjectFileDto();
-        }
-
-        public ProjectMetadataDto PrepareMetadataForSave(
-            ProjectMetadataDto currentMetadata,
-            string path,
-            DateTimeOffset savedAt)
-        {
-            ArgumentNullException.ThrowIfNull(currentMetadata);
-
-            string projectName = NomeProjetoParaSalvar(currentMetadata, path);
-
-            return new ProjectMetadataDto
-            {
-                AppName = AppName,
-                ProjectName = projectName,
-                CreatedAt = currentMetadata.CreatedAt ?? savedAt,
-                SavedAt = savedAt,
-                Generator = AppName,
-                Notes = currentMetadata.Notes
-            };
-        }
-
-        public ProjectMetadataDto CreateMetadataFromFile(ProjectFileDto dto, string path)
-        {
-            DateTimeOffset now = DateTimeOffset.UtcNow;
-            string projectName = string.IsNullOrWhiteSpace(dto.ProjectName)
-                ? Path.GetFileNameWithoutExtension(path)
-                : dto.ProjectName;
-
-            return new ProjectMetadataDto
-            {
-                AppName = string.IsNullOrWhiteSpace(dto.AppName) ? AppName : dto.AppName,
-                ProjectName = string.IsNullOrWhiteSpace(projectName) ? UntitledProjectName : projectName,
-                CreatedAt = dto.CreatedAt ?? dto.SavedAt ?? now,
-                SavedAt = dto.SavedAt ?? now,
-                Generator = string.IsNullOrWhiteSpace(dto.Generator) ? AppName : dto.Generator,
-                Notes = dto.Notes
-            };
-        }
-
-        public int GetVersion(ProjectFileDto dto)
-        {
-            return dto.Version <= 0 ? 1 : dto.Version;
-        }
-
-        private TypeLibrariesDto CreateTypeLibrariesDto()
-        {
-            return new TypeLibrariesDto
-            {
-                TextAnnotationTypes = _elements.GetTypes(ElementKinds.TextoAnotativo)
-                    .OfType<TipoTextoAnotativo>()
-                    .Select(CriarTextAnnotationTypeDto)
-                    .ToList()
-            };
-        }
-
-        private static IEnumerable<TextAnnotationTypeDto> CreateDefaultTextAnnotationTypeDtos()
-        {
-            yield return new TextAnnotationTypeDto { NomeTipo = "Texto padrão", Familia = "Anotações", Categoria = "Textos", CorTexto = "#FF000000", Fonte = "Arial", AlturaTexto = 14.0, AlinhamentoHorizontal = "Esquerda", LeaderEstiloSeta = "Seta preenchida", LeaderCor = "#FF000000", LeaderEspessura = 1.2, LeaderTamanhoSeta = 10.0 };
-            yield return new TextAnnotationTypeDto { NomeTipo = "Texto pequeno", Familia = "Anotações", Categoria = "Textos", CorTexto = "#FF000000", Fonte = "Arial", AlturaTexto = 10.0, AlinhamentoHorizontal = "Esquerda", LeaderEstiloSeta = "Seta preenchida", LeaderCor = "#FF000000", LeaderEspessura = 1.2, LeaderTamanhoSeta = 10.0 };
-            yield return new TextAnnotationTypeDto { NomeTipo = "Texto título", Familia = "Anotações", Categoria = "Textos", CorTexto = "#FF000000", Fonte = "Arial", AlturaTexto = 20.0, AlinhamentoHorizontal = "Centro", LeaderEstiloSeta = "Seta preenchida", LeaderCor = "#FF000000", LeaderEspessura = 1.2, LeaderTamanhoSeta = 10.0 };
-        }
-
-        private static TextAnnotationTypeDto CriarTextAnnotationTypeDto(TipoTextoAnotativo tipo)
-        {
-            return new TextAnnotationTypeDto
-            {
-                NomeTipo = tipo.NomeTipo,
-                Familia = tipo.Familia,
-                Categoria = tipo.Categoria,
-                CorTexto = tipo.CorTexto,
-                Fonte = tipo.Fonte,
-                AlturaTexto = tipo.AlturaTexto,
-                AlinhamentoHorizontal = tipo.AlinhamentoHorizontal,
-                LeaderEstiloSeta = tipo.LeaderEstiloSeta,
-                LeaderCor = tipo.LeaderCor,
-                LeaderEspessura = tipo.LeaderEspessura,
-                LeaderTamanhoSeta = tipo.LeaderTamanhoSeta
-            };
-        }
-
-        private static TipoTextoAnotativo CriarTipoTextoAnotativo(TextAnnotationTypeDto dto)
-        {
-            var tipo = new TipoTextoAnotativo
-            {
-                NomeTipo = string.IsNullOrWhiteSpace(dto.NomeTipo) ? "Texto padrão" : dto.NomeTipo.Trim(),
-                Familia = string.IsNullOrWhiteSpace(dto.Familia) ? "Anotações" : dto.Familia.Trim(),
-                Categoria = string.IsNullOrWhiteSpace(dto.Categoria) ? "Textos" : dto.Categoria.Trim()
-            };
-
-            tipo.CorTexto = dto.CorTexto;
-            tipo.Fonte = dto.Fonte;
-            tipo.AlturaTexto = dto.AlturaTexto;
-            tipo.AlinhamentoHorizontal = dto.AlinhamentoHorizontal;
-            tipo.LeaderEstiloSeta = dto.LeaderEstiloSeta;
-            tipo.LeaderCor = dto.LeaderCor;
-            tipo.LeaderEspessura = dto.LeaderEspessura;
-            tipo.LeaderTamanhoSeta = dto.LeaderTamanhoSeta;
-            return tipo;
-        }
-
-        private static string CriarChaveTipo(TipoTextoAnotativo tipo)
-        {
-            return $"{tipo.NomeTipo.Trim()}|{tipo.Familia.Trim()}|{tipo.Categoria.Trim()}";
-        }
-
-        private static UnitKind ParseUnit(string? value, UnitQuantityKind quantity, UnitKind fallback)
-        {
-            if (string.IsNullOrWhiteSpace(value))
-                return fallback;
-
-            if (!Enum.TryParse(value, ignoreCase: true, out UnitKind unit))
-                return fallback;
-
-            return UnitFormatter.GetQuantity(unit) == quantity ? unit : fallback;
-        }
-
-        private static string NomeProjetoParaSalvar(ProjectMetadataDto metadata, string path)
-        {
-            if (!string.IsNullOrWhiteSpace(metadata.ProjectName) &&
-                !string.Equals(metadata.ProjectName, UntitledProjectName, StringComparison.OrdinalIgnoreCase))
-            {
-                return metadata.ProjectName;
-            }
-
-            string name = Path.GetFileNameWithoutExtension(path);
-            return string.IsNullOrWhiteSpace(name) ? UntitledProjectName : name;
-        }
-
-        private ElementDto CriarElementoDto(Elemento elemento)
-        {
-            return new ElementDto
-            {
-                Kind = ObterKind(elemento),
-                DomainRole = elemento.DomainRole.ToString(),
-                Id = elemento.Id,
-                ViewId = elemento.ViewId,
-                X = elemento.PosicaoX,
-                Y = elemento.PosicaoY,
-                Rotation = elemento.Rotacao,
-                Scale = elemento.Escala,
-                Type = CriarTypeRef(elemento.Tipo),
-                Parameters = elemento.Parametros.Values
-                    .Select(CriarParameterDto)
-                    .ToList(),
-                Terminals = (elemento as ITerminalOwner)?.Terminais
-                    .Select(CriarTerminalDto)
-                    .ToList() ?? new List<TerminalDto>(),
-                Vertices = elemento is Cabo cabo
-                    ? cabo.Vertices.Select(CriarPointDto).ToList()
-                    : new List<PointDto>()
-            };
-        }
-
-        private static ProjectViewDto CriarProjectViewDto(ProjectView vista)
-        {
-            return new ProjectViewDto
-            {
-                Id = vista.Id,
-                Nome = vista.Nome,
-                Escala = vista.Escala,
-                Disciplina = vista.Disciplina.ToString(),
-                RecortarVista = vista.RecortarVista,
-                RegiaoRecorteVisivel = vista.RegiaoRecorteVisivel,
-                CameraX = vista.CameraX,
-                CameraY = vista.CameraY,
-                Zoom = vista.Zoom
-            };
-        }
-
-        private static ProjectTableDto CriarProjectTableDto(ProjectTable tabela, IEnumerable<Guid> vistasIds)
-        {
-            List<ProjectTableFieldSelection> campos = NormalizarProjectTableFields(tabela.CamposSelecionados, tabela.CategoriasElementos);
-            Guid? filtroVistaId = NormalizarProjectTableViewFilter(tabela.FiltroVistaId, vistasIds);
-            ProjectTableSorting? ordenacao = NormalizarProjectTableSorting(tabela.Ordenacao, campos);
-
-            return new ProjectTableDto
-            {
-                Id = tabela.Id,
-                Nome = tabela.Nome,
-                Disciplina = tabela.Disciplina.ToString(),
-                CategoriasElementos = tabela.CategoriasElementos
-                    .Distinct()
-                    .Select(c => c.ToString())
-                    .ToList(),
-                CamposSelecionados = campos
-                    .Select(c => new ProjectTableFieldSelectionDto
-                    {
-                        Categoria = c.Categoria.ToString(),
-                        CampoId = c.CampoId,
-                        NomeExibicao = c.NomeExibicao,
-                        Ordem = c.Ordem
-                    })
-                    .ToList(),
-                FiltroVistaId = filtroVistaId,
-                ModoFiltro = tabela.ModoFiltro.ToString(),
-                Filtros = NormalizarProjectTableFilters(tabela.Filtros, campos)
-                    .Select(f => new ProjectTableFilterRuleDto
-                    {
-                        Ordem = f.Ordem,
-                        Categoria = f.Categoria.ToString(),
-                        CampoId = f.CampoId,
-                        NomeExibicao = f.NomeExibicao,
-                        Operador = f.Operador.ToString(),
-                        Valor = f.Valor
-                    })
-                    .ToList(),
-                Ordenacao = ordenacao == null
-                    ? null
-                    : new ProjectTableSortingDto
-                    {
-                        Categoria = ordenacao.Categoria.ToString(),
-                        CampoId = ordenacao.CampoId,
-                        NomeExibicao = ordenacao.NomeExibicao,
-                        Direcao = ordenacao.Direcao.ToString()
-                    }
-            };
-        }
-
-        private static ProjectSheetDto CriarProjectSheetDto(ProjectSheet prancha)
-        {
-            return new ProjectSheetDto
-            {
-                Id = prancha.Id,
-                Nome = prancha.Nome,
-                Numero = prancha.Numero
-            };
-        }
-
-        private static ProjectView? CriarProjectView(ProjectViewDto dto)
-        {
-            if (string.IsNullOrWhiteSpace(dto.Nome))
-                return null;
-
-            return new ProjectView
-            {
-                Id = dto.Id == Guid.Empty ? Guid.NewGuid() : dto.Id,
-                Nome = dto.Nome,
-                Escala = NormalizarTextoVista(dto.Escala, "1:100"),
-                Disciplina = ParseEnum(dto.Disciplina, ProjectViewDiscipline.Eletrica),
-                RecortarVista = dto.RecortarVista,
-                RegiaoRecorteVisivel = dto.RegiaoRecorteVisivel ?? true,
-                CameraX = NormalizarCoordenadaCamera(dto.CameraX),
-                CameraY = NormalizarCoordenadaCamera(dto.CameraY),
-                Zoom = NormalizarZoomVista(dto.Zoom)
-            };
-        }
-
-        private static ProjectTable? CriarProjectTable(ProjectTableDto dto, IEnumerable<Guid> vistasIds)
-        {
-            if (string.IsNullOrWhiteSpace(dto.Nome))
-                return null;
-
-            List<ProjectTableElementCategory> categorias = ParseProjectTableElementCategories(dto.CategoriasElementos);
-            List<ProjectTableFieldSelection> campos = ParseProjectTableFields(dto.CamposSelecionados, categorias);
-
-            return new ProjectTable
-            {
-                Id = dto.Id == Guid.Empty ? Guid.NewGuid() : dto.Id,
-                Nome = dto.Nome,
-                Disciplina = ParseEnum(dto.Disciplina, ProjectViewDiscipline.Eletrica),
-                CategoriasElementos = categorias,
-                CamposSelecionados = campos,
-                FiltroVistaId = NormalizarProjectTableViewFilter(dto.FiltroVistaId, vistasIds),
-                ModoFiltro = ParseEnum(dto.ModoFiltro, ProjectTableFilterLogicalMode.Todas),
-                Filtros = ParseProjectTableFilters(dto.Filtros, campos),
-                Ordenacao = ParseProjectTableSorting(dto.Ordenacao, campos)
-            };
-        }
-
-        private static ProjectSheet? CriarProjectSheet(ProjectSheetDto dto)
-        {
-            if (string.IsNullOrWhiteSpace(dto.Nome))
-                return null;
-
-            return new ProjectSheet
-            {
-                Id = dto.Id == Guid.Empty ? Guid.NewGuid() : dto.Id,
-                Nome = dto.Nome,
-                Numero = dto.Numero ?? string.Empty
-            };
-        }
-
-        private Elemento? CriarElemento(ElementDto dto)
-        {
-            Elemento? elemento = _modelFactory.CreateModel(dto.Kind);
-
-            if (elemento == null)
-                return null;
-
-            elemento.Id = dto.Id == Guid.Empty ? Guid.NewGuid() : dto.Id;
-            elemento.ViewId = dto.ViewId;
-            elemento.PosicaoX = NormalizarCoordenada(dto.X);
-            elemento.PosicaoY = NormalizarCoordenada(dto.Y);
-            elemento.Rotacao = NormalizarRotacao(dto.Rotation);
-            elemento.Escala = dto.Scale == 0 ? 1 : dto.Scale;
-            elemento.Tipo = ResolverTipo(dto.Kind, dto.Type);
-
-            AplicarParametros(elemento, dto.Parameters);
-            NormalizarParametros(elemento);
-            AplicarVertices(elemento, dto.Vertices);
-            _terminalLayout.AtualizarTerminais(elemento);
-            RestaurarTerminais(elemento, dto.Terminals);
-
-            return elemento;
-        }
-
-        private void AplicarParametros(Elemento elemento, IEnumerable<ParameterDto> parametros)
-        {
-            foreach (ParameterDto dto in parametros)
-            {
-                if (!elemento.PossuiParametro(dto.Name))
-                    continue;
-
-                Parameter parameter = elemento.Parametros[dto.Name];
-                parameter.ValorObjeto = ConverterValor(dto, parameter.Tipo);
-            }
-        }
-
-        private static void NormalizarParametros(Elemento elemento)
-        {
-            if (elemento is Barra barra)
-                barra.Altura = barra.Altura;
-
-            if (elemento is TextoAnotativo texto)
-                NormalizarTextoAnotativo(texto);
-        }
-
-        private static void NormalizarTextoAnotativo(TextoAnotativo texto)
-        {
-            texto.Texto = texto.Texto;
-            texto.LarguraCaixa = texto.LarguraCaixa;
-            texto.Rotacao = NormalizarRotacao(texto.Rotacao);
-            texto.LeaderAtivo = texto.LeaderAtivo;
-            texto.LeaderX = NormalizarCoordenada(texto.LeaderX);
-            texto.LeaderY = NormalizarCoordenada(texto.LeaderY);
-            texto.LeaderComCotovelo = texto.LeaderComCotovelo;
-            texto.LeaderCotoveloX = NormalizarCoordenada(texto.LeaderCotoveloX);
-            texto.LeaderCotoveloY = NormalizarCoordenada(texto.LeaderCotoveloY);
-            texto.LeaderCotoveloManual = texto.LeaderCotoveloManual;
-        }
-
-        private static object? ConverterValor(ParameterDto dto, Type destino)
-        {
-            if (dto.Value.ValueKind is JsonValueKind.Null or JsonValueKind.Undefined)
-                return null;
-
-            if (destino == typeof(string))
-                return dto.Value.ValueKind == JsonValueKind.String
-                    ? dto.Value.GetString() ?? string.Empty
-                    : dto.Value.ToString();
-
-            if (destino == typeof(int))
-                return dto.Value.ValueKind == JsonValueKind.Number && dto.Value.TryGetInt32(out int i)
-                    ? i
-                    : 0;
-
-            if (destino == typeof(double))
-                return dto.Value.ValueKind == JsonValueKind.Number && dto.Value.TryGetDouble(out double d)
-                    ? d
-                    : 0.0;
-
-            if (destino == typeof(bool))
-                return dto.Value.ValueKind == JsonValueKind.True || dto.Value.ValueKind == JsonValueKind.False
-                    ? dto.Value.GetBoolean()
-                    : false;
-
-            if (destino == typeof(Guid))
-                return dto.Value.ValueKind == JsonValueKind.String && dto.Value.TryGetGuid(out Guid guid)
-                    ? guid
-                    : Guid.Empty;
-
-            return dto.Value.ToString();
-        }
-
-        private void AplicarVertices(Elemento elemento, IEnumerable<PointDto> vertices)
-        {
-            if (elemento is not Cabo cabo)
-                return;
-
-            cabo.Vertices.Clear();
-
-            foreach (PointDto p in vertices)
-                cabo.Vertices.Add(new Point(p.X, p.Y));
-
-            cabo.PreviewPonto = null;
-
-            if (cabo.Vertices.Count > 0)
-                cabo.DefinirOrigem(cabo.Vertices[0]);
-
-            if (cabo.Vertices.Count > 1)
-                cabo.DefinirDestino(cabo.Vertices[^1]);
-        }
-
-        private void RestaurarTerminais(Elemento elemento, IEnumerable<TerminalDto> terminais)
-        {
-            if (elemento is not ITerminalOwner owner)
-                return;
-
-            Size tamanho = _geometry.ObterTamanho(elemento);
-
-            foreach (TerminalDto dto in terminais)
-            {
-                Terminal? terminal = owner.Terminais.FirstOrDefault(t =>
-                    string.Equals(t.Id, dto.Id, StringComparison.OrdinalIgnoreCase));
-
-                if (terminal == null)
-                    continue;
-
-                if (elemento is Cabo || tamanho.IsEmpty)
-                    terminal.DefinirPosicaoVisual(new Point(dto.X, dto.Y));
-                else
-                    terminal.DefinirPosicaoVisual(new Point(dto.X, dto.Y), tamanho.Width, tamanho.Height);
-
-                terminal.Barra = dto.Barra;
-            }
-        }
-
-        private TipoElemento? ResolverTipo(string kind, TypeRefDto? dto)
-        {
-            return _elements.ResolveType(
-                kind,
-                dto?.NomeTipo,
-                dto?.Familia,
-                dto?.Categoria);
-        }
-
-        private string ObterKind(Elemento elemento)
-        {
-            return _elements.GetKind(elemento);
-        }
-
-        private static TypeRefDto? CriarTypeRef(TipoElemento? tipo)
-        {
-            return tipo == null
-                ? null
-                : new TypeRefDto
-                {
-                    NomeTipo = tipo.NomeTipo,
-                    Familia = tipo.Familia,
-                    Categoria = tipo.Categoria
-                };
-        }
-
-        private static ParameterDto CriarParameterDto(Parameter parameter)
-        {
-            return new ParameterDto
-            {
-                Name = parameter.Nome,
-                Type = parameter.Tipo.FullName ?? parameter.Tipo.Name,
-                Value = JsonSerializer.SerializeToElement(parameter.ValorObjeto, parameter.Tipo)
-            };
-        }
-
-        private static TerminalDto CriarTerminalDto(Terminal terminal)
-        {
-            return new TerminalDto
-            {
-                Id = terminal.Id,
-                X = terminal.Posicao.X,
-                Y = terminal.Posicao.Y,
-                Barra = terminal.Barra
-            };
-        }
-
-        private static PointDto CriarPointDto(Point point)
-        {
-            return new PointDto { X = point.X, Y = point.Y };
-        }
-
-        private static double NormalizarRotacao(double valor)
-        {
-            if (double.IsNaN(valor) || double.IsInfinity(valor))
-                return 0;
-
-            double normalizada = valor % 360;
-
-            if (normalizada < 0)
-                normalizada += 360;
-
-            return normalizada >= 360 ? 0 : normalizada;
-        }
-
-        private static double NormalizarCoordenada(double valor)
-        {
-            return double.IsNaN(valor) || double.IsInfinity(valor) ? 0.0 : valor;
-        }
-
-        private static double NormalizarCoordenadaCamera(double valor)
-        {
-            return double.IsNaN(valor) || double.IsInfinity(valor) ? 0.0 : valor;
-        }
-
-        private static double NormalizarZoomVista(double valor)
-        {
-            if (double.IsNaN(valor) || double.IsInfinity(valor) || valor <= 0)
-                return Camera.DefaultZoom;
-
-            return Math.Max(Camera.MinZoom, Math.Min(Camera.MaxZoom, valor));
-        }
-
-        private static string NormalizarTextoVista(string? valor, string fallback)
-        {
-            return string.IsNullOrWhiteSpace(valor) ? fallback : valor.Trim();
-        }
-
-        private static TEnum ParseEnum<TEnum>(string? valor, TEnum fallback)
-            where TEnum : struct
-        {
-            return Enum.TryParse(valor, ignoreCase: true, out TEnum convertido)
-                ? convertido
-                : fallback;
-        }
-
-        private static List<ProjectTableElementCategory> ParseProjectTableElementCategories(IEnumerable<string>? valores)
-        {
-            if (valores == null)
-                return new List<ProjectTableElementCategory>();
-
-            return valores
-                .Select(valor => Enum.TryParse(valor, ignoreCase: true, out ProjectTableElementCategory categoria)
-                    ? (ProjectTableElementCategory?)categoria
-                    : null)
-                .Where(categoria => categoria.HasValue)
-                .Select(categoria => categoria!.Value)
-                .Distinct()
-                .OrderBy(categoria => categoria)
-                .ToList();
-        }
-
-        private static List<ProjectTableFieldSelection> ParseProjectTableFields(
-            IEnumerable<ProjectTableFieldSelectionDto>? valores,
-            IReadOnlyList<ProjectTableElementCategory> categorias)
-        {
-            if (valores == null)
-                return new List<ProjectTableFieldSelection>();
-
-            HashSet<ProjectTableElementCategory> categoriasPermitidas = categorias.ToHashSet();
-
-            return NormalizarProjectTableFields(
-                valores
-                    .Where(v => !string.IsNullOrWhiteSpace(v.CampoId))
-                    .Select(v => Enum.TryParse(v.Categoria, ignoreCase: true, out ProjectTableElementCategory categoria)
-                        ? new ProjectTableFieldSelection
-                        {
-                            Categoria = categoria,
-                            CampoId = v.CampoId.Trim(),
-                            NomeExibicao = string.IsNullOrWhiteSpace(v.NomeExibicao) ? v.CampoId.Trim() : v.NomeExibicao.Trim(),
-                            Ordem = v.Ordem
-                        }
-                        : null)
-                    .Where(v => v != null)
-                    .Cast<ProjectTableFieldSelection>(),
-                categoriasPermitidas);
-        }
-
-        private static List<ProjectTableFieldSelection> NormalizarProjectTableFields(
-            IEnumerable<ProjectTableFieldSelection>? campos,
-            IEnumerable<ProjectTableElementCategory> categorias)
-        {
-            HashSet<ProjectTableElementCategory> categoriasPermitidas = categorias.ToHashSet();
-
-            return (campos ?? Enumerable.Empty<ProjectTableFieldSelection>())
-                .Where(c => categoriasPermitidas.Contains(c.Categoria))
-                .Where(c => !string.IsNullOrWhiteSpace(c.CampoId))
-                .OrderBy(c => c.Ordem)
-                .GroupBy(c => new { c.Categoria, CampoId = c.CampoId.Trim() })
-                .Select((g, index) =>
-                {
-                    ProjectTableFieldSelection campo = g.First();
-                    return new ProjectTableFieldSelection
-                    {
-                        Categoria = campo.Categoria,
-                        CampoId = campo.CampoId.Trim(),
-                        NomeExibicao = string.IsNullOrWhiteSpace(campo.NomeExibicao) ? campo.CampoId.Trim() : campo.NomeExibicao.Trim(),
-                        Ordem = index
-                    };
-                })
-                .ToList();
-        }
-
-        private static Guid? NormalizarProjectTableViewFilter(Guid? filtroVistaId, IEnumerable<Guid> vistasIds)
-        {
-            if (!filtroVistaId.HasValue || filtroVistaId.Value == Guid.Empty)
-                return null;
-
-            HashSet<Guid> vistasValidas = vistasIds.ToHashSet();
-
-            return vistasValidas.Contains(filtroVistaId.Value)
-                ? filtroVistaId
-                : null;
-        }
-
-        private static List<ProjectTableFilterRule> ParseProjectTableFilters(
-            IEnumerable<ProjectTableFilterRuleDto>? valores,
-            IReadOnlyList<ProjectTableFieldSelection> camposSelecionados)
-        {
-            if (valores == null)
-                return new List<ProjectTableFilterRule>();
-
-            return NormalizarProjectTableFilters(
-                valores
-                    .Where(v => !string.IsNullOrWhiteSpace(v.CampoId))
-                    .Select(v => Enum.TryParse(v.Categoria, ignoreCase: true, out ProjectTableElementCategory categoria)
-                        ? new ProjectTableFilterRule
-                        {
-                            Ordem = v.Ordem,
-                            Categoria = categoria,
-                            CampoId = v.CampoId.Trim(),
-                            NomeExibicao = string.IsNullOrWhiteSpace(v.NomeExibicao) ? v.CampoId.Trim() : v.NomeExibicao.Trim(),
-                            Operador = ParseEnum(v.Operador, ProjectTableFilterOperator.Contem),
-                            Valor = v.Valor?.Trim() ?? string.Empty
-                        }
-                        : null)
-                    .Where(v => v != null)
-                    .Cast<ProjectTableFilterRule>(),
-                camposSelecionados);
-        }
-
-        private static List<ProjectTableFilterRule> NormalizarProjectTableFilters(
-            IEnumerable<ProjectTableFilterRule>? filtros,
-            IReadOnlyList<ProjectTableFieldSelection> camposSelecionados)
-        {
-            Dictionary<string, ProjectTableFieldSelection> camposPermitidos = camposSelecionados
-                .GroupBy(c => CriarChaveCampoTabela(c.Categoria, c.CampoId))
-                .ToDictionary(g => g.Key, g => g.First(), StringComparer.Ordinal);
-
-            return (filtros ?? Enumerable.Empty<ProjectTableFilterRule>())
-                .Where(f => !string.IsNullOrWhiteSpace(f.CampoId))
-                .OrderBy(f => f.Ordem)
-                .Select(f => new { Filtro = f, Chave = CriarChaveCampoTabela(f.Categoria, f.CampoId) })
-                .Where(item => camposPermitidos.ContainsKey(item.Chave))
-                .Take(5)
-                .Select((item, index) =>
-                {
-                    ProjectTableFieldSelection campo = camposPermitidos[item.Chave];
-                    return new ProjectTableFilterRule
-                    {
-                        Ordem = index,
-                        Categoria = campo.Categoria,
-                        CampoId = campo.CampoId,
-                        NomeExibicao = campo.NomeExibicao,
-                        Operador = Enum.IsDefined(typeof(ProjectTableFilterOperator), item.Filtro.Operador)
-                            ? item.Filtro.Operador
-                            : ProjectTableFilterOperator.Contem,
-                        Valor = item.Filtro.Valor?.Trim() ?? string.Empty
-                    };
-                })
-                .ToList();
-        }
-
-        private static ProjectTableSorting? ParseProjectTableSorting(
-            ProjectTableSortingDto? dto,
-            IReadOnlyList<ProjectTableFieldSelection> camposSelecionados)
-        {
-            if (dto == null || string.IsNullOrWhiteSpace(dto.CampoId))
-                return null;
-
-            if (!Enum.TryParse(dto.Categoria, ignoreCase: true, out ProjectTableElementCategory categoria))
-                return null;
-
-            return NormalizarProjectTableSorting(
-                new ProjectTableSorting
-                {
-                    Categoria = categoria,
-                    CampoId = dto.CampoId.Trim(),
-                    NomeExibicao = string.IsNullOrWhiteSpace(dto.NomeExibicao) ? dto.CampoId.Trim() : dto.NomeExibicao.Trim(),
-                    Direcao = ParseEnum(dto.Direcao, ProjectTableSortDirection.Crescente)
-                },
-                camposSelecionados);
-        }
-
-        private static ProjectTableSorting? NormalizarProjectTableSorting(
-            ProjectTableSorting? ordenacao,
-            IReadOnlyList<ProjectTableFieldSelection> camposSelecionados)
-        {
-            if (ordenacao == null || string.IsNullOrWhiteSpace(ordenacao.CampoId))
-                return null;
-
-            string chave = CriarChaveCampoTabela(ordenacao.Categoria, ordenacao.CampoId);
-            ProjectTableFieldSelection? campo = camposSelecionados.FirstOrDefault(c =>
-                string.Equals(CriarChaveCampoTabela(c.Categoria, c.CampoId), chave, StringComparison.Ordinal));
-
-            if (campo == null)
-                return null;
-
-            return new ProjectTableSorting
-            {
-                Categoria = campo.Categoria,
-                CampoId = campo.CampoId,
-                NomeExibicao = campo.NomeExibicao,
-                Direcao = Enum.IsDefined(typeof(ProjectTableSortDirection), ordenacao.Direcao)
-                    ? ordenacao.Direcao
-                    : ProjectTableSortDirection.Crescente
-            };
-        }
-
-        private static string CriarChaveCampoTabela(ProjectTableElementCategory categoria, string campoId)
-        {
-            return $"{categoria}|{campoId.Trim()}";
-        }
-    }
-}
-
-
-
-====================================================================================================
-ARQUIVO: C:\Users\User\source\repos\lucasffxavier\Araci-front\Properties\OrdenacaoTabelaWindow.xaml
-====================================================================================================
-
-<Window x:Class="Araci.Properties.OrdenacaoTabelaWindow"
+﻿<Window x:Class="Araci.MainWindow"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-        Title="Ordenação da tabela"
-        Width="560"
-        SizeToContent="Height"
-        ResizeMode="NoResize"
-        Background="#252526"
-        WindowStartupLocation="CenterOwner">
-    <Border Margin="10"
-            Padding="16"
-            BorderBrush="#F4F4F4"
-            BorderThickness="1"
-            Background="#252526">
-        <DockPanel LastChildFill="True">
-            <StackPanel DockPanel.Dock="Bottom"
-                        Orientation="Horizontal"
-                        HorizontalAlignment="Right"
-                        Margin="0,18,0,0">
-                <Button Content="OK"
-                        Width="90"
-                        Height="30"
-                        Margin="0,0,8,0"
-                        IsDefault="True"
-                        Click="OkButton_Click"/>
-                <Button Content="Cancelar"
-                        Width="90"
-                        Height="30"
-                        IsCancel="True"
-                        Click="CancelButton_Click"/>
-            </StackPanel>
-
-            <StackPanel>
-                <TextBlock Text="Ordenação da tabela"
-                           Foreground="#F4F4F4"
-                           FontSize="18"
-                           FontWeight="SemiBold"
-                           TextAlignment="Center"
-                           Margin="0,0,0,16"/>
-                <TextBlock Text="Configure um campo selecionado da tabela para definir a futura sequência das linhas."
-                           Foreground="#DCDCDC"
-                           TextWrapping="Wrap"
-                           Margin="0,0,0,14"/>
-
-                <Border BorderBrush="#3A3A3A"
-                        BorderThickness="1"
-                        Padding="10"
-                        Background="#1E1E1E">
-                    <Grid>
-                        <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="150"/>
-                            <ColumnDefinition Width="*"/>
-                        </Grid.ColumnDefinitions>
-                        <Grid.RowDefinitions>
-                            <RowDefinition Height="Auto"/>
-                            <RowDefinition Height="Auto"/>
-                        </Grid.RowDefinitions>
-
-                        <TextBlock Grid.Row="0" Grid.Column="0" Text="Campo" Foreground="#F4F4F4" FontWeight="SemiBold" Margin="0,0,12,8"/>
-                        <ComboBox x:Name="CampoComboBox" Grid.Row="0" Grid.Column="1" DisplayMemberPath="Texto" Margin="0,0,0,8" SelectionChanged="CampoComboBox_SelectionChanged"/>
-
-                        <TextBlock Grid.Row="1" Grid.Column="0" Text="Direção" Foreground="#F4F4F4" FontWeight="SemiBold" Margin="0,0,12,0"/>
-                        <ComboBox x:Name="DirecaoComboBox" Grid.Row="1" Grid.Column="1" DisplayMemberPath="Texto"/>
-                    </Grid>
-                </Border>
-            </StackPanel>
+        xmlns:views="clr-namespace:Araci.Views"
+        xmlns:ribbon="clr-namespace:Araci.Ribbon"
+        xmlns:properties="clr-namespace:Araci.Properties"
+        xmlns:tabs="clr-namespace:Araci.Ribbon.Tabs"
+        Title="ARACI ENGINE"
+        Width="1400"
+        Height="900"
+        WindowStartupLocation="CenterScreen"
+        Background="#D0D0D0">
+    <Grid>
+        <DockPanel>
+            <ribbon:RibbonView x:Name="Ribbon"
+                               DockPanel.Dock="Top"
+                               Height="130"/>
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition x:Name="ProjectBrowserColumn" Width="0"/>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition x:Name="PropertiesColumn" Width="320"/>
+                </Grid.ColumnDefinitions>
+                <views:ProjectBrowserView x:Name="ProjectBrowser"
+                                    Grid.Column="0"
+                                    Visibility="Collapsed"
+                                    CloseRequested="OnProjectBrowserCloseRequested"/>
+                <views:ViewportView x:Name="Viewport"
+                                    Grid.Column="1"
+                                    Margin="10"/>
+                <properties:PropertiesHostView x:Name="PropertiesHost"
+                                               Grid.Column="2"
+                                               CloseRequested="OnPropertiesCloseRequested"/>
+            </Grid>
         </DockPanel>
-    </Border>
+        <Popup x:Name="ArquivoPopup"
+               Placement="Bottom"
+               AllowsTransparency="True"
+               StaysOpen="False"
+               PopupAnimation="Fade">
+            <tabs:ArquivoMenuView x:Name="ArquivoMenu"/>
+        </Popup>
+    </Grid>
 </Window>
 
 
 
 ====================================================================================================
-ARQUIVO: C:\Users\User\source\repos\lucasffxavier\Araci-front\Properties\OrdenacaoTabelaWindow.xaml.cs
+ARQUIVO: C:\Users\User\source\repos\lucasffxavier\Araci-front\MainWindow.xaml.cs
 ====================================================================================================
 
-using System;
-using System.Collections.Generic;
+using Araci.Services;
+using Araci.Properties;
+using Araci.ViewModels;
+using System.ComponentModel;
 using System.Linq;
 using System.Windows;
-using System.Windows.Controls;
-using Araci.Core.Documents;
+using System.Windows.Controls.Primitives;
 
-namespace Araci.Properties
+namespace Araci
 {
-    public partial class OrdenacaoTabelaWindow : Window
+    public partial class MainWindow : Window
     {
-        private readonly List<CampoOrdenacaoItem> _campos;
-        private readonly List<DirecaoOrdenacaoItem> _direcoes;
+        private readonly EditorContext _context;
+        private readonly GridLength _projectBrowserColumnWidth = new(260);
+        private readonly GridLength _propertiesColumnWidth = new(320);
 
-        public OrdenacaoTabelaWindow(
-            IReadOnlyList<ProjectTableFieldSelection> camposSelecionados,
-            ProjectTableSorting? ordenacao)
+        public MainWindow()
         {
             InitializeComponent();
-
-            _campos = CriarCampos(camposSelecionados);
-            _direcoes = CriarDirecoes();
-
-            CampoComboBox.ItemsSource = _campos;
-            DirecaoComboBox.ItemsSource = _direcoes;
-            DirecaoComboBox.SelectedItem = _direcoes.First();
-
-            AplicarOrdenacao(ordenacao);
-            AtualizarEstadoDirecao();
+            _context = new EditorContext();
+            UnitValueConverter.CurrentUnits = _context.Settings.Units;
+            ProjectBrowser.DataContext = new ProjectBrowserViewModel(_context.Document, _context.DefinirVistaAtiva, _context.RenomearItemProjeto, _context.ExcluirItemProjeto, _context.DuplicarItemProjeto, MostrarPropriedadesVista, MostrarPropriedadesTabela);
+            _context.Editor.PropertyChanged += OnEditorStatePropertyChanged;
+            Viewport.Inicializar(_context);
+            InicializarRibbon();
+            AtualizarVisibilidadeNavegadorProjeto();
         }
 
-        public ProjectTableSorting? Ordenacao { get; private set; }
-
-        private void OkButton_Click(object sender, RoutedEventArgs e)
+        private void InicializarRibbon()
         {
-            if (CampoComboBox.SelectedItem is CampoOrdenacaoItem { Campo: not null } campo)
-            {
-                ProjectTableSortDirection direcao = DirecaoComboBox.SelectedItem is DirecaoOrdenacaoItem direcaoItem
-                    ? direcaoItem.Direcao
-                    : ProjectTableSortDirection.Crescente;
+            DataContext = _context;
+            ArquivoMenu.DataContext = _context;
+        }
 
-                Ordenacao = new ProjectTableSorting
-                {
-                    Categoria = campo.Campo.Categoria,
-                    CampoId = campo.Campo.CampoId,
-                    NomeExibicao = campo.Campo.NomeExibicao,
-                    Direcao = direcao
-                };
-            }
-            else
+        public void ToggleArquivoMenu(UIElement referencia)
+        {
+            if (ArquivoPopup.IsOpen)
             {
-                Ordenacao = null;
+                ArquivoPopup.IsOpen = false;
+                return;
             }
 
-            DialogResult = true;
+            ArquivoPopup.PlacementTarget = referencia;
+            ArquivoPopup.Placement = PlacementMode.Bottom;
+            ArquivoPopup.IsOpen = true;
         }
 
-        private void CancelButton_Click(object sender, RoutedEventArgs e)
+        public void FocarViewport()
         {
-            DialogResult = false;
+            Viewport.Focus();
+            System.Windows.Input.Keyboard.Focus(Viewport);
         }
 
-        private void CampoComboBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
+        public void MostrarPropriedades()
         {
-            AtualizarEstadoDirecao();
+            PropertiesColumn.Width = _propertiesColumnWidth;
+            PropertiesHost.Visibility = Visibility.Visible;
         }
 
-        private void AplicarOrdenacao(ProjectTableSorting? ordenacao)
+        public void MostrarPropriedadesVista(System.Guid vistaId)
         {
-            CampoComboBox.SelectedItem = _campos.FirstOrDefault(c =>
-                c.Campo != null &&
-                ordenacao != null &&
-                c.Campo.Categoria == ordenacao.Categoria &&
-                string.Equals(c.Campo.CampoId, ordenacao.CampoId, StringComparison.Ordinal)) ?? _campos.First();
+            Core.Documents.ProjectView? vista = _context.Document.Vistas.FirstOrDefault(v => v.Id == vistaId);
 
-            DirecaoComboBox.SelectedItem = _direcoes.FirstOrDefault(d =>
-                ordenacao != null &&
-                d.Direcao == ordenacao.Direcao) ?? _direcoes.First();
+            if (vista == null)
+                return;
+
+            _context.Editor.ElementoSelecionado = new ProjectViewPropertiesViewModel(
+                _context.Document,
+                vista,
+                _context.RenomearItemProjeto,
+                _context.EditarPropriedadesVista);
+
+            MostrarPropriedades();
         }
 
-        private void AtualizarEstadoDirecao()
+        public void MostrarPropriedadesTabela(System.Guid tabelaId)
         {
-            DirecaoComboBox.IsEnabled = CampoComboBox.SelectedItem is CampoOrdenacaoItem { Campo: not null };
+            Core.Documents.ProjectTable? tabela = _context.Document.Tabelas.FirstOrDefault(t => t.Id == tabelaId);
+
+            if (tabela == null)
+                return;
+
+            _context.Editor.ElementoSelecionado = new ProjectTablePropertiesViewModel(
+                _context.Document,
+                tabela,
+                _context.RenomearItemProjeto,
+                _context.EditarPropriedadesTabela,
+                _context.Dialogs);
+
+            MostrarPropriedades();
         }
 
-        private static List<CampoOrdenacaoItem> CriarCampos(IReadOnlyList<ProjectTableFieldSelection> camposSelecionados)
+        public void AlternarNavegadorProjeto()
         {
-            var itens = new List<CampoOrdenacaoItem>
+            _context.Editor.NavegadorProjetoVisivel = !_context.Editor.NavegadorProjetoVisivel;
+        }
+
+        public void CriarNovaVistaProjeto()
+        {
+            _context.CriarItemProjeto.CriarVista();
+            MostrarNavegadorProjeto();
+        }
+
+        public void CriarNovaTabelaProjeto()
+        {
+            _context.CriarItemProjeto.CriarTabela();
+            MostrarNavegadorProjeto();
+        }
+
+        public void CriarNovaPranchaProjeto()
+        {
+            _context.CriarItemProjeto.CriarPrancha();
+            MostrarNavegadorProjeto();
+        }
+
+        public void MostrarConfiguracaoUnidades()
+        {
+            var viewModel = new UnitsSettingsViewModel(_context.Settings.Units);
+            var window = new UnitsWindow(viewModel)
             {
-                new(null, "Sem ordenação")
+                Owner = this
             };
 
-            itens.AddRange(camposSelecionados
-                .OrderBy(c => c.Ordem)
-                .Select(c => new CampoOrdenacaoItem(c, $"{ObterRotuloCategoria(c.Categoria)} - {c.NomeExibicao}")));
+            if (window.ShowDialog() == true)
+                _context.AlterarUnidadesProjeto.Executar(viewModel.ToUnitDisplaySettings());
 
-            return itens;
+            FocarViewport();
         }
 
-        private static List<DirecaoOrdenacaoItem> CriarDirecoes()
+        private void OnPropertiesCloseRequested(object sender, RoutedEventArgs e)
         {
-            return new List<DirecaoOrdenacaoItem>
+            PropertiesColumn.Width = new GridLength(0);
+            PropertiesHost.Visibility = Visibility.Collapsed;
+            FocarViewport();
+        }
+
+        private void OnProjectBrowserCloseRequested(object sender, RoutedEventArgs e)
+        {
+            _context.Editor.NavegadorProjetoVisivel = false;
+            FocarViewport();
+        }
+
+        private void OnEditorStatePropertyChanged(object? sender, PropertyChangedEventArgs e)
+        {
+            if (string.IsNullOrEmpty(e.PropertyName) || e.PropertyName == nameof(EditorState.NavegadorProjetoVisivel))
+                AtualizarVisibilidadeNavegadorProjeto();
+        }
+
+        private void AtualizarVisibilidadeNavegadorProjeto()
+        {
+            if (_context.Editor.NavegadorProjetoVisivel)
             {
-                new(ProjectTableSortDirection.Crescente, "Crescente"),
-                new(ProjectTableSortDirection.Decrescente, "Decrescente")
-            };
-        }
-
-        private static string ObterRotuloCategoria(ProjectTableElementCategory categoria)
-        {
-            return categoria == ProjectTableElementCategory.Sin ? "SIN" : categoria.ToString();
-        }
-
-        private sealed class CampoOrdenacaoItem
-        {
-            public CampoOrdenacaoItem(ProjectTableFieldSelection? campo, string texto)
-            {
-                Campo = campo;
-                Texto = texto;
+                ProjectBrowserColumn.Width = _projectBrowserColumnWidth;
+                ProjectBrowser.Visibility = Visibility.Visible;
+                return;
             }
 
-            public ProjectTableFieldSelection? Campo { get; }
-            public string Texto { get; }
+            ProjectBrowserColumn.Width = new GridLength(0);
+            ProjectBrowser.Visibility = Visibility.Collapsed;
         }
 
-        private sealed class DirecaoOrdenacaoItem
+        private void MostrarNavegadorProjeto()
         {
-            public DirecaoOrdenacaoItem(ProjectTableSortDirection direcao, string texto)
-            {
-                Direcao = direcao;
-                Texto = texto;
-            }
-
-            public ProjectTableSortDirection Direcao { get; }
-            public string Texto { get; }
+            _context.Editor.NavegadorProjetoVisivel = true;
         }
     }
 }
@@ -8520,106 +7215,870 @@ namespace Araci.Properties
 
 
 ====================================================================================================
-ARQUIVO: C:\Users\User\source\repos\lucasffxavier\Araci-front\Service\UI\DialogService.cs
+ARQUIVO: C:\Users\User\source\repos\lucasffxavier\Araci-front\Service\EditorContext.cs
 ====================================================================================================
 
-using Araci.Applications.Abstractions;
-using Araci.Core.Documents;
-using Araci.Properties;
-using Araci.Services.Simulation;
 using System.Collections.Generic;
+using System.ComponentModel;
+using System.Linq;
 using System.Windows;
+using Araci.Applications.Abstractions;
+using Araci.Applications.Editor;
+using Araci.Applications.Factories;
+using Araci.Core.Commands;
+using Araci.Core.Documents;
+using Araci.Core.Events;
+using Araci.Core.SceneQueries;
+using Araci.Core.Transactions;
+using Araci.Applications.Anotar.InserirLinha;
+using Araci.Applications.Anotar.InserirRetangulo;
+using Araci.Applications.Anotar.InserirCirculo;
+using Araci.Applications.Diagrama.InserirCabo;
+using Araci.Applications.Diagrama.InserirElemento;
+using Araci.Applications.Editar.Alinhar;
+using Araci.Applications.Editar.Deletar;
+using Araci.Applications.Editar.Mover;
+using Araci.Applications.Editar.Selecionar;
+using Araci.Applications.Projects;
+using Araci.Applications.Simulation;
+using Araci.Applications.UseCases.Analise;
+using Araci.Applications.UseCases.Editar;
+using Araci.Applications.UseCases.Diagrama;
+using Araci.Applications.UseCases.Projeto;
+using Araci.Models;
+using Araci.Services.Composition;
+using Araci.ViewModels;
+using CoreScene = Araci.Core.Scenes.Scene;
+using Araci.Services.Geometry;
+using Araci.Services.Topology;
+using Araci.Services.Editing;
+using Araci.Services.Viewport;
+using Araci.Services.Simulation;
+using Araci.Services.UI;
+using Araci.Services.Settings;
+using Araci.Services.Catalog;
+using Araci.Services.Naming;
+using Araci.Services.Interaction;
 
-namespace Araci.Services.UI
+namespace Araci.Services
 {
-    public class DialogService : IUserDialogService
+    public class EditorContext : IEditorSession
     {
-        public void ShowInfo(string title, string message)
+        private bool _aplicandoCameraVista;
+
+        public EditorContext()
+            : this(new EventBus())
         {
-            Show(title, message, MessageBoxImage.Information);
         }
 
-        public void ShowWarning(string title, string message)
+        public EditorContext(IEventBus eventBus)
         {
-            Show(title, message, MessageBoxImage.Warning);
+            Events = eventBus;
+            Document.VistaAtivaAlterada += OnDocumentoVistaAtivaAlterada;
+
+            var core = EditorCoreComposition.Create(Document, Settings, Types);
+            Scene = core.Scene;
+            SceneQueries = core.SceneQueries;
+            Hover = core.Hover;
+            Snap = core.Snap;
+            TypePropertiesDialogs = core.TypePropertiesDialogs;
+            Dialogs = core.Dialogs;
+            Elements = core.Elements;
+            Connectivity = core.Connectivity;
+            ElectricGraph = core.ElectricGraph;
+            OperationalState = core.OperationalState;
+            Topology = core.Topology;
+            Geometry = core.Geometry;
+            TerminalLayout = core.TerminalLayout;
+            TypePropertiesDialogs.Configure(Commands, NotifyTextAnnotationTypeLibraryChanged, () => Document.Elementos.OfType<TextoAnotativo>());
+
+            var simulation = SimulationComposition.Create(Document, NotifySimulationResultViewModels, Dialogs);
+            SimulationResults = simulation.Results;
+            Simulation = simulation.Pipeline;
+            SimulationExport = simulation.Export;
+            SimulationMessages = simulation.Messages;
+            ExecutarSimulacao = simulation.ExecutarSimulacao;
+
+            VisualUpdates = EditingComposition.CreateVisualUpdates(() => Viewport, TerminalLayout, Connectivity, SceneQueries, TerminalSnap, RefreshEditingHandles);
+            Names = new NameService(Document, Elements);
+            GeometryUpdates = new ElementGeometryUpdateService(TerminalLayout, Connectivity, VisualUpdates);
+            var elementoModelFactory = new ElementoModelFactory(Elements);
+            var elementoViewModelFactory = new ElementoViewModelFactory(Elements, elementoModelFactory, Names, TypePropertiesDialogs, TerminalLayout, GeometryUpdates);
+            ElementoFactory = new ElementoFactory(elementoModelFactory, elementoViewModelFactory);
+            InserirElemento = new InserirElementoUseCase(ElementoFactory, TerminalLayout, Commands, Document, Names);
+            InserirCabo = new InserirCaboUseCase(ElementoFactory, Commands, Document, Names, cabo => Viewport?.ObterViewModel(cabo) as CaboViewModel);
+            CopiarElementos = new CopiarElementosUseCase();
+            ColarElementos = new ColarElementosUseCase(CopiarElementos, Document, Names, Commands, ObterDestinoColagem);
+            ExcluirElemento = new ExcluirElementoUseCase(Document, Connectivity, Commands);
+            EditarPropriedades = new EditarPropriedadesUseCase(Commands);
+            Selection = EditingComposition.CreateSelection(Editor, Events, EditarPropriedades, Settings);
+            SelecionarElementos = new SelecionarElementosUseCase(Selection);
+            AtualizarPropriedadesSelecionadas = new AtualizarPropriedadesSelecionadasUseCase(Selection);
+            EditarVerticesCabo = new EditarVerticesCaboUseCase(Commands);
+            CableVertexEdit = EditingComposition.CreateCableVertexEdit(Selection, SceneQueries, VisualUpdates, EditarVerticesCabo);
+            Selection.SelectionChanged += CableVertexEdit.Refresh;
+            SafeDelete = EditingComposition.CreateSafeDelete(Selection, CableVertexEdit, ExcluirElemento, Hover, TerminalSnap, SceneQueries);
+            Clipboard = EditingComposition.CreateClipboard(CopiarElementos, ColarElementos, Selection, () => Viewport, SceneQueries, CableVertexEdit);
+            Projects = PersistenceComposition.CreateProjects(Document, Commands, Elements, elementoModelFactory, TerminalLayout, Geometry, Dialogs, Settings, LimparEstadoTransitorioProjeto);
+            NovoProjeto = new NovoProjetoUseCase(Projects);
+            AbrirProjeto = new AbrirProjetoUseCase(Projects);
+            SalvarProjeto = new SalvarProjetoUseCase(Projects);
+            CriarItemProjeto = new CriarItemProjetoUseCase(Document, Commands);
+            RenomearItemProjeto = new RenomearItemProjetoUseCase(Document, Commands);
+            ExcluirItemProjeto = new ExcluirItemProjetoUseCase(Document, Commands);
+            DuplicarItemProjeto = new DuplicarItemProjetoUseCase(Document, Commands);
+            EditarPropriedadesVista = new EditarPropriedadesVistaUseCase(Document, Commands);
+            EditarPropriedadesTabela = new EditarPropriedadesTabelaUseCase(Document, Commands);
+
+            var moveServices = EditingComposition.CreateMoveServices(() => Viewport, () => Scene.Elementos, Settings, Connectivity, TerminalLayout, SceneQueries, VisualUpdates, Selection, GeometryUpdates, Commands);
+            MoveHud = moveServices.MoveHud;
+            AlignmentGuides = moveServices.AlignmentGuides;
+            MoveConstraints = moveServices.MoveConstraints;
+            MoverElemento = moveServices.MoverElemento;
+            RotacionarElemento = moveServices.RotacionarElemento;
+            RedimensionarBarra = moveServices.RedimensionarBarra;
+            Move = moveServices.Move;
+            BarraResize = moveServices.BarraResize;
+            Rotation = moveServices.Rotation;
+            LinhaEndpointEdit = EditingComposition.CreateLinhaEndpointEdit(Selection, SceneQueries, MoverElemento, VisualUpdates);
+            Selection.SelectionChanged += LinhaEndpointEdit.Refresh;
+            RetanguloResize = EditingComposition.CreateRetanguloResize(Selection, SceneQueries, MoverElemento, VisualUpdates);
+            Selection.SelectionChanged += RetanguloResize.Refresh;
+            CirculoResize = EditingComposition.CreateCirculoResize(Selection, SceneQueries, MoverElemento, VisualUpdates);
+            Selection.SelectionChanged += CirculoResize.Refresh;
+
+            Tools = new ToolService(
+                Elements,
+                CriarSelecionarTool,
+                CriarMoverTool,
+                CriarAlinharTool,
+                () => new DeletarTool(SafeDelete),
+                CriarInserirCaboTool,
+                CriarInserirElementoGenericoTool,
+                CriarInserirLinhaAnotativaTool,
+                CriarInserirRetanguloAnotativoTool,
+                CriarInserirCirculoAnotativoTool);
+
+            Input = EditingComposition.CreateInput(Tools, Commands, SafeDelete, Selection, Elements, Hover, Clipboard.CopiarSelecionados, Clipboard.Colar);
+            AlterarUnidadesProjeto = new AlterarUnidadesProjetoUseCase(Settings, RefreshProperties);
+            Navigation = ViewportComposition.CreateNavigation(() => Viewport);
         }
 
-        public void ShowError(string title, string message)
+        public IEventBus Events { get; }
+        public AraciDocument Document { get; } = new AraciDocument();
+        public CoreScene Scene { get; }
+        public ISceneQueryService SceneQueries { get; }
+        public HoverService Hover { get; }
+        public ToolService Tools { get; }
+        public InputRouter Input { get; }
+        public ViewportNavigationService Navigation { get; }
+        public ViewportService? Viewport { get; private set; }
+
+        public ViewportViewModel CriarViewportViewModel()
         {
-            Show(title, message, MessageBoxImage.Error);
+            return ViewportComposition.CreateViewModel(Document, Scene, SelectionBox, TerminalSnap, CableVertexEdit, LinhaEndpointEdit, RetanguloResize, CirculoResize, MoveHud, AlignmentGuides, ElementoFactory, Selection, Hover, SceneQueries);
         }
 
-        public ElementosTabelaDialogResult? ShowElementosTabelaDialog(
-            IReadOnlyList<ProjectTableElementCategory> categorias,
-            IReadOnlyList<ProjectTableFieldSelection> camposSelecionados)
+        public void InicializarViewport(ViewportViewModel viewportViewModel)
         {
-            var window = new ElementosTabelaWindow(categorias, camposSelecionados)
-            {
-                Owner = Application.Current?.MainWindow
-            };
+            if (Viewport != null)
+                Viewport.Camera.PropertyChanged -= OnCameraChanged;
 
-            return window.ShowDialog() == true
-                ? new ElementosTabelaDialogResult(window.CategoriasSelecionadas, window.CamposSelecionados)
-                : null;
+            Viewport = new ViewportService(viewportViewModel);
+            Viewport.Camera.PropertyChanged += OnCameraChanged;
+            AplicarCameraVistaAtiva();
         }
 
-        public FiltrosTabelaDialogResult? ShowFiltrosTabelaDialog(
-            IReadOnlyList<ProjectTableFieldSelection> camposSelecionados,
-            IReadOnlyList<ProjectViewDialogOption> vistasDisponiveis,
-            Guid? filtroVistaId,
-            ProjectTableFilterLogicalMode modo,
-            IReadOnlyList<ProjectTableFilterRule> filtros)
+        public void DefinirVistaAtiva(Guid vistaId)
         {
-            var window = new FiltrosTabelaWindow(camposSelecionados, vistasDisponiveis, filtroVistaId, modo, filtros)
-            {
-                Owner = Application.Current?.MainWindow
-            };
-
-            return window.ShowDialog() == true
-                ? new FiltrosTabelaDialogResult(window.FiltroVistaId, window.ModoFiltro, window.Filtros)
-                : null;
+            SalvarCameraVistaAtiva();
+            Document.DefinirVistaAtiva(vistaId);
         }
 
-        public OrdenacaoTabelaDialogResult? ShowOrdenacaoTabelaDialog(
-            IReadOnlyList<ProjectTableFieldSelection> camposSelecionados,
-            ProjectTableSorting? ordenacao)
+        public void RefreshProperties()
         {
-            var window = new OrdenacaoTabelaWindow(camposSelecionados, ordenacao)
-            {
-                Owner = Application.Current?.MainWindow
-            };
-
-            return window.ShowDialog() == true
-                ? new OrdenacaoTabelaDialogResult(window.Ordenacao)
-                : null;
+            AtualizarPropriedadesSelecionadas.Executar();
         }
 
-        public bool Confirm(string title, string message)
-        {
-            MessageBoxResult result = MessageBox.Show(
-                message,
-                title,
-                MessageBoxButton.YesNo,
-                MessageBoxImage.Question);
+        public EditorState Editor { get; } = new EditorState();
+        public EditorSettings Settings { get; } = new EditorSettings();
+        public MoveHudService MoveHud { get; }
+        public AlignmentGuideService AlignmentGuides { get; }
+        public MoveConstraintService MoveConstraints { get; }
+        public SelectionBoxViewModel SelectionBox { get; } = new SelectionBoxViewModel();
+        public TerminalSnapState TerminalSnap { get; } = new TerminalSnapState();
+        public CableVertexEditService CableVertexEdit { get; }
+        public LinhaEndpointEditService LinhaEndpointEdit { get; }
+        public RetanguloResizeService RetanguloResize { get; }
+        public CirculoResizeService CirculoResize { get; }
+        public CommandManager Commands { get; } = new CommandManager();
+        ICommandHistory IEditorSession.Commands => Commands;
+        public SafeDeleteService SafeDelete { get; }
+        public ClipboardService Clipboard { get; }
+        public ProjectPersistenceService Projects { get; }
+        public NovoProjetoUseCase NovoProjeto { get; }
+        public AbrirProjetoUseCase AbrirProjeto { get; }
+        public SalvarProjetoUseCase SalvarProjeto { get; }
+        public CriarItemProjetoUseCase CriarItemProjeto { get; }
+        public RenomearItemProjetoUseCase RenomearItemProjeto { get; }
+        public ExcluirItemProjetoUseCase ExcluirItemProjeto { get; }
+        public DuplicarItemProjetoUseCase DuplicarItemProjeto { get; }
+        public EditarPropriedadesVistaUseCase EditarPropriedadesVista { get; }
+        public EditarPropriedadesTabelaUseCase EditarPropriedadesTabela { get; }
+        public VisualUpdateService VisualUpdates { get; }
+        public SelectionService Selection { get; }
+        public SelecionarElementosUseCase SelecionarElementos { get; }
+        public AtualizarPropriedadesSelecionadasUseCase AtualizarPropriedadesSelecionadas { get; }
+        public MoveService Move { get; }
+        public BarraResizeService BarraResize { get; }
+        public RotationService Rotation { get; }
+        public SnapService Snap { get; }
+        public NameService Names { get; }
+        public ConnectivityService Connectivity { get; }
+        public ElectricGraphBuilder ElectricGraph { get; }
+        public OperationalGraphStateBuilder OperationalState { get; }
+        public TopologyValidator Topology { get; }
+        public SimulationResultApplier SimulationResults { get; }
+        public SimulationPipeline Simulation { get; }
+        public SimulationExportService SimulationExport { get; }
+        public SimulationMessageBuilder SimulationMessages { get; }
+        public ExecutarSimulacaoUseCase ExecutarSimulacao { get; }
+        public TypePropertiesDialogService TypePropertiesDialogs { get; }
+        public DialogService Dialogs { get; }
+        public ElementGeometryService Geometry { get; }
+        public TerminalLayoutService TerminalLayout { get; }
+        public ElementGeometryUpdateService GeometryUpdates { get; }
+        public ElementRegistryService Elements { get; }
+        public TypeLibraryService Types { get; } = new TypeLibraryService();
+        public ElementoFactory ElementoFactory { get; }
+        public InserirElementoUseCase InserirElemento { get; }
+        public InserirCaboUseCase InserirCabo { get; }
+        public CopiarElementosUseCase CopiarElementos { get; }
+        public ColarElementosUseCase ColarElementos { get; }
+        public ExcluirElementoUseCase ExcluirElemento { get; }
+        public EditarPropriedadesUseCase EditarPropriedades { get; }
+        public MoverElementoUseCase MoverElemento { get; }
+        public RotacionarElementoUseCase RotacionarElemento { get; }
+        public RedimensionarBarraUseCase RedimensionarBarra { get; }
+        public EditarVerticesCaboUseCase EditarVerticesCabo { get; }
+        public AlterarUnidadesProjetoUseCase AlterarUnidadesProjeto { get; }
 
-            return result == MessageBoxResult.Yes;
+        public TransactionScope BeginTransaction()
+        {
+            return Commands.BeginTransaction();
         }
 
-        public void Show(SimulationMessage message)
+        private void NotifySimulationResultViewModels()
         {
-            if (message == null)
+            if (Viewport == null)
                 return;
 
-            MessageBox.Show(message.Text, message.Title, MessageBoxButton.OK, message.Icon);
+            foreach (ElementoViewModel vm in Viewport.Elementos)
+            {
+                if (vm.Modelo is Cabo or Carga)
+                    vm.NotificarPropriedades("CorrenteLinha", "CorrenteFaseA", "CorrenteFaseB", "CorrenteFaseC");
+            }
         }
 
-        private static void Show(string title, string message, MessageBoxImage icon)
+        private void OnDocumentoVistaAtivaAlterada()
         {
-            MessageBox.Show(
-                message ?? string.Empty,
-                string.IsNullOrWhiteSpace(title) ? "Araci" : title,
-                MessageBoxButton.OK,
-                icon);
+            AplicarCameraVistaAtiva();
+        }
+
+        private void OnCameraChanged(object? sender, PropertyChangedEventArgs e)
+        {
+            if (_aplicandoCameraVista)
+                return;
+
+            SalvarCameraVistaAtiva();
+        }
+
+        private void SalvarCameraVistaAtiva()
+        {
+            if (Viewport == null || Document.VistaAtiva == null)
+                return;
+
+            Document.VistaAtiva.CameraX = Viewport.Camera.Offset.X;
+            Document.VistaAtiva.CameraY = Viewport.Camera.Offset.Y;
+            Document.VistaAtiva.Zoom = Viewport.Camera.Zoom;
+        }
+
+        private void AplicarCameraVistaAtiva()
+        {
+            if (Viewport == null || Document.VistaAtiva == null)
+                return;
+
+            double cameraX = Document.VistaAtiva.CameraX;
+            double cameraY = Document.VistaAtiva.CameraY;
+            double zoom = Document.VistaAtiva.Zoom;
+
+            _aplicandoCameraVista = true;
+
+            try
+            {
+                Viewport.Camera.Offset = new Point(cameraX, cameraY);
+                Viewport.Camera.Zoom = zoom;
+            }
+            finally
+            {
+                _aplicandoCameraVista = false;
+            }
+        }
+
+        private void NotifyTextAnnotationTypeLibraryChanged()
+        {
+            if (Viewport == null)
+                return;
+
+            foreach (ElementoViewModel vm in Viewport.Elementos)
+            {
+                if (vm is TextoAnotativoViewModel texto)
+                    texto.AtualizarAposTipoAlterado();
+            }
+
+            RefreshProperties();
+            SceneQueries.Invalidate();
+        }
+
+        private SelecionarTool CriarSelecionarTool()
+        {
+            return new SelecionarTool(SceneQueries, Selection, SelectionBox, CableVertexEdit, LinhaEndpointEdit, RetanguloResize, CirculoResize, BarraResize, Move, MoveHud, AlignmentGuides, MoveConstraints, Rotation);
+        }
+
+        private MoverTool CriarMoverTool()
+        {
+            return new MoverTool(SceneQueries, Selection, SelectionBox, CableVertexEdit, LinhaEndpointEdit, RetanguloResize, CirculoResize, BarraResize, Move, MoveHud, AlignmentGuides, MoveConstraints, Rotation);
+        }
+
+        private AlinharTool CriarAlinharTool()
+        {
+            return new AlinharTool(Hover, AlignmentGuides, Commands, SceneQueries);
+        }
+
+        private InserirCaboTool CriarInserirCaboTool()
+        {
+            return new InserirCaboTool(Commands, ElementoFactory, InserirCabo, Snap, Connectivity, AlignmentGuides, Scene, SceneQueries, TerminalSnap, () => Tools.VoltarParaSelecao());
+        }
+
+        private InserirElementoGenericoTool CriarInserirElementoGenericoTool(ElementDefinition definition)
+        {
+            return new InserirElementoGenericoTool(definition, ElementoFactory, InserirElemento, Snap, Geometry, TerminalLayout, AlignmentGuides, Scene, SceneQueries, () => Tools.VoltarParaSelecao());
+        }
+
+        private InserirLinhaAnotativaTool CriarInserirLinhaAnotativaTool()
+        {
+            return new InserirLinhaAnotativaTool(Commands, Document, Names, ElementoFactory, Scene, SceneQueries, LinhaEndpointEdit, () => Tools.VoltarParaSelecao());
+        }
+
+        private InserirRetanguloAnotativoTool CriarInserirRetanguloAnotativoTool()
+        {
+            return new InserirRetanguloAnotativoTool(Commands, Document, Names, ElementoFactory, Scene, SceneQueries, () => Tools.VoltarParaSelecao());
+        }
+
+        private InserirCirculoAnotativoTool CriarInserirCirculoAnotativoTool()
+        {
+            return new InserirCirculoAnotativoTool(Commands, Document, Names, ElementoFactory, Scene, SceneQueries, () => Tools.VoltarParaSelecao());
+        }
+
+        private Point ObterDestinoColagem(IReadOnlyList<Elemento> copiados)
+        {
+            if (Input.PossuiUltimaPosicaoMouseMundo)
+                return Input.UltimaPosicaoMouseMundo;
+
+            if (Viewport != null)
+                return Viewport.ScreenToWorld(Viewport.CentroTela);
+
+            Point centro = ColarElementosUseCase.CalcularCentro(copiados);
+            return new Point(centro.X + ColarElementosUseCase.OffsetPadrao, centro.Y + ColarElementosUseCase.OffsetPadrao);
+        }
+
+        private void RefreshEditingHandles()
+        {
+            CableVertexEdit?.Refresh();
+            LinhaEndpointEdit?.Refresh();
+            RetanguloResize?.Refresh();
+            CirculoResize?.Refresh();
+        }
+
+        private void LimparEstadoTransitorioProjeto()
+        {
+            Selection.Limpar();
+            Hover.Clear();
+            CableVertexEdit.Clear();
+            LinhaEndpointEdit.Clear();
+            RetanguloResize.Clear();
+            CirculoResize.Clear();
+            TerminalSnap.Limpar();
+            SelectionBox.Visivel = false;
+            MoveHud.Visivel = false;
+            MoveHud.Reset();
+            SceneQueries.Invalidate();
+            Tools.VoltarParaSelecao();
+        }
+    }
+}
+
+
+
+====================================================================================================
+ARQUIVO: C:\Users\User\source\repos\lucasffxavier\Araci-front\ViewModels\ProjectBrowserViewModel.cs
+====================================================================================================
+
+using System;
+using System.Collections.Generic;
+using System.Collections.ObjectModel;
+using System.Collections.Specialized;
+using System.ComponentModel;
+using System.Linq;
+using System.Runtime.CompilerServices;
+using System.Windows.Input;
+using Araci.Applications.UseCases.Projeto;
+using Araci.Core.Documents;
+using Araci.ViewModels.Base;
+
+namespace Araci.ViewModels
+{
+    public sealed class ProjectBrowserViewModel
+    {
+        private readonly AraciDocument _document;
+        private readonly Action<Guid> _definirVistaAtiva;
+        private readonly RenomearItemProjetoUseCase? _renomearItemProjeto;
+        private readonly ExcluirItemProjetoUseCase? _excluirItemProjeto;
+        private readonly DuplicarItemProjetoUseCase? _duplicarItemProjeto;
+        private readonly Action<Guid>? _abrirPropriedadesVista;
+        private readonly Action<Guid>? _abrirPropriedadesTabela;
+        private Guid? _selectedItemId;
+        private string? _selectedItemKind;
+
+        public ProjectBrowserViewModel(
+            AraciDocument document,
+            Action<Guid>? definirVistaAtiva = null,
+            RenomearItemProjetoUseCase? renomearItemProjeto = null,
+            ExcluirItemProjetoUseCase? excluirItemProjeto = null,
+            DuplicarItemProjetoUseCase? duplicarItemProjeto = null,
+            Action<Guid>? abrirPropriedadesVista = null,
+            Action<Guid>? abrirPropriedadesTabela = null)
+        {
+            _document = document;
+            _definirVistaAtiva = definirVistaAtiva ?? _document.DefinirVistaAtiva;
+            _renomearItemProjeto = renomearItemProjeto;
+            _excluirItemProjeto = excluirItemProjeto;
+            _duplicarItemProjeto = duplicarItemProjeto;
+            _abrirPropriedadesVista = abrirPropriedadesVista;
+            _abrirPropriedadesTabela = abrirPropriedadesTabela;
+            Secoes = new ObservableCollection<ProjectBrowserSectionViewModel>
+            {
+                new("Vistas"),
+                new("Tabelas"),
+                new("Pranchas")
+            };
+
+            AtualizarSecoes();
+
+            _document.Vistas.CollectionChanged += OnDocumentCollectionChanged;
+            _document.Tabelas.CollectionChanged += OnDocumentCollectionChanged;
+            _document.Pranchas.CollectionChanged += OnDocumentCollectionChanged;
+            _document.VistaAtivaAlterada += OnVistaAtivaAlterada;
+            _document.ItemProjetoRenomeado += OnItemProjetoRenomeado;
+            ExcluirSelecionadoCommand = new RelayCommand(ExecutarExcluirSelecionado);
+        }
+
+        public ObservableCollection<ProjectBrowserSectionViewModel> Secoes { get; }
+        public ICommand ExcluirSelecionadoCommand { get; }
+
+        private void OnDocumentCollectionChanged(object? sender, NotifyCollectionChangedEventArgs e)
+        {
+            AtualizarSecoes();
+        }
+
+        private void OnVistaAtivaAlterada()
+        {
+            foreach (ProjectBrowserSectionViewModel secao in Secoes)
+            {
+                foreach (ProjectBrowserItemViewModel item in secao.Itens)
+                    item.IsActiveView = item.Tipo == "Vista" && _document.VistaAtivaId == item.Id;
+            }
+        }
+
+        private void OnItemProjetoRenomeado()
+        {
+            AtualizarSecoes();
+        }
+
+        private void AtualizarSecoes()
+        {
+            AtualizarItens(Secoes[0], _document.Vistas.Select(v => CriarItem(v.Id, "Vista", v.Nome)));
+            AtualizarItens(Secoes[1], CriarItensTabela());
+            AtualizarItens(Secoes[2], CriarItensPrancha());
+        }
+
+        private IEnumerable<ProjectBrowserItemViewModel> CriarItensTabela()
+        {
+            if (_document.Tabelas.Count == 0)
+            {
+                yield return ProjectBrowserItemViewModel.CriarPlaceholder("Nenhuma tabela");
+                yield break;
+            }
+
+            foreach (ProjectTable tabela in _document.Tabelas)
+                yield return CriarItem(tabela.Id, "Tabela", tabela.Nome);
+        }
+
+        private IEnumerable<ProjectBrowserItemViewModel> CriarItensPrancha()
+        {
+            if (_document.Pranchas.Count == 0)
+            {
+                yield return ProjectBrowserItemViewModel.CriarPlaceholder("Nenhuma prancha");
+                yield break;
+            }
+
+            foreach (ProjectSheet prancha in _document.Pranchas)
+                yield return CriarItem(prancha.Id, "Prancha", FormatarPrancha(prancha), prancha.Nome);
+        }
+
+        private ProjectBrowserItemViewModel CriarItem(Guid id, string tipo, string nome, string? nomeEdicao = null)
+        {
+            var item = new ProjectBrowserItemViewModel(
+                id,
+                tipo,
+                nome,
+                nomeEdicao ?? nome,
+                true,
+                SelecionarItem,
+                RenomearItem,
+                ExcluirItem,
+                DuplicarItem,
+                AbrirPropriedadesItem)
+            {
+                IsActiveView = tipo == "Vista" && _document.VistaAtivaId == id
+            };
+
+            item.IsSelected = _selectedItemId == id && _selectedItemKind == tipo;
+            return item;
+        }
+
+        private void SelecionarItem(ProjectBrowserItemViewModel item)
+        {
+            if (!item.IsSelectable)
+                return;
+
+            _selectedItemId = item.Id;
+            _selectedItemKind = item.Tipo;
+
+            if (item.Tipo == "Vista")
+            {
+                _definirVistaAtiva(item.Id);
+                _abrirPropriedadesVista?.Invoke(item.Id);
+            }
+            else if (item.Tipo == "Tabela")
+            {
+                _abrirPropriedadesTabela?.Invoke(item.Id);
+            }
+
+            foreach (ProjectBrowserSectionViewModel secao in Secoes)
+            {
+                foreach (ProjectBrowserItemViewModel atual in secao.Itens)
+                {
+                    atual.IsSelected = ReferenceEquals(atual, item);
+                    atual.IsActiveView = atual.Tipo == "Vista" && _document.VistaAtivaId == atual.Id;
+                }
+            }
+        }
+
+        private static void AtualizarItens(ProjectBrowserSectionViewModel secao, IEnumerable<ProjectBrowserItemViewModel> itens)
+        {
+            secao.Itens.Clear();
+
+            foreach (ProjectBrowserItemViewModel item in itens)
+                secao.Itens.Add(item);
+        }
+
+        private bool RenomearItem(ProjectBrowserItemViewModel item, string novoNome)
+        {
+            if (_renomearItemProjeto == null)
+                return false;
+
+            switch (item.Tipo)
+            {
+                case "Vista":
+                    return _renomearItemProjeto.RenomearVista(item.Id, novoNome);
+
+                case "Tabela":
+                    return _renomearItemProjeto.RenomearTabela(item.Id, novoNome);
+
+                case "Prancha":
+                    return _renomearItemProjeto.RenomearPrancha(item.Id, novoNome);
+
+                default:
+                    return false;
+            }
+        }
+
+        private bool ExcluirItem(ProjectBrowserItemViewModel item)
+        {
+            if (_excluirItemProjeto == null)
+                return false;
+
+            return item.Tipo switch
+            {
+                "Vista" => _excluirItemProjeto.ExcluirVista(item.Id),
+                "Tabela" => _excluirItemProjeto.ExcluirTabela(item.Id),
+                "Prancha" => _excluirItemProjeto.ExcluirPrancha(item.Id),
+                _ => false
+            };
+        }
+
+        private bool DuplicarItem(ProjectBrowserItemViewModel item)
+        {
+            if (_duplicarItemProjeto == null)
+                return false;
+
+            return item.Tipo switch
+            {
+                "Vista" => _duplicarItemProjeto.DuplicarVista(item.Id),
+                "Tabela" => _duplicarItemProjeto.DuplicarTabela(item.Id),
+                "Prancha" => _duplicarItemProjeto.DuplicarPrancha(item.Id),
+                _ => false
+            };
+        }
+
+        private void AbrirPropriedadesItem(ProjectBrowserItemViewModel item)
+        {
+            if (item.Tipo == "Vista")
+                _abrirPropriedadesVista?.Invoke(item.Id);
+            else if (item.Tipo == "Tabela")
+                _abrirPropriedadesTabela?.Invoke(item.Id);
+        }
+
+        public bool ExcluirSelecionado()
+        {
+            ProjectBrowserItemViewModel? item = Secoes
+                .SelectMany(secao => secao.Itens)
+                .FirstOrDefault(atual =>
+                    atual.IsSelected &&
+                    atual.Id == _selectedItemId &&
+                    atual.Tipo == _selectedItemKind);
+
+            return item?.TentarExcluir() == true;
+        }
+
+        private void ExecutarExcluirSelecionado()
+        {
+            ExcluirSelecionado();
+        }
+
+        private static string FormatarPrancha(ProjectSheet prancha)
+        {
+            return string.IsNullOrWhiteSpace(prancha.Numero)
+                ? prancha.Nome
+                : $"{prancha.Numero} - {prancha.Nome}";
+        }
+    }
+
+    public sealed class ProjectBrowserSectionViewModel
+    {
+        public ProjectBrowserSectionViewModel(string titulo)
+        {
+            Titulo = titulo;
+            Itens = new ObservableCollection<ProjectBrowserItemViewModel>();
+        }
+
+        public string Titulo { get; }
+        public ObservableCollection<ProjectBrowserItemViewModel> Itens { get; }
+    }
+
+    public sealed class ProjectBrowserItemViewModel : INotifyPropertyChanged
+    {
+        private readonly Action<ProjectBrowserItemViewModel>? _selecionar;
+        private readonly Func<ProjectBrowserItemViewModel, string, bool>? _renomear;
+        private readonly Func<ProjectBrowserItemViewModel, bool>? _excluir;
+        private readonly Func<ProjectBrowserItemViewModel, bool>? _duplicar;
+        private readonly Action<ProjectBrowserItemViewModel>? _abrirPropriedades;
+        private bool _isSelected;
+        private bool _isActiveView;
+        private bool _isEditing;
+        private string _nome;
+        private string _nomeEdicao;
+        private string _textoEdicao;
+
+        public ProjectBrowserItemViewModel(
+            Guid id,
+            string tipo,
+            string nome,
+            string nomeEdicao,
+            bool isSelectable,
+            Action<ProjectBrowserItemViewModel>? selecionar,
+            Func<ProjectBrowserItemViewModel, string, bool>? renomear = null,
+            Func<ProjectBrowserItemViewModel, bool>? excluir = null,
+            Func<ProjectBrowserItemViewModel, bool>? duplicar = null,
+            Action<ProjectBrowserItemViewModel>? abrirPropriedades = null)
+        {
+            Id = id;
+            Tipo = tipo;
+            _nome = nome;
+            _nomeEdicao = nomeEdicao;
+            _textoEdicao = nomeEdicao;
+            IsSelectable = isSelectable;
+            _selecionar = selecionar;
+            _renomear = renomear;
+            _excluir = excluir;
+            _duplicar = duplicar;
+            _abrirPropriedades = abrirPropriedades;
+            SelecionarCommand = new RelayCommand(Selecionar, () => IsSelectable);
+            IniciarEdicaoCommand = new RelayCommand(IniciarEdicao, () => IsSelectable);
+            ConfirmarEdicaoCommand = new RelayCommand(ConfirmarEdicao);
+            CancelarEdicaoCommand = new RelayCommand(CancelarEdicao);
+            ExcluirCommand = new RelayCommand(Excluir, () => IsSelectable && _excluir != null);
+            DuplicarCommand = new RelayCommand(Duplicar, () => IsSelectable && _duplicar != null);
+            PropriedadesCommand = new RelayCommand(AbrirPropriedades, () => IsSelectable && (Tipo == "Vista" || Tipo == "Tabela") && _abrirPropriedades != null);
+        }
+
+        public Guid Id { get; }
+        public string Tipo { get; }
+        public string Nome
+        {
+            get => _nome;
+            private set
+            {
+                if (_nome == value)
+                    return;
+
+                _nome = value;
+                OnPropertyChanged();
+            }
+        }
+
+        public bool IsSelectable { get; }
+        public ICommand SelecionarCommand { get; }
+        public ICommand IniciarEdicaoCommand { get; }
+        public ICommand ConfirmarEdicaoCommand { get; }
+        public ICommand CancelarEdicaoCommand { get; }
+        public ICommand ExcluirCommand { get; }
+        public ICommand DuplicarCommand { get; }
+        public ICommand PropriedadesCommand { get; }
+
+        public string TextoEdicao
+        {
+            get => _textoEdicao;
+            set
+            {
+                if (_textoEdicao == value)
+                    return;
+
+                _textoEdicao = value;
+                OnPropertyChanged();
+            }
+        }
+
+        public bool IsEditing
+        {
+            get => _isEditing;
+            set
+            {
+                if (_isEditing == value)
+                    return;
+
+                _isEditing = value;
+                OnPropertyChanged();
+            }
+        }
+
+        public bool IsActiveView
+        {
+            get => _isActiveView;
+            set
+            {
+                if (_isActiveView == value)
+                    return;
+
+                _isActiveView = value;
+                OnPropertyChanged();
+            }
+        }
+
+        public bool IsSelected
+        {
+            get => _isSelected;
+            set
+            {
+                if (_isSelected == value)
+                    return;
+
+                _isSelected = value;
+                OnPropertyChanged();
+            }
+        }
+
+        public static ProjectBrowserItemViewModel CriarPlaceholder(string nome)
+        {
+            return new ProjectBrowserItemViewModel(Guid.Empty, "Placeholder", nome, nome, false, null);
+        }
+
+        public void AtualizarNomeExibicao(string nome, string? nomeEdicao = null)
+        {
+            Nome = nome;
+            _nomeEdicao = nomeEdicao ?? nome;
+            TextoEdicao = _nomeEdicao;
+        }
+
+        private void Selecionar()
+        {
+            _selecionar?.Invoke(this);
+        }
+
+        private void IniciarEdicao()
+        {
+            if (!IsSelectable)
+                return;
+
+            TextoEdicao = _nomeEdicao;
+            IsEditing = true;
+        }
+
+        private void ConfirmarEdicao()
+        {
+            if (!IsEditing)
+                return;
+
+            string nomeAnterior = _nomeEdicao;
+
+            if (_renomear?.Invoke(this, TextoEdicao) != true)
+                TextoEdicao = nomeAnterior;
+
+            IsEditing = false;
+        }
+
+        private void CancelarEdicao()
+        {
+            TextoEdicao = _nomeEdicao;
+            IsEditing = false;
+        }
+
+        public bool TentarExcluir()
+        {
+            return _excluir?.Invoke(this) == true;
+        }
+
+        private void Excluir()
+        {
+            TentarExcluir();
+        }
+
+        private void Duplicar()
+        {
+            _duplicar?.Invoke(this);
+        }
+
+        private void AbrirPropriedades()
+        {
+            _abrirPropriedades?.Invoke(this);
+        }
+
+        public event PropertyChangedEventHandler? PropertyChanged;
+
+        private void OnPropertyChanged([CallerMemberName] string? propertyName = null)
+        {
+            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
         }
     }
 }
@@ -8770,10 +8229,10 @@ namespace Araci.ViewModels
         private void MostrarOrdenacaoPlaceholder()
         {
             OrdenacaoTabelaDialogResult? resultado =
-                _dialogs.ShowOrdenacaoTabelaDialog(_tabela.CamposSelecionados, _tabela.Ordenacao);
+                _dialogs.ShowOrdenacaoTabelaDialog(_tabela.CamposSelecionados, _tabela.Ordenacoes);
 
             if (resultado != null)
-                _editarPropriedadesTabela.AlterarOrdenacaoTabela(_tabela.Id, resultado.Ordenacao);
+                _editarPropriedadesTabela.AlterarOrdenacaoTabela(_tabela.Id, resultado.Ordenacoes);
         }
 
         private void MostrarExibicaoPlaceholder()

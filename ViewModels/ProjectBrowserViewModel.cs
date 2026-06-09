@@ -19,6 +19,7 @@ namespace Araci.ViewModels
         private readonly RenomearItemProjetoUseCase? _renomearItemProjeto;
         private readonly ExcluirItemProjetoUseCase? _excluirItemProjeto;
         private readonly DuplicarItemProjetoUseCase? _duplicarItemProjeto;
+        private readonly Action<Guid>? _abrirTabela;
         private readonly Action<Guid>? _abrirPropriedadesVista;
         private readonly Action<Guid>? _abrirPropriedadesTabela;
         private Guid? _selectedItemId;
@@ -30,6 +31,7 @@ namespace Araci.ViewModels
             RenomearItemProjetoUseCase? renomearItemProjeto = null,
             ExcluirItemProjetoUseCase? excluirItemProjeto = null,
             DuplicarItemProjetoUseCase? duplicarItemProjeto = null,
+            Action<Guid>? abrirTabela = null,
             Action<Guid>? abrirPropriedadesVista = null,
             Action<Guid>? abrirPropriedadesTabela = null)
         {
@@ -38,6 +40,7 @@ namespace Araci.ViewModels
             _renomearItemProjeto = renomearItemProjeto;
             _excluirItemProjeto = excluirItemProjeto;
             _duplicarItemProjeto = duplicarItemProjeto;
+            _abrirTabela = abrirTabela;
             _abrirPropriedadesVista = abrirPropriedadesVista;
             _abrirPropriedadesTabela = abrirPropriedadesTabela;
             Secoes = new ObservableCollection<ProjectBrowserSectionViewModel>
@@ -146,6 +149,7 @@ namespace Araci.ViewModels
             }
             else if (item.Tipo == "Tabela")
             {
+                _abrirTabela?.Invoke(item.Id);
                 _abrirPropriedadesTabela?.Invoke(item.Id);
             }
 

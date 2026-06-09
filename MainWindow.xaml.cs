@@ -1,8 +1,11 @@
 using Araci.Services;
 using Araci.Properties;
 using Araci.ViewModels;
+using Araci.Applications.Projects.Tables;
+using Araci.Core.Documents;
 using System.ComponentModel;
 using System.Linq;
+using System.Collections.Specialized;
 using System.Windows;
 using System.Windows.Controls.Primitives;
 
@@ -13,14 +16,17 @@ namespace Araci
         private readonly EditorContext _context;
         private readonly GridLength _projectBrowserColumnWidth = new(260);
         private readonly GridLength _propertiesColumnWidth = new(320);
+        private ProjectTableDataViewModel? _projectTableDataViewModel;
 
         public MainWindow()
         {
             InitializeComponent();
             _context = new EditorContext();
             UnitValueConverter.CurrentUnits = _context.Settings.Units;
-            ProjectBrowser.DataContext = new ProjectBrowserViewModel(_context.Document, _context.DefinirVistaAtiva, _context.RenomearItemProjeto, _context.ExcluirItemProjeto, _context.DuplicarItemProjeto, MostrarPropriedadesVista, MostrarPropriedadesTabela);
+            ProjectBrowser.DataContext = new ProjectBrowserViewModel(_context.Document, _context.DefinirVistaAtiva, _context.RenomearItemProjeto, _context.ExcluirItemProjeto, _context.DuplicarItemProjeto, MostrarTabela, MostrarPropriedadesVista, MostrarPropriedadesTabela);
             _context.Editor.PropertyChanged += OnEditorStatePropertyChanged;
+            _context.Document.PropriedadesTabelaAlteradas += OnPropriedadesTabelaAlteradas;
+            _context.Document.Tabelas.CollectionChanged += OnTabelasCollectionChanged;
             Viewport.Inicializar(_context);
             InicializarRibbon();
             AtualizarVisibilidadeNavegadorProjeto();
@@ -59,10 +65,12 @@ namespace Araci
 
         public void MostrarPropriedadesVista(System.Guid vistaId)
         {
-            Core.Documents.ProjectView? vista = _context.Document.Vistas.FirstOrDefault(v => v.Id == vistaId);
+            ProjectView? vista = _context.Document.Vistas.FirstOrDefault(v => v.Id == vistaId);
 
             if (vista == null)
                 return;
+
+            MostrarViewport();
 
             _context.Editor.ElementoSelecionado = new ProjectViewPropertiesViewModel(
                 _context.Document,
@@ -75,7 +83,7 @@ namespace Araci
 
         public void MostrarPropriedadesTabela(System.Guid tabelaId)
         {
-            Core.Documents.ProjectTable? tabela = _context.Document.Tabelas.FirstOrDefault(t => t.Id == tabelaId);
+            ProjectTable? tabela = _context.Document.Tabelas.FirstOrDefault(t => t.Id == tabelaId);
 
             if (tabela == null)
                 return;
@@ -88,6 +96,23 @@ namespace Araci
                 _context.Dialogs);
 
             MostrarPropriedades();
+        }
+
+        public void MostrarTabela(System.Guid tabelaId)
+        {
+            ProjectTable? tabela = _context.Document.Tabelas.FirstOrDefault(t => t.Id == tabelaId);
+
+            if (tabela == null)
+                return;
+
+            _projectTableDataViewModel = new ProjectTableDataViewModel(
+                _context.Document,
+                tabela,
+                new ProjectTableDataBuilder());
+
+            ProjectTableGrid.DataContext = _projectTableDataViewModel;
+            ProjectTableGrid.Visibility = Visibility.Visible;
+            Viewport.Visibility = Visibility.Collapsed;
         }
 
         public void AlternarNavegadorProjeto()
@@ -140,6 +165,21 @@ namespace Araci
             FocarViewport();
         }
 
+        private void OnPropriedadesTabelaAlteradas(ProjectTable tabela)
+        {
+            if (_projectTableDataViewModel?.TableId == tabela.Id)
+                _projectTableDataViewModel.Refresh();
+        }
+
+        private void OnTabelasCollectionChanged(object? sender, NotifyCollectionChangedEventArgs e)
+        {
+            if (_projectTableDataViewModel == null ||
+                _context.Document.Tabelas.Any(t => t.Id == _projectTableDataViewModel.TableId))
+                return;
+
+            MostrarViewport();
+        }
+
         private void OnEditorStatePropertyChanged(object? sender, PropertyChangedEventArgs e)
         {
             if (string.IsNullOrEmpty(e.PropertyName) || e.PropertyName == nameof(EditorState.NavegadorProjetoVisivel))
@@ -162,6 +202,14 @@ namespace Araci
         private void MostrarNavegadorProjeto()
         {
             _context.Editor.NavegadorProjetoVisivel = true;
+        }
+
+        private void MostrarViewport()
+        {
+            ProjectTableGrid.Visibility = Visibility.Collapsed;
+            ProjectTableGrid.DataContext = null;
+            _projectTableDataViewModel = null;
+            Viewport.Visibility = Visibility.Visible;
         }
     }
 }

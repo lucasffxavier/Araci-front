@@ -14,6 +14,7 @@ using Araci.Applications.Analisar.FluxoDeCorrente;
 using Araci.Applications.Diagrama;
 using Araci.Applications.Editar.Base;
 using Araci.Applications.Factories;
+using Araci.Applications.Projects.Tables;
 using Araci.Applications.UseCases.Analise;
 using Araci.Applications.UseCases.Editar;
 using Araci.Applications.UseCases.Projeto;
@@ -72,6 +73,21 @@ namespace Araci.TechnicalChecks
                 ("Tabela limpa apenas ordenacao de campo removido", TabelaLimpaApenasOrdenacaoDeCampoRemovido),
                 ("Tabela duplica e persiste multiplas ordenacoes", TabelaDuplicaEPersisteMultiplasOrdenacoes),
                 ("Tabela converte ordenacao unica legada", TabelaConverteOrdenacaoUnicaLegada),
+                ("Tabela data builder gera colunas por campos selecionados", TabelaDataBuilderGeraColunasPorCamposSelecionados),
+                ("Tabela data builder gera linhas por categorias", TabelaDataBuilderGeraLinhasPorCategorias),
+                ("Tabela data builder respeita filtro de vista", TabelaDataBuilderRespeitaFiltroVista),
+                ("Tabela data builder aplica filtro todas", TabelaDataBuilderAplicaFiltroTodas),
+                ("Tabela data builder aplica filtro qualquer", TabelaDataBuilderAplicaFiltroQualquer),
+                ("Tabela data builder aplica ordenacao multipla", TabelaDataBuilderAplicaOrdenacaoMultipla),
+                ("Tabela data builder sem ordenacao preserva ordem", TabelaDataBuilderSemOrdenacaoPreservaOrdem),
+                ("Tabela data builder ignora ordenacao invalida sem alterar tabela", TabelaDataBuilderIgnoraOrdenacaoInvalidaSemAlterarTabela),
+                ("Tabela data builder geracao repetida read only", TabelaDataBuilderGeracaoRepetidaReadOnly),
+                ("Tabela data builder ignora categoria nao selecionada", TabelaDataBuilderIgnoraCategoriaNaoSelecionada),
+                ("Tabela data view model expoe colunas linhas e celulas", TabelaDataViewModelExpoeColunasLinhasECelulas),
+                ("Tabela data view model trata tabela sem campos", TabelaDataViewModelTrataTabelaSemCampos),
+                ("Tabela data view model trata tabela sem linhas", TabelaDataViewModelTrataTabelaSemLinhas),
+                ("Tabela data view model refresh atualiza dados", TabelaDataViewModelRefreshAtualizaDados),
+                ("Project Browser seleciona tabela e solicita visualizacao", ProjectBrowserSelecionaTabelaESolicitaVisualizacao),
                 ("DTO permanece equivalente apos reload", DtoPermaneceEquivalenteAposReload),
                 ("IDs permanecem estaveis apos reload", IdsPermanecemEstaveisAposReload),
                 ("Builds repetidos apos reload nao alteram Document", BuildsRepetidosAposReloadNaoAlteramDocument),
@@ -5257,6 +5273,226 @@ namespace Araci.TechnicalChecks
             }
         }
 
+        private static void TabelaDataBuilderGeraColunasPorCamposSelecionados()
+        {
+            AraciDocument document = CriarDocumentoTabelaDados();
+            ProjectTable tabela = CriarTabelaDadosCarga(document);
+
+            ProjectTableDataResult result = new ProjectTableDataBuilder().Build(document, tabela);
+
+            AssertEqual(3, result.Columns.Count, "Columns.Count");
+            AssertEqual("Nome", result.Columns[0].CampoId, "Columns[0].CampoId");
+            AssertEqual("PotenciaAtiva", result.Columns[1].CampoId, "Columns[1].CampoId");
+            AssertEqual("Tensao", result.Columns[2].CampoId, "Columns[2].CampoId");
+        }
+
+        private static void TabelaDataBuilderGeraLinhasPorCategorias()
+        {
+            AraciDocument document = CriarDocumentoTabelaDados();
+            ProjectTable tabela = CriarTabelaDadosCarga(document);
+
+            ProjectTableDataResult result = new ProjectTableDataBuilder().Build(document, tabela);
+
+            AssertEqual(3, result.Rows.Count, "Rows.Count");
+            Assert(result.Rows.All(r => r.Categoria == ProjectTableElementCategory.Cargas), "Todas as linhas deveriam ser Cargas.");
+        }
+
+        private static void TabelaDataBuilderRespeitaFiltroVista()
+        {
+            AraciDocument document = CriarDocumentoTabelaDados();
+            ProjectTable tabela = CriarTabelaDadosCarga(document);
+            ProjectView vistaB = document.Vistas.Single(v => v.Nome == "Vista filtro");
+            tabela.FiltroVistaId = vistaB.Id;
+
+            ProjectTableDataResult result = new ProjectTableDataBuilder().Build(document, tabela);
+
+            AssertEqual(1, result.Rows.Count, "FiltroVista Rows.Count");
+            AssertEqual("Carga B", result.Rows[0].ElementoNome, "FiltroVista ElementoNome");
+        }
+
+        private static void TabelaDataBuilderAplicaFiltroTodas()
+        {
+            AraciDocument document = CriarDocumentoTabelaDados();
+            ProjectTable tabela = CriarTabelaDadosCarga(document);
+            tabela.ModoFiltro = ProjectTableFilterLogicalMode.Todas;
+            tabela.Filtros = new List<ProjectTableFilterRule>
+            {
+                new() { Ordem = 0, Categoria = ProjectTableElementCategory.Cargas, CampoId = "Nome", NomeExibicao = "Nome", Operador = ProjectTableFilterOperator.Contem, Valor = "Carga" },
+                new() { Ordem = 1, Categoria = ProjectTableElementCategory.Cargas, CampoId = "PotenciaAtiva", NomeExibicao = "Potencia ativa", Operador = ProjectTableFilterOperator.IgualA, Valor = "800" }
+            };
+
+            ProjectTableDataResult result = new ProjectTableDataBuilder().Build(document, tabela);
+
+            AssertEqual(1, result.Rows.Count, "Filtro Todas Rows.Count");
+            AssertEqual("Carga B", result.Rows[0].ElementoNome, "Filtro Todas ElementoNome");
+        }
+
+        private static void TabelaDataBuilderAplicaFiltroQualquer()
+        {
+            AraciDocument document = CriarDocumentoTabelaDados();
+            ProjectTable tabela = CriarTabelaDadosCarga(document);
+            tabela.ModoFiltro = ProjectTableFilterLogicalMode.Qualquer;
+            tabela.Filtros = new List<ProjectTableFilterRule>
+            {
+                new() { Ordem = 0, Categoria = ProjectTableElementCategory.Cargas, CampoId = "Nome", NomeExibicao = "Nome", Operador = ProjectTableFilterOperator.IgualA, Valor = "Carga C" },
+                new() { Ordem = 1, Categoria = ProjectTableElementCategory.Cargas, CampoId = "PotenciaAtiva", NomeExibicao = "Potencia ativa", Operador = ProjectTableFilterOperator.IgualA, Valor = "800" }
+            };
+
+            ProjectTableDataResult result = new ProjectTableDataBuilder().Build(document, tabela);
+
+            AssertEqual(2, result.Rows.Count, "Filtro Qualquer Rows.Count");
+            Assert(result.Rows.Any(r => r.ElementoNome == "Carga B"), "Filtro Qualquer deveria incluir Carga B.");
+            Assert(result.Rows.Any(r => r.ElementoNome == "Carga C"), "Filtro Qualquer deveria incluir Carga C.");
+        }
+
+        private static void TabelaDataBuilderAplicaOrdenacaoMultipla()
+        {
+            AraciDocument document = CriarDocumentoTabelaDados();
+            ProjectTable tabela = CriarTabelaDadosCarga(document);
+            tabela.Ordenacoes = new List<ProjectTableSorting>
+            {
+                new() { Ordem = 0, Categoria = ProjectTableElementCategory.Cargas, CampoId = "PotenciaAtiva", NomeExibicao = "Potencia ativa", Direcao = ProjectTableSortDirection.Crescente },
+                new() { Ordem = 1, Categoria = ProjectTableElementCategory.Cargas, CampoId = "Nome", NomeExibicao = "Nome", Direcao = ProjectTableSortDirection.Decrescente }
+            };
+
+            ProjectTableDataResult result = new ProjectTableDataBuilder().Build(document, tabela);
+
+            AssertEqual("Carga C", result.Rows[0].ElementoNome, "Ordenacao Rows[0]");
+            AssertEqual("Carga A", result.Rows[1].ElementoNome, "Ordenacao Rows[1]");
+            AssertEqual("Carga B", result.Rows[2].ElementoNome, "Ordenacao Rows[2]");
+        }
+
+        private static void TabelaDataBuilderSemOrdenacaoPreservaOrdem()
+        {
+            AraciDocument document = CriarDocumentoTabelaDados();
+            ProjectTable tabela = CriarTabelaDadosCarga(document);
+
+            ProjectTableDataResult result = new ProjectTableDataBuilder().Build(document, tabela);
+
+            AssertEqual("Carga A", result.Rows[0].ElementoNome, "Sem ordenacao Rows[0]");
+            AssertEqual("Carga B", result.Rows[1].ElementoNome, "Sem ordenacao Rows[1]");
+            AssertEqual("Carga C", result.Rows[2].ElementoNome, "Sem ordenacao Rows[2]");
+        }
+
+        private static void TabelaDataBuilderIgnoraOrdenacaoInvalidaSemAlterarTabela()
+        {
+            AraciDocument document = CriarDocumentoTabelaDados();
+            ProjectTable tabela = CriarTabelaDadosCarga(document);
+            tabela.Ordenacoes = new List<ProjectTableSorting>
+            {
+                new() { Ordem = 0, Categoria = ProjectTableElementCategory.Cargas, CampoId = "CampoInexistente", NomeExibicao = "Campo inexistente", Direcao = ProjectTableSortDirection.Decrescente }
+            };
+
+            ProjectTableDataResult result = new ProjectTableDataBuilder().Build(document, tabela);
+
+            AssertEqual("Carga A", result.Rows[0].ElementoNome, "Ordenacao invalida deveria preservar ordem.");
+            AssertEqual(1, tabela.Ordenacoes.Count, "Builder nao deveria alterar Ordenacoes.");
+            AssertEqual("CampoInexistente", tabela.Ordenacoes[0].CampoId, "Builder nao deveria normalizar ProjectTable.");
+        }
+
+        private static void TabelaDataBuilderGeracaoRepetidaReadOnly()
+        {
+            AraciDocument document = CriarDocumentoTabelaDados();
+            ProjectTable tabela = CriarTabelaDadosCarga(document);
+            string assinaturaAntes = CriarAssinaturaTabelaDados(document, tabela);
+            var builder = new ProjectTableDataBuilder();
+
+            builder.Build(document, tabela);
+            builder.Build(document, tabela);
+
+            string assinaturaDepois = CriarAssinaturaTabelaDados(document, tabela);
+            AssertEqual(assinaturaAntes, assinaturaDepois, "Geracao da tabela deveria ser read-only.");
+        }
+
+        private static void TabelaDataBuilderIgnoraCategoriaNaoSelecionada()
+        {
+            AraciDocument document = CriarDocumentoTabelaDados();
+            ProjectTable tabela = CriarTabelaDadosCarga(document);
+
+            ProjectTableDataResult result = new ProjectTableDataBuilder().Build(document, tabela);
+
+            Assert(result.Rows.All(r => r.ElementoNome != "Gerador A"), "Categoria nao selecionada nao deveria aparecer.");
+        }
+
+        private static void TabelaDataViewModelExpoeColunasLinhasECelulas()
+        {
+            AraciDocument document = CriarDocumentoTabelaDados();
+            ProjectTable tabela = CriarTabelaDadosCarga(document);
+            var viewModel = new ProjectTableDataViewModel(document, tabela);
+
+            AssertEqual(tabela.Nome, viewModel.Titulo, "ViewModel.Titulo");
+            AssertEqual(3, viewModel.Columns.Count, "ViewModel.Columns.Count");
+            AssertEqual(3, viewModel.Rows.Count, "ViewModel.Rows.Count");
+            AssertEqual("Carga A", viewModel.Rows[0][0], "ViewModel.Rows[0][0]");
+            AssertEqual("500", viewModel.Rows[0][1], "ViewModel.Rows[0][1]");
+            Assert(!viewModel.HasEmptyMessage, "ViewModel nao deveria exibir estado vazio.");
+        }
+
+        private static void TabelaDataViewModelTrataTabelaSemCampos()
+        {
+            AraciDocument document = CriarDocumentoTabelaDados();
+            ProjectTable tabela = CriarTabelaDadosCarga(document);
+            tabela.CamposSelecionados.Clear();
+
+            var viewModel = new ProjectTableDataViewModel(document, tabela);
+
+            AssertEqual(0, viewModel.Columns.Count, "Tabela sem campos Columns.Count");
+            AssertEqual(0, viewModel.Rows.Count, "Tabela sem campos Rows.Count");
+            AssertEqual("Nenhum campo selecionado", viewModel.EmptyMessage, "Tabela sem campos EmptyMessage");
+            Assert(viewModel.HasEmptyMessage, "Tabela sem campos deveria exibir estado vazio.");
+        }
+
+        private static void TabelaDataViewModelTrataTabelaSemLinhas()
+        {
+            AraciDocument document = CriarDocumentoTabelaDados();
+            ProjectTable tabela = CriarTabelaDadosCarga(document);
+            tabela.Filtros = new List<ProjectTableFilterRule>
+            {
+                new() { Ordem = 0, Categoria = ProjectTableElementCategory.Cargas, CampoId = "Nome", NomeExibicao = "Nome", Operador = ProjectTableFilterOperator.IgualA, Valor = "Nao existe" }
+            };
+
+            var viewModel = new ProjectTableDataViewModel(document, tabela);
+
+            AssertEqual(3, viewModel.Columns.Count, "Tabela sem linhas Columns.Count");
+            AssertEqual(0, viewModel.Rows.Count, "Tabela sem linhas Rows.Count");
+            AssertEqual("Nenhum item encontrado", viewModel.EmptyMessage, "Tabela sem linhas EmptyMessage");
+        }
+
+        private static void TabelaDataViewModelRefreshAtualizaDados()
+        {
+            AraciDocument document = CriarDocumentoTabelaDados();
+            ProjectTable tabela = CriarTabelaDadosCarga(document);
+            var viewModel = new ProjectTableDataViewModel(document, tabela);
+
+            tabela.CamposSelecionados = tabela.CamposSelecionados.Take(1).ToList();
+            viewModel.Refresh();
+
+            AssertEqual(1, viewModel.Columns.Count, "Refresh Columns.Count");
+            AssertEqual("Nome", viewModel.Columns[0].CampoId, "Refresh Columns[0].CampoId");
+            AssertEqual("Carga A", viewModel.Rows[0][0], "Refresh Rows[0][0]");
+        }
+
+        private static void ProjectBrowserSelecionaTabelaESolicitaVisualizacao()
+        {
+            var document = new AraciDocument();
+            ProjectTable tabela = document.CriarNovaTabela();
+            Guid? tabelaVisualizada = null;
+            Guid? tabelaPropriedades = null;
+            var viewModel = new ProjectBrowserViewModel(
+                document,
+                abrirTabela: id => tabelaVisualizada = id,
+                abrirPropriedadesTabela: id => tabelaPropriedades = id);
+
+            ProjectBrowserItemViewModel itemTabela = viewModel.Secoes
+                .SelectMany(secao => secao.Itens)
+                .Single(item => item.Tipo == "Tabela" && item.Id == tabela.Id);
+
+            itemTabela.SelecionarCommand.Execute(null);
+
+            AssertEqual(tabela.Id, tabelaVisualizada, "Tabela visualizada");
+            AssertEqual(tabela.Id, tabelaPropriedades, "Tabela propriedades");
+        }
+
         private static ProjectTable CriarTabelaComCampos(AraciDocument document)
         {
             ProjectTable tabela = document.CriarNovaTabela();
@@ -5272,6 +5508,80 @@ namespace Araci.TechnicalChecks
             };
 
             return tabela;
+        }
+
+        private static AraciDocument CriarDocumentoTabelaDados()
+        {
+            var document = new AraciDocument();
+            ProjectView vistaA = document.Vistas[0];
+            ProjectView vistaB = document.CriarNovaVista();
+            vistaB.Nome = "Vista filtro";
+
+            document.Elementos.Add(new Carga
+            {
+                Nome = "Carga A",
+                PotenciaAtiva = 500,
+                TensaoLinha = "13.8",
+                ViewId = vistaA.Id
+            });
+            document.Elementos.Add(new Carga
+            {
+                Nome = "Carga B",
+                PotenciaAtiva = 800,
+                TensaoLinha = "13.8",
+                ViewId = vistaB.Id
+            });
+            document.Elementos.Add(new Carga
+            {
+                Nome = "Carga C",
+                PotenciaAtiva = 500,
+                TensaoLinha = "0.38",
+                ViewId = vistaA.Id
+            });
+            document.Elementos.Add(new Gerador
+            {
+                Nome = "Gerador A",
+                PotenciaAtiva = 1000,
+                TensaoLinha = "13.8",
+                ViewId = vistaA.Id
+            });
+
+            return document;
+        }
+
+        private static ProjectTable CriarTabelaDadosCarga(AraciDocument document)
+        {
+            ProjectTable tabela = document.CriarNovaTabela();
+            tabela.CategoriasElementos = new List<ProjectTableElementCategory>
+            {
+                ProjectTableElementCategory.Cargas
+            };
+            tabela.CamposSelecionados = new List<ProjectTableFieldSelection>
+            {
+                new() { Categoria = ProjectTableElementCategory.Cargas, CampoId = "Nome", NomeExibicao = "Nome", Ordem = 0 },
+                new() { Categoria = ProjectTableElementCategory.Cargas, CampoId = "PotenciaAtiva", NomeExibicao = "Potencia ativa", Ordem = 1 },
+                new() { Categoria = ProjectTableElementCategory.Cargas, CampoId = "Tensao", NomeExibicao = "Tensao", Ordem = 2 }
+            };
+
+            return tabela;
+        }
+
+        private static string CriarAssinaturaTabelaDados(AraciDocument document, ProjectTable tabela)
+        {
+            string elementos = string.Join(
+                ";",
+                document.Elementos.Select(e => $"{e.Id}:{e.Nome}:{e.ViewId}:{e.PosicaoX}:{e.PosicaoY}"));
+            string campos = string.Join(
+                ";",
+                tabela.CamposSelecionados.Select(c => $"{c.Ordem}:{c.Categoria}:{c.CampoId}:{c.NomeExibicao}"));
+            string filtros = string.Join(
+                ";",
+                tabela.Filtros.Select(f => $"{f.Ordem}:{f.Categoria}:{f.CampoId}:{f.Operador}:{f.Valor}"));
+            string ordenacoes = string.Join(
+                ";",
+                tabela.Ordenacoes.Select(o => $"{o.Ordem}:{o.Categoria}:{o.CampoId}:{o.Direcao}"));
+
+            return $"{document.Elementos.Count}|{elementos}|{tabela.FiltroVistaId}|{tabela.ModoFiltro}|{campos}|{filtros}|{ordenacoes}";
         }
 
         private static IReadOnlyList<ProjectTableSorting> CriarOrdenacoes(ProjectTable tabela, params string[] campoIds)
