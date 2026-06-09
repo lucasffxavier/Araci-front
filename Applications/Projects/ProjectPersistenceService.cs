@@ -1,5 +1,6 @@
 using System;
 using System.IO;
+using System.Linq;
 using System.Text.Json;
 using Araci.Applications.Abstractions;
 using Araci.Core.Documents;
@@ -111,7 +112,7 @@ namespace Araci.Applications.Projects
                 _serializer.ApplyTypeLibraries(dto.TypeLibraries);
                 var vistas = _serializer.CreateProjectViews(dto);
                 var tabelas = _serializer.CreateProjectTables(dto);
-                var pranchas = _serializer.CreateProjectSheets(dto);
+                var pranchas = _serializer.CreateProjectSheets(dto, tabelas.Select(t => t.Id));
                 Guid? vistaAtivaId = _serializer.GetActiveViewId(dto);
                 var elementos = _serializer.CreateElements(dto);
 

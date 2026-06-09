@@ -14,6 +14,10 @@ namespace Araci.Applications.Abstractions
 
         string? ShowSaveCsvDialog(string suggestedFileName);
 
+        InserirTabelaPranchaDialogResult? ShowInserirTabelaPranchaDialog(
+            IReadOnlyList<ProjectItemDialogOption> pranchas,
+            IReadOnlyList<ProjectItemDialogOption> tabelas);
+
         ElementosTabelaDialogResult? ShowElementosTabelaDialog(
             IReadOnlyList<ProjectTableElementCategory> categorias,
             IReadOnlyList<ProjectTableFieldSelection> camposSelecionados);

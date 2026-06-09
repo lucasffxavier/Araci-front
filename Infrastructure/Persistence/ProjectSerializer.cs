@@ -73,7 +73,7 @@ namespace Araci.Infrastructure.Persistence
                     .Select(t => CriarProjectTableDto(t, document.Vistas.Select(v => v.Id)))
                     .ToList(),
                 Sheets = document.Pranchas
-                    .Select(CriarProjectSheetDto)
+                    .Select(p => CriarProjectSheetDto(p, document.Tabelas.Select(t => t.Id)))
                     .ToList(),
                 Elements = document.Elementos
                     .Select(CriarElementoDto)
@@ -166,10 +166,15 @@ namespace Araci.Infrastructure.Persistence
 
         public IReadOnlyList<ProjectSheet> CreateProjectSheets(ProjectFileDto dto)
         {
+            return CreateProjectSheets(dto, dto.Tables.Select(t => t.Id));
+        }
+
+        public IReadOnlyList<ProjectSheet> CreateProjectSheets(ProjectFileDto dto, IEnumerable<Guid> tableIds)
+        {
             ArgumentNullException.ThrowIfNull(dto);
 
             return dto.Sheets
-                .Select(CriarProjectSheet)
+                .Select(s => CriarProjectSheet(s, tableIds))
                 .Where(s => s != null)
                 .Cast<ProjectSheet>()
                 .ToList();
@@ -411,13 +416,27 @@ namespace Araci.Infrastructure.Persistence
             };
         }
 
-        private static ProjectSheetDto CriarProjectSheetDto(ProjectSheet prancha)
+        private static ProjectSheetDto CriarProjectSheetDto(ProjectSheet prancha, IEnumerable<Guid> tableIds)
         {
+            HashSet<Guid> tabelasValidas = tableIds.ToHashSet();
+
             return new ProjectSheetDto
             {
                 Id = prancha.Id,
                 Nome = prancha.Nome,
-                Numero = prancha.Numero
+                Numero = prancha.Numero,
+                Tabelas = (prancha.Tabelas ?? new List<ProjectSheetTableInstance>())
+                    .Where(i => i != null && i.IsValid && tabelasValidas.Contains(i.TableId))
+                    .Select(i => new ProjectSheetTableInstanceDto
+                    {
+                        Id = i.Id,
+                        TableId = i.TableId,
+                        X = i.X,
+                        Y = i.Y,
+                        Width = i.Width,
+                        Height = i.Height
+                    })
+                    .ToList()
             };
         }
 
@@ -462,16 +481,19 @@ namespace Araci.Infrastructure.Persistence
             };
         }
 
-        private static ProjectSheet? CriarProjectSheet(ProjectSheetDto dto)
+        private static ProjectSheet? CriarProjectSheet(ProjectSheetDto dto, IEnumerable<Guid> tableIds)
         {
             if (string.IsNullOrWhiteSpace(dto.Nome))
                 return null;
+
+            HashSet<Guid> tabelasValidas = tableIds.ToHashSet();
 
             return new ProjectSheet
             {
                 Id = dto.Id == Guid.Empty ? Guid.NewGuid() : dto.Id,
                 Nome = dto.Nome,
-                Numero = dto.Numero ?? string.Empty
+                Numero = dto.Numero ?? string.Empty,
+                Tabelas = ParseProjectSheetTableInstances(dto.Tabelas, tabelasValidas)
             };
         }
 
@@ -497,6 +519,28 @@ namespace Araci.Infrastructure.Persistence
             RestaurarTerminais(elemento, dto.Terminals);
 
             return elemento;
+        }
+
+        private static List<ProjectSheetTableInstance> ParseProjectSheetTableInstances(
+            IEnumerable<ProjectSheetTableInstanceDto>? valores,
+            IReadOnlySet<Guid> tableIds)
+        {
+            if (valores == null)
+                return new List<ProjectSheetTableInstance>();
+
+            return valores
+                .Where(v => v.TableId != Guid.Empty && tableIds.Contains(v.TableId))
+                .Select(v => new ProjectSheetTableInstance
+                {
+                    Id = v.Id == Guid.Empty ? Guid.NewGuid() : v.Id,
+                    TableId = v.TableId,
+                    X = v.X,
+                    Y = v.Y,
+                    Width = v.Width,
+                    Height = v.Height
+                })
+                .Where(i => i.IsValid)
+                .ToList();
         }
 
         private void AplicarParametros(Elemento elemento, IEnumerable<ParameterDto> parametros)

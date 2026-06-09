@@ -93,6 +93,21 @@ namespace Araci.TechnicalChecks
                 ("Tabela CSV use case cancela sem escrever", TabelaCsvUseCaseCancelaSemEscrever),
                 ("Tabela CSV use case avisa sem tabela", TabelaCsvUseCaseAvisaSemTabela),
                 ("Tabela CSV use case mostra erro de escrita", TabelaCsvUseCaseMostraErroDeEscrita),
+                ("Prancha nova inicia sem instancias de tabela", PranchaNovaIniciaSemInstanciasTabela),
+                ("Prancha persiste instancia de tabela", PranchaPersisteInstanciaTabela),
+                ("Prancha duplica instancias de tabela com copia profunda", PranchaDuplicaInstanciasTabelaComCopiaProfunda),
+                ("Excluir tabela limpa instancias em pranchas com undo redo", ExcluirTabelaLimpaInstanciasPranchaComUndoRedo),
+                ("Prancha carrega arquivo antigo sem instancias", PranchaCarregaArquivoAntigoSemInstancias),
+                ("Prancha ignora instancia orfa no load", PranchaIgnoraInstanciaOrfaNoLoad),
+                ("Inserir tabela na prancha cria instancia undo redo", InserirTabelaNaPranchaCriaInstanciaUndoRedo),
+                ("Inserir tabela na prancha ignora ids invalidos", InserirTabelaNaPranchaIgnoraIdsInvalidos),
+                ("Inserir tabela na prancha multiplas instancias independentes", InserirTabelaNaPranchaMultiplasInstanciasIndependentes),
+                ("EditorContext expoe inserir tabela na prancha", EditorContextExpoeInserirTabelaNaPrancha),
+                ("ProjectSheetViewModel expoe instancias de tabela", ProjectSheetViewModelExpoeInstanciasTabela),
+                ("ProjectSheetViewModel resolve nome da tabela", ProjectSheetViewModelResolveNomeTabela),
+                ("ProjectSheetViewModel trata prancha vazia", ProjectSheetViewModelTrataPranchaVazia),
+                ("ProjectSheetViewModel trata tabela inexistente", ProjectSheetViewModelTrataTabelaInexistente),
+                ("ProjectSheetViewModel refresh nao altera modelo", ProjectSheetViewModelRefreshNaoAlteraModelo),
                 ("Tabela data view model expoe colunas linhas e celulas", TabelaDataViewModelExpoeColunasLinhasECelulas),
                 ("Tabela data view model trata tabela sem campos", TabelaDataViewModelTrataTabelaSemCampos),
                 ("Tabela data view model trata tabela sem linhas", TabelaDataViewModelTrataTabelaSemLinhas),
@@ -101,7 +116,10 @@ namespace Araci.TechnicalChecks
                 ("Filtros tabela window permite sem filtro", FiltrosTabelaWindowPermiteSemFiltro),
                 ("Tabela remove filtro com undo redo", TabelaRemoveFiltroComUndoRedo),
                 ("Project Browser seleciona tabela e solicita visualizacao", ProjectBrowserSelecionaTabelaESolicitaVisualizacao),
+                ("Project Browser seleciona prancha e solicita visualizacao", ProjectBrowserSelecionaPranchaESolicitaVisualizacao),
                 ("Project Browser seleciona vista e restaura viewport", ProjectBrowserSelecionaVistaERestauraViewport),
+                ("Project Browser seleciona vista depois de prancha", ProjectBrowserSelecionaVistaDepoisDePrancha),
+                ("Project Browser seleciona tabela depois de prancha", ProjectBrowserSelecionaTabelaDepoisDePrancha),
                 ("ProjectTableGridView recria colunas dinamicas", ProjectTableGridViewRecriaColunasDinamicas),
                 ("DTO permanece equivalente apos reload", DtoPermaneceEquivalenteAposReload),
                 ("IDs permanecem estaveis apos reload", IdsPermanecemEstaveisAposReload),
@@ -5576,6 +5594,368 @@ namespace Araci.TechnicalChecks
             AssertEqual(assinaturaAntes, CriarAssinaturaTabelaDados(document, tabela), "Erro de exportacao nao deveria alterar estado.");
         }
 
+        private static void PranchaNovaIniciaSemInstanciasTabela()
+        {
+            var document = new AraciDocument();
+            ProjectSheet prancha = document.CriarNovaPrancha();
+            List<ProjectSheetTableInstance> tabelas = prancha.Tabelas ?? throw new InvalidOperationException("ProjectSheet.Tabelas null.");
+
+            AssertEqual(0, tabelas.Count, "ProjectSheet.Tabelas.Count inicial");
+        }
+
+        private static void PranchaPersisteInstanciaTabela()
+        {
+            var document = new AraciDocument();
+            ProjectTable tabela = document.CriarNovaTabela();
+            ProjectSheet prancha = document.CriarNovaPrancha();
+            Guid instanciaId = Guid.NewGuid();
+            prancha.Tabelas.Add(new ProjectSheetTableInstance
+            {
+                Id = instanciaId,
+                TableId = tabela.Id,
+                X = 12.5,
+                Y = -8.25,
+                Width = 210,
+                Height = 95
+            });
+            EditorContext context = new();
+            var serializer = new ProjectSerializer(
+                context.Elements,
+                new ElementoModelFactory(context.Elements),
+                context.TerminalLayout,
+                context.Geometry);
+
+            ProjectFileDto dto = serializer.CreateFileDto(
+                document,
+                ProjectMetadataDto.CreateNew("Prancha tabela"),
+                context.Settings.Units);
+            ProjectSheetTableInstanceDto instanceDto = dto.Sheets.Single(s => s.Id == prancha.Id).Tabelas.Single();
+            string json = serializer.Serialize(dto);
+            ProjectFileDto reloadedDto = serializer.Deserialize(json);
+            IReadOnlyList<ProjectTable> tabelas = serializer.CreateProjectTables(reloadedDto);
+            ProjectSheet reloaded = serializer.CreateProjectSheets(reloadedDto, tabelas.Select(t => t.Id)).Single(s => s.Id == prancha.Id);
+            ProjectSheetTableInstance instance = reloaded.Tabelas.Single();
+
+            AssertEqual(instanciaId, instanceDto.Id, "DTO instancia Id");
+            AssertEqual(tabela.Id, instanceDto.TableId, "DTO instancia TableId");
+            AssertEqual(12.5, instanceDto.X, "DTO instancia X");
+            AssertEqual(-8.25, instanceDto.Y, "DTO instancia Y");
+            AssertEqual(210, instanceDto.Width, "DTO instancia Width");
+            AssertEqual(95, instanceDto.Height, "DTO instancia Height");
+            AssertEqual(instanciaId, instance.Id, "Reload instancia Id");
+            AssertEqual(tabela.Id, instance.TableId, "Reload instancia TableId");
+            AssertEqual(12.5, instance.X, "Reload instancia X");
+            AssertEqual(-8.25, instance.Y, "Reload instancia Y");
+            AssertEqual(210, instance.Width, "Reload instancia Width");
+            AssertEqual(95, instance.Height, "Reload instancia Height");
+        }
+
+        private static void PranchaDuplicaInstanciasTabelaComCopiaProfunda()
+        {
+            var document = new AraciDocument();
+            ProjectTable tabela = document.CriarNovaTabela();
+            ProjectSheet origem = document.CriarNovaPrancha();
+            var instancia = new ProjectSheetTableInstance
+            {
+                TableId = tabela.Id,
+                X = 10,
+                Y = 20,
+                Width = 220,
+                Height = 120
+            };
+            origem.Tabelas.Add(instancia);
+            var commands = new Araci.Core.Commands.CommandManager();
+            var useCase = new DuplicarItemProjetoUseCase(document, commands);
+
+            bool duplicou = useCase.DuplicarPrancha(origem.Id);
+            ProjectSheet duplicata = document.Pranchas.Single(p => p.Id != origem.Id);
+            ProjectSheetTableInstance copia = duplicata.Tabelas.Single();
+
+            Assert(duplicou, "DuplicarPrancha deveria retornar true.");
+            Assert(!ReferenceEquals(instancia, copia), "Instancia duplicada nao deveria compartilhar referencia.");
+            Assert(instancia.Id != copia.Id, "Instancia duplicada deveria receber novo Id.");
+            AssertEqual(instancia.TableId, copia.TableId, "Duplicata instancia TableId");
+            AssertEqual(instancia.X, copia.X, "Duplicata instancia X");
+            AssertEqual(instancia.Y, copia.Y, "Duplicata instancia Y");
+            AssertEqual(instancia.Width, copia.Width, "Duplicata instancia Width");
+            AssertEqual(instancia.Height, copia.Height, "Duplicata instancia Height");
+        }
+
+        private static void ExcluirTabelaLimpaInstanciasPranchaComUndoRedo()
+        {
+            var document = new AraciDocument();
+            ProjectTable tabela = document.CriarNovaTabela();
+            ProjectTable outraTabela = document.CriarNovaTabela();
+            ProjectSheet prancha = document.CriarNovaPrancha();
+            var instanciaAfetada = new ProjectSheetTableInstance { TableId = tabela.Id, X = 1, Y = 2, Width = 100, Height = 50 };
+            var instanciaOutraTabela = new ProjectSheetTableInstance { TableId = outraTabela.Id, X = 3, Y = 4, Width = 120, Height = 60 };
+            prancha.Tabelas.Add(instanciaAfetada);
+            prancha.Tabelas.Add(instanciaOutraTabela);
+            var commands = new Araci.Core.Commands.CommandManager();
+            var useCase = new ExcluirItemProjetoUseCase(document, commands);
+
+            bool excluiu = useCase.ExcluirTabela(tabela.Id);
+
+            Assert(excluiu, "ExcluirTabela deveria retornar true.");
+            Assert(!document.Tabelas.Any(t => t.Id == tabela.Id), "Tabela deveria ser removida.");
+            AssertEqual(1, prancha.Tabelas.Count, "Instancias apos excluir tabela");
+            AssertEqual(outraTabela.Id, prancha.Tabelas[0].TableId, "Instancia de outra tabela deveria ser preservada.");
+
+            commands.Undo();
+
+            Assert(document.Tabelas.Any(t => t.Id == tabela.Id), "Undo deveria restaurar tabela.");
+            AssertEqual(2, prancha.Tabelas.Count, "Undo deveria restaurar instancia removida.");
+            AssertEqual(instanciaAfetada.Id, prancha.Tabelas[0].Id, "Undo instancia restaurada Id");
+            AssertEqual(tabela.Id, prancha.Tabelas[0].TableId, "Undo instancia restaurada TableId");
+            AssertEqual(outraTabela.Id, prancha.Tabelas[1].TableId, "Undo deveria preservar ordem.");
+
+            commands.Redo();
+
+            Assert(!document.Tabelas.Any(t => t.Id == tabela.Id), "Redo deveria remover tabela novamente.");
+            AssertEqual(1, prancha.Tabelas.Count, "Redo deveria remover instancia novamente.");
+            AssertEqual(outraTabela.Id, prancha.Tabelas[0].TableId, "Redo instancia restante");
+        }
+
+        private static void PranchaCarregaArquivoAntigoSemInstancias()
+        {
+            var serializer = CriarProjectSerializerTeste();
+            Guid sheetId = Guid.NewGuid();
+            string json = $$"""
+            {
+              "Version": 1,
+              "Sheets": [
+                {
+                  "Id": "{{sheetId}}",
+                  "Nome": "Prancha antiga",
+                  "Numero": "A001"
+                }
+              ]
+            }
+            """;
+
+            ProjectFileDto dto = serializer.Deserialize(json);
+            ProjectSheet prancha = serializer.CreateProjectSheets(dto, Array.Empty<Guid>()).Single();
+            List<ProjectSheetTableInstance> tabelas = prancha.Tabelas ?? throw new InvalidOperationException("ProjectSheet.Tabelas null.");
+
+            AssertEqual(sheetId, prancha.Id, "Prancha antiga Id");
+            AssertEqual("Prancha antiga", prancha.Nome, "Prancha antiga Nome");
+            AssertEqual(0, tabelas.Count, "Prancha antiga Tabelas.Count");
+        }
+
+        private static void PranchaIgnoraInstanciaOrfaNoLoad()
+        {
+            var serializer = CriarProjectSerializerTeste();
+            Guid tabelaValidaId = Guid.NewGuid();
+            Guid tabelaOrfaId = Guid.NewGuid();
+            var dto = new ProjectFileDto
+            {
+                Tables = new List<ProjectTableDto>
+                {
+                    new() { Id = tabelaValidaId, Nome = "Tabela 1" }
+                },
+                Sheets = new List<ProjectSheetDto>
+                {
+                    new()
+                    {
+                        Id = Guid.NewGuid(),
+                        Nome = "Prancha 1",
+                        Numero = "A001",
+                        Tabelas = new List<ProjectSheetTableInstanceDto>
+                        {
+                            new() { Id = Guid.NewGuid(), TableId = tabelaValidaId, X = 1, Y = 2, Width = 100, Height = 50 },
+                            new() { Id = Guid.NewGuid(), TableId = tabelaOrfaId, X = 3, Y = 4, Width = 120, Height = 60 },
+                            new() { Id = Guid.NewGuid(), TableId = Guid.Empty, X = 5, Y = 6, Width = 140, Height = 70 }
+                        }
+                    }
+                }
+            };
+            IReadOnlyList<ProjectTable> tabelas = serializer.CreateProjectTables(dto);
+
+            ProjectSheet prancha = serializer.CreateProjectSheets(dto, tabelas.Select(t => t.Id)).Single();
+
+            AssertEqual(1, prancha.Tabelas.Count, "Instancias validas apos ignorar orfas");
+            AssertEqual(tabelaValidaId, prancha.Tabelas[0].TableId, "Instancia valida TableId");
+        }
+
+        private static void InserirTabelaNaPranchaCriaInstanciaUndoRedo()
+        {
+            var document = new AraciDocument();
+            ProjectTable tabela = document.CriarNovaTabela();
+            ProjectSheet prancha = document.CriarNovaPrancha();
+            var commands = new Araci.Core.Commands.CommandManager();
+            var useCase = new InserirTabelaNaPranchaUseCase(document, commands);
+
+            ProjectSheetTableInstance? instancia = useCase.Inserir(prancha.Id, tabela.Id);
+
+            Assert(instancia != null, "Inserir deveria retornar instancia.");
+            Assert(instancia!.Id != Guid.Empty, "Instancia.Id nao deveria ser vazio.");
+            AssertEqual(tabela.Id, instancia.TableId, "Instancia.TableId");
+            AssertEqual(InserirTabelaNaPranchaUseCase.DefaultX, instancia.X, "Instancia.X padrao");
+            AssertEqual(InserirTabelaNaPranchaUseCase.DefaultY, instancia.Y, "Instancia.Y padrao");
+            AssertEqual(InserirTabelaNaPranchaUseCase.DefaultWidth, instancia.Width, "Instancia.Width padrao");
+            AssertEqual(InserirTabelaNaPranchaUseCase.DefaultHeight, instancia.Height, "Instancia.Height padrao");
+            AssertEqual(1, prancha.Tabelas.Count, "Prancha.Tabelas.Count apos inserir");
+            Assert(ReferenceEquals(instancia, prancha.Tabelas[0]), "Command deveria adicionar a mesma instancia criada pelo use case.");
+
+            Guid instanciaId = instancia.Id;
+            commands.Undo();
+
+            AssertEqual(0, prancha.Tabelas.Count, "Undo deveria remover instancia.");
+
+            commands.Redo();
+
+            AssertEqual(1, prancha.Tabelas.Count, "Redo deveria restaurar instancia.");
+            AssertEqual(instanciaId, prancha.Tabelas[0].Id, "Redo deveria preservar o mesmo Id da instancia.");
+            Assert(ReferenceEquals(instancia, prancha.Tabelas[0]), "Redo deveria reinserir a mesma instancia.");
+        }
+
+        private static void InserirTabelaNaPranchaIgnoraIdsInvalidos()
+        {
+            var document = new AraciDocument();
+            ProjectTable tabela = document.CriarNovaTabela();
+            ProjectSheet prancha = document.CriarNovaPrancha();
+            var commands = new Araci.Core.Commands.CommandManager();
+            var useCase = new InserirTabelaNaPranchaUseCase(document, commands);
+
+            ProjectSheetTableInstance? semPrancha = useCase.Inserir(Guid.NewGuid(), tabela.Id);
+            ProjectSheetTableInstance? semTabela = useCase.Inserir(prancha.Id, Guid.NewGuid());
+
+            Assert(semPrancha == null, "SheetId inexistente deveria retornar null.");
+            Assert(semTabela == null, "TableId inexistente deveria retornar null.");
+            AssertEqual(0, prancha.Tabelas.Count, "Ids invalidos nao deveriam alterar prancha.");
+            Assert(!commands.CanUndo, "Ids invalidos nao deveriam entrar no historico.");
+        }
+
+        private static void InserirTabelaNaPranchaMultiplasInstanciasIndependentes()
+        {
+            var document = new AraciDocument();
+            ProjectTable tabela = document.CriarNovaTabela();
+            ProjectSheet prancha = document.CriarNovaPrancha();
+            var commands = new Araci.Core.Commands.CommandManager();
+            var useCase = new InserirTabelaNaPranchaUseCase(document, commands);
+
+            ProjectSheetTableInstance? primeira = useCase.Inserir(prancha.Id, tabela.Id, x: 10, y: 20, width: 200, height: 100);
+            ProjectSheetTableInstance? segunda = useCase.Inserir(prancha.Id, tabela.Id, x: 30, y: 40, width: 240, height: 120);
+
+            Assert(primeira != null && segunda != null, "Multiplas insercoes deveriam retornar instancias.");
+            AssertEqual(2, prancha.Tabelas.Count, "Multiplas insercoes Count");
+            Assert(primeira!.Id != segunda!.Id, "Multiplas instancias deveriam ter IDs distintos.");
+            Assert(!ReferenceEquals(primeira, segunda), "Multiplas instancias deveriam ser objetos distintos.");
+            AssertEqual(10, prancha.Tabelas[0].X, "Primeira instancia X");
+            AssertEqual(30, prancha.Tabelas[1].X, "Segunda instancia X");
+
+            commands.Undo();
+
+            AssertEqual(1, prancha.Tabelas.Count, "Undo deveria remover apenas ultima insercao.");
+            AssertEqual(primeira.Id, prancha.Tabelas[0].Id, "Undo preserva primeira instancia.");
+        }
+
+        private static void EditorContextExpoeInserirTabelaNaPrancha()
+        {
+            var context = new EditorContext();
+
+            Assert(context.InserirTabelaNaPrancha != null, "EditorContext deveria expor InserirTabelaNaPranchaUseCase.");
+        }
+
+        private static void ProjectSheetViewModelExpoeInstanciasTabela()
+        {
+            var document = new AraciDocument();
+            ProjectTable tabela = document.CriarNovaTabela();
+            ProjectSheet prancha = document.CriarNovaPrancha();
+            var instancia = new ProjectSheetTableInstance
+            {
+                TableId = tabela.Id,
+                X = 11,
+                Y = 22,
+                Width = 333,
+                Height = 144
+            };
+            prancha.Tabelas.Add(instancia);
+
+            var viewModel = new ProjectSheetViewModel(document, prancha);
+            ProjectSheetTableInstanceViewModel instanceViewModel = viewModel.TableInstances.Single();
+
+            AssertEqual(prancha.Id, viewModel.SheetId, "ProjectSheetViewModel.SheetId");
+            AssertEqual(instancia.Id, instanceViewModel.Id, "Instancia VM Id");
+            AssertEqual(tabela.Id, instanceViewModel.TableId, "Instancia VM TableId");
+            AssertEqual(11, instanceViewModel.X, "Instancia VM X");
+            AssertEqual(22, instanceViewModel.Y, "Instancia VM Y");
+            AssertEqual(333, instanceViewModel.Width, "Instancia VM Width");
+            AssertEqual(144, instanceViewModel.Height, "Instancia VM Height");
+            Assert(viewModel.HasInstances, "ProjectSheetViewModel deveria indicar instancias.");
+            Assert(!viewModel.HasEmptyMessage, "ProjectSheetViewModel com instancias nao deveria exibir vazio.");
+        }
+
+        private static void ProjectSheetViewModelResolveNomeTabela()
+        {
+            var document = new AraciDocument();
+            ProjectTable tabela = document.CriarNovaTabela();
+            tabela.Nome = "Quadro de Cargas";
+            ProjectSheet prancha = document.CriarNovaPrancha();
+            prancha.Nome = "Prancha Geral";
+            prancha.Numero = "A101";
+            prancha.Tabelas.Add(new ProjectSheetTableInstance { TableId = tabela.Id });
+
+            var viewModel = new ProjectSheetViewModel(document, prancha);
+
+            AssertEqual("A101 - Prancha Geral", viewModel.Titulo, "ProjectSheetViewModel.Titulo");
+            AssertEqual("Quadro de Cargas", viewModel.TableInstances.Single().TableName, "Nome resolvido da tabela");
+        }
+
+        private static void ProjectSheetViewModelTrataPranchaVazia()
+        {
+            var document = new AraciDocument();
+            ProjectSheet prancha = document.CriarNovaPrancha();
+
+            var viewModel = new ProjectSheetViewModel(document, prancha);
+
+            AssertEqual(0, viewModel.TableInstances.Count, "Prancha vazia TableInstances.Count");
+            Assert(!viewModel.HasInstances, "Prancha vazia nao deveria indicar instancias.");
+            Assert(viewModel.HasEmptyMessage, "Prancha vazia deveria exibir mensagem.");
+            AssertEqual("Nenhuma tabela inserida na prancha", viewModel.EmptyMessage, "Prancha vazia EmptyMessage");
+        }
+
+        private static void ProjectSheetViewModelTrataTabelaInexistente()
+        {
+            var document = new AraciDocument();
+            ProjectSheet prancha = document.CriarNovaPrancha();
+            prancha.Tabelas.Add(new ProjectSheetTableInstance { TableId = Guid.NewGuid() });
+
+            var viewModel = new ProjectSheetViewModel(document, prancha);
+
+            AssertEqual(1, viewModel.TableInstances.Count, "Instancia com tabela inexistente Count");
+            AssertEqual("Tabela nao encontrada", viewModel.TableInstances.Single().TableName, "Tabela inexistente TableName");
+        }
+
+        private static void ProjectSheetViewModelRefreshNaoAlteraModelo()
+        {
+            var document = new AraciDocument();
+            ProjectTable tabela = document.CriarNovaTabela();
+            tabela.Nome = "Tabela Original";
+            ProjectSheet prancha = document.CriarNovaPrancha();
+            var instancia = new ProjectSheetTableInstance
+            {
+                TableId = tabela.Id,
+                X = 40,
+                Y = 50,
+                Width = 400,
+                Height = 240
+            };
+            prancha.Tabelas.Add(instancia);
+            var viewModel = new ProjectSheetViewModel(document, prancha);
+            Guid instanciaId = instancia.Id;
+            Guid tabelaId = instancia.TableId;
+
+            tabela.Nome = "Tabela Renomeada";
+            viewModel.Refresh();
+
+            AssertEqual(1, prancha.Tabelas.Count, "Refresh nao deveria alterar Tabelas.Count da prancha");
+            AssertEqual(instanciaId, prancha.Tabelas[0].Id, "Refresh nao deveria alterar instancia Id");
+            AssertEqual(tabelaId, prancha.Tabelas[0].TableId, "Refresh nao deveria alterar instancia TableId");
+            AssertEqual(40, prancha.Tabelas[0].X, "Refresh nao deveria alterar instancia X");
+            AssertEqual("Tabela Renomeada", viewModel.TableInstances.Single().TableName, "Refresh deveria atualizar nome exibido");
+        }
+
         private static void TabelaDataViewModelExpoeColunasLinhasECelulas()
         {
             AraciDocument document = CriarDocumentoTabelaDados();
@@ -5822,6 +6202,31 @@ namespace Araci.TechnicalChecks
             AssertEqual(tabela.Id, tabelaPropriedades, "Tabela propriedades");
         }
 
+        private static void ProjectBrowserSelecionaPranchaESolicitaVisualizacao()
+        {
+            var document = new AraciDocument();
+            ProjectSheet prancha = document.CriarNovaPrancha();
+            Guid? pranchaVisualizada = null;
+            Guid? tabelaVisualizada = null;
+            Guid? vistaAtiva = null;
+            var viewModel = new ProjectBrowserViewModel(
+                document,
+                definirVistaAtiva: id => vistaAtiva = id,
+                abrirTabela: id => tabelaVisualizada = id,
+                abrirPrancha: id => pranchaVisualizada = id);
+
+            ProjectBrowserItemViewModel itemPrancha = viewModel.Secoes
+                .SelectMany(secao => secao.Itens)
+                .Single(item => item.Tipo == "Prancha" && item.Id == prancha.Id);
+
+            itemPrancha.SelecionarCommand.Execute(null);
+
+            AssertEqual(prancha.Id, pranchaVisualizada, "Prancha visualizada");
+            Assert(tabelaVisualizada == null, "Selecionar prancha nao deveria solicitar tabela.");
+            Assert(vistaAtiva == null, "Selecionar prancha nao deveria ativar vista.");
+            Assert(itemPrancha.IsSelected, "Prancha deveria ficar selecionada no Project Browser.");
+        }
+
         private static void ProjectBrowserSelecionaVistaERestauraViewport()
         {
             var document = new AraciDocument();
@@ -5856,6 +6261,72 @@ namespace Araci.TechnicalChecks
             Assert(itemVista.IsSelected, "Vista deveria ficar selecionada no Project Browser.");
             Assert(!itemTabela.IsSelected, "Tabela deveria deixar de ficar selecionada no Project Browser.");
             Assert(itemVista.IsActiveView, "Vista selecionada deveria ficar marcada como ativa.");
+        }
+
+        private static void ProjectBrowserSelecionaVistaDepoisDePrancha()
+        {
+            var document = new AraciDocument();
+            ProjectSheet prancha = document.CriarNovaPrancha();
+            ProjectView vista = document.Vistas[0];
+            Guid? pranchaVisualizada = null;
+            Guid? vistaAtiva = null;
+            Guid? vistaPropriedades = null;
+            var viewModel = new ProjectBrowserViewModel(
+                document,
+                definirVistaAtiva: id =>
+                {
+                    document.DefinirVistaAtiva(id);
+                    vistaAtiva = id;
+                },
+                abrirPrancha: id => pranchaVisualizada = id,
+                abrirPropriedadesVista: id => vistaPropriedades = id);
+
+            ProjectBrowserItemViewModel itemPrancha = viewModel.Secoes
+                .SelectMany(secao => secao.Itens)
+                .Single(item => item.Tipo == "Prancha" && item.Id == prancha.Id);
+            ProjectBrowserItemViewModel itemVista = viewModel.Secoes
+                .SelectMany(secao => secao.Itens)
+                .Single(item => item.Tipo == "Vista" && item.Id == vista.Id);
+
+            itemPrancha.SelecionarCommand.Execute(null);
+            itemVista.SelecionarCommand.Execute(null);
+
+            AssertEqual(prancha.Id, pranchaVisualizada, "Prancha visualizada antes de voltar para vista");
+            AssertEqual(vista.Id, vistaAtiva, "Vista ativa apos prancha");
+            AssertEqual(vista.Id, vistaPropriedades, "Vista propriedades apos prancha");
+            Assert(itemVista.IsSelected, "Vista deveria ficar selecionada apos prancha.");
+            Assert(!itemPrancha.IsSelected, "Prancha deveria deixar de ficar selecionada apos vista.");
+        }
+
+        private static void ProjectBrowserSelecionaTabelaDepoisDePrancha()
+        {
+            var document = new AraciDocument();
+            ProjectTable tabela = document.CriarNovaTabela();
+            ProjectSheet prancha = document.CriarNovaPrancha();
+            Guid? pranchaVisualizada = null;
+            Guid? tabelaVisualizada = null;
+            Guid? tabelaPropriedades = null;
+            var viewModel = new ProjectBrowserViewModel(
+                document,
+                abrirTabela: id => tabelaVisualizada = id,
+                abrirPrancha: id => pranchaVisualizada = id,
+                abrirPropriedadesTabela: id => tabelaPropriedades = id);
+
+            ProjectBrowserItemViewModel itemPrancha = viewModel.Secoes
+                .SelectMany(secao => secao.Itens)
+                .Single(item => item.Tipo == "Prancha" && item.Id == prancha.Id);
+            ProjectBrowserItemViewModel itemTabela = viewModel.Secoes
+                .SelectMany(secao => secao.Itens)
+                .Single(item => item.Tipo == "Tabela" && item.Id == tabela.Id);
+
+            itemPrancha.SelecionarCommand.Execute(null);
+            itemTabela.SelecionarCommand.Execute(null);
+
+            AssertEqual(prancha.Id, pranchaVisualizada, "Prancha visualizada antes de abrir tabela");
+            AssertEqual(tabela.Id, tabelaVisualizada, "Tabela visualizada apos prancha");
+            AssertEqual(tabela.Id, tabelaPropriedades, "Tabela propriedades apos prancha");
+            Assert(itemTabela.IsSelected, "Tabela deveria ficar selecionada apos prancha.");
+            Assert(!itemPrancha.IsSelected, "Prancha deveria deixar de ficar selecionada apos tabela.");
         }
 
         private static void ProjectTableGridViewRecriaColunasDinamicas()
@@ -6036,6 +6507,17 @@ namespace Araci.TechnicalChecks
                 .ToList();
         }
 
+        private static ProjectSerializer CriarProjectSerializerTeste()
+        {
+            EditorContext context = new();
+
+            return new ProjectSerializer(
+                context.Elements,
+                new ElementoModelFactory(context.Elements),
+                context.TerminalLayout,
+                context.Geometry);
+        }
+
         private static ExecutarSimulacaoUseCase CriarExecutarSimulacaoUseCase(
             FakeSimulationPipeline pipeline,
             FakeDialogService dialogs)
@@ -6126,6 +6608,15 @@ namespace Araci.TechnicalChecks
             {
                 SaveCsvChamadas++;
                 return SaveCsvPath;
+            }
+
+            public InserirTabelaPranchaDialogResult? ShowInserirTabelaPranchaDialog(
+                IReadOnlyList<ProjectItemDialogOption> pranchas,
+                IReadOnlyList<ProjectItemDialogOption> tabelas)
+            {
+                return pranchas.Count > 0 && tabelas.Count > 0
+                    ? new InserirTabelaPranchaDialogResult(pranchas[0].Id, tabelas[0].Id)
+                    : null;
             }
 
             public ElementosTabelaDialogResult? ShowElementosTabelaDialog(

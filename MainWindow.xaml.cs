@@ -1,8 +1,10 @@
 using Araci.Services;
 using Araci.Properties;
 using Araci.ViewModels;
+using Araci.Applications.Abstractions;
 using Araci.Applications.Projects.Tables;
 using Araci.Core.Documents;
+using System.Collections.Generic;
 using System.ComponentModel;
 using System.Linq;
 using System.Collections.Specialized;
@@ -17,16 +19,19 @@ namespace Araci
         private readonly GridLength _projectBrowserColumnWidth = new(260);
         private readonly GridLength _propertiesColumnWidth = new(320);
         private ProjectTableDataViewModel? _projectTableDataViewModel;
+        private ProjectSheetViewModel? _projectSheetViewModel;
 
         public MainWindow()
         {
             InitializeComponent();
             _context = new EditorContext();
             UnitValueConverter.CurrentUnits = _context.Settings.Units;
-            ProjectBrowser.DataContext = new ProjectBrowserViewModel(_context.Document, _context.DefinirVistaAtiva, _context.RenomearItemProjeto, _context.ExcluirItemProjeto, _context.DuplicarItemProjeto, MostrarTabela, MostrarPropriedadesVista, MostrarPropriedadesTabela);
+            ProjectBrowser.DataContext = new ProjectBrowserViewModel(_context.Document, _context.DefinirVistaAtiva, _context.RenomearItemProjeto, _context.ExcluirItemProjeto, _context.DuplicarItemProjeto, MostrarTabela, MostrarPrancha, MostrarPropriedadesVista, MostrarPropriedadesTabela);
             _context.Editor.PropertyChanged += OnEditorStatePropertyChanged;
             _context.Document.PropriedadesTabelaAlteradas += OnPropriedadesTabelaAlteradas;
+            _context.Document.ItemProjetoRenomeado += OnItemProjetoRenomeado;
             _context.Document.Tabelas.CollectionChanged += OnTabelasCollectionChanged;
+            _context.Document.Pranchas.CollectionChanged += OnPranchasCollectionChanged;
             Viewport.Inicializar(_context);
             InicializarRibbon();
             AtualizarVisibilidadeNavegadorProjeto();
@@ -113,6 +118,26 @@ namespace Araci
 
             ProjectTableGrid.DataContext = _projectTableDataViewModel;
             ProjectTableGrid.Visibility = Visibility.Visible;
+            ProjectSheetViewer.Visibility = Visibility.Collapsed;
+            ProjectSheetViewer.DataContext = null;
+            _projectSheetViewModel = null;
+            Viewport.Visibility = Visibility.Collapsed;
+        }
+
+        public void MostrarPrancha(System.Guid pranchaId)
+        {
+            ProjectSheet? prancha = _context.Document.Pranchas.FirstOrDefault(p => p.Id == pranchaId);
+
+            if (prancha == null)
+                return;
+
+            _projectSheetViewModel = new ProjectSheetViewModel(_context.Document, prancha);
+
+            ProjectSheetViewer.DataContext = _projectSheetViewModel;
+            ProjectSheetViewer.Visibility = Visibility.Visible;
+            ProjectTableGrid.Visibility = Visibility.Collapsed;
+            ProjectTableGrid.DataContext = null;
+            _projectTableDataViewModel = null;
             Viewport.Visibility = Visibility.Collapsed;
         }
 
@@ -148,6 +173,45 @@ namespace Araci
             _context.ExportarTabela.Executar(tabela);
         }
 
+        public void InserirTabelaNaPrancha()
+        {
+            if (_context.Document.Pranchas.Count == 0)
+            {
+                _context.Dialogs.ShowWarning("Inserir tabela na prancha", "Crie uma prancha antes de inserir uma tabela.");
+                return;
+            }
+
+            if (_context.Document.Tabelas.Count == 0)
+            {
+                _context.Dialogs.ShowWarning("Inserir tabela na prancha", "Crie uma tabela antes de inseri-la em uma prancha.");
+                return;
+            }
+
+            List<ProjectItemDialogOption> pranchas = _context.Document.Pranchas
+                .Select(p => new ProjectItemDialogOption(p.Id, string.IsNullOrWhiteSpace(p.Numero) ? p.Nome : $"{p.Numero} - {p.Nome}"))
+                .ToList();
+            List<ProjectItemDialogOption> tabelas = _context.Document.Tabelas
+                .Select(t => new ProjectItemDialogOption(t.Id, t.Nome))
+                .ToList();
+
+            InserirTabelaPranchaDialogResult? result = pranchas.Count == 1 && tabelas.Count == 1
+                ? new InserirTabelaPranchaDialogResult(pranchas[0].Id, tabelas[0].Id)
+                : _context.Dialogs.ShowInserirTabelaPranchaDialog(pranchas, tabelas);
+
+            if (result == null)
+                return;
+
+            ProjectSheetTableInstance? instance = _context.InserirTabelaNaPrancha.Inserir(result.SheetId, result.TableId);
+
+            if (instance == null)
+            {
+                _context.Dialogs.ShowWarning("Inserir tabela na prancha", "Não foi possível inserir a tabela na prancha selecionada.");
+                return;
+            }
+
+            _context.Dialogs.ShowInfo("Inserir tabela na prancha", "Tabela inserida na prancha.");
+        }
+
         public void MostrarConfiguracaoUnidades()
         {
             var viewModel = new UnitsSettingsViewModel(_context.Settings.Units);
@@ -179,12 +243,32 @@ namespace Araci
         {
             if (_projectTableDataViewModel?.TableId == tabela.Id)
                 _projectTableDataViewModel.Refresh();
+
+            if (_projectSheetViewModel != null)
+                _projectSheetViewModel.Refresh();
+        }
+
+        private void OnItemProjetoRenomeado()
+        {
+            _projectSheetViewModel?.Refresh();
         }
 
         private void OnTabelasCollectionChanged(object? sender, NotifyCollectionChangedEventArgs e)
         {
             if (_projectTableDataViewModel == null ||
                 _context.Document.Tabelas.Any(t => t.Id == _projectTableDataViewModel.TableId))
+            {
+                _projectSheetViewModel?.Refresh();
+                return;
+            }
+
+            MostrarViewport();
+        }
+
+        private void OnPranchasCollectionChanged(object? sender, NotifyCollectionChangedEventArgs e)
+        {
+            if (_projectSheetViewModel == null ||
+                _context.Document.Pranchas.Any(p => p.Id == _projectSheetViewModel.SheetId))
                 return;
 
             MostrarViewport();
@@ -219,6 +303,9 @@ namespace Araci
             ProjectTableGrid.Visibility = Visibility.Collapsed;
             ProjectTableGrid.DataContext = null;
             _projectTableDataViewModel = null;
+            ProjectSheetViewer.Visibility = Visibility.Collapsed;
+            ProjectSheetViewer.DataContext = null;
+            _projectSheetViewModel = null;
             Viewport.Visibility = Visibility.Visible;
             FocarViewport();
         }

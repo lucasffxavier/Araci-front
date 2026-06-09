@@ -158,7 +158,11 @@ namespace Araci.Core.Documents
             return new ProjectSheet
             {
                 Nome = CriarNomeUnico(origem?.Nome ?? "Prancha", Pranchas.Select(p => p.Nome)),
-                Numero = CriarNumeroPranchaUnico()
+                Numero = CriarNumeroPranchaUnico(),
+                Tabelas = origem?.Tabelas
+                    .Where(i => i != null)
+                    .Select(i => i.CriarCopia(gerarNovoId: true))
+                    .ToList() ?? new List<ProjectSheetTableInstance>()
             };
         }
 
@@ -312,7 +316,10 @@ namespace Araci.Core.Documents
             Pranchas.Clear();
 
             foreach (ProjectSheet prancha in pranchas.Where(p => p != null && !string.IsNullOrWhiteSpace(p.Nome)))
+            {
+                prancha.Tabelas ??= new List<ProjectSheetTableInstance>();
                 Pranchas.Add(prancha);
+            }
         }
 
         public void AdicionarElemento(Elemento elemento)

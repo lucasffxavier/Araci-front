@@ -111,6 +111,7 @@ namespace Araci.Services
             EditarPropriedadesVista = new EditarPropriedadesVistaUseCase(Document, Commands);
             EditarPropriedadesTabela = new EditarPropriedadesTabelaUseCase(Document, Commands);
             ExportarTabela = new ExportarTabelaUseCase(Document, Dialogs, new ProjectTableDataBuilder(), new ProjectTableCsvExportService());
+            InserirTabelaNaPrancha = new InserirTabelaNaPranchaUseCase(Document, Commands);
 
             var moveServices = EditingComposition.CreateMoveServices(() => Viewport, () => Scene.Elementos, Settings, Connectivity, TerminalLayout, SceneQueries, VisualUpdates, Selection, GeometryUpdates, Commands);
             MoveHud = moveServices.MoveHud;
@@ -208,6 +209,7 @@ namespace Araci.Services
         public EditarPropriedadesVistaUseCase EditarPropriedadesVista { get; }
         public EditarPropriedadesTabelaUseCase EditarPropriedadesTabela { get; }
         public ExportarTabelaUseCase ExportarTabela { get; }
+        public InserirTabelaNaPranchaUseCase InserirTabelaNaPrancha { get; }
         public VisualUpdateService VisualUpdates { get; }
         public SelectionService Selection { get; }
         public SelecionarElementosUseCase SelecionarElementos { get; }

@@ -51,10 +51,28 @@ namespace Araci.Core.Commands
             ArgumentNullException.ThrowIfNull(tabela);
 
             int indice = document.Tabelas.IndexOf(tabela);
+            IReadOnlyList<SheetTableInstancesSnapshot> instanciasAfetadas = document.Pranchas
+                .Select(prancha => new SheetTableInstancesSnapshot(
+                    prancha,
+                    prancha.Tabelas
+                        .Select((instancia, index) => new { Instancia = instancia, Index = index })
+                        .Where(item => item.Instancia.TableId == tabela.Id)
+                        .Select(item => new SheetTableInstanceSnapshot(item.Index, item.Instancia.CriarCopia(gerarNovoId: false)))
+                        .ToList()))
+                .Where(snapshot => snapshot.Instancias.Count > 0)
+                .ToList();
 
             return new DeleteProjectItemCommand(
-                () => document.RemoverTabela(tabela),
-                () => document.RestaurarTabela(tabela, indice));
+                () =>
+                {
+                    document.RemoverTabela(tabela);
+                    RemoverInstanciasTabela(instanciasAfetadas, tabela.Id);
+                },
+                () =>
+                {
+                    document.RestaurarTabela(tabela, indice);
+                    RestaurarInstanciasTabela(instanciasAfetadas);
+                });
         }
 
         public static DeleteProjectItemCommand Prancha(AraciDocument document, ProjectSheet prancha)
@@ -105,6 +123,55 @@ namespace Araci.Core.Commands
                 tabela.FiltroVistaId = filtroVistaId;
                 document.AtualizarPropriedadesTabela(tabela);
             }
+        }
+
+        private static void RemoverInstanciasTabela(
+            IReadOnlyList<SheetTableInstancesSnapshot> snapshots,
+            Guid tableId)
+        {
+            foreach (SheetTableInstancesSnapshot snapshot in snapshots)
+                snapshot.Prancha.Tabelas.RemoveAll(i => i.TableId == tableId);
+        }
+
+        private static void RestaurarInstanciasTabela(IReadOnlyList<SheetTableInstancesSnapshot> snapshots)
+        {
+            foreach (SheetTableInstancesSnapshot snapshot in snapshots)
+            {
+                foreach (SheetTableInstanceSnapshot instancia in snapshot.Instancias.OrderBy(i => i.Index))
+                {
+                    int indiceSeguro = instancia.Index < 0 || instancia.Index > snapshot.Prancha.Tabelas.Count
+                        ? snapshot.Prancha.Tabelas.Count
+                        : instancia.Index;
+
+                    snapshot.Prancha.Tabelas.Insert(indiceSeguro, instancia.Instancia.CriarCopia(gerarNovoId: false));
+                }
+            }
+        }
+
+        private sealed class SheetTableInstancesSnapshot
+        {
+            public SheetTableInstancesSnapshot(
+                ProjectSheet prancha,
+                IReadOnlyList<SheetTableInstanceSnapshot> instancias)
+            {
+                Prancha = prancha;
+                Instancias = instancias;
+            }
+
+            public ProjectSheet Prancha { get; }
+            public IReadOnlyList<SheetTableInstanceSnapshot> Instancias { get; }
+        }
+
+        private sealed class SheetTableInstanceSnapshot
+        {
+            public SheetTableInstanceSnapshot(int index, ProjectSheetTableInstance instancia)
+            {
+                Index = index;
+                Instancia = instancia;
+            }
+
+            public int Index { get; }
+            public ProjectSheetTableInstance Instancia { get; }
         }
     }
 }

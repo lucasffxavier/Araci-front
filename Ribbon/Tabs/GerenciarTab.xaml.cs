@@ -46,6 +46,12 @@ namespace Araci.Ribbon.Tabs
                 mainWindow.CriarNovaPranchaProjeto();
         }
 
+        private void InserirTabelaPranchaButton_Click(object sender, RoutedEventArgs e)
+        {
+            if (Window.GetWindow(this) is MainWindow mainWindow)
+                mainWindow.InserirTabelaNaPrancha();
+        }
+
         private void UnidadesButton_Click(object sender, RoutedEventArgs e)
         {
             if (Window.GetWindow(this) is MainWindow mainWindow)

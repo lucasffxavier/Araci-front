@@ -20,6 +20,7 @@ namespace Araci.ViewModels
         private readonly ExcluirItemProjetoUseCase? _excluirItemProjeto;
         private readonly DuplicarItemProjetoUseCase? _duplicarItemProjeto;
         private readonly Action<Guid>? _abrirTabela;
+        private readonly Action<Guid>? _abrirPrancha;
         private readonly Action<Guid>? _abrirPropriedadesVista;
         private readonly Action<Guid>? _abrirPropriedadesTabela;
         private Guid? _selectedItemId;
@@ -32,6 +33,7 @@ namespace Araci.ViewModels
             ExcluirItemProjetoUseCase? excluirItemProjeto = null,
             DuplicarItemProjetoUseCase? duplicarItemProjeto = null,
             Action<Guid>? abrirTabela = null,
+            Action<Guid>? abrirPrancha = null,
             Action<Guid>? abrirPropriedadesVista = null,
             Action<Guid>? abrirPropriedadesTabela = null)
         {
@@ -41,6 +43,7 @@ namespace Araci.ViewModels
             _excluirItemProjeto = excluirItemProjeto;
             _duplicarItemProjeto = duplicarItemProjeto;
             _abrirTabela = abrirTabela;
+            _abrirPrancha = abrirPrancha;
             _abrirPropriedadesVista = abrirPropriedadesVista;
             _abrirPropriedadesTabela = abrirPropriedadesTabela;
             Secoes = new ObservableCollection<ProjectBrowserSectionViewModel>
@@ -151,6 +154,10 @@ namespace Araci.ViewModels
             {
                 _abrirTabela?.Invoke(item.Id);
                 _abrirPropriedadesTabela?.Invoke(item.Id);
+            }
+            else if (item.Tipo == "Prancha")
+            {
+                _abrirPrancha?.Invoke(item.Id);
             }
 
             foreach (ProjectBrowserSectionViewModel secao in Secoes)

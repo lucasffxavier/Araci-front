@@ -19,6 +19,7 @@ Araci-front
 │   │   ├── IElementModelFactory.cs
 │   │   ├── IElementViewModelFactory.cs
 │   │   ├── IHoverService.cs
+│   │   ├── InserirTabelaPranchaDialogResult.cs
 │   │   ├── IProjectFileDialogService.cs
 │   │   ├── IProjectPersistenceService.cs
 │   │   ├── ISafeDeleteService.cs
@@ -29,6 +30,7 @@ Araci-front
 │   │   ├── ITypePropertiesDialogService.cs
 │   │   ├── IUserDialogService.cs
 │   │   ├── OrdenacaoTabelaDialogResult.cs
+│   │   ├── ProjectItemDialogOption.cs
 │   │   └── ProjectViewDialogOption.cs
 │   ├── Analisar
 │   │   ├── FluxoDeCorrente
@@ -48,6 +50,7 @@ Araci-front
 │   ├── Commands
 │   │   ├── AddElementoCommand.cs
 │   │   ├── AddProjectItemCommand.cs
+│   │   ├── AddProjectSheetTableInstanceCommand.cs
 │   │   ├── CommandManager.cs
 │   │   ├── CompositeCommand.cs
 │   │   ├── DeleteElementCommand.cs
@@ -101,6 +104,8 @@ Araci-front
 │   │   └── ElementViewModelFactoryContext.cs
 │   ├── Projects
 │   │   ├── Tables
+│   │   │   ├── IProjectTableCsvExportService.cs
+│   │   │   ├── ProjectTableCsvExportService.cs
 │   │   │   ├── ProjectTableDataBuilder.cs
 │   │   │   ├── ProjectTableDataCell.cs
 │   │   │   ├── ProjectTableDataColumn.cs
@@ -137,6 +142,8 @@ Araci-front
 │           ├── EditarPropriedadesTabelaUseCase.cs
 │           ├── EditarPropriedadesVistaUseCase.cs
 │           ├── ExcluirItemProjetoUseCase.cs
+│           ├── ExportarTabelaUseCase.cs
+│           ├── InserirTabelaNaPranchaUseCase.cs
 │           ├── NovoProjetoUseCase.cs
 │           ├── RenomearItemProjetoUseCase.cs
 │           └── SalvarProjetoUseCase.cs
@@ -168,6 +175,7 @@ Araci-front
 │   ├── Documents
 │   │   ├── AraciDocument.cs
 │   │   ├── ProjectSheet.cs
+│   │   ├── ProjectSheetTableInstance.cs
 │   │   ├── ProjectTable.cs
 │   │   └── ProjectView.cs
 │   ├── Events
@@ -301,6 +309,8 @@ Araci-front
 │   ├── FiltrosTabelaWindow.xaml.cs
 │   ├── GeradorPropertiesView.xaml
 │   ├── GeradorPropertiesView.xaml.cs
+│   ├── InserirTabelaPranchaWindow.xaml
+│   ├── InserirTabelaPranchaWindow.xaml.cs
 │   ├── OrdenacaoTabelaWindow.xaml
 │   ├── OrdenacaoTabelaWindow.xaml.cs
 │   ├── PropertiesHostView.xaml
@@ -515,47 +525,6 @@ Araci-front
 ├── README.md
 ├── ROADMAP.md
 └── SECURITY.md
-
-
-====================================================================================================
-ARQUIVO: C:\Users\User\source\repos\lucasffxavier\Araci-front\Applications\Abstractions\IUserDialogService.cs
-====================================================================================================
-
-using Araci.Services.Simulation;
-using Araci.Core.Documents;
-using System.Collections.Generic;
-
-namespace Araci.Applications.Abstractions
-{
-    public interface IUserDialogService
-    {
-        void ShowInfo(string title, string message);
-
-        void ShowWarning(string title, string message);
-
-        void ShowError(string title, string message);
-
-        ElementosTabelaDialogResult? ShowElementosTabelaDialog(
-            IReadOnlyList<ProjectTableElementCategory> categorias,
-            IReadOnlyList<ProjectTableFieldSelection> camposSelecionados);
-
-        FiltrosTabelaDialogResult? ShowFiltrosTabelaDialog(
-            IReadOnlyList<ProjectTableFieldSelection> camposSelecionados,
-            IReadOnlyList<ProjectViewDialogOption> vistasDisponiveis,
-            Guid? filtroVistaId,
-            ProjectTableFilterLogicalMode modo,
-            IReadOnlyList<ProjectTableFilterRule> filtros);
-
-        OrdenacaoTabelaDialogResult? ShowOrdenacaoTabelaDialog(
-            IReadOnlyList<ProjectTableFieldSelection> camposSelecionados,
-            IReadOnlyList<ProjectTableSorting> ordenacoes);
-
-        bool Confirm(string title, string message);
-
-        void Show(SimulationMessage message);
-    }
-}
-
 
 
 ====================================================================================================
@@ -973,31 +942,6 @@ namespace Araci.Applications.Projects.Tables
 
 
 ====================================================================================================
-ARQUIVO: C:\Users\User\source\repos\lucasffxavier\Araci-front\Applications\Projects\Tables\ProjectTableDataResult.cs
-====================================================================================================
-
-using System.Collections.Generic;
-
-namespace Araci.Applications.Projects.Tables
-{
-    public sealed class ProjectTableDataResult
-    {
-        public ProjectTableDataResult(
-            IReadOnlyList<ProjectTableDataColumn> columns,
-            IReadOnlyList<ProjectTableDataRow> rows)
-        {
-            Columns = columns;
-            Rows = rows;
-        }
-
-        public IReadOnlyList<ProjectTableDataColumn> Columns { get; }
-        public IReadOnlyList<ProjectTableDataRow> Rows { get; }
-    }
-}
-
-
-
-====================================================================================================
 ARQUIVO: C:\Users\User\source\repos\lucasffxavier\Araci-front\Araci.TechnicalChecks\Program.cs
 ====================================================================================================
 
@@ -1007,6 +951,7 @@ using System.IO;
 using System.Linq;
 using System.Reflection;
 using System.Text.Json;
+using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Windows;
@@ -1089,6 +1034,22 @@ namespace Araci.TechnicalChecks
                 ("Tabela data builder ignora ordenacao invalida sem alterar tabela", TabelaDataBuilderIgnoraOrdenacaoInvalidaSemAlterarTabela),
                 ("Tabela data builder geracao repetida read only", TabelaDataBuilderGeracaoRepetidaReadOnly),
                 ("Tabela data builder ignora categoria nao selecionada", TabelaDataBuilderIgnoraCategoriaNaoSelecionada),
+                ("Tabela CSV exporta cabecalhos linhas e display value", TabelaCsvExportaCabecalhosLinhasEDisplayValue),
+                ("Tabela CSV escapa delimitador aspas e quebra", TabelaCsvEscapaDelimitadorAspasEQuebra),
+                ("Tabela CSV exportacao respeita builder e nao altera estado", TabelaCsvExportacaoRespeitaBuilderENaoAlteraEstado),
+                ("Tabela CSV use case cancela sem escrever", TabelaCsvUseCaseCancelaSemEscrever),
+                ("Tabela CSV use case avisa sem tabela", TabelaCsvUseCaseAvisaSemTabela),
+                ("Tabela CSV use case mostra erro de escrita", TabelaCsvUseCaseMostraErroDeEscrita),
+                ("Prancha nova inicia sem instancias de tabela", PranchaNovaIniciaSemInstanciasTabela),
+                ("Prancha persiste instancia de tabela", PranchaPersisteInstanciaTabela),
+                ("Prancha duplica instancias de tabela com copia profunda", PranchaDuplicaInstanciasTabelaComCopiaProfunda),
+                ("Excluir tabela limpa instancias em pranchas com undo redo", ExcluirTabelaLimpaInstanciasPranchaComUndoRedo),
+                ("Prancha carrega arquivo antigo sem instancias", PranchaCarregaArquivoAntigoSemInstancias),
+                ("Prancha ignora instancia orfa no load", PranchaIgnoraInstanciaOrfaNoLoad),
+                ("Inserir tabela na prancha cria instancia undo redo", InserirTabelaNaPranchaCriaInstanciaUndoRedo),
+                ("Inserir tabela na prancha ignora ids invalidos", InserirTabelaNaPranchaIgnoraIdsInvalidos),
+                ("Inserir tabela na prancha multiplas instancias independentes", InserirTabelaNaPranchaMultiplasInstanciasIndependentes),
+                ("EditorContext expoe inserir tabela na prancha", EditorContextExpoeInserirTabelaNaPrancha),
                 ("Tabela data view model expoe colunas linhas e celulas", TabelaDataViewModelExpoeColunasLinhasECelulas),
                 ("Tabela data view model trata tabela sem campos", TabelaDataViewModelTrataTabelaSemCampos),
                 ("Tabela data view model trata tabela sem linhas", TabelaDataViewModelTrataTabelaSemLinhas),
@@ -6425,6 +6386,416 @@ namespace Araci.TechnicalChecks
             Assert(result.Rows.All(r => r.ElementoNome != "Gerador A"), "Categoria nao selecionada nao deveria aparecer.");
         }
 
+        private static void TabelaCsvExportaCabecalhosLinhasEDisplayValue()
+        {
+            var result = new ProjectTableDataResult(
+                new[]
+                {
+                    new ProjectTableDataColumn(ProjectTableElementCategory.Cargas, "Nome", "Nome", 0),
+                    new ProjectTableDataColumn(ProjectTableElementCategory.Cargas, "Corrente", "Corrente", 1)
+                },
+                new[]
+                {
+                    new ProjectTableDataRow(
+                        Guid.NewGuid(),
+                        "Carga 1",
+                        ProjectTableElementCategory.Cargas,
+                        new[]
+                        {
+                            new ProjectTableDataCell(ProjectTableElementCategory.Cargas, "Nome", "Nome", "raw diferente", "Carga 1"),
+                            new ProjectTableDataCell(ProjectTableElementCategory.Cargas, "Corrente", "Corrente", 611.04, "611.04∠0°")
+                        })
+                });
+
+            string csv = new ProjectTableCsvExportService().GenerateCsv(result);
+
+            AssertEqual("Nome;Corrente\r\nCarga 1;611.04∠0°", NormalizarQuebras(csv), "CSV cabecalho linhas display value");
+            Assert(!csv.Contains("raw diferente"), "CSV deveria usar DisplayValue, nao RawValue.");
+        }
+
+        private static void TabelaCsvEscapaDelimitadorAspasEQuebra()
+        {
+            var result = new ProjectTableDataResult(
+                new[]
+                {
+                    new ProjectTableDataColumn(ProjectTableElementCategory.Cargas, "Nome", "Nome", 0),
+                    new ProjectTableDataColumn(ProjectTableElementCategory.Cargas, "Observacao", "Observação", 1)
+                },
+                new[]
+                {
+                    new ProjectTableDataRow(
+                        Guid.NewGuid(),
+                        "Carga 1",
+                        ProjectTableElementCategory.Cargas,
+                        new[]
+                        {
+                            new ProjectTableDataCell(ProjectTableElementCategory.Cargas, "Nome", "Nome", null, "Carga;1"),
+                            new ProjectTableDataCell(ProjectTableElementCategory.Cargas, "Observacao", "Observação", null, "texto com \"aspas\"\ne quebra")
+                        })
+                });
+
+            string csv = new ProjectTableCsvExportService().GenerateCsv(result);
+
+            AssertEqual(
+                NormalizarQuebras("Nome;Observação\n\"Carga;1\";\"texto com \"\"aspas\"\"\ne quebra\""),
+                NormalizarQuebras(csv),
+                "CSV escaping");
+        }
+
+        private static void TabelaCsvExportacaoRespeitaBuilderENaoAlteraEstado()
+        {
+            AraciDocument document = CriarDocumentoTabelaDados();
+            ProjectTable tabela = CriarTabelaDadosCarga(document);
+            tabela.Filtros = new List<ProjectTableFilterRule>
+            {
+                new()
+                {
+                    Ordem = 0,
+                    Categoria = ProjectTableElementCategory.Cargas,
+                    CampoId = "Nome",
+                    NomeExibicao = "Nome",
+                    Operador = ProjectTableFilterOperator.IgualA,
+                    Valor = "Carga B"
+                }
+            };
+            string assinaturaAntes = CriarAssinaturaTabelaDados(document, tabela);
+            string path = Path.Combine(Path.GetTempPath(), $"araci-table-export-{Guid.NewGuid():N}.csv");
+            var dialogs = new FakeDialogService { SaveCsvPath = path };
+            var useCase = new ExportarTabelaUseCase(document, dialogs);
+
+            try
+            {
+                bool exportou = useCase.Executar(tabela);
+                string csv = File.ReadAllText(path, Encoding.UTF8);
+                string assinaturaDepois = CriarAssinaturaTabelaDados(document, tabela);
+
+                Assert(exportou, "Exportacao deveria retornar true.");
+                AssertEqual("Nome;Potencia ativa;Tensao\r\nCarga B;800;13.8", NormalizarQuebras(csv), "CSV filtrado pelo builder");
+                AssertEqual(assinaturaAntes, assinaturaDepois, "Exportacao nao deveria alterar Document ou ProjectTable.");
+                AssertEqual(1, dialogs.SaveCsvChamadas, "ShowSaveCsvDialog chamadas");
+                AssertEqual(1, dialogs.InfoChamadas, "ShowInfo chamadas apos sucesso");
+            }
+            finally
+            {
+                if (File.Exists(path))
+                    File.Delete(path);
+            }
+        }
+
+        private static void TabelaCsvUseCaseCancelaSemEscrever()
+        {
+            AraciDocument document = CriarDocumentoTabelaDados();
+            ProjectTable tabela = CriarTabelaDadosCarga(document);
+            string path = Path.Combine(Path.GetTempPath(), $"araci-table-export-cancel-{Guid.NewGuid():N}.csv");
+            var dialogs = new FakeDialogService { SaveCsvPath = null };
+            var useCase = new ExportarTabelaUseCase(document, dialogs);
+
+            bool exportou = useCase.Executar(tabela);
+
+            Assert(!exportou, "Exportacao cancelada deveria retornar false.");
+            Assert(!File.Exists(path), "Cancelamento nao deveria criar arquivo.");
+            AssertEqual(1, dialogs.SaveCsvChamadas, "ShowSaveCsvDialog chamadas no cancelamento");
+            AssertEqual(0, dialogs.InfoChamadas, "Cancelamento nao deveria mostrar sucesso.");
+            AssertEqual(0, dialogs.ErrorChamadas, "Cancelamento nao deveria mostrar erro.");
+        }
+
+        private static void TabelaCsvUseCaseAvisaSemTabela()
+        {
+            AraciDocument document = CriarDocumentoTabelaDados();
+            var dialogs = new FakeDialogService();
+            var useCase = new ExportarTabelaUseCase(document, dialogs);
+
+            bool exportou = useCase.Executar(null);
+
+            Assert(!exportou, "Exportacao sem tabela deveria retornar false.");
+            AssertEqual(1, dialogs.WarningChamadas, "Warning sem tabela");
+            AssertEqual("Selecione uma tabela para exportar.", dialogs.LastWarningMessage, "Mensagem sem tabela");
+            AssertEqual(0, dialogs.SaveCsvChamadas, "Sem tabela nao deveria abrir dialogo de salvar.");
+        }
+
+        private static void TabelaCsvUseCaseMostraErroDeEscrita()
+        {
+            AraciDocument document = CriarDocumentoTabelaDados();
+            ProjectTable tabela = CriarTabelaDadosCarga(document);
+            string assinaturaAntes = CriarAssinaturaTabelaDados(document, tabela);
+            var dialogs = new FakeDialogService { SaveCsvPath = Path.Combine(Path.GetTempPath(), $"araci-table-export-error-{Guid.NewGuid():N}.csv") };
+            var useCase = new ExportarTabelaUseCase(
+                document,
+                dialogs,
+                new ProjectTableDataBuilder(),
+                new ThrowingCsvExportService());
+
+            bool exportou = useCase.Executar(tabela);
+
+            Assert(!exportou, "Exportacao com erro deveria retornar false.");
+            AssertEqual(1, dialogs.ErrorChamadas, "Erro de escrita deveria mostrar mensagem amigavel.");
+            Assert(dialogs.LastErrorMessage?.Contains("Não foi possível salvar o arquivo CSV") == true, "Mensagem de erro deveria explicar falha ao salvar.");
+            AssertEqual(assinaturaAntes, CriarAssinaturaTabelaDados(document, tabela), "Erro de exportacao nao deveria alterar estado.");
+        }
+
+        private static void PranchaNovaIniciaSemInstanciasTabela()
+        {
+            var document = new AraciDocument();
+            ProjectSheet prancha = document.CriarNovaPrancha();
+            List<ProjectSheetTableInstance> tabelas = prancha.Tabelas ?? throw new InvalidOperationException("ProjectSheet.Tabelas null.");
+
+            AssertEqual(0, tabelas.Count, "ProjectSheet.Tabelas.Count inicial");
+        }
+
+        private static void PranchaPersisteInstanciaTabela()
+        {
+            var document = new AraciDocument();
+            ProjectTable tabela = document.CriarNovaTabela();
+            ProjectSheet prancha = document.CriarNovaPrancha();
+            Guid instanciaId = Guid.NewGuid();
+            prancha.Tabelas.Add(new ProjectSheetTableInstance
+            {
+                Id = instanciaId,
+                TableId = tabela.Id,
+                X = 12.5,
+                Y = -8.25,
+                Width = 210,
+                Height = 95
+            });
+            EditorContext context = new();
+            var serializer = new ProjectSerializer(
+                context.Elements,
+                new ElementoModelFactory(context.Elements),
+                context.TerminalLayout,
+                context.Geometry);
+
+            ProjectFileDto dto = serializer.CreateFileDto(
+                document,
+                ProjectMetadataDto.CreateNew("Prancha tabela"),
+                context.Settings.Units);
+            ProjectSheetTableInstanceDto instanceDto = dto.Sheets.Single(s => s.Id == prancha.Id).Tabelas.Single();
+            string json = serializer.Serialize(dto);
+            ProjectFileDto reloadedDto = serializer.Deserialize(json);
+            IReadOnlyList<ProjectTable> tabelas = serializer.CreateProjectTables(reloadedDto);
+            ProjectSheet reloaded = serializer.CreateProjectSheets(reloadedDto, tabelas.Select(t => t.Id)).Single(s => s.Id == prancha.Id);
+            ProjectSheetTableInstance instance = reloaded.Tabelas.Single();
+
+            AssertEqual(instanciaId, instanceDto.Id, "DTO instancia Id");
+            AssertEqual(tabela.Id, instanceDto.TableId, "DTO instancia TableId");
+            AssertEqual(12.5, instanceDto.X, "DTO instancia X");
+            AssertEqual(-8.25, instanceDto.Y, "DTO instancia Y");
+            AssertEqual(210, instanceDto.Width, "DTO instancia Width");
+            AssertEqual(95, instanceDto.Height, "DTO instancia Height");
+            AssertEqual(instanciaId, instance.Id, "Reload instancia Id");
+            AssertEqual(tabela.Id, instance.TableId, "Reload instancia TableId");
+            AssertEqual(12.5, instance.X, "Reload instancia X");
+            AssertEqual(-8.25, instance.Y, "Reload instancia Y");
+            AssertEqual(210, instance.Width, "Reload instancia Width");
+            AssertEqual(95, instance.Height, "Reload instancia Height");
+        }
+
+        private static void PranchaDuplicaInstanciasTabelaComCopiaProfunda()
+        {
+            var document = new AraciDocument();
+            ProjectTable tabela = document.CriarNovaTabela();
+            ProjectSheet origem = document.CriarNovaPrancha();
+            var instancia = new ProjectSheetTableInstance
+            {
+                TableId = tabela.Id,
+                X = 10,
+                Y = 20,
+                Width = 220,
+                Height = 120
+            };
+            origem.Tabelas.Add(instancia);
+            var commands = new Araci.Core.Commands.CommandManager();
+            var useCase = new DuplicarItemProjetoUseCase(document, commands);
+
+            bool duplicou = useCase.DuplicarPrancha(origem.Id);
+            ProjectSheet duplicata = document.Pranchas.Single(p => p.Id != origem.Id);
+            ProjectSheetTableInstance copia = duplicata.Tabelas.Single();
+
+            Assert(duplicou, "DuplicarPrancha deveria retornar true.");
+            Assert(!ReferenceEquals(instancia, copia), "Instancia duplicada nao deveria compartilhar referencia.");
+            Assert(instancia.Id != copia.Id, "Instancia duplicada deveria receber novo Id.");
+            AssertEqual(instancia.TableId, copia.TableId, "Duplicata instancia TableId");
+            AssertEqual(instancia.X, copia.X, "Duplicata instancia X");
+            AssertEqual(instancia.Y, copia.Y, "Duplicata instancia Y");
+            AssertEqual(instancia.Width, copia.Width, "Duplicata instancia Width");
+            AssertEqual(instancia.Height, copia.Height, "Duplicata instancia Height");
+        }
+
+        private static void ExcluirTabelaLimpaInstanciasPranchaComUndoRedo()
+        {
+            var document = new AraciDocument();
+            ProjectTable tabela = document.CriarNovaTabela();
+            ProjectTable outraTabela = document.CriarNovaTabela();
+            ProjectSheet prancha = document.CriarNovaPrancha();
+            var instanciaAfetada = new ProjectSheetTableInstance { TableId = tabela.Id, X = 1, Y = 2, Width = 100, Height = 50 };
+            var instanciaOutraTabela = new ProjectSheetTableInstance { TableId = outraTabela.Id, X = 3, Y = 4, Width = 120, Height = 60 };
+            prancha.Tabelas.Add(instanciaAfetada);
+            prancha.Tabelas.Add(instanciaOutraTabela);
+            var commands = new Araci.Core.Commands.CommandManager();
+            var useCase = new ExcluirItemProjetoUseCase(document, commands);
+
+            bool excluiu = useCase.ExcluirTabela(tabela.Id);
+
+            Assert(excluiu, "ExcluirTabela deveria retornar true.");
+            Assert(!document.Tabelas.Any(t => t.Id == tabela.Id), "Tabela deveria ser removida.");
+            AssertEqual(1, prancha.Tabelas.Count, "Instancias apos excluir tabela");
+            AssertEqual(outraTabela.Id, prancha.Tabelas[0].TableId, "Instancia de outra tabela deveria ser preservada.");
+
+            commands.Undo();
+
+            Assert(document.Tabelas.Any(t => t.Id == tabela.Id), "Undo deveria restaurar tabela.");
+            AssertEqual(2, prancha.Tabelas.Count, "Undo deveria restaurar instancia removida.");
+            AssertEqual(instanciaAfetada.Id, prancha.Tabelas[0].Id, "Undo instancia restaurada Id");
+            AssertEqual(tabela.Id, prancha.Tabelas[0].TableId, "Undo instancia restaurada TableId");
+            AssertEqual(outraTabela.Id, prancha.Tabelas[1].TableId, "Undo deveria preservar ordem.");
+
+            commands.Redo();
+
+            Assert(!document.Tabelas.Any(t => t.Id == tabela.Id), "Redo deveria remover tabela novamente.");
+            AssertEqual(1, prancha.Tabelas.Count, "Redo deveria remover instancia novamente.");
+            AssertEqual(outraTabela.Id, prancha.Tabelas[0].TableId, "Redo instancia restante");
+        }
+
+        private static void PranchaCarregaArquivoAntigoSemInstancias()
+        {
+            var serializer = CriarProjectSerializerTeste();
+            Guid sheetId = Guid.NewGuid();
+            string json = $$"""
+            {
+              "Version": 1,
+              "Sheets": [
+                {
+                  "Id": "{{sheetId}}",
+                  "Nome": "Prancha antiga",
+                  "Numero": "A001"
+                }
+              ]
+            }
+            """;
+
+            ProjectFileDto dto = serializer.Deserialize(json);
+            ProjectSheet prancha = serializer.CreateProjectSheets(dto, Array.Empty<Guid>()).Single();
+            List<ProjectSheetTableInstance> tabelas = prancha.Tabelas ?? throw new InvalidOperationException("ProjectSheet.Tabelas null.");
+
+            AssertEqual(sheetId, prancha.Id, "Prancha antiga Id");
+            AssertEqual("Prancha antiga", prancha.Nome, "Prancha antiga Nome");
+            AssertEqual(0, tabelas.Count, "Prancha antiga Tabelas.Count");
+        }
+
+        private static void PranchaIgnoraInstanciaOrfaNoLoad()
+        {
+            var serializer = CriarProjectSerializerTeste();
+            Guid tabelaValidaId = Guid.NewGuid();
+            Guid tabelaOrfaId = Guid.NewGuid();
+            var dto = new ProjectFileDto
+            {
+                Tables = new List<ProjectTableDto>
+                {
+                    new() { Id = tabelaValidaId, Nome = "Tabela 1" }
+                },
+                Sheets = new List<ProjectSheetDto>
+                {
+                    new()
+                    {
+                        Id = Guid.NewGuid(),
+                        Nome = "Prancha 1",
+                        Numero = "A001",
+                        Tabelas = new List<ProjectSheetTableInstanceDto>
+                        {
+                            new() { Id = Guid.NewGuid(), TableId = tabelaValidaId, X = 1, Y = 2, Width = 100, Height = 50 },
+                            new() { Id = Guid.NewGuid(), TableId = tabelaOrfaId, X = 3, Y = 4, Width = 120, Height = 60 },
+                            new() { Id = Guid.NewGuid(), TableId = Guid.Empty, X = 5, Y = 6, Width = 140, Height = 70 }
+                        }
+                    }
+                }
+            };
+            IReadOnlyList<ProjectTable> tabelas = serializer.CreateProjectTables(dto);
+
+            ProjectSheet prancha = serializer.CreateProjectSheets(dto, tabelas.Select(t => t.Id)).Single();
+
+            AssertEqual(1, prancha.Tabelas.Count, "Instancias validas apos ignorar orfas");
+            AssertEqual(tabelaValidaId, prancha.Tabelas[0].TableId, "Instancia valida TableId");
+        }
+
+        private static void InserirTabelaNaPranchaCriaInstanciaUndoRedo()
+        {
+            var document = new AraciDocument();
+            ProjectTable tabela = document.CriarNovaTabela();
+            ProjectSheet prancha = document.CriarNovaPrancha();
+            var commands = new Araci.Core.Commands.CommandManager();
+            var useCase = new InserirTabelaNaPranchaUseCase(document, commands);
+
+            ProjectSheetTableInstance? instancia = useCase.Inserir(prancha.Id, tabela.Id);
+
+            Assert(instancia != null, "Inserir deveria retornar instancia.");
+            Assert(instancia!.Id != Guid.Empty, "Instancia.Id nao deveria ser vazio.");
+            AssertEqual(tabela.Id, instancia.TableId, "Instancia.TableId");
+            AssertEqual(InserirTabelaNaPranchaUseCase.DefaultX, instancia.X, "Instancia.X padrao");
+            AssertEqual(InserirTabelaNaPranchaUseCase.DefaultY, instancia.Y, "Instancia.Y padrao");
+            AssertEqual(InserirTabelaNaPranchaUseCase.DefaultWidth, instancia.Width, "Instancia.Width padrao");
+            AssertEqual(InserirTabelaNaPranchaUseCase.DefaultHeight, instancia.Height, "Instancia.Height padrao");
+            AssertEqual(1, prancha.Tabelas.Count, "Prancha.Tabelas.Count apos inserir");
+            Assert(ReferenceEquals(instancia, prancha.Tabelas[0]), "Command deveria adicionar a mesma instancia criada pelo use case.");
+
+            Guid instanciaId = instancia.Id;
+            commands.Undo();
+
+            AssertEqual(0, prancha.Tabelas.Count, "Undo deveria remover instancia.");
+
+            commands.Redo();
+
+            AssertEqual(1, prancha.Tabelas.Count, "Redo deveria restaurar instancia.");
+            AssertEqual(instanciaId, prancha.Tabelas[0].Id, "Redo deveria preservar o mesmo Id da instancia.");
+            Assert(ReferenceEquals(instancia, prancha.Tabelas[0]), "Redo deveria reinserir a mesma instancia.");
+        }
+
+        private static void InserirTabelaNaPranchaIgnoraIdsInvalidos()
+        {
+            var document = new AraciDocument();
+            ProjectTable tabela = document.CriarNovaTabela();
+            ProjectSheet prancha = document.CriarNovaPrancha();
+            var commands = new Araci.Core.Commands.CommandManager();
+            var useCase = new InserirTabelaNaPranchaUseCase(document, commands);
+
+            ProjectSheetTableInstance? semPrancha = useCase.Inserir(Guid.NewGuid(), tabela.Id);
+            ProjectSheetTableInstance? semTabela = useCase.Inserir(prancha.Id, Guid.NewGuid());
+
+            Assert(semPrancha == null, "SheetId inexistente deveria retornar null.");
+            Assert(semTabela == null, "TableId inexistente deveria retornar null.");
+            AssertEqual(0, prancha.Tabelas.Count, "Ids invalidos nao deveriam alterar prancha.");
+            Assert(!commands.CanUndo, "Ids invalidos nao deveriam entrar no historico.");
+        }
+
+        private static void InserirTabelaNaPranchaMultiplasInstanciasIndependentes()
+        {
+            var document = new AraciDocument();
+            ProjectTable tabela = document.CriarNovaTabela();
+            ProjectSheet prancha = document.CriarNovaPrancha();
+            var commands = new Araci.Core.Commands.CommandManager();
+            var useCase = new InserirTabelaNaPranchaUseCase(document, commands);
+
+            ProjectSheetTableInstance? primeira = useCase.Inserir(prancha.Id, tabela.Id, x: 10, y: 20, width: 200, height: 100);
+            ProjectSheetTableInstance? segunda = useCase.Inserir(prancha.Id, tabela.Id, x: 30, y: 40, width: 240, height: 120);
+
+            Assert(primeira != null && segunda != null, "Multiplas insercoes deveriam retornar instancias.");
+            AssertEqual(2, prancha.Tabelas.Count, "Multiplas insercoes Count");
+            Assert(primeira!.Id != segunda!.Id, "Multiplas instancias deveriam ter IDs distintos.");
+            Assert(!ReferenceEquals(primeira, segunda), "Multiplas instancias deveriam ser objetos distintos.");
+            AssertEqual(10, prancha.Tabelas[0].X, "Primeira instancia X");
+            AssertEqual(30, prancha.Tabelas[1].X, "Segunda instancia X");
+
+            commands.Undo();
+
+            AssertEqual(1, prancha.Tabelas.Count, "Undo deveria remover apenas ultima insercao.");
+            AssertEqual(primeira.Id, prancha.Tabelas[0].Id, "Undo preserva primeira instancia.");
+        }
+
+        private static void EditorContextExpoeInserirTabelaNaPrancha()
+        {
+            var context = new EditorContext();
+
+            Assert(context.InserirTabelaNaPrancha != null, "EditorContext deveria expor InserirTabelaNaPranchaUseCase.");
+        }
+
         private static void TabelaDataViewModelExpoeColunasLinhasECelulas()
         {
             AraciDocument document = CriarDocumentoTabelaDados();
@@ -6847,6 +7218,11 @@ namespace Araci.TechnicalChecks
             return $"{document.Elementos.Count}|{elementos}|{tabela.FiltroVistaId}|{tabela.ModoFiltro}|{campos}|{filtros}|{ordenacoes}";
         }
 
+        private static string NormalizarQuebras(string text)
+        {
+            return text.Replace("\r\n", "\n").Replace("\n", "\r\n");
+        }
+
         private static IReadOnlyList<ProjectTableSorting> CriarOrdenacoes(ProjectTable tabela, params string[] campoIds)
         {
             return campoIds
@@ -6878,6 +7254,17 @@ namespace Araci.TechnicalChecks
                     Ordem = c.Ordem
                 })
                 .ToList();
+        }
+
+        private static ProjectSerializer CriarProjectSerializerTeste()
+        {
+            EditorContext context = new();
+
+            return new ProjectSerializer(
+                context.Elements,
+                new ElementoModelFactory(context.Elements),
+                context.TerminalLayout,
+                context.Geometry);
         }
 
         private static ExecutarSimulacaoUseCase CriarExecutarSimulacaoUseCase(
@@ -6924,17 +7311,32 @@ namespace Araci.TechnicalChecks
             }
         }
 
+        private sealed class ThrowingCsvExportService : IProjectTableCsvExportService
+        {
+            public string GenerateCsv(ProjectTableDataResult result)
+            {
+                throw new IOException("falha simulada");
+            }
+        }
+
         private sealed class FakeDialogService : IUserDialogService
         {
+            public int InfoChamadas { get; private set; }
             public int WarningChamadas { get; private set; }
+            public int ErrorChamadas { get; private set; }
             public int ConfirmChamadas { get; private set; }
             public int ShowMessageChamadas { get; private set; }
+            public int SaveCsvChamadas { get; private set; }
+            public string? SaveCsvPath { get; set; }
             public string? LastWarningTitle { get; private set; }
             public string? LastWarningMessage { get; private set; }
+            public string? LastErrorTitle { get; private set; }
+            public string? LastErrorMessage { get; private set; }
             public SimulationMessage? LastSimulationMessage { get; private set; }
 
             public void ShowInfo(string title, string message)
             {
+                InfoChamadas++;
             }
 
             public void ShowWarning(string title, string message)
@@ -6946,6 +7348,24 @@ namespace Araci.TechnicalChecks
 
             public void ShowError(string title, string message)
             {
+                ErrorChamadas++;
+                LastErrorTitle = title;
+                LastErrorMessage = message;
+            }
+
+            public string? ShowSaveCsvDialog(string suggestedFileName)
+            {
+                SaveCsvChamadas++;
+                return SaveCsvPath;
+            }
+
+            public InserirTabelaPranchaDialogResult? ShowInserirTabelaPranchaDialog(
+                IReadOnlyList<ProjectItemDialogOption> pranchas,
+                IReadOnlyList<ProjectItemDialogOption> tabelas)
+            {
+                return pranchas.Count > 0 && tabelas.Count > 0
+                    ? new InserirTabelaPranchaDialogResult(pranchas[0].Id, tabelas[0].Id)
+                    : null;
             }
 
             public ElementosTabelaDialogResult? ShowElementosTabelaDialog(
@@ -7306,6 +7726,104 @@ namespace Araci.TechnicalChecks
 
 
 ====================================================================================================
+ARQUIVO: C:\Users\User\source\repos\lucasffxavier\Araci-front\Core\Documents\ProjectSheet.cs
+====================================================================================================
+
+using System;
+using System.Collections.Generic;
+
+namespace Araci.Core.Documents
+{
+    public class ProjectSheet
+    {
+        public Guid Id { get; set; } = Guid.NewGuid();
+        public string Nome { get; set; } = string.Empty;
+        public string Numero { get; set; } = string.Empty;
+        public List<ProjectSheetTableInstance> Tabelas { get; set; } = new();
+    }
+}
+
+
+
+====================================================================================================
+ARQUIVO: C:\Users\User\source\repos\lucasffxavier\Araci-front\Core\Documents\ProjectSheetTableInstance.cs
+====================================================================================================
+
+using System;
+
+namespace Araci.Core.Documents
+{
+    public class ProjectSheetTableInstance
+    {
+        public const double DefaultWidth = 180.0;
+        public const double DefaultHeight = 80.0;
+        public const double MinWidth = 20.0;
+        public const double MinHeight = 20.0;
+
+        private double _x;
+        private double _y;
+        private double _width = DefaultWidth;
+        private double _height = DefaultHeight;
+
+        public Guid Id { get; set; } = Guid.NewGuid();
+        public Guid TableId { get; set; }
+
+        public double X
+        {
+            get => _x;
+            set => _x = NormalizarCoordenada(value);
+        }
+
+        public double Y
+        {
+            get => _y;
+            set => _y = NormalizarCoordenada(value);
+        }
+
+        public double Width
+        {
+            get => _width;
+            set => _width = NormalizarDimensao(value, MinWidth);
+        }
+
+        public double Height
+        {
+            get => _height;
+            set => _height = NormalizarDimensao(value, MinHeight);
+        }
+
+        public ProjectSheetTableInstance CriarCopia(bool gerarNovoId)
+        {
+            return new ProjectSheetTableInstance
+            {
+                Id = gerarNovoId ? Guid.NewGuid() : Id,
+                TableId = TableId,
+                X = X,
+                Y = Y,
+                Width = Width,
+                Height = Height
+            };
+        }
+
+        public bool IsValid => Id != Guid.Empty && TableId != Guid.Empty;
+
+        private static double NormalizarCoordenada(double valor)
+        {
+            return double.IsNaN(valor) || double.IsInfinity(valor) ? 0.0 : valor;
+        }
+
+        private static double NormalizarDimensao(double valor, double minimo)
+        {
+            return double.IsNaN(valor) || double.IsInfinity(valor) || valor < minimo
+                ? minimo
+                : valor;
+        }
+    }
+}
+
+
+
+====================================================================================================
 ARQUIVO: C:\Users\User\source\repos\lucasffxavier\Araci-front\MainWindow.xaml
 ====================================================================================================
 
@@ -7366,8 +7884,10 @@ ARQUIVO: C:\Users\User\source\repos\lucasffxavier\Araci-front\MainWindow.xaml.cs
 using Araci.Services;
 using Araci.Properties;
 using Araci.ViewModels;
+using Araci.Applications.Abstractions;
 using Araci.Applications.Projects.Tables;
 using Araci.Core.Documents;
+using System.Collections.Generic;
 using System.ComponentModel;
 using System.Linq;
 using System.Collections.Specialized;
@@ -7458,6 +7978,7 @@ namespace Araci
                 tabela,
                 _context.RenomearItemProjeto,
                 _context.EditarPropriedadesTabela,
+                _context.ExportarTabela,
                 _context.Dialogs);
 
             MostrarPropriedades();
@@ -7501,6 +8022,54 @@ namespace Araci
         {
             _context.CriarItemProjeto.CriarPrancha();
             MostrarNavegadorProjeto();
+        }
+
+        public void ExportarTabelaAtualCsv()
+        {
+            ProjectTable? tabela = _projectTableDataViewModel == null
+                ? null
+                : _context.Document.Tabelas.FirstOrDefault(t => t.Id == _projectTableDataViewModel.TableId);
+
+            _context.ExportarTabela.Executar(tabela);
+        }
+
+        public void InserirTabelaNaPrancha()
+        {
+            if (_context.Document.Pranchas.Count == 0)
+            {
+                _context.Dialogs.ShowWarning("Inserir tabela na prancha", "Crie uma prancha antes de inserir uma tabela.");
+                return;
+            }
+
+            if (_context.Document.Tabelas.Count == 0)
+            {
+                _context.Dialogs.ShowWarning("Inserir tabela na prancha", "Crie uma tabela antes de inseri-la em uma prancha.");
+                return;
+            }
+
+            List<ProjectItemDialogOption> pranchas = _context.Document.Pranchas
+                .Select(p => new ProjectItemDialogOption(p.Id, string.IsNullOrWhiteSpace(p.Numero) ? p.Nome : $"{p.Numero} - {p.Nome}"))
+                .ToList();
+            List<ProjectItemDialogOption> tabelas = _context.Document.Tabelas
+                .Select(t => new ProjectItemDialogOption(t.Id, t.Nome))
+                .ToList();
+
+            InserirTabelaPranchaDialogResult? result = pranchas.Count == 1 && tabelas.Count == 1
+                ? new InserirTabelaPranchaDialogResult(pranchas[0].Id, tabelas[0].Id)
+                : _context.Dialogs.ShowInserirTabelaPranchaDialog(pranchas, tabelas);
+
+            if (result == null)
+                return;
+
+            ProjectSheetTableInstance? instance = _context.InserirTabelaNaPrancha.Inserir(result.SheetId, result.TableId);
+
+            if (instance == null)
+            {
+                _context.Dialogs.ShowWarning("Inserir tabela na prancha", "Não foi possível inserir a tabela na prancha selecionada.");
+                return;
+            }
+
+            _context.Dialogs.ShowInfo("Inserir tabela na prancha", "Tabela inserida na prancha.");
         }
 
         public void MostrarConfiguracaoUnidades()
@@ -7583,259 +8152,410 @@ namespace Araci
 
 
 ====================================================================================================
-ARQUIVO: C:\Users\User\source\repos\lucasffxavier\Araci-front\Ribbon\Tabs\GerenciarTab.xaml
+ARQUIVO: C:\Users\User\source\repos\lucasffxavier\Araci-front\Service\EditorContext.cs
 ====================================================================================================
 
-﻿<UserControl x:Class="Araci.Ribbon.Tabs.GerenciarTab"
-             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
-             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-             xmlns:svgc="http://sharpvectors.codeplex.com/svgc/"
-             Background="#F4F4F4"
-             Height="100">
-    <Grid Margin="3">
-        <StackPanel Orientation="Horizontal">
-            <Border Background="#F4F4F4"
-                    BorderBrush="#D0D0D0"
-                    BorderThickness="1"
-                    Padding="3"
-                    Margin="0,0,4,0">
-                <DockPanel>
-                    <TextBlock Text="Sistema"
-                               DockPanel.Dock="Bottom"
-                               HorizontalAlignment="Center"
-                               FontSize="11"
-                               FontWeight="SemiBold"
-                               Margin="0,2,0,0"/>
-                    <WrapPanel>
-                        <Button Style="{StaticResource RibbonToolButton}">
-                            <StackPanel HorizontalAlignment="Center">
-                                <svgc:SvgViewbox Source="pack://application:,,,/Resources/Icons/configuracoes.svg" Width="32" Height="32"/>
-                                <TextBlock Text="Config" Width="68" TextAlignment="Center" FontSize="11" Foreground="Black" Margin="0,1,0,0" TextWrapping="Wrap"/>
-                            </StackPanel>
-                        </Button>
-                        <Button Style="{StaticResource RibbonToolButton}">
-                            <StackPanel HorizontalAlignment="Center">
-                                <svgc:SvgViewbox Source="pack://application:,,,/Resources/Icons/biblioteca.svg" Width="32" Height="32"/>
-                                <TextBlock Text="Biblioteca" Width="68" TextAlignment="Center" FontSize="11" Foreground="Black" Margin="0,1,0,0" TextWrapping="Wrap"/>
-                            </StackPanel>
-                        </Button>
-                        <Button Style="{StaticResource RibbonToolButton}" Click="PropriedadesButton_Click">
-                            <StackPanel HorizontalAlignment="Center">
-                                <svgc:SvgViewbox Source="pack://application:,,,/Resources/Icons/propriedades.svg" Width="32" Height="32"/>
-                                <TextBlock Text="Propriedades" Width="68" TextAlignment="Center" FontSize="11" Foreground="Black" Margin="0,1,0,0" TextWrapping="Wrap"/>
-                            </StackPanel>
-                        </Button>
-                        <Button Style="{StaticResource RibbonToolButton}" Click="NavegadorButton_Click">
-                            <StackPanel HorizontalAlignment="Center">
-                                <svgc:SvgViewbox Source="pack://application:,,,/Resources/Icons/navegador.svg" Width="32" Height="32"/>
-                                <TextBlock Text="Navegador" Width="68" TextAlignment="Center" FontSize="11" Foreground="Black" Margin="0,1,0,0" TextWrapping="Wrap"/>
-                            </StackPanel>
-                        </Button>
-                        <Button Style="{StaticResource RibbonToolButton}" Click="UnidadesButton_Click">
-                            <StackPanel HorizontalAlignment="Center">
-                                <svgc:SvgViewbox Source="pack://application:,,,/Resources/Icons/unidades.svg" Width="32" Height="32"/>
-                                <TextBlock Text="Unidades" Width="68" TextAlignment="Center" FontSize="11" Foreground="Black" Margin="0,1,0,0" TextWrapping="Wrap"/>
-                            </StackPanel>
-                        </Button>
-                    </WrapPanel>
-                </DockPanel>
-            </Border>
-            <Border Background="#F4F4F4"
-                    BorderBrush="#D0D0D0"
-                    BorderThickness="1"
-                    Padding="3">
-                <DockPanel>
-                    <TextBlock Text="Projeto"
-                               DockPanel.Dock="Bottom"
-                               HorizontalAlignment="Center"
-                               FontSize="11"
-                               FontWeight="SemiBold"
-                               Margin="0,2,0,0"/>
-                    <WrapPanel>
-                        <Button Style="{StaticResource RibbonToolButton}" Click="NovaVistaButton_Click">
-                            <StackPanel HorizontalAlignment="Center">
-                                <svgc:SvgViewbox Source="pack://application:,,,/Resources/Icons/vistas.svg" Width="32" Height="32"/>
-                                <TextBlock Text="Nova Vista" Width="68" TextAlignment="Center" FontSize="11" Foreground="Black" Margin="0,1,0,0" TextWrapping="Wrap"/>
-                            </StackPanel>
-                        </Button>
-                        <Button Style="{StaticResource RibbonToolButton}" Click="NovaTabelaButton_Click">
-                            <StackPanel HorizontalAlignment="Center">
-                                <svgc:SvgViewbox Source="pack://application:,,,/Resources/Icons/tabela.svg" Width="32" Height="32"/>
-                                <TextBlock Text="Nova Tabela" Width="68" TextAlignment="Center" FontSize="11" Foreground="Black" Margin="0,1,0,0" TextWrapping="Wrap"/>
-                            </StackPanel>
-                        </Button>
-                        <Button Style="{StaticResource RibbonToolButton}" Click="NovaPranchaButton_Click">
-                            <StackPanel HorizontalAlignment="Center">
-                                <svgc:SvgViewbox Source="pack://application:,,,/Resources/Icons/prancha.svg" Width="32" Height="32"/>
-                                <TextBlock Text="Nova Prancha" Width="68" TextAlignment="Center" FontSize="11" Foreground="Black" Margin="0,1,0,0" TextWrapping="Wrap"/>
-                            </StackPanel>
-                        </Button>
-                    </WrapPanel>
-                </DockPanel>
-            </Border>
-        </StackPanel>
-    </Grid>
-</UserControl>
-
-
-
-====================================================================================================
-ARQUIVO: C:\Users\User\source\repos\lucasffxavier\Araci-front\Ribbon\Tabs\GerenciarTab.xaml.cs
-====================================================================================================
-
-﻿using System.Windows;
-using System.Windows.Controls;
-
-namespace Araci.Ribbon.Tabs
-{
-    public partial class GerenciarTab : UserControl
-    {
-        public GerenciarTab()
-        {
-            InitializeComponent();
-        }
-
-        private void PropriedadesButton_Click(object sender, RoutedEventArgs e)
-        {
-            if (Window.GetWindow(this) is MainWindow mainWindow)
-                mainWindow.MostrarPropriedades();
-        }
-
-        private void NavegadorButton_Click(object sender, RoutedEventArgs e)
-        {
-            if (Window.GetWindow(this) is MainWindow mainWindow)
-                mainWindow.AlternarNavegadorProjeto();
-        }
-
-        private void NovaVistaButton_Click(object sender, RoutedEventArgs e)
-        {
-            if (Window.GetWindow(this) is MainWindow mainWindow)
-                mainWindow.CriarNovaVistaProjeto();
-        }
-
-        private void NovaTabelaButton_Click(object sender, RoutedEventArgs e)
-        {
-            if (Window.GetWindow(this) is MainWindow mainWindow)
-                mainWindow.CriarNovaTabelaProjeto();
-        }
-
-        private void NovaPranchaButton_Click(object sender, RoutedEventArgs e)
-        {
-            if (Window.GetWindow(this) is MainWindow mainWindow)
-                mainWindow.CriarNovaPranchaProjeto();
-        }
-
-        private void UnidadesButton_Click(object sender, RoutedEventArgs e)
-        {
-            if (Window.GetWindow(this) is MainWindow mainWindow)
-                mainWindow.MostrarConfiguracaoUnidades();
-        }
-    }
-}
-
-
-
-====================================================================================================
-ARQUIVO: C:\Users\User\source\repos\lucasffxavier\Araci-front\Service\UI\DialogService.cs
-====================================================================================================
-
-using Araci.Applications.Abstractions;
-using Araci.Core.Documents;
-using Araci.Properties;
-using Araci.Services.Simulation;
 using System.Collections.Generic;
+using System.ComponentModel;
+using System.Linq;
 using System.Windows;
+using Araci.Applications.Abstractions;
+using Araci.Applications.Editor;
+using Araci.Applications.Factories;
+using Araci.Core.Commands;
+using Araci.Core.Documents;
+using Araci.Core.Events;
+using Araci.Core.SceneQueries;
+using Araci.Core.Transactions;
+using Araci.Applications.Anotar.InserirLinha;
+using Araci.Applications.Anotar.InserirRetangulo;
+using Araci.Applications.Anotar.InserirCirculo;
+using Araci.Applications.Diagrama.InserirCabo;
+using Araci.Applications.Diagrama.InserirElemento;
+using Araci.Applications.Editar.Alinhar;
+using Araci.Applications.Editar.Deletar;
+using Araci.Applications.Editar.Mover;
+using Araci.Applications.Editar.Selecionar;
+using Araci.Applications.Projects;
+using Araci.Applications.Projects.Tables;
+using Araci.Applications.Simulation;
+using Araci.Applications.UseCases.Analise;
+using Araci.Applications.UseCases.Editar;
+using Araci.Applications.UseCases.Diagrama;
+using Araci.Applications.UseCases.Projeto;
+using Araci.Models;
+using Araci.Services.Composition;
+using Araci.ViewModels;
+using CoreScene = Araci.Core.Scenes.Scene;
+using Araci.Services.Geometry;
+using Araci.Services.Topology;
+using Araci.Services.Editing;
+using Araci.Services.Viewport;
+using Araci.Services.Simulation;
+using Araci.Services.UI;
+using Araci.Services.Settings;
+using Araci.Services.Catalog;
+using Araci.Services.Naming;
+using Araci.Services.Interaction;
 
-namespace Araci.Services.UI
+namespace Araci.Services
 {
-    public class DialogService : IUserDialogService
+    public class EditorContext : IEditorSession
     {
-        public void ShowInfo(string title, string message)
+        private bool _aplicandoCameraVista;
+
+        public EditorContext()
+            : this(new EventBus())
         {
-            Show(title, message, MessageBoxImage.Information);
         }
 
-        public void ShowWarning(string title, string message)
+        public EditorContext(IEventBus eventBus)
         {
-            Show(title, message, MessageBoxImage.Warning);
+            Events = eventBus;
+            Document.VistaAtivaAlterada += OnDocumentoVistaAtivaAlterada;
+
+            var core = EditorCoreComposition.Create(Document, Settings, Types);
+            Scene = core.Scene;
+            SceneQueries = core.SceneQueries;
+            Hover = core.Hover;
+            Snap = core.Snap;
+            TypePropertiesDialogs = core.TypePropertiesDialogs;
+            Dialogs = core.Dialogs;
+            Elements = core.Elements;
+            Connectivity = core.Connectivity;
+            ElectricGraph = core.ElectricGraph;
+            OperationalState = core.OperationalState;
+            Topology = core.Topology;
+            Geometry = core.Geometry;
+            TerminalLayout = core.TerminalLayout;
+            TypePropertiesDialogs.Configure(Commands, NotifyTextAnnotationTypeLibraryChanged, () => Document.Elementos.OfType<TextoAnotativo>());
+
+            var simulation = SimulationComposition.Create(Document, NotifySimulationResultViewModels, Dialogs);
+            SimulationResults = simulation.Results;
+            Simulation = simulation.Pipeline;
+            SimulationExport = simulation.Export;
+            SimulationMessages = simulation.Messages;
+            ExecutarSimulacao = simulation.ExecutarSimulacao;
+
+            VisualUpdates = EditingComposition.CreateVisualUpdates(() => Viewport, TerminalLayout, Connectivity, SceneQueries, TerminalSnap, RefreshEditingHandles);
+            Names = new NameService(Document, Elements);
+            GeometryUpdates = new ElementGeometryUpdateService(TerminalLayout, Connectivity, VisualUpdates);
+            var elementoModelFactory = new ElementoModelFactory(Elements);
+            var elementoViewModelFactory = new ElementoViewModelFactory(Elements, elementoModelFactory, Names, TypePropertiesDialogs, TerminalLayout, GeometryUpdates);
+            ElementoFactory = new ElementoFactory(elementoModelFactory, elementoViewModelFactory);
+            InserirElemento = new InserirElementoUseCase(ElementoFactory, TerminalLayout, Commands, Document, Names);
+            InserirCabo = new InserirCaboUseCase(ElementoFactory, Commands, Document, Names, cabo => Viewport?.ObterViewModel(cabo) as CaboViewModel);
+            CopiarElementos = new CopiarElementosUseCase();
+            ColarElementos = new ColarElementosUseCase(CopiarElementos, Document, Names, Commands, ObterDestinoColagem);
+            ExcluirElemento = new ExcluirElementoUseCase(Document, Connectivity, Commands);
+            EditarPropriedades = new EditarPropriedadesUseCase(Commands);
+            Selection = EditingComposition.CreateSelection(Editor, Events, EditarPropriedades, Settings);
+            SelecionarElementos = new SelecionarElementosUseCase(Selection);
+            AtualizarPropriedadesSelecionadas = new AtualizarPropriedadesSelecionadasUseCase(Selection);
+            EditarVerticesCabo = new EditarVerticesCaboUseCase(Commands);
+            CableVertexEdit = EditingComposition.CreateCableVertexEdit(Selection, SceneQueries, VisualUpdates, EditarVerticesCabo);
+            Selection.SelectionChanged += CableVertexEdit.Refresh;
+            SafeDelete = EditingComposition.CreateSafeDelete(Selection, CableVertexEdit, ExcluirElemento, Hover, TerminalSnap, SceneQueries);
+            Clipboard = EditingComposition.CreateClipboard(CopiarElementos, ColarElementos, Selection, () => Viewport, SceneQueries, CableVertexEdit);
+            Projects = PersistenceComposition.CreateProjects(Document, Commands, Elements, elementoModelFactory, TerminalLayout, Geometry, Dialogs, Settings, LimparEstadoTransitorioProjeto);
+            NovoProjeto = new NovoProjetoUseCase(Projects);
+            AbrirProjeto = new AbrirProjetoUseCase(Projects);
+            SalvarProjeto = new SalvarProjetoUseCase(Projects);
+            CriarItemProjeto = new CriarItemProjetoUseCase(Document, Commands);
+            RenomearItemProjeto = new RenomearItemProjetoUseCase(Document, Commands);
+            ExcluirItemProjeto = new ExcluirItemProjetoUseCase(Document, Commands);
+            DuplicarItemProjeto = new DuplicarItemProjetoUseCase(Document, Commands);
+            EditarPropriedadesVista = new EditarPropriedadesVistaUseCase(Document, Commands);
+            EditarPropriedadesTabela = new EditarPropriedadesTabelaUseCase(Document, Commands);
+            ExportarTabela = new ExportarTabelaUseCase(Document, Dialogs, new ProjectTableDataBuilder(), new ProjectTableCsvExportService());
+            InserirTabelaNaPrancha = new InserirTabelaNaPranchaUseCase(Document, Commands);
+
+            var moveServices = EditingComposition.CreateMoveServices(() => Viewport, () => Scene.Elementos, Settings, Connectivity, TerminalLayout, SceneQueries, VisualUpdates, Selection, GeometryUpdates, Commands);
+            MoveHud = moveServices.MoveHud;
+            AlignmentGuides = moveServices.AlignmentGuides;
+            MoveConstraints = moveServices.MoveConstraints;
+            MoverElemento = moveServices.MoverElemento;
+            RotacionarElemento = moveServices.RotacionarElemento;
+            RedimensionarBarra = moveServices.RedimensionarBarra;
+            Move = moveServices.Move;
+            BarraResize = moveServices.BarraResize;
+            Rotation = moveServices.Rotation;
+            LinhaEndpointEdit = EditingComposition.CreateLinhaEndpointEdit(Selection, SceneQueries, MoverElemento, VisualUpdates);
+            Selection.SelectionChanged += LinhaEndpointEdit.Refresh;
+            RetanguloResize = EditingComposition.CreateRetanguloResize(Selection, SceneQueries, MoverElemento, VisualUpdates);
+            Selection.SelectionChanged += RetanguloResize.Refresh;
+            CirculoResize = EditingComposition.CreateCirculoResize(Selection, SceneQueries, MoverElemento, VisualUpdates);
+            Selection.SelectionChanged += CirculoResize.Refresh;
+
+            Tools = new ToolService(
+                Elements,
+                CriarSelecionarTool,
+                CriarMoverTool,
+                CriarAlinharTool,
+                () => new DeletarTool(SafeDelete),
+                CriarInserirCaboTool,
+                CriarInserirElementoGenericoTool,
+                CriarInserirLinhaAnotativaTool,
+                CriarInserirRetanguloAnotativoTool,
+                CriarInserirCirculoAnotativoTool);
+
+            Input = EditingComposition.CreateInput(Tools, Commands, SafeDelete, Selection, Elements, Hover, Clipboard.CopiarSelecionados, Clipboard.Colar);
+            AlterarUnidadesProjeto = new AlterarUnidadesProjetoUseCase(Settings, RefreshProperties);
+            Navigation = ViewportComposition.CreateNavigation(() => Viewport);
         }
 
-        public void ShowError(string title, string message)
+        public IEventBus Events { get; }
+        public AraciDocument Document { get; } = new AraciDocument();
+        public CoreScene Scene { get; }
+        public ISceneQueryService SceneQueries { get; }
+        public HoverService Hover { get; }
+        public ToolService Tools { get; }
+        public InputRouter Input { get; }
+        public ViewportNavigationService Navigation { get; }
+        public ViewportService? Viewport { get; private set; }
+
+        public ViewportViewModel CriarViewportViewModel()
         {
-            Show(title, message, MessageBoxImage.Error);
+            return ViewportComposition.CreateViewModel(Document, Scene, SelectionBox, TerminalSnap, CableVertexEdit, LinhaEndpointEdit, RetanguloResize, CirculoResize, MoveHud, AlignmentGuides, ElementoFactory, Selection, Hover, SceneQueries);
         }
 
-        public ElementosTabelaDialogResult? ShowElementosTabelaDialog(
-            IReadOnlyList<ProjectTableElementCategory> categorias,
-            IReadOnlyList<ProjectTableFieldSelection> camposSelecionados)
+        public void InicializarViewport(ViewportViewModel viewportViewModel)
         {
-            var window = new ElementosTabelaWindow(categorias, camposSelecionados)
-            {
-                Owner = Application.Current?.MainWindow
-            };
+            if (Viewport != null)
+                Viewport.Camera.PropertyChanged -= OnCameraChanged;
 
-            return window.ShowDialog() == true
-                ? new ElementosTabelaDialogResult(window.CategoriasSelecionadas, window.CamposSelecionados)
-                : null;
+            Viewport = new ViewportService(viewportViewModel);
+            Viewport.Camera.PropertyChanged += OnCameraChanged;
+            AplicarCameraVistaAtiva();
         }
 
-        public FiltrosTabelaDialogResult? ShowFiltrosTabelaDialog(
-            IReadOnlyList<ProjectTableFieldSelection> camposSelecionados,
-            IReadOnlyList<ProjectViewDialogOption> vistasDisponiveis,
-            Guid? filtroVistaId,
-            ProjectTableFilterLogicalMode modo,
-            IReadOnlyList<ProjectTableFilterRule> filtros)
+        public void DefinirVistaAtiva(Guid vistaId)
         {
-            var window = new FiltrosTabelaWindow(camposSelecionados, vistasDisponiveis, filtroVistaId, modo, filtros)
-            {
-                Owner = Application.Current?.MainWindow
-            };
-
-            return window.ShowDialog() == true
-                ? new FiltrosTabelaDialogResult(window.FiltroVistaId, window.ModoFiltro, window.Filtros)
-                : null;
+            SalvarCameraVistaAtiva();
+            Document.DefinirVistaAtiva(vistaId);
         }
 
-        public OrdenacaoTabelaDialogResult? ShowOrdenacaoTabelaDialog(
-            IReadOnlyList<ProjectTableFieldSelection> camposSelecionados,
-            IReadOnlyList<ProjectTableSorting> ordenacoes)
+        public void RefreshProperties()
         {
-            var window = new OrdenacaoTabelaWindow(camposSelecionados, ordenacoes)
-            {
-                Owner = Application.Current?.MainWindow
-            };
-
-            return window.ShowDialog() == true
-                ? new OrdenacaoTabelaDialogResult(window.Ordenacoes)
-                : null;
+            AtualizarPropriedadesSelecionadas.Executar();
         }
 
-        public bool Confirm(string title, string message)
-        {
-            MessageBoxResult result = MessageBox.Show(
-                message,
-                title,
-                MessageBoxButton.YesNo,
-                MessageBoxImage.Question);
+        public EditorState Editor { get; } = new EditorState();
+        public EditorSettings Settings { get; } = new EditorSettings();
+        public MoveHudService MoveHud { get; }
+        public AlignmentGuideService AlignmentGuides { get; }
+        public MoveConstraintService MoveConstraints { get; }
+        public SelectionBoxViewModel SelectionBox { get; } = new SelectionBoxViewModel();
+        public TerminalSnapState TerminalSnap { get; } = new TerminalSnapState();
+        public CableVertexEditService CableVertexEdit { get; }
+        public LinhaEndpointEditService LinhaEndpointEdit { get; }
+        public RetanguloResizeService RetanguloResize { get; }
+        public CirculoResizeService CirculoResize { get; }
+        public CommandManager Commands { get; } = new CommandManager();
+        ICommandHistory IEditorSession.Commands => Commands;
+        public SafeDeleteService SafeDelete { get; }
+        public ClipboardService Clipboard { get; }
+        public ProjectPersistenceService Projects { get; }
+        public NovoProjetoUseCase NovoProjeto { get; }
+        public AbrirProjetoUseCase AbrirProjeto { get; }
+        public SalvarProjetoUseCase SalvarProjeto { get; }
+        public CriarItemProjetoUseCase CriarItemProjeto { get; }
+        public RenomearItemProjetoUseCase RenomearItemProjeto { get; }
+        public ExcluirItemProjetoUseCase ExcluirItemProjeto { get; }
+        public DuplicarItemProjetoUseCase DuplicarItemProjeto { get; }
+        public EditarPropriedadesVistaUseCase EditarPropriedadesVista { get; }
+        public EditarPropriedadesTabelaUseCase EditarPropriedadesTabela { get; }
+        public ExportarTabelaUseCase ExportarTabela { get; }
+        public InserirTabelaNaPranchaUseCase InserirTabelaNaPrancha { get; }
+        public VisualUpdateService VisualUpdates { get; }
+        public SelectionService Selection { get; }
+        public SelecionarElementosUseCase SelecionarElementos { get; }
+        public AtualizarPropriedadesSelecionadasUseCase AtualizarPropriedadesSelecionadas { get; }
+        public MoveService Move { get; }
+        public BarraResizeService BarraResize { get; }
+        public RotationService Rotation { get; }
+        public SnapService Snap { get; }
+        public NameService Names { get; }
+        public ConnectivityService Connectivity { get; }
+        public ElectricGraphBuilder ElectricGraph { get; }
+        public OperationalGraphStateBuilder OperationalState { get; }
+        public TopologyValidator Topology { get; }
+        public SimulationResultApplier SimulationResults { get; }
+        public SimulationPipeline Simulation { get; }
+        public SimulationExportService SimulationExport { get; }
+        public SimulationMessageBuilder SimulationMessages { get; }
+        public ExecutarSimulacaoUseCase ExecutarSimulacao { get; }
+        public TypePropertiesDialogService TypePropertiesDialogs { get; }
+        public DialogService Dialogs { get; }
+        public ElementGeometryService Geometry { get; }
+        public TerminalLayoutService TerminalLayout { get; }
+        public ElementGeometryUpdateService GeometryUpdates { get; }
+        public ElementRegistryService Elements { get; }
+        public TypeLibraryService Types { get; } = new TypeLibraryService();
+        public ElementoFactory ElementoFactory { get; }
+        public InserirElementoUseCase InserirElemento { get; }
+        public InserirCaboUseCase InserirCabo { get; }
+        public CopiarElementosUseCase CopiarElementos { get; }
+        public ColarElementosUseCase ColarElementos { get; }
+        public ExcluirElementoUseCase ExcluirElemento { get; }
+        public EditarPropriedadesUseCase EditarPropriedades { get; }
+        public MoverElementoUseCase MoverElemento { get; }
+        public RotacionarElementoUseCase RotacionarElemento { get; }
+        public RedimensionarBarraUseCase RedimensionarBarra { get; }
+        public EditarVerticesCaboUseCase EditarVerticesCabo { get; }
+        public AlterarUnidadesProjetoUseCase AlterarUnidadesProjeto { get; }
 
-            return result == MessageBoxResult.Yes;
+        public TransactionScope BeginTransaction()
+        {
+            return Commands.BeginTransaction();
         }
 
-        public void Show(SimulationMessage message)
+        private void NotifySimulationResultViewModels()
         {
-            if (message == null)
+            if (Viewport == null)
                 return;
 
-            MessageBox.Show(message.Text, message.Title, MessageBoxButton.OK, message.Icon);
+            foreach (ElementoViewModel vm in Viewport.Elementos)
+            {
+                if (vm.Modelo is Cabo or Carga)
+                    vm.NotificarPropriedades("CorrenteLinha", "CorrenteFaseA", "CorrenteFaseB", "CorrenteFaseC");
+            }
         }
 
-        private static void Show(string title, string message, MessageBoxImage icon)
+        private void OnDocumentoVistaAtivaAlterada()
         {
-            MessageBox.Show(
-                message ?? string.Empty,
-                string.IsNullOrWhiteSpace(title) ? "Araci" : title,
-                MessageBoxButton.OK,
-                icon);
+            AplicarCameraVistaAtiva();
+        }
+
+        private void OnCameraChanged(object? sender, PropertyChangedEventArgs e)
+        {
+            if (_aplicandoCameraVista)
+                return;
+
+            SalvarCameraVistaAtiva();
+        }
+
+        private void SalvarCameraVistaAtiva()
+        {
+            if (Viewport == null || Document.VistaAtiva == null)
+                return;
+
+            Document.VistaAtiva.CameraX = Viewport.Camera.Offset.X;
+            Document.VistaAtiva.CameraY = Viewport.Camera.Offset.Y;
+            Document.VistaAtiva.Zoom = Viewport.Camera.Zoom;
+        }
+
+        private void AplicarCameraVistaAtiva()
+        {
+            if (Viewport == null || Document.VistaAtiva == null)
+                return;
+
+            double cameraX = Document.VistaAtiva.CameraX;
+            double cameraY = Document.VistaAtiva.CameraY;
+            double zoom = Document.VistaAtiva.Zoom;
+
+            _aplicandoCameraVista = true;
+
+            try
+            {
+                Viewport.Camera.Offset = new Point(cameraX, cameraY);
+                Viewport.Camera.Zoom = zoom;
+            }
+            finally
+            {
+                _aplicandoCameraVista = false;
+            }
+        }
+
+        private void NotifyTextAnnotationTypeLibraryChanged()
+        {
+            if (Viewport == null)
+                return;
+
+            foreach (ElementoViewModel vm in Viewport.Elementos)
+            {
+                if (vm is TextoAnotativoViewModel texto)
+                    texto.AtualizarAposTipoAlterado();
+            }
+
+            RefreshProperties();
+            SceneQueries.Invalidate();
+        }
+
+        private SelecionarTool CriarSelecionarTool()
+        {
+            return new SelecionarTool(SceneQueries, Selection, SelectionBox, CableVertexEdit, LinhaEndpointEdit, RetanguloResize, CirculoResize, BarraResize, Move, MoveHud, AlignmentGuides, MoveConstraints, Rotation);
+        }
+
+        private MoverTool CriarMoverTool()
+        {
+            return new MoverTool(SceneQueries, Selection, SelectionBox, CableVertexEdit, LinhaEndpointEdit, RetanguloResize, CirculoResize, BarraResize, Move, MoveHud, AlignmentGuides, MoveConstraints, Rotation);
+        }
+
+        private AlinharTool CriarAlinharTool()
+        {
+            return new AlinharTool(Hover, AlignmentGuides, Commands, SceneQueries);
+        }
+
+        private InserirCaboTool CriarInserirCaboTool()
+        {
+            return new InserirCaboTool(Commands, ElementoFactory, InserirCabo, Snap, Connectivity, AlignmentGuides, Scene, SceneQueries, TerminalSnap, () => Tools.VoltarParaSelecao());
+        }
+
+        private InserirElementoGenericoTool CriarInserirElementoGenericoTool(ElementDefinition definition)
+        {
+            return new InserirElementoGenericoTool(definition, ElementoFactory, InserirElemento, Snap, Geometry, TerminalLayout, AlignmentGuides, Scene, SceneQueries, () => Tools.VoltarParaSelecao());
+        }
+
+        private InserirLinhaAnotativaTool CriarInserirLinhaAnotativaTool()
+        {
+            return new InserirLinhaAnotativaTool(Commands, Document, Names, ElementoFactory, Scene, SceneQueries, LinhaEndpointEdit, () => Tools.VoltarParaSelecao());
+        }
+
+        private InserirRetanguloAnotativoTool CriarInserirRetanguloAnotativoTool()
+        {
+            return new InserirRetanguloAnotativoTool(Commands, Document, Names, ElementoFactory, Scene, SceneQueries, () => Tools.VoltarParaSelecao());
+        }
+
+        private InserirCirculoAnotativoTool CriarInserirCirculoAnotativoTool()
+        {
+            return new InserirCirculoAnotativoTool(Commands, Document, Names, ElementoFactory, Scene, SceneQueries, () => Tools.VoltarParaSelecao());
+        }
+
+        private Point ObterDestinoColagem(IReadOnlyList<Elemento> copiados)
+        {
+            if (Input.PossuiUltimaPosicaoMouseMundo)
+                return Input.UltimaPosicaoMouseMundo;
+
+            if (Viewport != null)
+                return Viewport.ScreenToWorld(Viewport.CentroTela);
+
+            Point centro = ColarElementosUseCase.CalcularCentro(copiados);
+            return new Point(centro.X + ColarElementosUseCase.OffsetPadrao, centro.Y + ColarElementosUseCase.OffsetPadrao);
+        }
+
+        private void RefreshEditingHandles()
+        {
+            CableVertexEdit?.Refresh();
+            LinhaEndpointEdit?.Refresh();
+            RetanguloResize?.Refresh();
+            CirculoResize?.Refresh();
+        }
+
+        private void LimparEstadoTransitorioProjeto()
+        {
+            Selection.Limpar();
+            Hover.Clear();
+            CableVertexEdit.Clear();
+            LinhaEndpointEdit.Clear();
+            RetanguloResize.Clear();
+            CirculoResize.Clear();
+            TerminalSnap.Limpar();
+            SelectionBox.Visivel = false;
+            MoveHud.Visivel = false;
+            MoveHud.Reset();
+            SceneQueries.Invalidate();
+            Tools.VoltarParaSelecao();
         }
     }
 }
@@ -8306,140 +9026,6 @@ namespace Araci.ViewModels
         {
             PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
         }
-    }
-}
-
-
-
-====================================================================================================
-ARQUIVO: C:\Users\User\source\repos\lucasffxavier\Araci-front\ViewModels\ProjectTableDataViewModel.cs
-====================================================================================================
-
-using System;
-using System.Collections.Generic;
-using System.Collections.ObjectModel;
-using System.ComponentModel;
-using System.Linq;
-using System.Runtime.CompilerServices;
-using Araci.Applications.Projects.Tables;
-using Araci.Core.Documents;
-
-namespace Araci.ViewModels
-{
-    public sealed class ProjectTableDataViewModel : INotifyPropertyChanged
-    {
-        private readonly AraciDocument _document;
-        private readonly ProjectTable _table;
-        private readonly ProjectTableDataBuilder _builder;
-        private string _titulo = string.Empty;
-        private IReadOnlyList<ProjectTableDataColumn> _columns = new List<ProjectTableDataColumn>();
-        private string _emptyMessage = string.Empty;
-
-        public ProjectTableDataViewModel(
-            AraciDocument document,
-            ProjectTable table,
-            ProjectTableDataBuilder? builder = null)
-        {
-            _document = document;
-            _table = table;
-            _builder = builder ?? new ProjectTableDataBuilder();
-            Rows = new ObservableCollection<ProjectTableDataRowViewModel>();
-            Refresh();
-        }
-
-        public Guid TableId => _table.Id;
-        public ObservableCollection<ProjectTableDataRowViewModel> Rows { get; }
-
-        public string Titulo
-        {
-            get => _titulo;
-            private set
-            {
-                if (_titulo == value)
-                    return;
-
-                _titulo = value;
-                OnPropertyChanged();
-            }
-        }
-
-        public IReadOnlyList<ProjectTableDataColumn> Columns
-        {
-            get => _columns;
-            private set
-            {
-                _columns = value;
-                OnPropertyChanged();
-                OnPropertyChanged(nameof(HasColumns));
-            }
-        }
-
-        public bool HasColumns => Columns.Count > 0;
-        public bool HasRows => Rows.Count > 0;
-        public bool HasEmptyMessage => !string.IsNullOrWhiteSpace(EmptyMessage);
-
-        public string EmptyMessage
-        {
-            get => _emptyMessage;
-            private set
-            {
-                if (_emptyMessage == value)
-                    return;
-
-                _emptyMessage = value;
-                OnPropertyChanged();
-                OnPropertyChanged(nameof(HasEmptyMessage));
-            }
-        }
-
-        public void Refresh()
-        {
-            Titulo = _table.Nome;
-            ProjectTableDataResult result = _builder.Build(_document, _table);
-            Columns = result.Columns.ToList();
-
-            Rows.Clear();
-
-            foreach (ProjectTableDataRow row in result.Rows)
-                Rows.Add(new ProjectTableDataRowViewModel(row));
-
-            EmptyMessage = !HasColumns
-                ? "Nenhum campo selecionado"
-                : !HasRows
-                    ? "Nenhum item encontrado"
-                    : string.Empty;
-
-            OnPropertyChanged(nameof(HasRows));
-        }
-
-        public event PropertyChangedEventHandler? PropertyChanged;
-
-        private void OnPropertyChanged([CallerMemberName] string? propertyName = null)
-        {
-            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
-        }
-    }
-
-    public sealed class ProjectTableDataRowViewModel
-    {
-        private readonly IReadOnlyList<ProjectTableDataCell> _cells;
-
-        public ProjectTableDataRowViewModel(ProjectTableDataRow row)
-        {
-            ElementoId = row.ElementoId;
-            ElementoNome = row.ElementoNome;
-            Categoria = row.Categoria;
-            _cells = row.Cells;
-        }
-
-        public Guid ElementoId { get; }
-        public string ElementoNome { get; }
-        public ProjectTableElementCategory Categoria { get; }
-
-        public string this[int index] =>
-            index >= 0 && index < _cells.Count
-                ? _cells[index].DisplayValue
-                : string.Empty;
     }
 }
 

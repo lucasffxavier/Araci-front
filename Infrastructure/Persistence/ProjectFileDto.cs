@@ -81,6 +81,17 @@ namespace Araci.Infrastructure.Persistence
         public Guid Id { get; set; }
         public string Nome { get; set; } = string.Empty;
         public string Numero { get; set; } = string.Empty;
+        public List<ProjectSheetTableInstanceDto> Tabelas { get; set; } = new();
+    }
+
+    public sealed class ProjectSheetTableInstanceDto
+    {
+        public Guid Id { get; set; }
+        public Guid TableId { get; set; }
+        public double X { get; set; }
+        public double Y { get; set; }
+        public double Width { get; set; }
+        public double Height { get; set; }
     }
 
     public sealed class ProjectMetadataDto
