@@ -131,6 +131,7 @@ namespace Araci.TechnicalChecks
                 ("ProjectSheetViewModel zoom altera percentual", ProjectSheetViewModelZoomAlteraPercentual),
                 ("ProjectSheetView aplica zoom no workspace", ProjectSheetViewAplicaZoomNoWorkspace),
                 ("ProjectSheetView possui folha nomeada para centralizacao", ProjectSheetViewPossuiFolhaNomeadaParaCentralizacao),
+                ("ProjectSheetView possui estilos visuais basicos de tabela", ProjectSheetViewPossuiEstilosVisuaisBasicosTabela),
                 ("ProjectSheetViewModel instancia renderiza dados reais da tabela", ProjectSheetViewModelInstanciaRenderizaDadosReaisTabela),
                 ("ProjectSheetViewModel instancia trata tabela sem campos", ProjectSheetViewModelInstanciaTrataTabelaSemCampos),
                 ("ProjectSheetViewModel instancia trata tabela sem linhas", ProjectSheetViewModelInstanciaTrataTabelaSemLinhas),
@@ -6437,6 +6438,20 @@ namespace Araci.TechnicalChecks
                 var sheetPageBorder = view.FindName("SheetPageBorder") as Border;
 
                 Assert(sheetPageBorder != null, "ProjectSheetView deveria possuir SheetPageBorder para centralizar a folha real.");
+            });
+        }
+
+        private static void ProjectSheetViewPossuiEstilosVisuaisBasicosTabela()
+        {
+            RunSta(() =>
+            {
+                var view = new ProjectSheetView();
+
+                Assert(view.Resources["SheetTableTitleTextStyle"] is Style, "ProjectSheetView deveria possuir estilo visual para titulo da tabela.");
+                Assert(view.Resources["SheetTableHeaderCellStyle"] is Style, "ProjectSheetView deveria possuir estilo visual para celula de cabecalho.");
+                Assert(view.Resources["SheetTableHeaderTextStyle"] is Style, "ProjectSheetView deveria possuir estilo visual para texto de cabecalho.");
+                Assert(view.Resources["SheetTableBodyCellStyle"] is Style, "ProjectSheetView deveria possuir estilo visual para celula de dados.");
+                Assert(view.Resources["SheetTableEmptyMessageTextStyle"] is Style, "ProjectSheetView deveria possuir estilo visual para mensagem vazia.");
             });
         }
 
