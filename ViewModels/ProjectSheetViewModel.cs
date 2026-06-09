@@ -13,6 +13,7 @@ namespace Araci.ViewModels
         private readonly AraciDocument _document;
         private readonly ProjectSheet _sheet;
         private readonly MoverTabelaNaPranchaUseCase? _moverTabelaNaPrancha;
+        private readonly RedimensionarTabelaNaPranchaUseCase? _redimensionarTabelaNaPrancha;
         private readonly RemoverTabelaDaPranchaUseCase? _removerTabelaDaPrancha;
         private string _titulo = string.Empty;
         private string _emptyMessage = string.Empty;
@@ -22,11 +23,13 @@ namespace Araci.ViewModels
             AraciDocument document,
             ProjectSheet sheet,
             MoverTabelaNaPranchaUseCase? moverTabelaNaPrancha = null,
+            RedimensionarTabelaNaPranchaUseCase? redimensionarTabelaNaPrancha = null,
             RemoverTabelaDaPranchaUseCase? removerTabelaDaPrancha = null)
         {
             _document = document ?? throw new ArgumentNullException(nameof(document));
             _sheet = sheet ?? throw new ArgumentNullException(nameof(sheet));
             _moverTabelaNaPrancha = moverTabelaNaPrancha;
+            _redimensionarTabelaNaPrancha = redimensionarTabelaNaPrancha;
             _removerTabelaDaPrancha = removerTabelaDaPrancha;
             TableInstances = new ObservableCollection<ProjectSheetTableInstanceViewModel>();
             Refresh();
@@ -130,6 +133,21 @@ namespace Araci.ViewModels
                 SelecionarInstancia(instanceId);
 
             return moved;
+        }
+
+        public bool RedimensionarInstancia(Guid instanceId, double novaLargura, double novaAltura)
+        {
+            ProjectSheetTableInstanceViewModel? instanceViewModel = TableInstances.FirstOrDefault(i => i.Id == instanceId);
+
+            if (instanceViewModel == null)
+                return false;
+
+            bool resized = _redimensionarTabelaNaPrancha?.Redimensionar(SheetId, instanceId, novaLargura, novaAltura, Refresh) == true;
+
+            if (resized)
+                SelecionarInstancia(instanceId);
+
+            return resized;
         }
 
         public bool RemoverInstanciaSelecionada()

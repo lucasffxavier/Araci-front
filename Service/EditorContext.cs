@@ -113,6 +113,7 @@ namespace Araci.Services
             ExportarTabela = new ExportarTabelaUseCase(Document, Dialogs, new ProjectTableDataBuilder(), new ProjectTableCsvExportService());
             InserirTabelaNaPrancha = new InserirTabelaNaPranchaUseCase(Document, Commands);
             MoverTabelaNaPrancha = new MoverTabelaNaPranchaUseCase(Document, Commands);
+            RedimensionarTabelaNaPrancha = new RedimensionarTabelaNaPranchaUseCase(Document, Commands);
             RemoverTabelaDaPrancha = new RemoverTabelaDaPranchaUseCase(Document, Commands);
 
             var moveServices = EditingComposition.CreateMoveServices(() => Viewport, () => Scene.Elementos, Settings, Connectivity, TerminalLayout, SceneQueries, VisualUpdates, Selection, GeometryUpdates, Commands);
@@ -213,6 +214,7 @@ namespace Araci.Services
         public ExportarTabelaUseCase ExportarTabela { get; }
         public InserirTabelaNaPranchaUseCase InserirTabelaNaPrancha { get; }
         public MoverTabelaNaPranchaUseCase MoverTabelaNaPrancha { get; }
+        public RedimensionarTabelaNaPranchaUseCase RedimensionarTabelaNaPrancha { get; }
         public RemoverTabelaDaPranchaUseCase RemoverTabelaDaPrancha { get; }
         public VisualUpdateService VisualUpdates { get; }
         public SelectionService Selection { get; }

@@ -15,6 +15,14 @@ namespace Araci.Views
         private double _dragStartY;
         private bool _isDragging;
 
+        private ProjectSheetTableInstanceViewModel? _resizedInstance;
+        private FrameworkElement? _resizeElement;
+        private Point _resizeStartPoint;
+        private double _resizeStartWidth;
+        private double _resizeStartHeight;
+        private SheetTableResizeMode _resizeMode = SheetTableResizeMode.None;
+        private bool _isResizing;
+
         public ProjectSheetView()
         {
             InitializeComponent();
@@ -24,12 +32,17 @@ namespace Araci.Views
 
         private void SheetSurface_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
         {
+            CancelResizePreview();
+            CancelDragPreview();
             ViewModel?.LimparSelecao();
             Focus();
         }
 
         private void TableInstance_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
         {
+            if (_isResizing)
+                return;
+
             if (sender is not FrameworkElement element ||
                 element.DataContext is not ProjectSheetTableInstanceViewModel instance ||
                 ViewModel == null)
@@ -75,6 +88,67 @@ namespace Araci.Views
         {
             if (_isDragging)
                 CancelDragPreview();
+
+            if (_isResizing)
+                CancelResizePreview();
+        }
+
+        private void ResizeHandle_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
+        {
+            if (sender is not FrameworkElement element ||
+                element.DataContext is not ProjectSheetTableInstanceViewModel instance ||
+                ViewModel == null)
+                return;
+
+            CancelDragPreview();
+            ViewModel.SelecionarInstancia(instance.Id);
+            Focus();
+
+            _resizedInstance = instance;
+            _resizeElement = element;
+            _resizeStartPoint = e.GetPosition(SheetSurface);
+            _resizeStartWidth = instance.Width;
+            _resizeStartHeight = instance.Height;
+            _resizeMode = ObterModoRedimensionamento(element.Tag);
+            _isResizing = _resizeMode != SheetTableResizeMode.None;
+
+            if (_isResizing)
+                element.CaptureMouse();
+
+            e.Handled = true;
+        }
+
+        private void ResizeHandle_MouseMove(object sender, MouseEventArgs e)
+        {
+            if (!_isResizing || _resizedInstance == null || e.LeftButton != MouseButtonState.Pressed)
+                return;
+
+            Point current = e.GetPosition(SheetSurface);
+            double deltaX = current.X - _resizeStartPoint.X;
+            double deltaY = current.Y - _resizeStartPoint.Y;
+            double newWidth = _resizeStartWidth;
+            double newHeight = _resizeStartHeight;
+
+            if (_resizeMode is SheetTableResizeMode.Right or SheetTableResizeMode.BottomRight)
+                newWidth = _resizeStartWidth + deltaX;
+
+            if (_resizeMode is SheetTableResizeMode.Bottom or SheetTableResizeMode.BottomRight)
+                newHeight = _resizeStartHeight + deltaY;
+
+            _resizedInstance.SetPreviewSize(newWidth, newHeight);
+            e.Handled = true;
+        }
+
+        private void ResizeHandle_MouseLeftButtonUp(object sender, MouseButtonEventArgs e)
+        {
+            CommitResize();
+            e.Handled = true;
+        }
+
+        private void ResizeHandle_LostMouseCapture(object sender, MouseEventArgs e)
+        {
+            if (_isResizing)
+                CancelResizePreview();
         }
 
         private void RemoveSelectedButton_Click(object sender, RoutedEventArgs e)
@@ -94,6 +168,7 @@ namespace Araci.Views
 
         private bool RemoveSelectedInstance()
         {
+            CancelResizePreview();
             CancelDragPreview();
             return ViewModel?.RemoverInstanciaSelecionada() == true;
         }
@@ -117,12 +192,39 @@ namespace Araci.Views
                 instance.SetPreviewPosition(_dragStartX, _dragStartY);
         }
 
+        private void CommitResize()
+        {
+            if (!_isResizing || _resizedInstance == null)
+                return;
+
+            ProjectSheetTableInstanceViewModel instance = _resizedInstance;
+            double newWidth = instance.Width;
+            double newHeight = instance.Height;
+            ReleaseResize();
+
+            if (Math.Abs(newWidth - _resizeStartWidth) < 0.000001 && Math.Abs(newHeight - _resizeStartHeight) < 0.000001)
+                return;
+
+            bool resized = ViewModel?.RedimensionarInstancia(instance.Id, newWidth, newHeight) == true;
+
+            if (!resized)
+                instance.SetPreviewSize(_resizeStartWidth, _resizeStartHeight);
+        }
+
         private void CancelDragPreview()
         {
             if (_draggedInstance != null)
                 _draggedInstance.SetPreviewPosition(_dragStartX, _dragStartY);
 
             ReleaseDrag();
+        }
+
+        private void CancelResizePreview()
+        {
+            if (_resizedInstance != null)
+                _resizedInstance.SetPreviewSize(_resizeStartWidth, _resizeStartHeight);
+
+            ReleaseResize();
         }
 
         private void ReleaseDrag()
@@ -134,6 +236,39 @@ namespace Araci.Views
 
             _dragElement = null;
             _draggedInstance = null;
+        }
+
+        private void ReleaseResize()
+        {
+            _isResizing = false;
+
+            if (_resizeElement?.IsMouseCaptured == true)
+                _resizeElement.ReleaseMouseCapture();
+
+            _resizeElement = null;
+            _resizedInstance = null;
+            _resizeMode = SheetTableResizeMode.None;
+        }
+
+        private static SheetTableResizeMode ObterModoRedimensionamento(object? tag)
+        {
+            string? value = tag?.ToString();
+
+            return value switch
+            {
+                "Right" => SheetTableResizeMode.Right,
+                "Bottom" => SheetTableResizeMode.Bottom,
+                "BottomRight" => SheetTableResizeMode.BottomRight,
+                _ => SheetTableResizeMode.None
+            };
+        }
+
+        private enum SheetTableResizeMode
+        {
+            None,
+            Right,
+            Bottom,
+            BottomRight
         }
     }
 }

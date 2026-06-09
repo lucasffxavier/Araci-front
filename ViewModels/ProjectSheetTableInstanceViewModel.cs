@@ -9,6 +9,8 @@ namespace Araci.ViewModels
     {
         private double _x;
         private double _y;
+        private double _width;
+        private double _height;
         private bool _isSelected;
 
         public ProjectSheetTableInstanceViewModel(ProjectSheetTableInstance instance, string tableName)
@@ -20,8 +22,8 @@ namespace Araci.ViewModels
             TableName = string.IsNullOrWhiteSpace(tableName) ? "Tabela sem nome" : tableName;
             _x = instance.X;
             _y = instance.Y;
-            Width = instance.Width;
-            Height = instance.Height;
+            _width = instance.Width;
+            _height = instance.Height;
         }
 
         public Guid Id { get; }
@@ -54,8 +56,31 @@ namespace Araci.ViewModels
             }
         }
 
-        public double Width { get; }
-        public double Height { get; }
+        public double Width
+        {
+            get => _width;
+            private set
+            {
+                if (Math.Abs(_width - value) < 0.000001)
+                    return;
+
+                _width = value;
+                OnPropertyChanged();
+            }
+        }
+
+        public double Height
+        {
+            get => _height;
+            private set
+            {
+                if (Math.Abs(_height - value) < 0.000001)
+                    return;
+
+                _height = value;
+                OnPropertyChanged();
+            }
+        }
 
         public bool IsSelected
         {
@@ -74,6 +99,19 @@ namespace Araci.ViewModels
         {
             X = x;
             Y = y;
+        }
+
+        public void SetPreviewSize(double width, double height)
+        {
+            Width = NormalizeDimension(width, ProjectSheetTableInstance.MinWidth);
+            Height = NormalizeDimension(height, ProjectSheetTableInstance.MinHeight);
+        }
+
+        private static double NormalizeDimension(double value, double minimum)
+        {
+            return double.IsNaN(value) || double.IsInfinity(value) || value < minimum
+                ? minimum
+                : value;
         }
 
         public event PropertyChangedEventHandler? PropertyChanged;
