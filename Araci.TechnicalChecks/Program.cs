@@ -102,6 +102,13 @@ namespace Araci.TechnicalChecks
                 ("Inserir tabela na prancha cria instancia undo redo", InserirTabelaNaPranchaCriaInstanciaUndoRedo),
                 ("Inserir tabela na prancha ignora ids invalidos", InserirTabelaNaPranchaIgnoraIdsInvalidos),
                 ("Inserir tabela na prancha multiplas instancias independentes", InserirTabelaNaPranchaMultiplasInstanciasIndependentes),
+                ("Inserir multiplas tabelas na prancha em uma operacao", InserirMultiplasTabelasNaPranchaEmUmaOperacao),
+                ("Inserir multiplas tabelas undo redo agrupado", InserirMultiplasTabelasUndoRedoAgrupado),
+                ("Inserir multiplas tabelas ignora ids invalidos", InserirMultiplasTabelasIgnoraIdsInvalidos),
+                ("Inserir multiplas tabelas remove duplicidades", InserirMultiplasTabelasRemoveDuplicidades),
+                ("Inserir multiplas tabelas distribui posicoes", InserirMultiplasTabelasDistribuiPosicoes),
+                ("InserirTabelaPranchaDialogResult transporta multiplos ids", InserirTabelaPranchaDialogResultTransportaMultiplosIds),
+                ("InserirTabelaPranchaWindow seleciona multiplas sem duplicidade", InserirTabelaPranchaWindowSelecionaMultiplasSemDuplicidade),
                 ("EditorContext expoe inserir tabela na prancha", EditorContextExpoeInserirTabelaNaPrancha),
                 ("ProjectSheetViewModel expoe instancias de tabela", ProjectSheetViewModelExpoeInstanciasTabela),
                 ("ProjectSheetViewModel resolve nome da tabela", ProjectSheetViewModelResolveNomeTabela),
@@ -5850,6 +5857,141 @@ namespace Araci.TechnicalChecks
             AssertEqual(primeira.Id, prancha.Tabelas[0].Id, "Undo preserva primeira instancia.");
         }
 
+        private static void InserirMultiplasTabelasNaPranchaEmUmaOperacao()
+        {
+            var document = new AraciDocument();
+            ProjectTable tabelaA = document.CriarNovaTabela();
+            ProjectTable tabelaB = document.CriarNovaTabela();
+            ProjectSheet prancha = document.CriarNovaPrancha();
+            var commands = new Araci.Core.Commands.CommandManager();
+            var useCase = new InserirTabelaNaPranchaUseCase(document, commands);
+
+            IReadOnlyList<ProjectSheetTableInstance> instancias = useCase.InserirMultiplas(prancha.Id, new[] { tabelaA.Id, tabelaB.Id });
+
+            AssertEqual(2, instancias.Count, "InserirMultiplas retorno Count");
+            AssertEqual(2, prancha.Tabelas.Count, "InserirMultiplas prancha Count");
+            AssertEqual(tabelaA.Id, prancha.Tabelas[0].TableId, "InserirMultiplas primeira TableId");
+            AssertEqual(tabelaB.Id, prancha.Tabelas[1].TableId, "InserirMultiplas segunda TableId");
+            Assert(commands.CanUndo, "InserirMultiplas deveria entrar no historico.");
+        }
+
+        private static void InserirMultiplasTabelasUndoRedoAgrupado()
+        {
+            var document = new AraciDocument();
+            ProjectTable tabelaA = document.CriarNovaTabela();
+            ProjectTable tabelaB = document.CriarNovaTabela();
+            ProjectTable tabelaC = document.CriarNovaTabela();
+            ProjectSheet prancha = document.CriarNovaPrancha();
+            var commands = new Araci.Core.Commands.CommandManager();
+            var useCase = new InserirTabelaNaPranchaUseCase(document, commands);
+
+            IReadOnlyList<ProjectSheetTableInstance> instancias = useCase.InserirMultiplas(prancha.Id, new[] { tabelaA.Id, tabelaB.Id, tabelaC.Id });
+            List<Guid> ids = instancias.Select(i => i.Id).ToList();
+            List<double> ys = instancias.Select(i => i.Y).ToList();
+
+            commands.Undo();
+
+            AssertEqual(0, prancha.Tabelas.Count, "Undo agrupado deveria remover todas as instancias.");
+
+            commands.Redo();
+
+            AssertEqual(3, prancha.Tabelas.Count, "Redo agrupado deveria restaurar todas as instancias.");
+            AssertEqual(ids[0], prancha.Tabelas[0].Id, "Redo agrupado instancia 0 Id");
+            AssertEqual(ids[1], prancha.Tabelas[1].Id, "Redo agrupado instancia 1 Id");
+            AssertEqual(ids[2], prancha.Tabelas[2].Id, "Redo agrupado instancia 2 Id");
+            AssertEqual(ys[0], prancha.Tabelas[0].Y, "Redo agrupado instancia 0 Y");
+            AssertEqual(ys[1], prancha.Tabelas[1].Y, "Redo agrupado instancia 1 Y");
+            AssertEqual(ys[2], prancha.Tabelas[2].Y, "Redo agrupado instancia 2 Y");
+        }
+
+        private static void InserirMultiplasTabelasIgnoraIdsInvalidos()
+        {
+            var document = new AraciDocument();
+            ProjectTable tabela = document.CriarNovaTabela();
+            ProjectSheet prancha = document.CriarNovaPrancha();
+            var commands = new Araci.Core.Commands.CommandManager();
+            var useCase = new InserirTabelaNaPranchaUseCase(document, commands);
+
+            IReadOnlyList<ProjectSheetTableInstance> semPrancha = useCase.InserirMultiplas(Guid.NewGuid(), new[] { tabela.Id });
+            IReadOnlyList<ProjectSheetTableInstance> comTabelaInvalida = useCase.InserirMultiplas(prancha.Id, new[] { Guid.Empty, Guid.NewGuid(), tabela.Id });
+
+            AssertEqual(0, semPrancha.Count, "InserirMultiplas sem prancha retorno Count");
+            AssertEqual(1, comTabelaInvalida.Count, "InserirMultiplas deveria ignorar tabelas invalidas");
+            AssertEqual(tabela.Id, prancha.Tabelas.Single().TableId, "InserirMultiplas tabela valida restante");
+        }
+
+        private static void InserirMultiplasTabelasRemoveDuplicidades()
+        {
+            var document = new AraciDocument();
+            ProjectTable tabelaA = document.CriarNovaTabela();
+            ProjectTable tabelaB = document.CriarNovaTabela();
+            ProjectSheet prancha = document.CriarNovaPrancha();
+            var commands = new Araci.Core.Commands.CommandManager();
+            var useCase = new InserirTabelaNaPranchaUseCase(document, commands);
+
+            IReadOnlyList<ProjectSheetTableInstance> instancias = useCase.InserirMultiplas(prancha.Id, new[] { tabelaA.Id, tabelaB.Id, tabelaA.Id, tabelaB.Id });
+
+            AssertEqual(2, instancias.Count, "InserirMultiplas sem duplicidade retorno Count");
+            AssertEqual(2, prancha.Tabelas.Count, "InserirMultiplas sem duplicidade prancha Count");
+            AssertEqual(tabelaA.Id, prancha.Tabelas[0].TableId, "InserirMultiplas preserva primeira ocorrencia A");
+            AssertEqual(tabelaB.Id, prancha.Tabelas[1].TableId, "InserirMultiplas preserva primeira ocorrencia B");
+        }
+
+        private static void InserirMultiplasTabelasDistribuiPosicoes()
+        {
+            var document = new AraciDocument();
+            ProjectTable tabelaA = document.CriarNovaTabela();
+            ProjectTable tabelaB = document.CriarNovaTabela();
+            ProjectTable tabelaC = document.CriarNovaTabela();
+            ProjectSheet prancha = document.CriarNovaPrancha();
+            var commands = new Araci.Core.Commands.CommandManager();
+            var useCase = new InserirTabelaNaPranchaUseCase(document, commands);
+
+            IReadOnlyList<ProjectSheetTableInstance> instancias = useCase.InserirMultiplas(prancha.Id, new[] { tabelaA.Id, tabelaB.Id, tabelaC.Id });
+
+            AssertEqual(InserirTabelaNaPranchaUseCase.DefaultX, instancias[0].X, "InserirMultiplas primeira X");
+            AssertEqual(InserirTabelaNaPranchaUseCase.DefaultY, instancias[0].Y, "InserirMultiplas primeira Y");
+            AssertEqual(InserirTabelaNaPranchaUseCase.DefaultY + InserirTabelaNaPranchaUseCase.DefaultHeight + 20, instancias[1].Y, "InserirMultiplas segunda Y");
+            AssertEqual(InserirTabelaNaPranchaUseCase.DefaultY + 2 * (InserirTabelaNaPranchaUseCase.DefaultHeight + 20), instancias[2].Y, "InserirMultiplas terceira Y");
+            Assert(instancias.Select(i => (i.X, i.Y)).Distinct().Count() == 3, "Instancias multiplas nao deveriam ficar totalmente sobrepostas.");
+        }
+
+        private static void InserirTabelaPranchaDialogResultTransportaMultiplosIds()
+        {
+            Guid sheetId = Guid.NewGuid();
+            Guid tabelaA = Guid.NewGuid();
+            Guid tabelaB = Guid.NewGuid();
+
+            var result = new InserirTabelaPranchaDialogResult(sheetId, new[] { tabelaA, Guid.Empty, tabelaB, tabelaA });
+
+            AssertEqual(sheetId, result.SheetId, "DialogResult SheetId");
+            AssertEqual(2, result.TableIds.Count, "DialogResult TableIds Count");
+            AssertEqual(tabelaA, result.TableIds[0], "DialogResult TableIds 0");
+            AssertEqual(tabelaB, result.TableIds[1], "DialogResult TableIds 1");
+        }
+
+        private static void InserirTabelaPranchaWindowSelecionaMultiplasSemDuplicidade()
+        {
+            RunSta(() =>
+            {
+                Guid pranchaId = Guid.NewGuid();
+                var tabelaA = new ProjectItemDialogOption(Guid.NewGuid(), "Tabela A");
+                var tabelaB = new ProjectItemDialogOption(Guid.NewGuid(), "Tabela B");
+                var window = new InserirTabelaPranchaWindow(
+                    new[] { new ProjectItemDialogOption(pranchaId, "Prancha A") },
+                    new[] { tabelaA, tabelaB });
+
+                window.MoverParaSelecionadas(new[] { tabelaA, tabelaB, tabelaA });
+
+                AssertEqual(pranchaId, window.PranchaSelecionada?.Id, "Janela PranchaSelecionada");
+                AssertEqual(2, window.TabelasSelecionadas.Count, "Janela TabelasSelecionadas Count");
+                AssertEqual(tabelaA.Id, window.TableIdsSelecionados[0], "Janela TableIdsSelecionados 0");
+                AssertEqual(tabelaB.Id, window.TableIdsSelecionados[1], "Janela TableIdsSelecionados 1");
+
+                window.Close();
+            });
+        }
+
         private static void EditorContextExpoeInserirTabelaNaPrancha()
         {
             var context = new EditorContext();
@@ -6615,7 +6757,7 @@ namespace Araci.TechnicalChecks
                 IReadOnlyList<ProjectItemDialogOption> tabelas)
             {
                 return pranchas.Count > 0 && tabelas.Count > 0
-                    ? new InserirTabelaPranchaDialogResult(pranchas[0].Id, tabelas[0].Id)
+                    ? new InserirTabelaPranchaDialogResult(pranchas[0].Id, tabelas.Select(t => t.Id))
                     : null;
             }
 

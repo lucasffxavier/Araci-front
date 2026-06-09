@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Linq;
 using Araci.Applications.Abstractions;
 using Araci.Core.Commands;
@@ -46,6 +47,47 @@ namespace Araci.Applications.UseCases.Projeto
 
             _commands.Execute(new AddProjectSheetTableInstanceCommand(sheet, instance));
             return instance;
+        }
+
+        public IReadOnlyList<ProjectSheetTableInstance> InserirMultiplas(
+            Guid sheetId,
+            IEnumerable<Guid> tableIds)
+        {
+            ProjectSheet? sheet = _document.Pranchas.FirstOrDefault(p => p.Id == sheetId);
+
+            if (sheet == null)
+                return Array.Empty<ProjectSheetTableInstance>();
+
+            HashSet<Guid> validTableIds = _document.Tabelas.Select(t => t.Id).ToHashSet();
+            List<Guid> tableIdsValidos = (tableIds ?? Array.Empty<Guid>())
+                .Where(id => id != Guid.Empty && validTableIds.Contains(id))
+                .Distinct()
+                .ToList();
+
+            if (tableIdsValidos.Count == 0)
+                return Array.Empty<ProjectSheetTableInstance>();
+
+            var instances = new List<ProjectSheetTableInstance>();
+            var command = new CompositeCommand();
+            int baseIndex = sheet.Tabelas.Count;
+
+            for (int i = 0; i < tableIdsValidos.Count; i++)
+            {
+                var instance = new ProjectSheetTableInstance
+                {
+                    TableId = tableIdsValidos[i],
+                    X = DefaultX,
+                    Y = DefaultY + i * (DefaultHeight + 20),
+                    Width = DefaultWidth,
+                    Height = DefaultHeight
+                };
+
+                instances.Add(instance);
+                command.Add(new AddProjectSheetTableInstanceCommand(sheet, instance, baseIndex + i));
+            }
+
+            _commands.Execute(command);
+            return instances;
         }
     }
 }

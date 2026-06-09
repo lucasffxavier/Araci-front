@@ -1,16 +1,21 @@
 using System;
+using System.Collections.Generic;
+using System.Linq;
 
 namespace Araci.Applications.Abstractions
 {
     public sealed class InserirTabelaPranchaDialogResult
     {
-        public InserirTabelaPranchaDialogResult(Guid sheetId, Guid tableId)
+        public InserirTabelaPranchaDialogResult(Guid sheetId, IEnumerable<Guid> tableIds)
         {
             SheetId = sheetId;
-            TableId = tableId;
+            TableIds = (tableIds ?? Array.Empty<Guid>())
+                .Where(id => id != Guid.Empty)
+                .Distinct()
+                .ToList();
         }
 
         public Guid SheetId { get; }
-        public Guid TableId { get; }
+        public IReadOnlyList<Guid> TableIds { get; }
     }
 }

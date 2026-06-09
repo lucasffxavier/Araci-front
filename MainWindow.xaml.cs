@@ -194,22 +194,23 @@ namespace Araci
                 .Select(t => new ProjectItemDialogOption(t.Id, t.Nome))
                 .ToList();
 
-            InserirTabelaPranchaDialogResult? result = pranchas.Count == 1 && tabelas.Count == 1
-                ? new InserirTabelaPranchaDialogResult(pranchas[0].Id, tabelas[0].Id)
-                : _context.Dialogs.ShowInserirTabelaPranchaDialog(pranchas, tabelas);
+            InserirTabelaPranchaDialogResult? result = _context.Dialogs.ShowInserirTabelaPranchaDialog(pranchas, tabelas);
 
-            if (result == null)
+            if (result == null || result.TableIds.Count == 0)
                 return;
 
-            ProjectSheetTableInstance? instance = _context.InserirTabelaNaPrancha.Inserir(result.SheetId, result.TableId);
+            IReadOnlyList<ProjectSheetTableInstance> instances = _context.InserirTabelaNaPrancha.InserirMultiplas(result.SheetId, result.TableIds);
 
-            if (instance == null)
+            if (instances.Count == 0)
             {
-                _context.Dialogs.ShowWarning("Inserir tabela na prancha", "Não foi possível inserir a tabela na prancha selecionada.");
+                _context.Dialogs.ShowWarning("Inserir tabela na prancha", "Nao foi possivel inserir as tabelas na prancha selecionada.");
                 return;
             }
 
-            _context.Dialogs.ShowInfo("Inserir tabela na prancha", "Tabela inserida na prancha.");
+            if (_projectSheetViewModel?.SheetId == result.SheetId)
+                _projectSheetViewModel.Refresh();
+
+            _context.Dialogs.ShowInfo("Inserir tabela na prancha", instances.Count == 1 ? "Tabela inserida na prancha." : "Tabelas inseridas na prancha.");
         }
 
         public void MostrarConfiguracaoUnidades()

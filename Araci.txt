@@ -477,6 +477,8 @@ Araci-front
 │   ├── LinhaEndpointHandleViewModel.cs
 │   ├── ParameterViewModel.cs
 │   ├── ProjectBrowserViewModel.cs
+│   ├── ProjectSheetTableInstanceViewModel.cs
+│   ├── ProjectSheetViewModel.cs
 │   ├── ProjectTableDataViewModel.cs
 │   ├── ProjectTablePropertiesViewModel.cs
 │   ├── ProjectViewPropertiesViewModel.cs
@@ -503,6 +505,8 @@ Araci-front
 ├── Views
 │   ├── ProjectBrowserView.xaml
 │   ├── ProjectBrowserView.xaml.cs
+│   ├── ProjectSheetView.xaml
+│   ├── ProjectSheetView.xaml.cs
 │   ├── ProjectTableGridView.xaml
 │   ├── ProjectTableGridView.xaml.cs
 │   ├── ViewportView.xaml
@@ -528,413 +532,204 @@ Araci-front
 
 
 ====================================================================================================
-ARQUIVO: C:\Users\User\source\repos\lucasffxavier\Araci-front\Applications\Projects\Tables\ProjectTableDataBuilder.cs
+ARQUIVO: C:\Users\User\source\repos\lucasffxavier\Araci-front\Applications\Abstractions\IUserDialogService.cs
+====================================================================================================
+
+using Araci.Services.Simulation;
+using Araci.Core.Documents;
+using System.Collections.Generic;
+
+namespace Araci.Applications.Abstractions
+{
+    public interface IUserDialogService
+    {
+        void ShowInfo(string title, string message);
+
+        void ShowWarning(string title, string message);
+
+        void ShowError(string title, string message);
+
+        string? ShowSaveCsvDialog(string suggestedFileName);
+
+        InserirTabelaPranchaDialogResult? ShowInserirTabelaPranchaDialog(
+            IReadOnlyList<ProjectItemDialogOption> pranchas,
+            IReadOnlyList<ProjectItemDialogOption> tabelas);
+
+        ElementosTabelaDialogResult? ShowElementosTabelaDialog(
+            IReadOnlyList<ProjectTableElementCategory> categorias,
+            IReadOnlyList<ProjectTableFieldSelection> camposSelecionados);
+
+        FiltrosTabelaDialogResult? ShowFiltrosTabelaDialog(
+            IReadOnlyList<ProjectTableFieldSelection> camposSelecionados,
+            IReadOnlyList<ProjectViewDialogOption> vistasDisponiveis,
+            Guid? filtroVistaId,
+            ProjectTableFilterLogicalMode modo,
+            IReadOnlyList<ProjectTableFilterRule> filtros);
+
+        OrdenacaoTabelaDialogResult? ShowOrdenacaoTabelaDialog(
+            IReadOnlyList<ProjectTableFieldSelection> camposSelecionados,
+            IReadOnlyList<ProjectTableSorting> ordenacoes);
+
+        bool Confirm(string title, string message);
+
+        void Show(SimulationMessage message);
+    }
+}
+
+
+
+====================================================================================================
+ARQUIVO: C:\Users\User\source\repos\lucasffxavier\Araci-front\Applications\Abstractions\InserirTabelaPranchaDialogResult.cs
 ====================================================================================================
 
 using System;
-using System.Collections.Generic;
-using System.Globalization;
+
+namespace Araci.Applications.Abstractions
+{
+    public sealed class InserirTabelaPranchaDialogResult
+    {
+        public InserirTabelaPranchaDialogResult(Guid sheetId, Guid tableId)
+        {
+            SheetId = sheetId;
+            TableId = tableId;
+        }
+
+        public Guid SheetId { get; }
+        public Guid TableId { get; }
+    }
+}
+
+
+
+====================================================================================================
+ARQUIVO: C:\Users\User\source\repos\lucasffxavier\Araci-front\Applications\Abstractions\ProjectItemDialogOption.cs
+====================================================================================================
+
+using System;
+
+namespace Araci.Applications.Abstractions
+{
+    public sealed class ProjectItemDialogOption
+    {
+        public ProjectItemDialogOption(Guid id, string nome)
+        {
+            Id = id;
+            Nome = nome;
+        }
+
+        public Guid Id { get; }
+        public string Nome { get; }
+    }
+}
+
+
+
+====================================================================================================
+ARQUIVO: C:\Users\User\source\repos\lucasffxavier\Araci-front\Applications\Commands\AddProjectSheetTableInstanceCommand.cs
+====================================================================================================
+
+using System;
 using System.Linq;
 using Araci.Core.Documents;
-using Araci.Models;
 
-namespace Araci.Applications.Projects.Tables
+namespace Araci.Core.Commands
 {
-    public sealed class ProjectTableDataBuilder
+    public sealed class AddProjectSheetTableInstanceCommand : IUndoableCommand
     {
-        public ProjectTableDataResult Build(AraciDocument document, ProjectTable table)
+        private readonly ProjectSheet _sheet;
+        private readonly ProjectSheetTableInstance _instance;
+        private readonly int _index;
+
+        public AddProjectSheetTableInstanceCommand(ProjectSheet sheet, ProjectSheetTableInstance instance)
         {
-            ArgumentNullException.ThrowIfNull(document);
-            ArgumentNullException.ThrowIfNull(table);
-
-            List<ProjectTableDataColumn> columns = CriarColunas(table);
-
-            if (columns.Count == 0 || table.CategoriasElementos.Count == 0)
-                return new ProjectTableDataResult(columns, new List<ProjectTableDataRow>());
-
-            HashSet<ProjectTableElementCategory> categorias = table.CategoriasElementos.ToHashSet();
-            Guid? filtroVistaId = ObterFiltroVistaValido(document, table.FiltroVistaId);
-
-            List<RowBuildData> rows = document.Elementos
-                .Select((elemento, index) => new { Elemento = elemento, Index = index, Categoria = ObterCategoria(elemento) })
-                .Where(item => item.Categoria.HasValue && categorias.Contains(item.Categoria.Value))
-                .Where(item => PassaFiltroVista(item.Elemento, filtroVistaId))
-                .Select(item => CriarLinha(item.Elemento, item.Categoria!.Value, item.Index, columns))
-                .Where(row => PassaFiltros(row, table))
-                .ToList();
-
-            rows = OrdenarLinhas(rows, table, columns);
-
-            return new ProjectTableDataResult(
-                columns,
-                rows.Select(row => row.Row).ToList());
+            _sheet = sheet ?? throw new ArgumentNullException(nameof(sheet));
+            _instance = instance ?? throw new ArgumentNullException(nameof(instance));
+            _index = sheet.Tabelas.Count;
         }
 
-        private static List<ProjectTableDataColumn> CriarColunas(ProjectTable table)
+        public void Execute()
         {
-            return (table.CamposSelecionados ?? new List<ProjectTableFieldSelection>())
-                .Where(c => !string.IsNullOrWhiteSpace(c.CampoId))
-                .OrderBy(c => c.Ordem)
-                .GroupBy(c => CriarChaveCampo(c.Categoria, c.CampoId))
-                .Select((g, index) =>
-                {
-                    ProjectTableFieldSelection campo = g.First();
-                    string campoId = campo.CampoId.Trim();
-                    return new ProjectTableDataColumn(
-                        campo.Categoria,
-                        campoId,
-                        string.IsNullOrWhiteSpace(campo.NomeExibicao) ? campoId : campo.NomeExibicao.Trim(),
-                        index);
-                })
-                .ToList();
+            Add();
         }
 
-        private static Guid? ObterFiltroVistaValido(AraciDocument document, Guid? filtroVistaId)
+        public void Undo()
         {
-            if (!filtroVistaId.HasValue || filtroVistaId.Value == Guid.Empty)
+            _sheet.Tabelas.RemoveAll(i => i.Id == _instance.Id);
+        }
+
+        public void Redo()
+        {
+            Add();
+        }
+
+        private void Add()
+        {
+            if (_sheet.Tabelas.Any(i => i.Id == _instance.Id))
+                return;
+
+            int safeIndex = _index < 0 || _index > _sheet.Tabelas.Count
+                ? _sheet.Tabelas.Count
+                : _index;
+
+            _sheet.Tabelas.Insert(safeIndex, _instance);
+        }
+    }
+}
+
+
+
+====================================================================================================
+ARQUIVO: C:\Users\User\source\repos\lucasffxavier\Araci-front\Applications\UseCases\Projeto\InserirTabelaNaPranchaUseCase.cs
+====================================================================================================
+
+using System;
+using System.Linq;
+using Araci.Applications.Abstractions;
+using Araci.Core.Commands;
+using Araci.Core.Documents;
+
+namespace Araci.Applications.UseCases.Projeto
+{
+    public sealed class InserirTabelaNaPranchaUseCase
+    {
+        public const double DefaultX = 40.0;
+        public const double DefaultY = 40.0;
+        public const double DefaultWidth = 400.0;
+        public const double DefaultHeight = 240.0;
+
+        private readonly AraciDocument _document;
+        private readonly ICommandHistory _commands;
+
+        public InserirTabelaNaPranchaUseCase(AraciDocument document, ICommandHistory commands)
+        {
+            _document = document ?? throw new ArgumentNullException(nameof(document));
+            _commands = commands ?? throw new ArgumentNullException(nameof(commands));
+        }
+
+        public ProjectSheetTableInstance? Inserir(
+            Guid sheetId,
+            Guid tableId,
+            double? x = null,
+            double? y = null,
+            double? width = null,
+            double? height = null)
+        {
+            ProjectSheet? sheet = _document.Pranchas.FirstOrDefault(p => p.Id == sheetId);
+
+            if (sheet == null || !_document.Tabelas.Any(t => t.Id == tableId))
                 return null;
 
-            return document.Vistas.Any(v => v.Id == filtroVistaId.Value)
-                ? filtroVistaId
-                : null;
-        }
-
-        private static bool PassaFiltroVista(Elemento elemento, Guid? filtroVistaId)
-        {
-            return !filtroVistaId.HasValue || elemento.ViewId == filtroVistaId.Value;
-        }
-
-        private static RowBuildData CriarLinha(
-            Elemento elemento,
-            ProjectTableElementCategory categoria,
-            int documentIndex,
-            IReadOnlyList<ProjectTableDataColumn> columns)
-        {
-            List<ProjectTableDataCell> cells = columns
-                .Select(column =>
-                {
-                    object? valor = ExtrairValor(elemento, categoria, column);
-                    return new ProjectTableDataCell(
-                        column.Categoria,
-                        column.CampoId,
-                        column.NomeExibicao,
-                        valor,
-                        FormatarValor(valor));
-                })
-                .ToList();
-
-            var row = new ProjectTableDataRow(
-                elemento.Id,
-                elemento.Nome,
-                categoria,
-                cells);
-
-            return new RowBuildData(elemento, documentIndex, row);
-        }
-
-        private static bool PassaFiltros(RowBuildData row, ProjectTable table)
-        {
-            List<ProjectTableFilterRule> filtros = NormalizarFiltros(table.Filtros, row.Row.Cells);
-
-            if (filtros.Count == 0)
-                return true;
-
-            return table.ModoFiltro == ProjectTableFilterLogicalMode.Qualquer
-                ? filtros.Any(f => AvaliarFiltro(row, f))
-                : filtros.All(f => AvaliarFiltro(row, f));
-        }
-
-        private static List<ProjectTableFilterRule> NormalizarFiltros(
-            IEnumerable<ProjectTableFilterRule>? filtros,
-            IReadOnlyList<ProjectTableDataCell> cells)
-        {
-            HashSet<string> campos = cells
-                .Select(c => CriarChaveCampo(c.Categoria, c.CampoId))
-                .ToHashSet(StringComparer.Ordinal);
-
-            return (filtros ?? Enumerable.Empty<ProjectTableFilterRule>())
-                .Where(f => !string.IsNullOrWhiteSpace(f.CampoId))
-                .OrderBy(f => f.Ordem)
-                .Where(f => campos.Contains(CriarChaveCampo(f.Categoria, f.CampoId)))
-                .Take(5)
-                .ToList();
-        }
-
-        private static bool AvaliarFiltro(RowBuildData row, ProjectTableFilterRule filtro)
-        {
-            ProjectTableDataCell? cell = ObterCell(row, filtro.Categoria, filtro.CampoId);
-
-            if (cell == null)
-                return false;
-
-            string valorFiltro = filtro.Valor?.Trim() ?? string.Empty;
-            string display = cell.DisplayValue ?? string.Empty;
-
-            if (filtro.Operador is ProjectTableFilterOperator.IgualA or ProjectTableFilterOperator.DiferenteDe &&
-                TentarConverterNumero(cell.RawValue, out double numeroCelula) &&
-                TentarConverterNumero(valorFiltro, out double numeroFiltro))
+            var instance = new ProjectSheetTableInstance
             {
-                bool igualNumero = Math.Abs(numeroCelula - numeroFiltro) < 0.0000001;
-                return filtro.Operador == ProjectTableFilterOperator.IgualA ? igualNumero : !igualNumero;
-            }
-
-            int comparacao = string.Compare(display, valorFiltro, StringComparison.OrdinalIgnoreCase);
-            bool resultado = filtro.Operador switch
-            {
-                ProjectTableFilterOperator.Contem => display.Contains(valorFiltro, StringComparison.OrdinalIgnoreCase),
-                ProjectTableFilterOperator.NaoContem => !display.Contains(valorFiltro, StringComparison.OrdinalIgnoreCase),
-                ProjectTableFilterOperator.ComecaCom => display.StartsWith(valorFiltro, StringComparison.OrdinalIgnoreCase),
-                ProjectTableFilterOperator.TerminaCom => display.EndsWith(valorFiltro, StringComparison.OrdinalIgnoreCase),
-                ProjectTableFilterOperator.IgualA => comparacao == 0,
-                ProjectTableFilterOperator.DiferenteDe => comparacao != 0,
-                _ => display.Contains(valorFiltro, StringComparison.OrdinalIgnoreCase)
+                TableId = tableId,
+                X = x ?? DefaultX,
+                Y = y ?? DefaultY,
+                Width = width ?? DefaultWidth,
+                Height = height ?? DefaultHeight
             };
 
-            return resultado;
-        }
-
-        private static List<RowBuildData> OrdenarLinhas(
-            List<RowBuildData> rows,
-            ProjectTable table,
-            IReadOnlyList<ProjectTableDataColumn> columns)
-        {
-            List<ProjectTableSorting> ordenacoes = NormalizarOrdenacoes(table.Ordenacoes, columns);
-
-            if (ordenacoes.Count == 0)
-                return rows.OrderBy(row => row.DocumentIndex).ToList();
-
-            return rows
-                .OrderBy(row => row, new RowBuildDataComparer(ordenacoes))
-                .ToList();
-        }
-
-        private static List<ProjectTableSorting> NormalizarOrdenacoes(
-            IEnumerable<ProjectTableSorting>? ordenacoes,
-            IReadOnlyList<ProjectTableDataColumn> columns)
-        {
-            HashSet<string> campos = columns
-                .Select(c => CriarChaveCampo(c.Categoria, c.CampoId))
-                .ToHashSet(StringComparer.Ordinal);
-
-            var chavesUsadas = new HashSet<string>(StringComparer.Ordinal);
-            var resultado = new List<ProjectTableSorting>();
-
-            foreach (ProjectTableSorting ordenacao in (ordenacoes ?? Enumerable.Empty<ProjectTableSorting>())
-                .Where(o => !string.IsNullOrWhiteSpace(o.CampoId))
-                .OrderBy(o => o.Ordem))
-            {
-                string chave = CriarChaveCampo(ordenacao.Categoria, ordenacao.CampoId);
-
-                if (!campos.Contains(chave) || !chavesUsadas.Add(chave))
-                    continue;
-
-                resultado.Add(new ProjectTableSorting
-                {
-                    Ordem = resultado.Count,
-                    Categoria = ordenacao.Categoria,
-                    CampoId = ordenacao.CampoId.Trim(),
-                    NomeExibicao = ordenacao.NomeExibicao,
-                    Direcao = Enum.IsDefined(typeof(ProjectTableSortDirection), ordenacao.Direcao)
-                        ? ordenacao.Direcao
-                        : ProjectTableSortDirection.Crescente
-                });
-
-                if (resultado.Count == 5)
-                    break;
-            }
-
-            return resultado;
-        }
-
-        private static object? ExtrairValor(
-            Elemento elemento,
-            ProjectTableElementCategory categoriaElemento,
-            ProjectTableDataColumn column)
-        {
-            if (categoriaElemento != column.Categoria)
-                return null;
-
-            string campoId = column.CampoId.Trim();
-
-            if (string.Equals(campoId, Elemento.PARAM_NOME, StringComparison.Ordinal))
-                return elemento.Nome;
-
-            if (string.Equals(campoId, "Tipo", StringComparison.Ordinal))
-                return elemento.Tipo?.NomeTipo ?? string.Empty;
-
-            string? parametro = ObterParametroAlias(categoriaElemento, campoId);
-
-            if (parametro != null && elemento.Parametros.TryGetValue(parametro, out Parameter? aliasParameter))
-                return aliasParameter.ValorObjeto;
-
-            return elemento.Parametros.TryGetValue(campoId, out Parameter? parameter)
-                ? parameter.ValorObjeto
-                : null;
-        }
-
-        private static string? ObterParametroAlias(ProjectTableElementCategory categoria, string campoId)
-        {
-            return categoria switch
-            {
-                ProjectTableElementCategory.Barras when campoId == "TensaoNominal" => Barra.PARAM_TENSAO,
-                ProjectTableElementCategory.Cabos when campoId == "Corrente" => Cabo.PARAM_CORRENTE_LINHA,
-                ProjectTableElementCategory.Cargas when campoId == "Tensao" => ElementoEquipamento.PARAM_TENSAO_LINHA,
-                ProjectTableElementCategory.Geradores when campoId == "Tensao" => ElementoEquipamento.PARAM_TENSAO_LINHA,
-                ProjectTableElementCategory.Transformadores when campoId == "PotenciaNominal" => Transformador.PARAM_POTENCIA_APARENTE,
-                ProjectTableElementCategory.Transformadores when campoId == "TensaoPrimaria" => Transformador.PARAM_TENSAO_PRIMARIO_KV,
-                ProjectTableElementCategory.Transformadores when campoId == "TensaoSecundaria" => Transformador.PARAM_TENSAO_SECUNDARIO_KV,
-                ProjectTableElementCategory.Sin when campoId == "Tensao" => ElementoEquipamento.PARAM_TENSAO_LINHA,
-                _ => null
-            };
-        }
-
-        private static ProjectTableElementCategory? ObterCategoria(Elemento elemento)
-        {
-            return elemento switch
-            {
-                Barra => ProjectTableElementCategory.Barras,
-                Cabo => ProjectTableElementCategory.Cabos,
-                Carga => ProjectTableElementCategory.Cargas,
-                Gerador => ProjectTableElementCategory.Geradores,
-                Transformador => ProjectTableElementCategory.Transformadores,
-                Sin => ProjectTableElementCategory.Sin,
-                _ => null
-            };
-        }
-
-        private static ProjectTableDataCell? ObterCell(
-            RowBuildData row,
-            ProjectTableElementCategory categoria,
-            string campoId)
-        {
-            string chave = CriarChaveCampo(categoria, campoId);
-            return row.Row.Cells.FirstOrDefault(c =>
-                string.Equals(CriarChaveCampo(c.Categoria, c.CampoId), chave, StringComparison.Ordinal));
-        }
-
-        private static int CompararValores(object? a, object? b, bool decrescente)
-        {
-            bool vazioA = ValorVazio(a);
-            bool vazioB = ValorVazio(b);
-
-            if (vazioA && vazioB)
-                return 0;
-
-            if (vazioA)
-                return 1;
-
-            if (vazioB)
-                return -1;
-
-            int comparacao;
-
-            if (TentarConverterNumero(a, out double numeroA) &&
-                TentarConverterNumero(b, out double numeroB))
-                comparacao = numeroA.CompareTo(numeroB);
-            else
-                comparacao = string.Compare(FormatarValor(a), FormatarValor(b), StringComparison.OrdinalIgnoreCase);
-
-            return decrescente ? -comparacao : comparacao;
-        }
-
-        private static bool ValorVazio(object? valor)
-        {
-            return valor == null || valor is string texto && string.IsNullOrWhiteSpace(texto);
-        }
-
-        private static bool TentarConverterNumero(object? valor, out double numero)
-        {
-            numero = 0;
-
-            if (valor == null)
-                return false;
-
-            if (valor is double d)
-            {
-                numero = d;
-                return true;
-            }
-
-            if (valor is int i)
-            {
-                numero = i;
-                return true;
-            }
-
-            string texto = Convert.ToString(valor, CultureInfo.InvariantCulture)?.Trim() ?? string.Empty;
-
-            return double.TryParse(texto, NumberStyles.Float, CultureInfo.InvariantCulture, out numero) ||
-                double.TryParse(texto, NumberStyles.Float, CultureInfo.GetCultureInfo("pt-BR"), out numero);
-        }
-
-        private static string FormatarValor(object? valor)
-        {
-            return valor switch
-            {
-                null => string.Empty,
-                double d => d.ToString(CultureInfo.InvariantCulture),
-                float f => f.ToString(CultureInfo.InvariantCulture),
-                decimal m => m.ToString(CultureInfo.InvariantCulture),
-                _ => Convert.ToString(valor, CultureInfo.InvariantCulture) ?? string.Empty
-            };
-        }
-
-        private static string CriarChaveCampo(ProjectTableElementCategory categoria, string campoId)
-        {
-            return $"{categoria}|{campoId.Trim()}";
-        }
-
-        private sealed class RowBuildData
-        {
-            public RowBuildData(Elemento elemento, int documentIndex, ProjectTableDataRow row)
-            {
-                Elemento = elemento;
-                DocumentIndex = documentIndex;
-                Row = row;
-            }
-
-            public Elemento Elemento { get; }
-            public int DocumentIndex { get; }
-            public ProjectTableDataRow Row { get; }
-        }
-
-        private sealed class RowBuildDataComparer : IComparer<RowBuildData>
-        {
-            private readonly IReadOnlyList<ProjectTableSorting> _ordenacoes;
-
-            public RowBuildDataComparer(IReadOnlyList<ProjectTableSorting> ordenacoes)
-            {
-                _ordenacoes = ordenacoes;
-            }
-
-            public int Compare(RowBuildData? x, RowBuildData? y)
-            {
-                if (ReferenceEquals(x, y))
-                    return 0;
-
-                if (x == null)
-                    return 1;
-
-                if (y == null)
-                    return -1;
-
-                foreach (ProjectTableSorting ordenacao in _ordenacoes)
-                {
-                    ProjectTableDataCell? cellX = ObterCell(x, ordenacao.Categoria, ordenacao.CampoId);
-                    ProjectTableDataCell? cellY = ObterCell(y, ordenacao.Categoria, ordenacao.CampoId);
-                    int comparacao = CompararValores(
-                        cellX?.RawValue,
-                        cellY?.RawValue,
-                        ordenacao.Direcao == ProjectTableSortDirection.Decrescente);
-
-                    if (comparacao == 0)
-                        continue;
-
-                    return comparacao;
-                }
-
-                return x.DocumentIndex.CompareTo(y.DocumentIndex);
-            }
+            _commands.Execute(new AddProjectSheetTableInstanceCommand(sheet, instance));
+            return instance;
         }
     }
 }
@@ -1050,6 +845,11 @@ namespace Araci.TechnicalChecks
                 ("Inserir tabela na prancha ignora ids invalidos", InserirTabelaNaPranchaIgnoraIdsInvalidos),
                 ("Inserir tabela na prancha multiplas instancias independentes", InserirTabelaNaPranchaMultiplasInstanciasIndependentes),
                 ("EditorContext expoe inserir tabela na prancha", EditorContextExpoeInserirTabelaNaPrancha),
+                ("ProjectSheetViewModel expoe instancias de tabela", ProjectSheetViewModelExpoeInstanciasTabela),
+                ("ProjectSheetViewModel resolve nome da tabela", ProjectSheetViewModelResolveNomeTabela),
+                ("ProjectSheetViewModel trata prancha vazia", ProjectSheetViewModelTrataPranchaVazia),
+                ("ProjectSheetViewModel trata tabela inexistente", ProjectSheetViewModelTrataTabelaInexistente),
+                ("ProjectSheetViewModel refresh nao altera modelo", ProjectSheetViewModelRefreshNaoAlteraModelo),
                 ("Tabela data view model expoe colunas linhas e celulas", TabelaDataViewModelExpoeColunasLinhasECelulas),
                 ("Tabela data view model trata tabela sem campos", TabelaDataViewModelTrataTabelaSemCampos),
                 ("Tabela data view model trata tabela sem linhas", TabelaDataViewModelTrataTabelaSemLinhas),
@@ -1058,7 +858,10 @@ namespace Araci.TechnicalChecks
                 ("Filtros tabela window permite sem filtro", FiltrosTabelaWindowPermiteSemFiltro),
                 ("Tabela remove filtro com undo redo", TabelaRemoveFiltroComUndoRedo),
                 ("Project Browser seleciona tabela e solicita visualizacao", ProjectBrowserSelecionaTabelaESolicitaVisualizacao),
+                ("Project Browser seleciona prancha e solicita visualizacao", ProjectBrowserSelecionaPranchaESolicitaVisualizacao),
                 ("Project Browser seleciona vista e restaura viewport", ProjectBrowserSelecionaVistaERestauraViewport),
+                ("Project Browser seleciona vista depois de prancha", ProjectBrowserSelecionaVistaDepoisDePrancha),
+                ("Project Browser seleciona tabela depois de prancha", ProjectBrowserSelecionaTabelaDepoisDePrancha),
                 ("ProjectTableGridView recria colunas dinamicas", ProjectTableGridViewRecriaColunasDinamicas),
                 ("DTO permanece equivalente apos reload", DtoPermaneceEquivalenteAposReload),
                 ("IDs permanecem estaveis apos reload", IdsPermanecemEstaveisAposReload),
@@ -6796,6 +6599,105 @@ namespace Araci.TechnicalChecks
             Assert(context.InserirTabelaNaPrancha != null, "EditorContext deveria expor InserirTabelaNaPranchaUseCase.");
         }
 
+        private static void ProjectSheetViewModelExpoeInstanciasTabela()
+        {
+            var document = new AraciDocument();
+            ProjectTable tabela = document.CriarNovaTabela();
+            ProjectSheet prancha = document.CriarNovaPrancha();
+            var instancia = new ProjectSheetTableInstance
+            {
+                TableId = tabela.Id,
+                X = 11,
+                Y = 22,
+                Width = 333,
+                Height = 144
+            };
+            prancha.Tabelas.Add(instancia);
+
+            var viewModel = new ProjectSheetViewModel(document, prancha);
+            ProjectSheetTableInstanceViewModel instanceViewModel = viewModel.TableInstances.Single();
+
+            AssertEqual(prancha.Id, viewModel.SheetId, "ProjectSheetViewModel.SheetId");
+            AssertEqual(instancia.Id, instanceViewModel.Id, "Instancia VM Id");
+            AssertEqual(tabela.Id, instanceViewModel.TableId, "Instancia VM TableId");
+            AssertEqual(11, instanceViewModel.X, "Instancia VM X");
+            AssertEqual(22, instanceViewModel.Y, "Instancia VM Y");
+            AssertEqual(333, instanceViewModel.Width, "Instancia VM Width");
+            AssertEqual(144, instanceViewModel.Height, "Instancia VM Height");
+            Assert(viewModel.HasInstances, "ProjectSheetViewModel deveria indicar instancias.");
+            Assert(!viewModel.HasEmptyMessage, "ProjectSheetViewModel com instancias nao deveria exibir vazio.");
+        }
+
+        private static void ProjectSheetViewModelResolveNomeTabela()
+        {
+            var document = new AraciDocument();
+            ProjectTable tabela = document.CriarNovaTabela();
+            tabela.Nome = "Quadro de Cargas";
+            ProjectSheet prancha = document.CriarNovaPrancha();
+            prancha.Nome = "Prancha Geral";
+            prancha.Numero = "A101";
+            prancha.Tabelas.Add(new ProjectSheetTableInstance { TableId = tabela.Id });
+
+            var viewModel = new ProjectSheetViewModel(document, prancha);
+
+            AssertEqual("A101 - Prancha Geral", viewModel.Titulo, "ProjectSheetViewModel.Titulo");
+            AssertEqual("Quadro de Cargas", viewModel.TableInstances.Single().TableName, "Nome resolvido da tabela");
+        }
+
+        private static void ProjectSheetViewModelTrataPranchaVazia()
+        {
+            var document = new AraciDocument();
+            ProjectSheet prancha = document.CriarNovaPrancha();
+
+            var viewModel = new ProjectSheetViewModel(document, prancha);
+
+            AssertEqual(0, viewModel.TableInstances.Count, "Prancha vazia TableInstances.Count");
+            Assert(!viewModel.HasInstances, "Prancha vazia nao deveria indicar instancias.");
+            Assert(viewModel.HasEmptyMessage, "Prancha vazia deveria exibir mensagem.");
+            AssertEqual("Nenhuma tabela inserida na prancha", viewModel.EmptyMessage, "Prancha vazia EmptyMessage");
+        }
+
+        private static void ProjectSheetViewModelTrataTabelaInexistente()
+        {
+            var document = new AraciDocument();
+            ProjectSheet prancha = document.CriarNovaPrancha();
+            prancha.Tabelas.Add(new ProjectSheetTableInstance { TableId = Guid.NewGuid() });
+
+            var viewModel = new ProjectSheetViewModel(document, prancha);
+
+            AssertEqual(1, viewModel.TableInstances.Count, "Instancia com tabela inexistente Count");
+            AssertEqual("Tabela nao encontrada", viewModel.TableInstances.Single().TableName, "Tabela inexistente TableName");
+        }
+
+        private static void ProjectSheetViewModelRefreshNaoAlteraModelo()
+        {
+            var document = new AraciDocument();
+            ProjectTable tabela = document.CriarNovaTabela();
+            tabela.Nome = "Tabela Original";
+            ProjectSheet prancha = document.CriarNovaPrancha();
+            var instancia = new ProjectSheetTableInstance
+            {
+                TableId = tabela.Id,
+                X = 40,
+                Y = 50,
+                Width = 400,
+                Height = 240
+            };
+            prancha.Tabelas.Add(instancia);
+            var viewModel = new ProjectSheetViewModel(document, prancha);
+            Guid instanciaId = instancia.Id;
+            Guid tabelaId = instancia.TableId;
+
+            tabela.Nome = "Tabela Renomeada";
+            viewModel.Refresh();
+
+            AssertEqual(1, prancha.Tabelas.Count, "Refresh nao deveria alterar Tabelas.Count da prancha");
+            AssertEqual(instanciaId, prancha.Tabelas[0].Id, "Refresh nao deveria alterar instancia Id");
+            AssertEqual(tabelaId, prancha.Tabelas[0].TableId, "Refresh nao deveria alterar instancia TableId");
+            AssertEqual(40, prancha.Tabelas[0].X, "Refresh nao deveria alterar instancia X");
+            AssertEqual("Tabela Renomeada", viewModel.TableInstances.Single().TableName, "Refresh deveria atualizar nome exibido");
+        }
+
         private static void TabelaDataViewModelExpoeColunasLinhasECelulas()
         {
             AraciDocument document = CriarDocumentoTabelaDados();
@@ -7042,6 +6944,31 @@ namespace Araci.TechnicalChecks
             AssertEqual(tabela.Id, tabelaPropriedades, "Tabela propriedades");
         }
 
+        private static void ProjectBrowserSelecionaPranchaESolicitaVisualizacao()
+        {
+            var document = new AraciDocument();
+            ProjectSheet prancha = document.CriarNovaPrancha();
+            Guid? pranchaVisualizada = null;
+            Guid? tabelaVisualizada = null;
+            Guid? vistaAtiva = null;
+            var viewModel = new ProjectBrowserViewModel(
+                document,
+                definirVistaAtiva: id => vistaAtiva = id,
+                abrirTabela: id => tabelaVisualizada = id,
+                abrirPrancha: id => pranchaVisualizada = id);
+
+            ProjectBrowserItemViewModel itemPrancha = viewModel.Secoes
+                .SelectMany(secao => secao.Itens)
+                .Single(item => item.Tipo == "Prancha" && item.Id == prancha.Id);
+
+            itemPrancha.SelecionarCommand.Execute(null);
+
+            AssertEqual(prancha.Id, pranchaVisualizada, "Prancha visualizada");
+            Assert(tabelaVisualizada == null, "Selecionar prancha nao deveria solicitar tabela.");
+            Assert(vistaAtiva == null, "Selecionar prancha nao deveria ativar vista.");
+            Assert(itemPrancha.IsSelected, "Prancha deveria ficar selecionada no Project Browser.");
+        }
+
         private static void ProjectBrowserSelecionaVistaERestauraViewport()
         {
             var document = new AraciDocument();
@@ -7076,6 +7003,72 @@ namespace Araci.TechnicalChecks
             Assert(itemVista.IsSelected, "Vista deveria ficar selecionada no Project Browser.");
             Assert(!itemTabela.IsSelected, "Tabela deveria deixar de ficar selecionada no Project Browser.");
             Assert(itemVista.IsActiveView, "Vista selecionada deveria ficar marcada como ativa.");
+        }
+
+        private static void ProjectBrowserSelecionaVistaDepoisDePrancha()
+        {
+            var document = new AraciDocument();
+            ProjectSheet prancha = document.CriarNovaPrancha();
+            ProjectView vista = document.Vistas[0];
+            Guid? pranchaVisualizada = null;
+            Guid? vistaAtiva = null;
+            Guid? vistaPropriedades = null;
+            var viewModel = new ProjectBrowserViewModel(
+                document,
+                definirVistaAtiva: id =>
+                {
+                    document.DefinirVistaAtiva(id);
+                    vistaAtiva = id;
+                },
+                abrirPrancha: id => pranchaVisualizada = id,
+                abrirPropriedadesVista: id => vistaPropriedades = id);
+
+            ProjectBrowserItemViewModel itemPrancha = viewModel.Secoes
+                .SelectMany(secao => secao.Itens)
+                .Single(item => item.Tipo == "Prancha" && item.Id == prancha.Id);
+            ProjectBrowserItemViewModel itemVista = viewModel.Secoes
+                .SelectMany(secao => secao.Itens)
+                .Single(item => item.Tipo == "Vista" && item.Id == vista.Id);
+
+            itemPrancha.SelecionarCommand.Execute(null);
+            itemVista.SelecionarCommand.Execute(null);
+
+            AssertEqual(prancha.Id, pranchaVisualizada, "Prancha visualizada antes de voltar para vista");
+            AssertEqual(vista.Id, vistaAtiva, "Vista ativa apos prancha");
+            AssertEqual(vista.Id, vistaPropriedades, "Vista propriedades apos prancha");
+            Assert(itemVista.IsSelected, "Vista deveria ficar selecionada apos prancha.");
+            Assert(!itemPrancha.IsSelected, "Prancha deveria deixar de ficar selecionada apos vista.");
+        }
+
+        private static void ProjectBrowserSelecionaTabelaDepoisDePrancha()
+        {
+            var document = new AraciDocument();
+            ProjectTable tabela = document.CriarNovaTabela();
+            ProjectSheet prancha = document.CriarNovaPrancha();
+            Guid? pranchaVisualizada = null;
+            Guid? tabelaVisualizada = null;
+            Guid? tabelaPropriedades = null;
+            var viewModel = new ProjectBrowserViewModel(
+                document,
+                abrirTabela: id => tabelaVisualizada = id,
+                abrirPrancha: id => pranchaVisualizada = id,
+                abrirPropriedadesTabela: id => tabelaPropriedades = id);
+
+            ProjectBrowserItemViewModel itemPrancha = viewModel.Secoes
+                .SelectMany(secao => secao.Itens)
+                .Single(item => item.Tipo == "Prancha" && item.Id == prancha.Id);
+            ProjectBrowserItemViewModel itemTabela = viewModel.Secoes
+                .SelectMany(secao => secao.Itens)
+                .Single(item => item.Tipo == "Tabela" && item.Id == tabela.Id);
+
+            itemPrancha.SelecionarCommand.Execute(null);
+            itemTabela.SelecionarCommand.Execute(null);
+
+            AssertEqual(prancha.Id, pranchaVisualizada, "Prancha visualizada antes de abrir tabela");
+            AssertEqual(tabela.Id, tabelaVisualizada, "Tabela visualizada apos prancha");
+            AssertEqual(tabela.Id, tabelaPropriedades, "Tabela propriedades apos prancha");
+            Assert(itemTabela.IsSelected, "Tabela deveria ficar selecionada apos prancha.");
+            Assert(!itemPrancha.IsSelected, "Prancha deveria deixar de ficar selecionada apos tabela.");
         }
 
         private static void ProjectTableGridViewRecriaColunasDinamicas()
@@ -7726,425 +7719,174 @@ namespace Araci.TechnicalChecks
 
 
 ====================================================================================================
-ARQUIVO: C:\Users\User\source\repos\lucasffxavier\Araci-front\Core\Documents\ProjectSheet.cs
+ARQUIVO: C:\Users\User\source\repos\lucasffxavier\Araci-front\Properties\InserirTabelaPranchaWindow.xaml
 ====================================================================================================
 
-using System;
-using System.Collections.Generic;
-
-namespace Araci.Core.Documents
-{
-    public class ProjectSheet
-    {
-        public Guid Id { get; set; } = Guid.NewGuid();
-        public string Nome { get; set; } = string.Empty;
-        public string Numero { get; set; } = string.Empty;
-        public List<ProjectSheetTableInstance> Tabelas { get; set; } = new();
-    }
-}
-
-
-
-====================================================================================================
-ARQUIVO: C:\Users\User\source\repos\lucasffxavier\Araci-front\Core\Documents\ProjectSheetTableInstance.cs
-====================================================================================================
-
-using System;
-
-namespace Araci.Core.Documents
-{
-    public class ProjectSheetTableInstance
-    {
-        public const double DefaultWidth = 180.0;
-        public const double DefaultHeight = 80.0;
-        public const double MinWidth = 20.0;
-        public const double MinHeight = 20.0;
-
-        private double _x;
-        private double _y;
-        private double _width = DefaultWidth;
-        private double _height = DefaultHeight;
-
-        public Guid Id { get; set; } = Guid.NewGuid();
-        public Guid TableId { get; set; }
-
-        public double X
-        {
-            get => _x;
-            set => _x = NormalizarCoordenada(value);
-        }
-
-        public double Y
-        {
-            get => _y;
-            set => _y = NormalizarCoordenada(value);
-        }
-
-        public double Width
-        {
-            get => _width;
-            set => _width = NormalizarDimensao(value, MinWidth);
-        }
-
-        public double Height
-        {
-            get => _height;
-            set => _height = NormalizarDimensao(value, MinHeight);
-        }
-
-        public ProjectSheetTableInstance CriarCopia(bool gerarNovoId)
-        {
-            return new ProjectSheetTableInstance
-            {
-                Id = gerarNovoId ? Guid.NewGuid() : Id,
-                TableId = TableId,
-                X = X,
-                Y = Y,
-                Width = Width,
-                Height = Height
-            };
-        }
-
-        public bool IsValid => Id != Guid.Empty && TableId != Guid.Empty;
-
-        private static double NormalizarCoordenada(double valor)
-        {
-            return double.IsNaN(valor) || double.IsInfinity(valor) ? 0.0 : valor;
-        }
-
-        private static double NormalizarDimensao(double valor, double minimo)
-        {
-            return double.IsNaN(valor) || double.IsInfinity(valor) || valor < minimo
-                ? minimo
-                : valor;
-        }
-    }
-}
-
-
-
-====================================================================================================
-ARQUIVO: C:\Users\User\source\repos\lucasffxavier\Araci-front\MainWindow.xaml
-====================================================================================================
-
-﻿<Window x:Class="Araci.MainWindow"
+<Window x:Class="Araci.Properties.InserirTabelaPranchaWindow"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-        xmlns:views="clr-namespace:Araci.Views"
-        xmlns:ribbon="clr-namespace:Araci.Ribbon"
-        xmlns:properties="clr-namespace:Araci.Properties"
-        xmlns:tabs="clr-namespace:Araci.Ribbon.Tabs"
-        Title="ARACI ENGINE"
-        Width="1400"
-        Height="900"
-        WindowStartupLocation="CenterScreen"
-        Background="#D0D0D0">
-    <Grid>
-        <DockPanel>
-            <ribbon:RibbonView x:Name="Ribbon"
-                               DockPanel.Dock="Top"
-                               Height="130"/>
-            <Grid>
-                <Grid.ColumnDefinitions>
-                    <ColumnDefinition x:Name="ProjectBrowserColumn" Width="0"/>
-                    <ColumnDefinition Width="*"/>
-                    <ColumnDefinition x:Name="PropertiesColumn" Width="320"/>
-                </Grid.ColumnDefinitions>
-                <views:ProjectBrowserView x:Name="ProjectBrowser"
-                                    Grid.Column="0"
-                                    Visibility="Collapsed"
-                                    CloseRequested="OnProjectBrowserCloseRequested"/>
-                <views:ViewportView x:Name="Viewport"
-                                    Grid.Column="1"
-                                    Margin="10"/>
-                <views:ProjectTableGridView x:Name="ProjectTableGrid"
-                                            Grid.Column="1"
-                                            Visibility="Collapsed"/>
-                <properties:PropertiesHostView x:Name="PropertiesHost"
-                                               Grid.Column="2"
-                                               CloseRequested="OnPropertiesCloseRequested"/>
-            </Grid>
+        Title="Inserir tabela na prancha"
+        Width="420"
+        SizeToContent="Height"
+        ResizeMode="NoResize"
+        Background="#252526"
+        WindowStartupLocation="CenterOwner">
+    <Border Margin="10"
+            Padding="16"
+            BorderBrush="#F4F4F4"
+            BorderThickness="1"
+            Background="#252526">
+        <DockPanel LastChildFill="True">
+            <StackPanel DockPanel.Dock="Bottom"
+                        Orientation="Horizontal"
+                        HorizontalAlignment="Right"
+                        Margin="0,18,0,0">
+                <Button Content="OK"
+                        Width="90"
+                        Height="30"
+                        Margin="0,0,8,0"
+                        IsDefault="True"
+                        Click="OkButton_Click"/>
+                <Button Content="Cancelar"
+                        Width="90"
+                        Height="30"
+                        IsCancel="True"
+                        Click="CancelButton_Click"/>
+            </StackPanel>
+
+            <StackPanel>
+                <TextBlock Text="Inserir tabela na prancha"
+                           Foreground="#F4F4F4"
+                           FontSize="18"
+                           FontWeight="SemiBold"
+                           TextAlignment="Center"
+                           Margin="0,0,0,16"/>
+
+                <TextBlock Text="Prancha"
+                           Foreground="#F4F4F4"
+                           FontWeight="SemiBold"
+                           Margin="0,0,0,6"/>
+                <ComboBox x:Name="PranchaComboBox"
+                          DisplayMemberPath="Nome"
+                          Margin="0,0,0,12"/>
+
+                <TextBlock Text="Tabela"
+                           Foreground="#F4F4F4"
+                           FontWeight="SemiBold"
+                           Margin="0,0,0,6"/>
+                <ComboBox x:Name="TabelaComboBox"
+                          DisplayMemberPath="Nome"/>
+            </StackPanel>
         </DockPanel>
-        <Popup x:Name="ArquivoPopup"
-               Placement="Bottom"
-               AllowsTransparency="True"
-               StaysOpen="False"
-               PopupAnimation="Fade">
-            <tabs:ArquivoMenuView x:Name="ArquivoMenu"/>
-        </Popup>
-    </Grid>
+    </Border>
 </Window>
 
 
 
 ====================================================================================================
-ARQUIVO: C:\Users\User\source\repos\lucasffxavier\Araci-front\MainWindow.xaml.cs
+ARQUIVO: C:\Users\User\source\repos\lucasffxavier\Araci-front\Properties\InserirTabelaPranchaWindow.xaml.cs
 ====================================================================================================
 
-using Araci.Services;
-using Araci.Properties;
-using Araci.ViewModels;
-using Araci.Applications.Abstractions;
-using Araci.Applications.Projects.Tables;
-using Araci.Core.Documents;
 using System.Collections.Generic;
-using System.ComponentModel;
 using System.Linq;
-using System.Collections.Specialized;
 using System.Windows;
-using System.Windows.Controls.Primitives;
+using Araci.Applications.Abstractions;
 
-namespace Araci
+namespace Araci.Properties
 {
-    public partial class MainWindow : Window
+    public partial class InserirTabelaPranchaWindow : Window
     {
-        private readonly EditorContext _context;
-        private readonly GridLength _projectBrowserColumnWidth = new(260);
-        private readonly GridLength _propertiesColumnWidth = new(320);
-        private ProjectTableDataViewModel? _projectTableDataViewModel;
-
-        public MainWindow()
+        public InserirTabelaPranchaWindow(
+            IReadOnlyList<ProjectItemDialogOption> pranchas,
+            IReadOnlyList<ProjectItemDialogOption> tabelas)
         {
             InitializeComponent();
-            _context = new EditorContext();
-            UnitValueConverter.CurrentUnits = _context.Settings.Units;
-            ProjectBrowser.DataContext = new ProjectBrowserViewModel(_context.Document, _context.DefinirVistaAtiva, _context.RenomearItemProjeto, _context.ExcluirItemProjeto, _context.DuplicarItemProjeto, MostrarTabela, MostrarPropriedadesVista, MostrarPropriedadesTabela);
-            _context.Editor.PropertyChanged += OnEditorStatePropertyChanged;
-            _context.Document.PropriedadesTabelaAlteradas += OnPropriedadesTabelaAlteradas;
-            _context.Document.Tabelas.CollectionChanged += OnTabelasCollectionChanged;
-            Viewport.Inicializar(_context);
-            InicializarRibbon();
-            AtualizarVisibilidadeNavegadorProjeto();
+
+            PranchaComboBox.ItemsSource = pranchas ?? new List<ProjectItemDialogOption>();
+            TabelaComboBox.ItemsSource = tabelas ?? new List<ProjectItemDialogOption>();
+            PranchaComboBox.SelectedItem = PranchaComboBox.Items.OfType<ProjectItemDialogOption>().FirstOrDefault();
+            TabelaComboBox.SelectedItem = TabelaComboBox.Items.OfType<ProjectItemDialogOption>().FirstOrDefault();
         }
 
-        private void InicializarRibbon()
+        public ProjectItemDialogOption? PranchaSelecionada => PranchaComboBox.SelectedItem as ProjectItemDialogOption;
+        public ProjectItemDialogOption? TabelaSelecionada => TabelaComboBox.SelectedItem as ProjectItemDialogOption;
+
+        private void OkButton_Click(object sender, RoutedEventArgs e)
         {
-            DataContext = _context;
-            ArquivoMenu.DataContext = _context;
+            DialogResult = PranchaSelecionada != null && TabelaSelecionada != null;
         }
 
-        public void ToggleArquivoMenu(UIElement referencia)
+        private void CancelButton_Click(object sender, RoutedEventArgs e)
         {
-            if (ArquivoPopup.IsOpen)
-            {
-                ArquivoPopup.IsOpen = false;
-                return;
-            }
+            DialogResult = false;
+        }
+    }
+}
 
-            ArquivoPopup.PlacementTarget = referencia;
-            ArquivoPopup.Placement = PlacementMode.Bottom;
-            ArquivoPopup.IsOpen = true;
+
+
+====================================================================================================
+ARQUIVO: C:\Users\User\source\repos\lucasffxavier\Araci-front\Ribbon\Tabs\GerenciarTab.xaml.cs
+====================================================================================================
+
+﻿using System.Windows;
+using System.Windows.Controls;
+
+namespace Araci.Ribbon.Tabs
+{
+    public partial class GerenciarTab : UserControl
+    {
+        public GerenciarTab()
+        {
+            InitializeComponent();
         }
 
-        public void FocarViewport()
+        private void PropriedadesButton_Click(object sender, RoutedEventArgs e)
         {
-            Viewport.Focus();
-            System.Windows.Input.Keyboard.Focus(Viewport);
+            if (Window.GetWindow(this) is MainWindow mainWindow)
+                mainWindow.MostrarPropriedades();
         }
 
-        public void MostrarPropriedades()
+        private void NavegadorButton_Click(object sender, RoutedEventArgs e)
         {
-            PropertiesColumn.Width = _propertiesColumnWidth;
-            PropertiesHost.Visibility = Visibility.Visible;
+            if (Window.GetWindow(this) is MainWindow mainWindow)
+                mainWindow.AlternarNavegadorProjeto();
         }
 
-        public void MostrarPropriedadesVista(System.Guid vistaId)
+        private void NovaVistaButton_Click(object sender, RoutedEventArgs e)
         {
-            ProjectView? vista = _context.Document.Vistas.FirstOrDefault(v => v.Id == vistaId);
-
-            if (vista == null)
-                return;
-
-            MostrarViewport();
-
-            _context.Editor.ElementoSelecionado = new ProjectViewPropertiesViewModel(
-                _context.Document,
-                vista,
-                _context.RenomearItemProjeto,
-                _context.EditarPropriedadesVista);
-
-            MostrarPropriedades();
+            if (Window.GetWindow(this) is MainWindow mainWindow)
+                mainWindow.CriarNovaVistaProjeto();
         }
 
-        public void MostrarPropriedadesTabela(System.Guid tabelaId)
+        private void NovaTabelaButton_Click(object sender, RoutedEventArgs e)
         {
-            ProjectTable? tabela = _context.Document.Tabelas.FirstOrDefault(t => t.Id == tabelaId);
-
-            if (tabela == null)
-                return;
-
-            _context.Editor.ElementoSelecionado = new ProjectTablePropertiesViewModel(
-                _context.Document,
-                tabela,
-                _context.RenomearItemProjeto,
-                _context.EditarPropriedadesTabela,
-                _context.ExportarTabela,
-                _context.Dialogs);
-
-            MostrarPropriedades();
+            if (Window.GetWindow(this) is MainWindow mainWindow)
+                mainWindow.CriarNovaTabelaProjeto();
         }
 
-        public void MostrarTabela(System.Guid tabelaId)
+        private void ExportarTabelaButton_Click(object sender, RoutedEventArgs e)
         {
-            ProjectTable? tabela = _context.Document.Tabelas.FirstOrDefault(t => t.Id == tabelaId);
-
-            if (tabela == null)
-                return;
-
-            _projectTableDataViewModel = new ProjectTableDataViewModel(
-                _context.Document,
-                tabela,
-                new ProjectTableDataBuilder());
-
-            ProjectTableGrid.DataContext = _projectTableDataViewModel;
-            ProjectTableGrid.Visibility = Visibility.Visible;
-            Viewport.Visibility = Visibility.Collapsed;
+            if (Window.GetWindow(this) is MainWindow mainWindow)
+                mainWindow.ExportarTabelaAtualCsv();
         }
 
-        public void AlternarNavegadorProjeto()
+        private void NovaPranchaButton_Click(object sender, RoutedEventArgs e)
         {
-            _context.Editor.NavegadorProjetoVisivel = !_context.Editor.NavegadorProjetoVisivel;
+            if (Window.GetWindow(this) is MainWindow mainWindow)
+                mainWindow.CriarNovaPranchaProjeto();
         }
 
-        public void CriarNovaVistaProjeto()
+        private void InserirTabelaPranchaButton_Click(object sender, RoutedEventArgs e)
         {
-            _context.CriarItemProjeto.CriarVista();
-            MostrarNavegadorProjeto();
+            if (Window.GetWindow(this) is MainWindow mainWindow)
+                mainWindow.InserirTabelaNaPrancha();
         }
 
-        public void CriarNovaTabelaProjeto()
+        private void UnidadesButton_Click(object sender, RoutedEventArgs e)
         {
-            _context.CriarItemProjeto.CriarTabela();
-            MostrarNavegadorProjeto();
-        }
-
-        public void CriarNovaPranchaProjeto()
-        {
-            _context.CriarItemProjeto.CriarPrancha();
-            MostrarNavegadorProjeto();
-        }
-
-        public void ExportarTabelaAtualCsv()
-        {
-            ProjectTable? tabela = _projectTableDataViewModel == null
-                ? null
-                : _context.Document.Tabelas.FirstOrDefault(t => t.Id == _projectTableDataViewModel.TableId);
-
-            _context.ExportarTabela.Executar(tabela);
-        }
-
-        public void InserirTabelaNaPrancha()
-        {
-            if (_context.Document.Pranchas.Count == 0)
-            {
-                _context.Dialogs.ShowWarning("Inserir tabela na prancha", "Crie uma prancha antes de inserir uma tabela.");
-                return;
-            }
-
-            if (_context.Document.Tabelas.Count == 0)
-            {
-                _context.Dialogs.ShowWarning("Inserir tabela na prancha", "Crie uma tabela antes de inseri-la em uma prancha.");
-                return;
-            }
-
-            List<ProjectItemDialogOption> pranchas = _context.Document.Pranchas
-                .Select(p => new ProjectItemDialogOption(p.Id, string.IsNullOrWhiteSpace(p.Numero) ? p.Nome : $"{p.Numero} - {p.Nome}"))
-                .ToList();
-            List<ProjectItemDialogOption> tabelas = _context.Document.Tabelas
-                .Select(t => new ProjectItemDialogOption(t.Id, t.Nome))
-                .ToList();
-
-            InserirTabelaPranchaDialogResult? result = pranchas.Count == 1 && tabelas.Count == 1
-                ? new InserirTabelaPranchaDialogResult(pranchas[0].Id, tabelas[0].Id)
-                : _context.Dialogs.ShowInserirTabelaPranchaDialog(pranchas, tabelas);
-
-            if (result == null)
-                return;
-
-            ProjectSheetTableInstance? instance = _context.InserirTabelaNaPrancha.Inserir(result.SheetId, result.TableId);
-
-            if (instance == null)
-            {
-                _context.Dialogs.ShowWarning("Inserir tabela na prancha", "Não foi possível inserir a tabela na prancha selecionada.");
-                return;
-            }
-
-            _context.Dialogs.ShowInfo("Inserir tabela na prancha", "Tabela inserida na prancha.");
-        }
-
-        public void MostrarConfiguracaoUnidades()
-        {
-            var viewModel = new UnitsSettingsViewModel(_context.Settings.Units);
-            var window = new UnitsWindow(viewModel)
-            {
-                Owner = this
-            };
-
-            if (window.ShowDialog() == true)
-                _context.AlterarUnidadesProjeto.Executar(viewModel.ToUnitDisplaySettings());
-
-            FocarViewport();
-        }
-
-        private void OnPropertiesCloseRequested(object sender, RoutedEventArgs e)
-        {
-            PropertiesColumn.Width = new GridLength(0);
-            PropertiesHost.Visibility = Visibility.Collapsed;
-            FocarViewport();
-        }
-
-        private void OnProjectBrowserCloseRequested(object sender, RoutedEventArgs e)
-        {
-            _context.Editor.NavegadorProjetoVisivel = false;
-            FocarViewport();
-        }
-
-        private void OnPropriedadesTabelaAlteradas(ProjectTable tabela)
-        {
-            if (_projectTableDataViewModel?.TableId == tabela.Id)
-                _projectTableDataViewModel.Refresh();
-        }
-
-        private void OnTabelasCollectionChanged(object? sender, NotifyCollectionChangedEventArgs e)
-        {
-            if (_projectTableDataViewModel == null ||
-                _context.Document.Tabelas.Any(t => t.Id == _projectTableDataViewModel.TableId))
-                return;
-
-            MostrarViewport();
-        }
-
-        private void OnEditorStatePropertyChanged(object? sender, PropertyChangedEventArgs e)
-        {
-            if (string.IsNullOrEmpty(e.PropertyName) || e.PropertyName == nameof(EditorState.NavegadorProjetoVisivel))
-                AtualizarVisibilidadeNavegadorProjeto();
-        }
-
-        private void AtualizarVisibilidadeNavegadorProjeto()
-        {
-            if (_context.Editor.NavegadorProjetoVisivel)
-            {
-                ProjectBrowserColumn.Width = _projectBrowserColumnWidth;
-                ProjectBrowser.Visibility = Visibility.Visible;
-                return;
-            }
-
-            ProjectBrowserColumn.Width = new GridLength(0);
-            ProjectBrowser.Visibility = Visibility.Collapsed;
-        }
-
-        private void MostrarNavegadorProjeto()
-        {
-            _context.Editor.NavegadorProjetoVisivel = true;
-        }
-
-        private void MostrarViewport()
-        {
-            ProjectTableGrid.Visibility = Visibility.Collapsed;
-            ProjectTableGrid.DataContext = null;
-            _projectTableDataViewModel = null;
-            Viewport.Visibility = Visibility.Visible;
-            FocarViewport();
+            if (Window.GetWindow(this) is MainWindow mainWindow)
+                mainWindow.MostrarConfiguracaoUnidades();
         }
     }
 }
@@ -8563,468 +8305,139 @@ namespace Araci.Services
 
 
 ====================================================================================================
-ARQUIVO: C:\Users\User\source\repos\lucasffxavier\Araci-front\ViewModels\ProjectBrowserViewModel.cs
+ARQUIVO: C:\Users\User\source\repos\lucasffxavier\Araci-front\Service\UI\DialogService.cs
 ====================================================================================================
 
-using System;
-using System.Collections.Generic;
-using System.Collections.ObjectModel;
-using System.Collections.Specialized;
-using System.ComponentModel;
-using System.Linq;
-using System.Runtime.CompilerServices;
-using System.Windows.Input;
-using Araci.Applications.UseCases.Projeto;
+using Araci.Applications.Abstractions;
 using Araci.Core.Documents;
-using Araci.ViewModels.Base;
+using Araci.Properties;
+using Araci.Services.Simulation;
+using Microsoft.Win32;
+using System.Collections.Generic;
+using System.Windows;
 
-namespace Araci.ViewModels
+namespace Araci.Services.UI
 {
-    public sealed class ProjectBrowserViewModel
+    public class DialogService : IUserDialogService
     {
-        private readonly AraciDocument _document;
-        private readonly Action<Guid> _definirVistaAtiva;
-        private readonly RenomearItemProjetoUseCase? _renomearItemProjeto;
-        private readonly ExcluirItemProjetoUseCase? _excluirItemProjeto;
-        private readonly DuplicarItemProjetoUseCase? _duplicarItemProjeto;
-        private readonly Action<Guid>? _abrirTabela;
-        private readonly Action<Guid>? _abrirPropriedadesVista;
-        private readonly Action<Guid>? _abrirPropriedadesTabela;
-        private Guid? _selectedItemId;
-        private string? _selectedItemKind;
-
-        public ProjectBrowserViewModel(
-            AraciDocument document,
-            Action<Guid>? definirVistaAtiva = null,
-            RenomearItemProjetoUseCase? renomearItemProjeto = null,
-            ExcluirItemProjetoUseCase? excluirItemProjeto = null,
-            DuplicarItemProjetoUseCase? duplicarItemProjeto = null,
-            Action<Guid>? abrirTabela = null,
-            Action<Guid>? abrirPropriedadesVista = null,
-            Action<Guid>? abrirPropriedadesTabela = null)
+        public void ShowInfo(string title, string message)
         {
-            _document = document;
-            _definirVistaAtiva = definirVistaAtiva ?? _document.DefinirVistaAtiva;
-            _renomearItemProjeto = renomearItemProjeto;
-            _excluirItemProjeto = excluirItemProjeto;
-            _duplicarItemProjeto = duplicarItemProjeto;
-            _abrirTabela = abrirTabela;
-            _abrirPropriedadesVista = abrirPropriedadesVista;
-            _abrirPropriedadesTabela = abrirPropriedadesTabela;
-            Secoes = new ObservableCollection<ProjectBrowserSectionViewModel>
+            Show(title, message, MessageBoxImage.Information);
+        }
+
+        public void ShowWarning(string title, string message)
+        {
+            Show(title, message, MessageBoxImage.Warning);
+        }
+
+        public void ShowError(string title, string message)
+        {
+            Show(title, message, MessageBoxImage.Error);
+        }
+
+        public string? ShowSaveCsvDialog(string suggestedFileName)
+        {
+            var dialog = new SaveFileDialog
             {
-                new("Vistas"),
-                new("Tabelas"),
-                new("Pranchas")
+                Title = "Exportar CSV",
+                Filter = "Arquivos CSV (*.csv)|*.csv",
+                DefaultExt = ".csv",
+                AddExtension = true,
+                FileName = string.IsNullOrWhiteSpace(suggestedFileName) ? "Tabela.csv" : suggestedFileName
             };
 
-            AtualizarSecoes();
-
-            _document.Vistas.CollectionChanged += OnDocumentCollectionChanged;
-            _document.Tabelas.CollectionChanged += OnDocumentCollectionChanged;
-            _document.Pranchas.CollectionChanged += OnDocumentCollectionChanged;
-            _document.VistaAtivaAlterada += OnVistaAtivaAlterada;
-            _document.ItemProjetoRenomeado += OnItemProjetoRenomeado;
-            ExcluirSelecionadoCommand = new RelayCommand(ExecutarExcluirSelecionado);
+            return dialog.ShowDialog(Application.Current?.MainWindow) == true
+                ? dialog.FileName
+                : null;
         }
 
-        public ObservableCollection<ProjectBrowserSectionViewModel> Secoes { get; }
-        public ICommand ExcluirSelecionadoCommand { get; }
-
-        private void OnDocumentCollectionChanged(object? sender, NotifyCollectionChangedEventArgs e)
+        public InserirTabelaPranchaDialogResult? ShowInserirTabelaPranchaDialog(
+            IReadOnlyList<ProjectItemDialogOption> pranchas,
+            IReadOnlyList<ProjectItemDialogOption> tabelas)
         {
-            AtualizarSecoes();
-        }
-
-        private void OnVistaAtivaAlterada()
-        {
-            foreach (ProjectBrowserSectionViewModel secao in Secoes)
+            var window = new InserirTabelaPranchaWindow(pranchas, tabelas)
             {
-                foreach (ProjectBrowserItemViewModel item in secao.Itens)
-                    item.IsActiveView = item.Tipo == "Vista" && _document.VistaAtivaId == item.Id;
-            }
-        }
-
-        private void OnItemProjetoRenomeado()
-        {
-            AtualizarSecoes();
-        }
-
-        private void AtualizarSecoes()
-        {
-            AtualizarItens(Secoes[0], _document.Vistas.Select(v => CriarItem(v.Id, "Vista", v.Nome)));
-            AtualizarItens(Secoes[1], CriarItensTabela());
-            AtualizarItens(Secoes[2], CriarItensPrancha());
-        }
-
-        private IEnumerable<ProjectBrowserItemViewModel> CriarItensTabela()
-        {
-            if (_document.Tabelas.Count == 0)
-            {
-                yield return ProjectBrowserItemViewModel.CriarPlaceholder("Nenhuma tabela");
-                yield break;
-            }
-
-            foreach (ProjectTable tabela in _document.Tabelas)
-                yield return CriarItem(tabela.Id, "Tabela", tabela.Nome);
-        }
-
-        private IEnumerable<ProjectBrowserItemViewModel> CriarItensPrancha()
-        {
-            if (_document.Pranchas.Count == 0)
-            {
-                yield return ProjectBrowserItemViewModel.CriarPlaceholder("Nenhuma prancha");
-                yield break;
-            }
-
-            foreach (ProjectSheet prancha in _document.Pranchas)
-                yield return CriarItem(prancha.Id, "Prancha", FormatarPrancha(prancha), prancha.Nome);
-        }
-
-        private ProjectBrowserItemViewModel CriarItem(Guid id, string tipo, string nome, string? nomeEdicao = null)
-        {
-            var item = new ProjectBrowserItemViewModel(
-                id,
-                tipo,
-                nome,
-                nomeEdicao ?? nome,
-                true,
-                SelecionarItem,
-                RenomearItem,
-                ExcluirItem,
-                DuplicarItem,
-                AbrirPropriedadesItem)
-            {
-                IsActiveView = tipo == "Vista" && _document.VistaAtivaId == id
+                Owner = Application.Current?.MainWindow
             };
 
-            item.IsSelected = _selectedItemId == id && _selectedItemKind == tipo;
-            return item;
+            return window.ShowDialog() == true &&
+                window.PranchaSelecionada != null &&
+                window.TabelaSelecionada != null
+                ? new InserirTabelaPranchaDialogResult(window.PranchaSelecionada.Id, window.TabelaSelecionada.Id)
+                : null;
         }
 
-        private void SelecionarItem(ProjectBrowserItemViewModel item)
+        public ElementosTabelaDialogResult? ShowElementosTabelaDialog(
+            IReadOnlyList<ProjectTableElementCategory> categorias,
+            IReadOnlyList<ProjectTableFieldSelection> camposSelecionados)
         {
-            if (!item.IsSelectable)
+            var window = new ElementosTabelaWindow(categorias, camposSelecionados)
+            {
+                Owner = Application.Current?.MainWindow
+            };
+
+            return window.ShowDialog() == true
+                ? new ElementosTabelaDialogResult(window.CategoriasSelecionadas, window.CamposSelecionados)
+                : null;
+        }
+
+        public FiltrosTabelaDialogResult? ShowFiltrosTabelaDialog(
+            IReadOnlyList<ProjectTableFieldSelection> camposSelecionados,
+            IReadOnlyList<ProjectViewDialogOption> vistasDisponiveis,
+            Guid? filtroVistaId,
+            ProjectTableFilterLogicalMode modo,
+            IReadOnlyList<ProjectTableFilterRule> filtros)
+        {
+            var window = new FiltrosTabelaWindow(camposSelecionados, vistasDisponiveis, filtroVistaId, modo, filtros)
+            {
+                Owner = Application.Current?.MainWindow
+            };
+
+            return window.ShowDialog() == true
+                ? new FiltrosTabelaDialogResult(window.FiltroVistaId, window.ModoFiltro, window.Filtros)
+                : null;
+        }
+
+        public OrdenacaoTabelaDialogResult? ShowOrdenacaoTabelaDialog(
+            IReadOnlyList<ProjectTableFieldSelection> camposSelecionados,
+            IReadOnlyList<ProjectTableSorting> ordenacoes)
+        {
+            var window = new OrdenacaoTabelaWindow(camposSelecionados, ordenacoes)
+            {
+                Owner = Application.Current?.MainWindow
+            };
+
+            return window.ShowDialog() == true
+                ? new OrdenacaoTabelaDialogResult(window.Ordenacoes)
+                : null;
+        }
+
+        public bool Confirm(string title, string message)
+        {
+            MessageBoxResult result = MessageBox.Show(
+                message,
+                title,
+                MessageBoxButton.YesNo,
+                MessageBoxImage.Question);
+
+            return result == MessageBoxResult.Yes;
+        }
+
+        public void Show(SimulationMessage message)
+        {
+            if (message == null)
                 return;
 
-            _selectedItemId = item.Id;
-            _selectedItemKind = item.Tipo;
-
-            if (item.Tipo == "Vista")
-            {
-                _definirVistaAtiva(item.Id);
-                _abrirPropriedadesVista?.Invoke(item.Id);
-            }
-            else if (item.Tipo == "Tabela")
-            {
-                _abrirTabela?.Invoke(item.Id);
-                _abrirPropriedadesTabela?.Invoke(item.Id);
-            }
-
-            foreach (ProjectBrowserSectionViewModel secao in Secoes)
-            {
-                foreach (ProjectBrowserItemViewModel atual in secao.Itens)
-                {
-                    atual.IsSelected = ReferenceEquals(atual, item);
-                    atual.IsActiveView = atual.Tipo == "Vista" && _document.VistaAtivaId == atual.Id;
-                }
-            }
+            MessageBox.Show(message.Text, message.Title, MessageBoxButton.OK, message.Icon);
         }
 
-        private static void AtualizarItens(ProjectBrowserSectionViewModel secao, IEnumerable<ProjectBrowserItemViewModel> itens)
+        private static void Show(string title, string message, MessageBoxImage icon)
         {
-            secao.Itens.Clear();
-
-            foreach (ProjectBrowserItemViewModel item in itens)
-                secao.Itens.Add(item);
-        }
-
-        private bool RenomearItem(ProjectBrowserItemViewModel item, string novoNome)
-        {
-            if (_renomearItemProjeto == null)
-                return false;
-
-            switch (item.Tipo)
-            {
-                case "Vista":
-                    return _renomearItemProjeto.RenomearVista(item.Id, novoNome);
-
-                case "Tabela":
-                    return _renomearItemProjeto.RenomearTabela(item.Id, novoNome);
-
-                case "Prancha":
-                    return _renomearItemProjeto.RenomearPrancha(item.Id, novoNome);
-
-                default:
-                    return false;
-            }
-        }
-
-        private bool ExcluirItem(ProjectBrowserItemViewModel item)
-        {
-            if (_excluirItemProjeto == null)
-                return false;
-
-            return item.Tipo switch
-            {
-                "Vista" => _excluirItemProjeto.ExcluirVista(item.Id),
-                "Tabela" => _excluirItemProjeto.ExcluirTabela(item.Id),
-                "Prancha" => _excluirItemProjeto.ExcluirPrancha(item.Id),
-                _ => false
-            };
-        }
-
-        private bool DuplicarItem(ProjectBrowserItemViewModel item)
-        {
-            if (_duplicarItemProjeto == null)
-                return false;
-
-            return item.Tipo switch
-            {
-                "Vista" => _duplicarItemProjeto.DuplicarVista(item.Id),
-                "Tabela" => _duplicarItemProjeto.DuplicarTabela(item.Id),
-                "Prancha" => _duplicarItemProjeto.DuplicarPrancha(item.Id),
-                _ => false
-            };
-        }
-
-        private void AbrirPropriedadesItem(ProjectBrowserItemViewModel item)
-        {
-            if (item.Tipo == "Vista")
-                _abrirPropriedadesVista?.Invoke(item.Id);
-            else if (item.Tipo == "Tabela")
-                _abrirPropriedadesTabela?.Invoke(item.Id);
-        }
-
-        public bool ExcluirSelecionado()
-        {
-            ProjectBrowserItemViewModel? item = Secoes
-                .SelectMany(secao => secao.Itens)
-                .FirstOrDefault(atual =>
-                    atual.IsSelected &&
-                    atual.Id == _selectedItemId &&
-                    atual.Tipo == _selectedItemKind);
-
-            return item?.TentarExcluir() == true;
-        }
-
-        private void ExecutarExcluirSelecionado()
-        {
-            ExcluirSelecionado();
-        }
-
-        private static string FormatarPrancha(ProjectSheet prancha)
-        {
-            return string.IsNullOrWhiteSpace(prancha.Numero)
-                ? prancha.Nome
-                : $"{prancha.Numero} - {prancha.Nome}";
-        }
-    }
-
-    public sealed class ProjectBrowserSectionViewModel
-    {
-        public ProjectBrowserSectionViewModel(string titulo)
-        {
-            Titulo = titulo;
-            Itens = new ObservableCollection<ProjectBrowserItemViewModel>();
-        }
-
-        public string Titulo { get; }
-        public ObservableCollection<ProjectBrowserItemViewModel> Itens { get; }
-    }
-
-    public sealed class ProjectBrowserItemViewModel : INotifyPropertyChanged
-    {
-        private readonly Action<ProjectBrowserItemViewModel>? _selecionar;
-        private readonly Func<ProjectBrowserItemViewModel, string, bool>? _renomear;
-        private readonly Func<ProjectBrowserItemViewModel, bool>? _excluir;
-        private readonly Func<ProjectBrowserItemViewModel, bool>? _duplicar;
-        private readonly Action<ProjectBrowserItemViewModel>? _abrirPropriedades;
-        private bool _isSelected;
-        private bool _isActiveView;
-        private bool _isEditing;
-        private string _nome;
-        private string _nomeEdicao;
-        private string _textoEdicao;
-
-        public ProjectBrowserItemViewModel(
-            Guid id,
-            string tipo,
-            string nome,
-            string nomeEdicao,
-            bool isSelectable,
-            Action<ProjectBrowserItemViewModel>? selecionar,
-            Func<ProjectBrowserItemViewModel, string, bool>? renomear = null,
-            Func<ProjectBrowserItemViewModel, bool>? excluir = null,
-            Func<ProjectBrowserItemViewModel, bool>? duplicar = null,
-            Action<ProjectBrowserItemViewModel>? abrirPropriedades = null)
-        {
-            Id = id;
-            Tipo = tipo;
-            _nome = nome;
-            _nomeEdicao = nomeEdicao;
-            _textoEdicao = nomeEdicao;
-            IsSelectable = isSelectable;
-            _selecionar = selecionar;
-            _renomear = renomear;
-            _excluir = excluir;
-            _duplicar = duplicar;
-            _abrirPropriedades = abrirPropriedades;
-            SelecionarCommand = new RelayCommand(Selecionar, () => IsSelectable);
-            IniciarEdicaoCommand = new RelayCommand(IniciarEdicao, () => IsSelectable);
-            ConfirmarEdicaoCommand = new RelayCommand(ConfirmarEdicao);
-            CancelarEdicaoCommand = new RelayCommand(CancelarEdicao);
-            ExcluirCommand = new RelayCommand(Excluir, () => IsSelectable && _excluir != null);
-            DuplicarCommand = new RelayCommand(Duplicar, () => IsSelectable && _duplicar != null);
-            PropriedadesCommand = new RelayCommand(AbrirPropriedades, () => IsSelectable && (Tipo == "Vista" || Tipo == "Tabela") && _abrirPropriedades != null);
-        }
-
-        public Guid Id { get; }
-        public string Tipo { get; }
-        public string Nome
-        {
-            get => _nome;
-            private set
-            {
-                if (_nome == value)
-                    return;
-
-                _nome = value;
-                OnPropertyChanged();
-            }
-        }
-
-        public bool IsSelectable { get; }
-        public ICommand SelecionarCommand { get; }
-        public ICommand IniciarEdicaoCommand { get; }
-        public ICommand ConfirmarEdicaoCommand { get; }
-        public ICommand CancelarEdicaoCommand { get; }
-        public ICommand ExcluirCommand { get; }
-        public ICommand DuplicarCommand { get; }
-        public ICommand PropriedadesCommand { get; }
-
-        public string TextoEdicao
-        {
-            get => _textoEdicao;
-            set
-            {
-                if (_textoEdicao == value)
-                    return;
-
-                _textoEdicao = value;
-                OnPropertyChanged();
-            }
-        }
-
-        public bool IsEditing
-        {
-            get => _isEditing;
-            set
-            {
-                if (_isEditing == value)
-                    return;
-
-                _isEditing = value;
-                OnPropertyChanged();
-            }
-        }
-
-        public bool IsActiveView
-        {
-            get => _isActiveView;
-            set
-            {
-                if (_isActiveView == value)
-                    return;
-
-                _isActiveView = value;
-                OnPropertyChanged();
-            }
-        }
-
-        public bool IsSelected
-        {
-            get => _isSelected;
-            set
-            {
-                if (_isSelected == value)
-                    return;
-
-                _isSelected = value;
-                OnPropertyChanged();
-            }
-        }
-
-        public static ProjectBrowserItemViewModel CriarPlaceholder(string nome)
-        {
-            return new ProjectBrowserItemViewModel(Guid.Empty, "Placeholder", nome, nome, false, null);
-        }
-
-        public void AtualizarNomeExibicao(string nome, string? nomeEdicao = null)
-        {
-            Nome = nome;
-            _nomeEdicao = nomeEdicao ?? nome;
-            TextoEdicao = _nomeEdicao;
-        }
-
-        private void Selecionar()
-        {
-            _selecionar?.Invoke(this);
-        }
-
-        private void IniciarEdicao()
-        {
-            if (!IsSelectable)
-                return;
-
-            TextoEdicao = _nomeEdicao;
-            IsEditing = true;
-        }
-
-        private void ConfirmarEdicao()
-        {
-            if (!IsEditing)
-                return;
-
-            string nomeAnterior = _nomeEdicao;
-
-            if (_renomear?.Invoke(this, TextoEdicao) != true)
-                TextoEdicao = nomeAnterior;
-
-            IsEditing = false;
-        }
-
-        private void CancelarEdicao()
-        {
-            TextoEdicao = _nomeEdicao;
-            IsEditing = false;
-        }
-
-        public bool TentarExcluir()
-        {
-            return _excluir?.Invoke(this) == true;
-        }
-
-        private void Excluir()
-        {
-            TentarExcluir();
-        }
-
-        private void Duplicar()
-        {
-            _duplicar?.Invoke(this);
-        }
-
-        private void AbrirPropriedades()
-        {
-            _abrirPropriedades?.Invoke(this);
-        }
-
-        public event PropertyChangedEventHandler? PropertyChanged;
-
-        private void OnPropertyChanged([CallerMemberName] string? propertyName = null)
-        {
-            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
+            MessageBox.Show(
+                message ?? string.Empty,
+                string.IsNullOrWhiteSpace(title) ? "Araci" : title,
+                MessageBoxButton.OK,
+                icon);
         }
     }
 }

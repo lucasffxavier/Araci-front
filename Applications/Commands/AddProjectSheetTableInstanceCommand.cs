@@ -10,11 +10,11 @@ namespace Araci.Core.Commands
         private readonly ProjectSheetTableInstance _instance;
         private readonly int _index;
 
-        public AddProjectSheetTableInstanceCommand(ProjectSheet sheet, ProjectSheetTableInstance instance)
+        public AddProjectSheetTableInstanceCommand(ProjectSheet sheet, ProjectSheetTableInstance instance, int? index = null)
         {
             _sheet = sheet ?? throw new ArgumentNullException(nameof(sheet));
             _instance = instance ?? throw new ArgumentNullException(nameof(instance));
-            _index = sheet.Tabelas.Count;
+            _index = index ?? sheet.Tabelas.Count;
         }
 
         public void Execute()

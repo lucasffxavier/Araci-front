@@ -52,8 +52,8 @@ namespace Araci.Services.UI
 
             return window.ShowDialog() == true &&
                 window.PranchaSelecionada != null &&
-                window.TabelaSelecionada != null
-                ? new InserirTabelaPranchaDialogResult(window.PranchaSelecionada.Id, window.TabelaSelecionada.Id)
+                window.TableIdsSelecionados.Count > 0
+                ? new InserirTabelaPranchaDialogResult(window.PranchaSelecionada.Id, window.TableIdsSelecionados)
                 : null;
         }
 
