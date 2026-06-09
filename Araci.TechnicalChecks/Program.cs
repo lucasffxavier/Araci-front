@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Reflection;
 using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
@@ -90,6 +91,8 @@ namespace Araci.TechnicalChecks
                 ("Tabela data view model trata tabela sem linhas", TabelaDataViewModelTrataTabelaSemLinhas),
                 ("Tabela data view model refresh atualiza dados", TabelaDataViewModelRefreshAtualizaDados),
                 ("Tabela data view model refresh reativo apos use cases", TabelaDataViewModelRefreshReativoAposUseCases),
+                ("Filtros tabela window permite sem filtro", FiltrosTabelaWindowPermiteSemFiltro),
+                ("Tabela remove filtro com undo redo", TabelaRemoveFiltroComUndoRedo),
                 ("Project Browser seleciona tabela e solicita visualizacao", ProjectBrowserSelecionaTabelaESolicitaVisualizacao),
                 ("Project Browser seleciona vista e restaura viewport", ProjectBrowserSelecionaVistaERestauraViewport),
                 ("ProjectTableGridView recria colunas dinamicas", ProjectTableGridViewRecriaColunasDinamicas),
@@ -5557,6 +5560,93 @@ namespace Araci.TechnicalChecks
             Assert(viewModel.Rows.All(row => row[0] != "Carga B"), "Filtro de vista deveria remover Carga B.");
         }
 
+        private static void FiltrosTabelaWindowPermiteSemFiltro()
+        {
+            RunSta(() =>
+            {
+                ProjectTableFilterRule filtroExistente = new()
+                {
+                    Ordem = 0,
+                    Categoria = ProjectTableElementCategory.Cargas,
+                    CampoId = "Nome",
+                    NomeExibicao = "Nome",
+                    Operador = ProjectTableFilterOperator.Contem,
+                    Valor = "Carga"
+                };
+                var window = new Araci.Properties.FiltrosTabelaWindow(
+                    CriarCamposTabelaDadosCarga(),
+                    Array.Empty<ProjectViewDialogOption>(),
+                    null,
+                    ProjectTableFilterLogicalMode.Todas,
+                    new[] { filtroExistente });
+                var campo1 = (ComboBox)window.FindName("Campo1ComboBox");
+                var campo2 = (ComboBox)window.FindName("Campo2ComboBox");
+                var campo3 = (ComboBox)window.FindName("Campo3ComboBox");
+                var valor1 = (TextBox)window.FindName("Valor1TextBox");
+                var valor2 = (TextBox)window.FindName("Valor2TextBox");
+                var valor3 = (TextBox)window.FindName("Valor3TextBox");
+
+                AssertEqual("Sem filtro", ObterTextoItem(campo1.Items[0]), "Primeira opcao do parametro");
+                AssertEqual("Nome", ObterCampoIdItem(campo1.SelectedItem!), "Filtro existente CampoId");
+                AssertEqual("Carga", valor1.Text, "Filtro existente Valor");
+
+                campo1.SelectedIndex = 0;
+                IReadOnlyList<ProjectTableFilterRule> filtros = ObterFiltrosTabelaWindow(window);
+                AssertEqual(0, filtros.Count, "Linha com Sem filtro nao deveria gerar regra");
+
+                campo1.SelectedIndex = 1;
+                valor1.Text = "Carga A";
+                campo2.SelectedIndex = 0;
+                valor2.Text = "Ignorado";
+                campo3.SelectedIndex = 2;
+                valor3.Text = "500";
+
+                filtros = ObterFiltrosTabelaWindow(window);
+
+                AssertEqual(2, filtros.Count, "Linhas validas com intermediaria Sem filtro");
+                AssertEqual(0, filtros[0].Ordem, "Filtro valido 1 Ordem");
+                AssertEqual("Nome", filtros[0].CampoId, "Filtro valido 1 CampoId");
+                AssertEqual(1, filtros[1].Ordem, "Filtro valido 2 Ordem");
+                AssertEqual("PotenciaAtiva", filtros[1].CampoId, "Filtro valido 2 CampoId");
+            });
+        }
+
+        private static void TabelaRemoveFiltroComUndoRedo()
+        {
+            AraciDocument document = CriarDocumentoTabelaDados();
+            ProjectTable tabela = CriarTabelaDadosCarga(document);
+            var commands = new Araci.Core.Commands.CommandManager();
+            var useCase = new EditarPropriedadesTabelaUseCase(document, commands);
+            tabela.Filtros = new List<ProjectTableFilterRule>
+            {
+                new()
+                {
+                    Ordem = 0,
+                    Categoria = ProjectTableElementCategory.Cargas,
+                    CampoId = "Nome",
+                    NomeExibicao = "Nome",
+                    Operador = ProjectTableFilterOperator.Contem,
+                    Valor = "Carga"
+                }
+            };
+
+            bool alterado = useCase.AlterarFiltrosTabela(
+                tabela.Id,
+                null,
+                ProjectTableFilterLogicalMode.Todas,
+                Array.Empty<ProjectTableFilterRule>());
+
+            Assert(alterado, "AlterarFiltrosTabela deveria remover filtro.");
+            AssertEqual(0, tabela.Filtros.Count, "Filtros apos remover");
+
+            commands.Undo();
+            AssertEqual(1, tabela.Filtros.Count, "Undo deveria restaurar filtro.");
+            AssertEqual("Nome", tabela.Filtros[0].CampoId, "Undo CampoId");
+
+            commands.Redo();
+            AssertEqual(0, tabela.Filtros.Count, "Redo deveria remover filtro novamente.");
+        }
+
         private static void ProjectBrowserSelecionaTabelaESolicitaVisualizacao()
         {
             var document = new AraciDocument();
@@ -5628,6 +5718,7 @@ namespace Araci.TechnicalChecks
                 var vmA = new ProjectTableDataViewModel(document, tabelaA);
                 var vmB = new ProjectTableDataViewModel(document, tabelaB);
                 var grid = (DataGrid)view.FindName("TableDataGrid");
+                var separator = (Border)view.FindName("TableTopSeparator");
 
                 view.DataContext = vmA;
                 AssertEqual(3, grid.Columns.Count, "Grid colunas tabela A");
@@ -5636,6 +5727,10 @@ namespace Araci.TechnicalChecks
                 Assert(!grid.CanUserAddRows, "DataGrid nao deveria permitir adicionar linhas.");
                 Assert(!grid.CanUserDeleteRows, "DataGrid nao deveria permitir deletar linhas.");
                 Assert(!grid.CanUserSortColumns, "DataGrid nao deveria ordenar pelo cabecalho.");
+                AssertEqual(HorizontalAlignment.Left, grid.HorizontalAlignment, "DataGrid alinhamento horizontal");
+                AssertEqual(DataGridGridLinesVisibility.Vertical, grid.GridLinesVisibility, "DataGrid linhas horizontais globais");
+                Assert(grid.CellStyle != null, "DataGrid deveria ter CellStyle para linhas por celula.");
+                AssertEqual(new Thickness(0, 1, 0, 0), separator.BorderThickness, "Separador superior da tabela");
 
                 view.DataContext = vmB;
                 AssertEqual(1, grid.Columns.Count, "Grid colunas tabela B apos troca");
@@ -6086,6 +6181,32 @@ namespace Araci.TechnicalChecks
             }
 
             throw new InvalidOperationException($"{name}: excecao {typeof(TException).Name} nao foi lancada.");
+        }
+
+        private static IReadOnlyList<ProjectTableFilterRule> ObterFiltrosTabelaWindow(Araci.Properties.FiltrosTabelaWindow window)
+        {
+            MethodInfo? method = typeof(Araci.Properties.FiltrosTabelaWindow).GetMethod(
+                "ObterFiltros",
+                BindingFlags.Instance | BindingFlags.NonPublic);
+
+            if (method == null)
+                throw new InvalidOperationException("Metodo ObterFiltros nao encontrado.");
+
+            return (IReadOnlyList<ProjectTableFilterRule>)method.Invoke(window, null)!;
+        }
+
+        private static string ObterTextoItem(object item)
+        {
+            return item.GetType().GetProperty("Texto", BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic)
+                ?.GetValue(item)
+                ?.ToString() ?? string.Empty;
+        }
+
+        private static string ObterCampoIdItem(object item)
+        {
+            return item.GetType().GetProperty("CampoId", BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic)
+                ?.GetValue(item)
+                ?.ToString() ?? string.Empty;
         }
 
         private static void RunSta(Action action)

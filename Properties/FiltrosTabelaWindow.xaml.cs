@@ -11,6 +11,7 @@ namespace Araci.Properties
     public partial class FiltrosTabelaWindow : Window
     {
         private readonly List<CampoFiltroItem> _campos;
+        private readonly CampoFiltroItem _semFiltroItem = CampoFiltroItem.CriarSemFiltro();
         private readonly List<ProjectViewDialogOption> _vistas;
         private readonly List<OperadorFiltroItem> _operadores;
         private readonly ComboBox[] _campoComboBoxes;
@@ -26,9 +27,10 @@ namespace Araci.Properties
         {
             InitializeComponent();
 
-            _campos = camposSelecionados
+            _campos = new[] { _semFiltroItem }
+                .Concat(camposSelecionados
                 .OrderBy(c => c.Ordem)
-                .Select(c => new CampoFiltroItem(c))
+                .Select(c => new CampoFiltroItem(c)))
                 .ToList();
             _vistas = CriarOpcoesVista(vistasDisponiveis);
 
@@ -88,6 +90,7 @@ namespace Araci.Properties
             for (int i = 0; i < _campoComboBoxes.Length; i++)
             {
                 _campoComboBoxes[i].ItemsSource = _campos;
+                _campoComboBoxes[i].SelectedItem = _semFiltroItem;
                 _operadorComboBoxes[i].ItemsSource = _operadores;
                 _operadorComboBoxes[i].SelectedItem = _operadores.First();
             }
@@ -98,6 +101,7 @@ namespace Araci.Properties
             List<ProjectTableFilterRule> filtrosValidos = filtros
                 .OrderBy(f => f.Ordem)
                 .Where(f => _campos.Any(c =>
+                    !c.IsSemFiltro &&
                     c.Categoria == f.Categoria &&
                     string.Equals(c.CampoId, f.CampoId, StringComparison.Ordinal)))
                 .Take(5)
@@ -117,7 +121,7 @@ namespace Araci.Properties
 
         private void AtualizarEstadoSemCampos()
         {
-            bool semCampos = _campos.Count == 0;
+            bool semCampos = _campos.All(c => c.IsSemFiltro);
             FiltrosGrid.IsEnabled = !semCampos;
             SemCamposTextBlock.Visibility = semCampos ? Visibility.Visible : Visibility.Collapsed;
         }
@@ -128,7 +132,7 @@ namespace Araci.Properties
 
             for (int i = 0; i < _campoComboBoxes.Length; i++)
             {
-                if (_campoComboBoxes[i].SelectedItem is not CampoFiltroItem campo)
+                if (_campoComboBoxes[i].SelectedItem is not CampoFiltroItem campo || campo.IsSemFiltro)
                     continue;
 
                 ProjectTableFilterOperator operador = _operadorComboBoxes[i].SelectedItem is OperadorFiltroItem operadorItem
@@ -183,6 +187,15 @@ namespace Araci.Properties
 
         private sealed class CampoFiltroItem
         {
+            private CampoFiltroItem()
+            {
+                Categoria = default;
+                CampoId = string.Empty;
+                NomeExibicao = string.Empty;
+                Texto = "Sem filtro";
+                IsSemFiltro = true;
+            }
+
             public CampoFiltroItem(ProjectTableFieldSelection campo)
             {
                 Categoria = campo.Categoria;
@@ -191,10 +204,16 @@ namespace Araci.Properties
                 Texto = $"{ObterRotuloCategoria(campo.Categoria)} - {campo.NomeExibicao}";
             }
 
+            public static CampoFiltroItem CriarSemFiltro()
+            {
+                return new CampoFiltroItem();
+            }
+
             public ProjectTableElementCategory Categoria { get; }
             public string CampoId { get; }
             public string NomeExibicao { get; }
             public string Texto { get; }
+            public bool IsSemFiltro { get; }
         }
 
         private sealed class OperadorFiltroItem
