@@ -130,6 +130,7 @@ namespace Araci.TechnicalChecks
                 ("ProjectSheetViewModel mantem workspace estavel durante preview de resize", ProjectSheetViewModelMantemWorkspaceEstavelDurantePreviewResize),
                 ("ProjectSheetViewModel zoom altera percentual", ProjectSheetViewModelZoomAlteraPercentual),
                 ("ProjectSheetView aplica zoom no workspace", ProjectSheetViewAplicaZoomNoWorkspace),
+                ("ProjectSheetView possui folha nomeada para centralizacao", ProjectSheetViewPossuiFolhaNomeadaParaCentralizacao),
                 ("Tabela data view model expoe colunas linhas e celulas", TabelaDataViewModelExpoeColunasLinhasECelulas),
                 ("Tabela data view model trata tabela sem campos", TabelaDataViewModelTrataTabelaSemCampos),
                 ("Tabela data view model trata tabela sem linhas", TabelaDataViewModelTrataTabelaSemLinhas),
@@ -6422,6 +6423,17 @@ namespace Araci.TechnicalChecks
                 Assert(zoomHost.HorizontalAlignment == HorizontalAlignment.Left, "ZoomHost deveria iniciar a esquerda para scroll previsivel.");
                 Assert(zoomHost.VerticalAlignment == VerticalAlignment.Top, "ZoomHost deveria iniciar no topo para scroll previsivel.");
                 Assert(!sheetSurface!.ClipToBounds, "SheetSurface nao deveria recortar tabelas fora da folha.");
+            });
+        }
+
+        private static void ProjectSheetViewPossuiFolhaNomeadaParaCentralizacao()
+        {
+            RunSta(() =>
+            {
+                var view = new ProjectSheetView();
+                var sheetPageBorder = view.FindName("SheetPageBorder") as Border;
+
+                Assert(sheetPageBorder != null, "ProjectSheetView deveria possuir SheetPageBorder para centralizar a folha real.");
             });
         }
 
