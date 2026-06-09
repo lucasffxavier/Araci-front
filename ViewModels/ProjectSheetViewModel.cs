@@ -124,13 +124,10 @@ namespace Araci.ViewModels
             if (instanceViewModel == null)
                 return false;
 
-            bool moved = _moverTabelaNaPrancha?.Mover(SheetId, instanceId, novoX, novoY) == true;
+            bool moved = _moverTabelaNaPrancha?.Mover(SheetId, instanceId, novoX, novoY, Refresh) == true;
 
             if (moved)
-            {
-                Refresh();
                 SelecionarInstancia(instanceId);
-            }
 
             return moved;
         }
@@ -141,7 +138,7 @@ namespace Araci.ViewModels
                 return false;
 
             Guid instanceId = _selectedInstanceId.Value;
-            bool removed = _removerTabelaDaPrancha?.Remover(SheetId, instanceId) == true;
+            bool removed = _removerTabelaDaPrancha?.Remover(SheetId, instanceId, Refresh) == true;
 
             if (removed)
             {

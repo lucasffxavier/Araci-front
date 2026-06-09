@@ -199,7 +199,7 @@ namespace Araci
             if (result == null || result.TableIds.Count == 0)
                 return;
 
-            IReadOnlyList<ProjectSheetTableInstance> instances = _context.InserirTabelaNaPrancha.InserirMultiplas(result.SheetId, result.TableIds);
+            IReadOnlyList<ProjectSheetTableInstance> instances = _context.InserirTabelaNaPrancha.InserirMultiplas(result.SheetId, result.TableIds, AtualizarPranchaAtual);
 
             if (instances.Count == 0)
             {
@@ -279,6 +279,11 @@ namespace Araci
         {
             if (string.IsNullOrEmpty(e.PropertyName) || e.PropertyName == nameof(EditorState.NavegadorProjetoVisivel))
                 AtualizarVisibilidadeNavegadorProjeto();
+        }
+
+        private void AtualizarPranchaAtual()
+        {
+            _projectSheetViewModel?.Refresh();
         }
 
         private void AtualizarVisibilidadeNavegadorProjeto()

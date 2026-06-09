@@ -10,19 +10,22 @@ namespace Araci.Core.Commands
         private readonly double _oldY;
         private readonly double _newX;
         private readonly double _newY;
+        private readonly Action? _onChanged;
 
         public MoveProjectSheetTableInstanceCommand(
             ProjectSheetTableInstance instance,
             double oldX,
             double oldY,
             double newX,
-            double newY)
+            double newY,
+            Action? onChanged = null)
         {
             _instance = instance ?? throw new ArgumentNullException(nameof(instance));
             _oldX = oldX;
             _oldY = oldY;
             _newX = newX;
             _newY = newY;
+            _onChanged = onChanged;
         }
 
         public void Execute()
@@ -44,6 +47,12 @@ namespace Araci.Core.Commands
         {
             _instance.X = x;
             _instance.Y = y;
+            NotifyChanged();
+        }
+
+        private void NotifyChanged()
+        {
+            _onChanged?.Invoke();
         }
     }
 }

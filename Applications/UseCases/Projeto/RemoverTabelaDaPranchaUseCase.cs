@@ -17,7 +17,7 @@ namespace Araci.Applications.UseCases.Projeto
             _commands = commands ?? throw new ArgumentNullException(nameof(commands));
         }
 
-        public bool Remover(Guid sheetId, Guid instanceId)
+        public bool Remover(Guid sheetId, Guid instanceId, Action? onChanged = null)
         {
             ProjectSheet? sheet = _document.Pranchas.FirstOrDefault(p => p.Id == sheetId);
             ProjectSheetTableInstance? instance = sheet?.Tabelas.FirstOrDefault(i => i.Id == instanceId);
@@ -25,7 +25,7 @@ namespace Araci.Applications.UseCases.Projeto
             if (sheet == null || instance == null)
                 return false;
 
-            _commands.Execute(new RemoveProjectSheetTableInstanceCommand(sheet, instance));
+            _commands.Execute(new RemoveProjectSheetTableInstanceCommand(sheet, instance, onChanged));
             return true;
         }
     }

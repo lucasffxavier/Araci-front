@@ -9,12 +9,14 @@ namespace Araci.Core.Commands
         private readonly ProjectSheet _sheet;
         private readonly ProjectSheetTableInstance _instance;
         private readonly int _index;
+        private readonly Action? _onChanged;
 
-        public AddProjectSheetTableInstanceCommand(ProjectSheet sheet, ProjectSheetTableInstance instance, int? index = null)
+        public AddProjectSheetTableInstanceCommand(ProjectSheet sheet, ProjectSheetTableInstance instance, int? index = null, Action? onChanged = null)
         {
             _sheet = sheet ?? throw new ArgumentNullException(nameof(sheet));
             _instance = instance ?? throw new ArgumentNullException(nameof(instance));
             _index = index ?? sheet.Tabelas.Count;
+            _onChanged = onChanged;
         }
 
         public void Execute()
@@ -24,7 +26,8 @@ namespace Araci.Core.Commands
 
         public void Undo()
         {
-            _sheet.Tabelas.RemoveAll(i => i.Id == _instance.Id);
+            if (_sheet.Tabelas.RemoveAll(i => i.Id == _instance.Id) > 0)
+                NotifyChanged();
         }
 
         public void Redo()
@@ -42,6 +45,12 @@ namespace Araci.Core.Commands
                 : _index;
 
             _sheet.Tabelas.Insert(safeIndex, _instance);
+            NotifyChanged();
+        }
+
+        private void NotifyChanged()
+        {
+            _onChanged?.Invoke();
         }
     }
 }

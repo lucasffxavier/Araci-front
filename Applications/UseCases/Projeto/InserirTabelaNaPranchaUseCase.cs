@@ -13,6 +13,7 @@ namespace Araci.Applications.UseCases.Projeto
         public const double DefaultY = 40.0;
         public const double DefaultWidth = 400.0;
         public const double DefaultHeight = 240.0;
+        public const double DefaultVerticalSpacing = 20.0;
 
         private readonly AraciDocument _document;
         private readonly ICommandHistory _commands;
@@ -29,7 +30,8 @@ namespace Araci.Applications.UseCases.Projeto
             double? x = null,
             double? y = null,
             double? width = null,
-            double? height = null)
+            double? height = null,
+            Action? onChanged = null)
         {
             ProjectSheet? sheet = _document.Pranchas.FirstOrDefault(p => p.Id == sheetId);
 
@@ -45,48 +47,46 @@ namespace Araci.Applications.UseCases.Projeto
                 Height = height ?? DefaultHeight
             };
 
-            _commands.Execute(new AddProjectSheetTableInstanceCommand(sheet, instance));
+            _commands.Execute(new AddProjectSheetTableInstanceCommand(sheet, instance, onChanged: onChanged));
             return instance;
         }
 
-        public IReadOnlyList<ProjectSheetTableInstance> InserirMultiplas(
-            Guid sheetId,
-            IEnumerable<Guid> tableIds)
+        public IReadOnlyList<ProjectSheetTableInstance> InserirMultiplas(Guid sheetId, IEnumerable<Guid> tableIds, Action? onChanged = null)
         {
             ProjectSheet? sheet = _document.Pranchas.FirstOrDefault(p => p.Id == sheetId);
 
-            if (sheet == null)
+            if (sheet == null || tableIds == null)
                 return Array.Empty<ProjectSheetTableInstance>();
 
-            HashSet<Guid> validTableIds = _document.Tabelas.Select(t => t.Id).ToHashSet();
-            List<Guid> tableIdsValidos = (tableIds ?? Array.Empty<Guid>())
-                .Where(id => id != Guid.Empty && validTableIds.Contains(id))
+            List<Guid> validTableIds = tableIds
+                .Where(id => id != Guid.Empty)
                 .Distinct()
+                .Where(id => _document.Tabelas.Any(t => t.Id == id))
                 .ToList();
 
-            if (tableIdsValidos.Count == 0)
+            if (validTableIds.Count == 0)
                 return Array.Empty<ProjectSheetTableInstance>();
 
+            var composite = new CompositeCommand();
             var instances = new List<ProjectSheetTableInstance>();
-            var command = new CompositeCommand();
             int baseIndex = sheet.Tabelas.Count;
 
-            for (int i = 0; i < tableIdsValidos.Count; i++)
+            for (int i = 0; i < validTableIds.Count; i++)
             {
                 var instance = new ProjectSheetTableInstance
                 {
-                    TableId = tableIdsValidos[i],
+                    TableId = validTableIds[i],
                     X = DefaultX,
-                    Y = DefaultY + i * (DefaultHeight + 20),
+                    Y = DefaultY + i * (DefaultHeight + DefaultVerticalSpacing),
                     Width = DefaultWidth,
                     Height = DefaultHeight
                 };
 
                 instances.Add(instance);
-                command.Add(new AddProjectSheetTableInstanceCommand(sheet, instance, baseIndex + i));
+                composite.Add(new AddProjectSheetTableInstanceCommand(sheet, instance, baseIndex + i, onChanged));
             }
 
-            _commands.Execute(command);
+            _commands.Execute(composite);
             return instances;
         }
     }
