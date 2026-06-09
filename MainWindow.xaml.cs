@@ -132,7 +132,7 @@ namespace Araci
             if (prancha == null)
                 return;
 
-            _projectSheetViewModel = new ProjectSheetViewModel(_context.Document, prancha, _context.MoverTabelaNaPrancha, _context.RedimensionarTabelaNaPrancha, _context.RemoverTabelaDaPrancha);
+            _projectSheetViewModel = new ProjectSheetViewModel(_context.Document, prancha, _context.MoverTabelaNaPrancha, _context.RedimensionarTabelaNaPrancha, _context.RemoverTabelaDaPrancha, _context.DividirTabelaNaPrancha);
 
             ProjectSheetViewer.DataContext = _projectSheetViewModel;
             ProjectSheetViewer.Visibility = Visibility.Visible;

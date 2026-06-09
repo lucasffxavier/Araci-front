@@ -434,7 +434,9 @@ namespace Araci.Infrastructure.Persistence
                         X = i.X,
                         Y = i.Y,
                         Width = i.Width,
-                        Height = i.Height
+                        Height = i.Height,
+                        RowStartIndex = i.RowStartIndex,
+                        RowCount = i.RowCount
                     })
                     .ToList()
             };
@@ -537,7 +539,9 @@ namespace Araci.Infrastructure.Persistence
                     X = v.X,
                     Y = v.Y,
                     Width = v.Width,
-                    Height = v.Height
+                    Height = v.Height,
+                    RowStartIndex = v.RowStartIndex,
+                    RowCount = v.RowCount
                 })
                 .Where(i => i.IsValid)
                 .ToList();

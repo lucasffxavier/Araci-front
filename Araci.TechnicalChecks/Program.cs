@@ -134,6 +134,11 @@ namespace Araci.TechnicalChecks
                 ("ProjectSheetView possui estilos visuais basicos de tabela", ProjectSheetViewPossuiEstilosVisuaisBasicosTabela),
                 ("ProjectSheetTableInstanceViewModel expoe dimensoes tabulares basicas", ProjectSheetTableInstanceViewModelExpoeDimensoesTabularesBasicas),
                 ("ProjectSheetView usa bindings para dimensoes tabulares", ProjectSheetViewUsaBindingsDimensoesTabulares),
+                ("Dividir tabela na prancha cria instancia independente", DividirTabelaNaPranchaCriaInstanciaIndependente),
+                ("Dividir tabela na prancha undo redo", DividirTabelaNaPranchaUndoRedo),
+                ("ProjectSheetViewModel recorta linhas por faixa da instancia", ProjectSheetViewModelRecortaLinhasPorFaixaInstancia),
+                ("ProjectSheetViewModel divide tabela selecionando nova instancia", ProjectSheetViewModelDivideTabelaSelecionandoNovaInstancia),
+                ("ProjectSheetView usa instancia real para divisao de tabela", ProjectSheetViewUsaInstanciaRealParaDivisaoTabela),
                 ("ProjectSheetViewModel instancia renderiza dados reais da tabela", ProjectSheetViewModelInstanciaRenderizaDadosReaisTabela),
                 ("ProjectSheetViewModel instancia trata tabela sem campos", ProjectSheetViewModelInstanciaTrataTabelaSemCampos),
                 ("ProjectSheetViewModel instancia trata tabela sem linhas", ProjectSheetViewModelInstanciaTrataTabelaSemLinhas),
@@ -5645,7 +5650,9 @@ namespace Araci.TechnicalChecks
                 X = 12.5,
                 Y = -8.25,
                 Width = 210,
-                Height = 95
+                Height = 95,
+                RowStartIndex = 4,
+                RowCount = 7
             });
             EditorContext context = new();
             var serializer = new ProjectSerializer(
@@ -5671,12 +5678,16 @@ namespace Araci.TechnicalChecks
             AssertEqual(-8.25, instanceDto.Y, "DTO instancia Y");
             AssertEqual(210, instanceDto.Width, "DTO instancia Width");
             AssertEqual(95, instanceDto.Height, "DTO instancia Height");
+            AssertEqual(4, instanceDto.RowStartIndex, "DTO instancia RowStartIndex");
+            AssertEqual(7, instanceDto.RowCount, "DTO instancia RowCount");
             AssertEqual(instanciaId, instance.Id, "Reload instancia Id");
             AssertEqual(tabela.Id, instance.TableId, "Reload instancia TableId");
             AssertEqual(12.5, instance.X, "Reload instancia X");
             AssertEqual(-8.25, instance.Y, "Reload instancia Y");
             AssertEqual(210, instance.Width, "Reload instancia Width");
             AssertEqual(95, instance.Height, "Reload instancia Height");
+            AssertEqual(4, instance.RowStartIndex, "Reload instancia RowStartIndex");
+            AssertEqual(7, instance.RowCount, "Reload instancia RowCount");
         }
 
         private static void PranchaDuplicaInstanciasTabelaComCopiaProfunda()
@@ -5690,7 +5701,9 @@ namespace Araci.TechnicalChecks
                 X = 10,
                 Y = 20,
                 Width = 220,
-                Height = 120
+                Height = 120,
+                RowStartIndex = 3,
+                RowCount = 5
             };
             origem.Tabelas.Add(instancia);
             var commands = new Araci.Core.Commands.CommandManager();
@@ -5708,6 +5721,8 @@ namespace Araci.TechnicalChecks
             AssertEqual(instancia.Y, copia.Y, "Duplicata instancia Y");
             AssertEqual(instancia.Width, copia.Width, "Duplicata instancia Width");
             AssertEqual(instancia.Height, copia.Height, "Duplicata instancia Height");
+            AssertEqual(instancia.RowStartIndex, copia.RowStartIndex, "Duplicata instancia RowStartIndex");
+            AssertEqual(instancia.RowCount, copia.RowCount, "Duplicata instancia RowCount");
         }
 
         private static void ExcluirTabelaLimpaInstanciasPranchaComUndoRedo()
@@ -6485,6 +6500,121 @@ namespace Araci.TechnicalChecks
             Assert(!xaml.Contains("<Setter Property=\"Width\" Value=\"112\"/>", StringComparison.Ordinal), "SheetTableHeaderCellStyle/BodyCellStyle nao deveriam fixar largura principal em XAML.");
             Assert(!xaml.Contains("<Setter Property=\"Height\" Value=\"26\"/>", StringComparison.Ordinal), "SheetTableHeaderCellStyle nao deveria fixar altura principal em XAML.");
             Assert(!xaml.Contains("<Setter Property=\"Height\" Value=\"24\"/>", StringComparison.Ordinal), "SheetTableBodyCellStyle nao deveria fixar altura principal em XAML.");
+        }
+
+        private static void DividirTabelaNaPranchaCriaInstanciaIndependente()
+        {
+            AraciDocument document = CriarDocumentoTabelaDados();
+            ProjectTable tabela = CriarTabelaDadosCarga(document);
+            ProjectSheet prancha = document.CriarNovaPrancha();
+            var original = new ProjectSheetTableInstance { TableId = tabela.Id, X = 10, Y = 20, Width = 200, Height = 120 };
+            prancha.Tabelas.Add(original);
+            var commands = new Araci.Core.Commands.CommandManager();
+            var useCase = new DividirTabelaNaPranchaUseCase(document, commands);
+
+            ProjectSheetTableInstance? nova = useCase.Dividir(prancha.Id, original.Id);
+
+            Assert(nova != null, "Dividir deveria criar nova instancia.");
+            AssertEqual(2, prancha.Tabelas.Count, "Split Tabelas.Count");
+            AssertEqual(tabela.Id, original.TableId, "Original TableId");
+            AssertEqual(tabela.Id, nova!.TableId, "Nova TableId");
+            AssertEqual(0, original.RowStartIndex, "Original RowStartIndex");
+            AssertEqual(2, original.RowCount, "Original RowCount");
+            AssertEqual(2, nova.RowStartIndex, "Nova RowStartIndex");
+            AssertEqual(1, nova.RowCount, "Nova RowCount");
+            AssertEqual(original.X + original.Width + DividirTabelaNaPranchaUseCase.DefaultSplitSpacing, nova.X, "Nova X");
+            AssertEqual(original.Y, nova.Y, "Nova Y");
+            AssertEqual(original.Width, nova.Width, "Nova Width");
+            AssertEqual(original.Height, nova.Height, "Nova Height");
+            Assert(commands.CanUndo, "Split deveria criar historico undo.");
+        }
+
+        private static void DividirTabelaNaPranchaUndoRedo()
+        {
+            AraciDocument document = CriarDocumentoTabelaDados();
+            ProjectTable tabela = CriarTabelaDadosCarga(document);
+            ProjectSheet prancha = document.CriarNovaPrancha();
+            var original = new ProjectSheetTableInstance { TableId = tabela.Id };
+            prancha.Tabelas.Add(original);
+            var commands = new Araci.Core.Commands.CommandManager();
+            var useCase = new DividirTabelaNaPranchaUseCase(document, commands);
+
+            ProjectSheetTableInstance? nova = useCase.Dividir(prancha.Id, original.Id);
+            Guid novaId = nova!.Id;
+
+            commands.Undo();
+
+            AssertEqual(1, prancha.Tabelas.Count, "Undo split Tabelas.Count");
+            AssertEqual(original.Id, prancha.Tabelas[0].Id, "Undo preserva original");
+            AssertEqual(0, original.RowStartIndex, "Undo original RowStartIndex");
+            AssertEqual(null, original.RowCount, "Undo original RowCount");
+
+            commands.Redo();
+
+            AssertEqual(2, prancha.Tabelas.Count, "Redo split Tabelas.Count");
+            AssertEqual(original.Id, prancha.Tabelas[0].Id, "Redo original Id");
+            AssertEqual(novaId, prancha.Tabelas[1].Id, "Redo nova Id");
+            AssertEqual(2, original.RowCount, "Redo original RowCount");
+            AssertEqual(2, prancha.Tabelas[1].RowStartIndex, "Redo nova RowStartIndex");
+        }
+
+        private static void ProjectSheetViewModelRecortaLinhasPorFaixaInstancia()
+        {
+            AraciDocument document = CriarDocumentoTabelaDados();
+            ProjectTable tabela = CriarTabelaDadosCarga(document);
+            ProjectSheet prancha = document.CriarNovaPrancha();
+            prancha.Tabelas.Add(new ProjectSheetTableInstance { TableId = tabela.Id, RowStartIndex = 0, RowCount = 2 });
+            prancha.Tabelas.Add(new ProjectSheetTableInstance { TableId = tabela.Id, RowStartIndex = 2, RowCount = 1 });
+
+            var viewModel = new ProjectSheetViewModel(document, prancha);
+
+            AssertEqual(2, viewModel.TableInstances.Count, "VM split TableInstances.Count");
+            AssertEqual(2, viewModel.TableInstances[0].Rows.Count, "VM original Rows.Count");
+            AssertEqual("Carga A", viewModel.TableInstances[0].Rows[0].Cells[0].DisplayValue, "VM original primeira linha");
+            AssertEqual("Carga B", viewModel.TableInstances[0].Rows[1].Cells[0].DisplayValue, "VM original segunda linha");
+            AssertEqual(1, viewModel.TableInstances[1].Rows.Count, "VM nova Rows.Count");
+            AssertEqual("Carga C", viewModel.TableInstances[1].Rows[0].Cells[0].DisplayValue, "VM nova primeira linha");
+            Assert(!viewModel.TableInstances[0].CanSplit, "Faixa limitada nao deveria permitir novo split nesta fase.");
+            Assert(!viewModel.TableInstances[1].CanSplit, "Continuacao nao deveria permitir novo split nesta fase.");
+        }
+
+        private static void ProjectSheetViewModelDivideTabelaSelecionandoNovaInstancia()
+        {
+            AraciDocument document = CriarDocumentoTabelaDados();
+            ProjectTable tabela = CriarTabelaDadosCarga(document);
+            ProjectSheet prancha = document.CriarNovaPrancha();
+            var original = new ProjectSheetTableInstance { TableId = tabela.Id };
+            prancha.Tabelas.Add(original);
+            var commands = new Araci.Core.Commands.CommandManager();
+            var split = new DividirTabelaNaPranchaUseCase(document, commands);
+            var viewModel = new ProjectSheetViewModel(document, prancha, dividirTabelaNaPrancha: split);
+
+            bool dividiu = viewModel.DividirInstanciaTabela(original.Id);
+
+            Assert(dividiu, "ProjectSheetViewModel deveria dividir instancia.");
+            AssertEqual(2, viewModel.TableInstances.Count, "ProjectSheetViewModel apos split TableInstances.Count");
+            AssertEqual(prancha.Tabelas[1].Id, viewModel.SelectedInstanceId, "ProjectSheetViewModel deveria selecionar nova instancia.");
+            AssertEqual(2, viewModel.TableInstances[0].Rows.Count, "ProjectSheetViewModel original Rows.Count");
+            AssertEqual(1, viewModel.TableInstances[1].Rows.Count, "ProjectSheetViewModel nova Rows.Count");
+        }
+
+        private static void ProjectSheetViewUsaInstanciaRealParaDivisaoTabela()
+        {
+            string xaml = File.ReadAllText(FindProjectFile("Views/ProjectSheetView.xaml"), Encoding.UTF8);
+            string codeBehind = File.ReadAllText(FindProjectFile("Views/ProjectSheetView.xaml.cs"), Encoding.UTF8);
+
+            Assert(!xaml.Contains("ItemsSource=\"{Binding Segments}\"", StringComparison.Ordinal), "ProjectSheetView nao deveria simular split com Segments internos.");
+            Assert(!xaml.Contains("ItemsSource=\"{Binding Blocks}\"", StringComparison.Ordinal), "ProjectSheetView nao deveria simular split com Blocks internos.");
+            Assert(!xaml.Contains("SelectedTableSplitButtonText", StringComparison.Ordinal), "ProjectSheetView nao deveria manter botao global de dividir/unir tabela.");
+            Assert(!xaml.Contains("CanToggleSelectedTableSplit", StringComparison.Ordinal), "ProjectSheetView nao deveria habilitar split por botao global.");
+            Assert(!xaml.Contains("ToggleSplitSelectedButton_Click", StringComparison.Ordinal), "ProjectSheetView nao deveria manter handler global de split.");
+            AssertContains(xaml, "MouseLeftButtonDown=\"ToggleSplitInlineControl_MouseLeftButtonDown\"", "ProjectSheetView deveria possuir controle contextual de split na tabela.");
+            AssertContains(xaml, "<Condition Binding=\"{Binding IsSelected}\" Value=\"True\"/>", "Controle contextual deveria aparecer apenas na tabela selecionada.");
+            AssertContains(xaml, "<Condition Binding=\"{Binding CanSplit}\" Value=\"True\"/>", "Controle contextual deveria aparecer apenas quando a tabela puder ser dividida.");
+            AssertContains(codeBehind, "ToggleSplitInlineControl_MouseLeftButtonDown", "ProjectSheetView code-behind deveria tratar o controle contextual de split.");
+            AssertContains(codeBehind, "e.Handled = true", "Handler contextual deveria marcar o evento como tratado para evitar drag.");
+            AssertContains(codeBehind, "ViewModel?.DividirInstanciaTabela(instance.Id)", "Handler contextual deveria chamar o fluxo oficial de divisao.");
+            Assert(!codeBehind.Contains("instance.ToggleSplit()", StringComparison.Ordinal), "Handler contextual nao deveria alternar estado visual temporario.");
         }
 
         private static void ProjectSheetViewModelInstanciaRenderizaDadosReaisTabela()

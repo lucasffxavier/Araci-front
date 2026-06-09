@@ -92,6 +92,8 @@ namespace Araci.Infrastructure.Persistence
         public double Y { get; set; }
         public double Width { get; set; }
         public double Height { get; set; }
+        public int RowStartIndex { get; set; }
+        public int? RowCount { get; set; }
     }
 
     public sealed class ProjectMetadataDto

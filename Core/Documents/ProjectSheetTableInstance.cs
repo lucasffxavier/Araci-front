@@ -13,6 +13,8 @@ namespace Araci.Core.Documents
         private double _y;
         private double _width = DefaultWidth;
         private double _height = DefaultHeight;
+        private int _rowStartIndex;
+        private int? _rowCount;
 
         public Guid Id { get; set; } = Guid.NewGuid();
         public Guid TableId { get; set; }
@@ -41,6 +43,18 @@ namespace Araci.Core.Documents
             set => _height = NormalizarDimensao(value, MinHeight);
         }
 
+        public int RowStartIndex
+        {
+            get => _rowStartIndex;
+            set => _rowStartIndex = value < 0 ? 0 : value;
+        }
+
+        public int? RowCount
+        {
+            get => _rowCount;
+            set => _rowCount = value.HasValue && value.Value > 0 ? value.Value : null;
+        }
+
         public ProjectSheetTableInstance CriarCopia(bool gerarNovoId)
         {
             return new ProjectSheetTableInstance
@@ -50,7 +64,9 @@ namespace Araci.Core.Documents
                 X = X,
                 Y = Y,
                 Width = Width,
-                Height = Height
+                Height = Height,
+                RowStartIndex = RowStartIndex,
+                RowCount = RowCount
             };
         }
 

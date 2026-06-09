@@ -115,6 +115,7 @@ namespace Araci.Services
             MoverTabelaNaPrancha = new MoverTabelaNaPranchaUseCase(Document, Commands);
             RedimensionarTabelaNaPrancha = new RedimensionarTabelaNaPranchaUseCase(Document, Commands);
             RemoverTabelaDaPrancha = new RemoverTabelaDaPranchaUseCase(Document, Commands);
+            DividirTabelaNaPrancha = new DividirTabelaNaPranchaUseCase(Document, Commands);
 
             var moveServices = EditingComposition.CreateMoveServices(() => Viewport, () => Scene.Elementos, Settings, Connectivity, TerminalLayout, SceneQueries, VisualUpdates, Selection, GeometryUpdates, Commands);
             MoveHud = moveServices.MoveHud;
@@ -216,6 +217,7 @@ namespace Araci.Services
         public MoverTabelaNaPranchaUseCase MoverTabelaNaPrancha { get; }
         public RedimensionarTabelaNaPranchaUseCase RedimensionarTabelaNaPrancha { get; }
         public RemoverTabelaDaPranchaUseCase RemoverTabelaDaPrancha { get; }
+        public DividirTabelaNaPranchaUseCase DividirTabelaNaPrancha { get; }
         public VisualUpdateService VisualUpdates { get; }
         public SelectionService Selection { get; }
         public SelecionarElementosUseCase SelecionarElementos { get; }

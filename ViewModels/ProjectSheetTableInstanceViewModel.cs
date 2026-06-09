@@ -38,8 +38,9 @@ namespace Araci.ViewModels
             _width = NormalizeDimension(instance.Width, ProjectSheetTableInstance.MinWidth);
             _height = NormalizeDimension(instance.Height, ProjectSheetTableInstance.MinHeight);
             Columns = tableData?.Columns.ToList() ?? new List<ProjectTableDataColumn>();
-            Rows = tableData?.Rows.Select(row => new ProjectSheetTableRowViewModel(row)).ToList() ??
-                new List<ProjectSheetTableRowViewModel>();
+            RowStartIndex = instance.RowStartIndex;
+            RowCount = instance.RowCount;
+            Rows = BuildVisibleRows(tableData, RowStartIndex, RowCount);
             EmptyDataMessage = tableData == null
                 ? "Tabela nao encontrada"
                 : Columns.Count == 0
@@ -54,9 +55,12 @@ namespace Araci.ViewModels
         public string TableName { get; }
         public IReadOnlyList<ProjectTableDataColumn> Columns { get; }
         public IReadOnlyList<ProjectSheetTableRowViewModel> Rows { get; }
+        public int RowStartIndex { get; }
+        public int? RowCount { get; }
         public bool HasColumns => Columns.Count > 0;
         public bool HasRows => Rows.Count > 0;
         public bool HasRenderableTable => HasColumns && HasRows;
+        public bool CanSplit => HasRenderableTable && Rows.Count > 1 && RowStartIndex == 0 && !RowCount.HasValue;
         public bool HasEmptyDataMessage => !string.IsNullOrWhiteSpace(EmptyDataMessage);
         public string EmptyDataMessage { get; }
         public double ColumnWidth => DefaultColumnWidth;
@@ -177,6 +181,25 @@ namespace Araci.ViewModels
         {
             Width = NormalizeDimension(width, ProjectSheetTableInstance.MinWidth);
             Height = NormalizeDimension(height, ProjectSheetTableInstance.MinHeight);
+        }
+
+        private static IReadOnlyList<ProjectSheetTableRowViewModel> BuildVisibleRows(
+            ProjectTableDataResult? tableData,
+            int rowStartIndex,
+            int? rowCount)
+        {
+            if (tableData == null || tableData.Columns.Count == 0)
+                return new List<ProjectSheetTableRowViewModel>();
+
+            int startIndex = rowStartIndex < 0 ? 0 : rowStartIndex;
+            IEnumerable<ProjectTableDataRow> rows = tableData.Rows.Skip(startIndex);
+
+            if (rowCount.HasValue)
+                rows = rows.Take(rowCount.Value);
+
+            return rows
+                .Select(row => new ProjectSheetTableRowViewModel(row))
+                .ToList();
         }
 
         private static double NormalizePosition(double value)

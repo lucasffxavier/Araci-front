@@ -22,6 +22,7 @@ namespace Araci.ViewModels
         private readonly MoverTabelaNaPranchaUseCase? _moverTabelaNaPrancha;
         private readonly RedimensionarTabelaNaPranchaUseCase? _redimensionarTabelaNaPrancha;
         private readonly RemoverTabelaDaPranchaUseCase? _removerTabelaDaPrancha;
+        private readonly DividirTabelaNaPranchaUseCase? _dividirTabelaNaPrancha;
         private readonly ProjectTableDataBuilder _tableDataBuilder = new();
         private string _titulo = string.Empty;
         private string _emptyMessage = string.Empty;
@@ -35,13 +36,15 @@ namespace Araci.ViewModels
             ProjectSheet sheet,
             MoverTabelaNaPranchaUseCase? moverTabelaNaPrancha = null,
             RedimensionarTabelaNaPranchaUseCase? redimensionarTabelaNaPrancha = null,
-            RemoverTabelaDaPranchaUseCase? removerTabelaDaPrancha = null)
+            RemoverTabelaDaPranchaUseCase? removerTabelaDaPrancha = null,
+            DividirTabelaNaPranchaUseCase? dividirTabelaNaPrancha = null)
         {
             _document = document ?? throw new ArgumentNullException(nameof(document));
             _sheet = sheet ?? throw new ArgumentNullException(nameof(sheet));
             _moverTabelaNaPrancha = moverTabelaNaPrancha;
             _redimensionarTabelaNaPrancha = redimensionarTabelaNaPrancha;
             _removerTabelaDaPrancha = removerTabelaDaPrancha;
+            _dividirTabelaNaPrancha = dividirTabelaNaPrancha;
             TableInstances = new ObservableCollection<ProjectSheetTableInstanceViewModel>();
             Refresh();
         }
@@ -278,6 +281,21 @@ namespace Araci.ViewModels
             return removed;
         }
 
+        public bool DividirInstanciaTabela(Guid instanceId)
+        {
+            if (!TableInstances.Any(i => i.Id == instanceId && i.CanSplit))
+                return false;
+
+            ProjectSheetTableInstance? novaInstancia = _dividirTabelaNaPrancha?.Dividir(SheetId, instanceId, Refresh);
+
+            if (novaInstancia == null)
+                return false;
+
+            SelecionarInstancia(novaInstancia.Id);
+            RestoreWorkspaceFromDocument();
+            return true;
+        }
+
         public void ZoomIn()
         {
             ZoomScale += ZoomStep;
@@ -343,6 +361,8 @@ namespace Araci.ViewModels
             instance.Y = MoverTabelaNaPranchaUseCase.NormalizePosition(instance.Y);
             instance.Width = RedimensionarTabelaNaPranchaUseCase.NormalizeDimension(instance.Width, ProjectSheetTableInstance.MinWidth);
             instance.Height = RedimensionarTabelaNaPranchaUseCase.NormalizeDimension(instance.Height, ProjectSheetTableInstance.MinHeight);
+            instance.RowStartIndex = instance.RowStartIndex;
+            instance.RowCount = instance.RowCount;
         }
 
         private static double NormalizeWorkspaceDimension(double value, double fallback)

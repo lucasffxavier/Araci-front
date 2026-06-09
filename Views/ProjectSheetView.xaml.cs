@@ -229,6 +229,19 @@ namespace Araci.Views
             return ViewModel?.RemoverInstanciaSelecionada() == true;
         }
 
+        private void ToggleSplitInlineControl_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
+        {
+            if (sender is FrameworkElement element &&
+                element.DataContext is ProjectSheetTableInstanceViewModel instance)
+            {
+                ViewModel?.SelecionarInstancia(instance.Id);
+                ViewModel?.DividirInstanciaTabela(instance.Id);
+            }
+
+            e.Handled = true;
+            Focus();
+        }
+
         private void CommitDrag()
         {
             if (!_isDragging || _draggedInstance == null)
