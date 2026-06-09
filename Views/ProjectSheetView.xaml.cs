@@ -50,12 +50,14 @@ namespace Araci.Views
 
             ViewModel.SelecionarInstancia(instance.Id);
             Focus();
+
             _draggedInstance = instance;
             _dragElement = element;
             _dragStartPoint = e.GetPosition(SheetSurface);
             _dragStartX = instance.X;
             _dragStartY = instance.Y;
             _isDragging = true;
+
             element.CaptureMouse();
             e.Handled = true;
         }
@@ -68,7 +70,12 @@ namespace Araci.Views
             Point current = e.GetPosition(SheetSurface);
             double newX = _dragStartX + current.X - _dragStartPoint.X;
             double newY = _dragStartY + current.Y - _dragStartPoint.Y;
-            _draggedInstance.SetPreviewPosition(newX, newY);
+
+            if (ViewModel != null)
+                ViewModel.SetPreviewPosition(_draggedInstance, newX, newY);
+            else
+                _draggedInstance.SetPreviewPosition(newX, newY);
+
             e.Handled = true;
         }
 
@@ -135,7 +142,11 @@ namespace Araci.Views
             if (_resizeMode is SheetTableResizeMode.Bottom or SheetTableResizeMode.BottomRight)
                 newHeight = _resizeStartHeight + deltaY;
 
-            _resizedInstance.SetPreviewSize(newWidth, newHeight);
+            if (ViewModel != null)
+                ViewModel.SetPreviewSize(_resizedInstance, newWidth, newHeight);
+            else
+                _resizedInstance.SetPreviewSize(newWidth, newHeight);
+
             e.Handled = true;
         }
 
@@ -155,6 +166,37 @@ namespace Araci.Views
         {
             RemoveSelectedInstance();
             Focus();
+        }
+
+        private void ZoomInButton_Click(object sender, RoutedEventArgs e)
+        {
+            ViewModel?.ZoomIn();
+            Focus();
+        }
+
+        private void ZoomOutButton_Click(object sender, RoutedEventArgs e)
+        {
+            ViewModel?.ZoomOut();
+            Focus();
+        }
+
+        private void ResetZoomButton_Click(object sender, RoutedEventArgs e)
+        {
+            ViewModel?.ResetZoom();
+            Focus();
+        }
+
+        private void ProjectSheetView_PreviewMouseWheel(object sender, MouseWheelEventArgs e)
+        {
+            if ((Keyboard.Modifiers & ModifierKeys.Control) != ModifierKeys.Control)
+                return;
+
+            if (e.Delta > 0)
+                ViewModel?.ZoomIn();
+            else if (e.Delta < 0)
+                ViewModel?.ZoomOut();
+
+            e.Handled = true;
         }
 
         private void ProjectSheetView_KeyDown(object sender, KeyEventArgs e)
@@ -217,6 +259,7 @@ namespace Araci.Views
                 _draggedInstance.SetPreviewPosition(_dragStartX, _dragStartY);
 
             ReleaseDrag();
+            ViewModel?.RestoreWorkspaceFromDocument();
         }
 
         private void CancelResizePreview()
@@ -225,6 +268,7 @@ namespace Araci.Views
                 _resizedInstance.SetPreviewSize(_resizeStartWidth, _resizeStartHeight);
 
             ReleaseResize();
+            ViewModel?.RestoreWorkspaceFromDocument();
         }
 
         private void ReleaseDrag()

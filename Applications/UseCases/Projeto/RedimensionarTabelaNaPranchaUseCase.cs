@@ -8,6 +8,8 @@ namespace Araci.Applications.UseCases.Projeto
 {
     public sealed class RedimensionarTabelaNaPranchaUseCase
     {
+        private const double Tolerancia = 0.000001;
+
         private readonly AraciDocument _document;
         private readonly ICommandHistory _commands;
 
@@ -19,17 +21,39 @@ namespace Araci.Applications.UseCases.Projeto
 
         public bool Redimensionar(Guid sheetId, Guid instanceId, double novaLargura, double novaAltura, Action? onChanged = null)
         {
+            return Redimensionar(
+                sheetId,
+                instanceId,
+                novaLargura,
+                novaAltura,
+                MoverTabelaNaPranchaUseCase.LarguraPadraoPrancha,
+                MoverTabelaNaPranchaUseCase.AlturaPadraoPrancha,
+                onChanged);
+        }
+
+        public bool Redimensionar(
+            Guid sheetId,
+            Guid instanceId,
+            double novaLargura,
+            double novaAltura,
+            double larguraPrancha,
+            double alturaPrancha,
+            Action? onChanged = null)
+        {
             ProjectSheet? sheet = _document.Pranchas.FirstOrDefault(p => p.Id == sheetId);
             ProjectSheetTableInstance? instance = sheet?.Tabelas.FirstOrDefault(i => i.Id == instanceId);
 
             if (sheet == null || instance == null)
                 return false;
 
-            double larguraNormalizada = NormalizarDimensao(novaLargura, ProjectSheetTableInstance.MinWidth);
-            double alturaNormalizada = NormalizarDimensao(novaAltura, ProjectSheetTableInstance.MinHeight);
+            if (!double.IsFinite(novaLargura) || !double.IsFinite(novaAltura))
+                return false;
 
-            if (Math.Abs(instance.Width - larguraNormalizada) < 0.000001 &&
-                Math.Abs(instance.Height - alturaNormalizada) < 0.000001)
+            double larguraNormalizada = NormalizeDimension(novaLargura, ProjectSheetTableInstance.MinWidth);
+            double alturaNormalizada = NormalizeDimension(novaAltura, ProjectSheetTableInstance.MinHeight);
+
+            if (Math.Abs(instance.Width - larguraNormalizada) < Tolerancia &&
+                Math.Abs(instance.Height - alturaNormalizada) < Tolerancia)
                 return false;
 
             _commands.Execute(new ResizeProjectSheetTableInstanceCommand(
@@ -43,11 +67,27 @@ namespace Araci.Applications.UseCases.Projeto
             return true;
         }
 
-        private static double NormalizarDimensao(double valor, double minimo)
+        public static double ClampDimension(double valor, double minimo, double maximo)
         {
-            return double.IsNaN(valor) || double.IsInfinity(valor) || valor < minimo
-                ? minimo
-                : valor;
+            return NormalizeDimension(valor, minimo);
+        }
+
+        public static double NormalizeDimension(double valor, double minimo)
+        {
+            double minimoSeguro = NormalizarMinimo(minimo);
+
+            if (double.IsNaN(valor) || double.IsInfinity(valor) || valor < minimoSeguro)
+                return minimoSeguro;
+
+            return valor;
+        }
+
+        private static double NormalizarMinimo(double valor)
+        {
+            if (double.IsNaN(valor) || double.IsInfinity(valor) || valor < 0)
+                return 0;
+
+            return valor;
         }
     }
 }

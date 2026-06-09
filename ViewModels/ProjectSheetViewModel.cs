@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.ComponentModel;
 using System.Linq;
@@ -10,6 +11,11 @@ namespace Araci.ViewModels
 {
     public sealed class ProjectSheetViewModel : INotifyPropertyChanged
     {
+        private const double WorkspaceMargin = 320.0;
+        private const double MinZoomScale = 0.25;
+        private const double MaxZoomScale = 4.0;
+        private const double ZoomStep = 0.10;
+
         private readonly AraciDocument _document;
         private readonly ProjectSheet _sheet;
         private readonly MoverTabelaNaPranchaUseCase? _moverTabelaNaPrancha;
@@ -18,6 +24,11 @@ namespace Araci.ViewModels
         private string _titulo = string.Empty;
         private string _emptyMessage = string.Empty;
         private Guid? _selectedInstanceId;
+        private double _sheetOriginOffsetX = WorkspaceMargin;
+        private double _sheetOriginOffsetY = WorkspaceMargin;
+        private double _workspaceWidth = MoverTabelaNaPranchaUseCase.LarguraPadraoPrancha + WorkspaceMargin * 2;
+        private double _workspaceHeight = MoverTabelaNaPranchaUseCase.AlturaPadraoPrancha + WorkspaceMargin * 2;
+        private double _zoomScale = 1.0;
 
         public ProjectSheetViewModel(
             AraciDocument document,
@@ -41,6 +52,90 @@ namespace Araci.ViewModels
         public bool HasEmptyMessage => !string.IsNullOrWhiteSpace(EmptyMessage);
         public Guid? SelectedInstanceId => _selectedInstanceId;
         public bool HasSelectedInstance => _selectedInstanceId.HasValue;
+        public double SheetWidth => MoverTabelaNaPranchaUseCase.LarguraPadraoPrancha;
+        public double SheetHeight => MoverTabelaNaPranchaUseCase.AlturaPadraoPrancha;
+        public double MinimumWorkspaceWidth => SheetWidth + WorkspaceMargin * 2;
+        public double MinimumWorkspaceHeight => SheetHeight + WorkspaceMargin * 2;
+
+        public double SheetOriginOffsetX
+        {
+            get => _sheetOriginOffsetX;
+            private set
+            {
+                double normalized = NormalizeWorkspaceDimension(value, WorkspaceMargin);
+
+                if (Math.Abs(_sheetOriginOffsetX - normalized) < 0.000001)
+                    return;
+
+                _sheetOriginOffsetX = normalized;
+                OnPropertyChanged();
+                UpdateInstanceOffsets();
+            }
+        }
+
+        public double SheetOriginOffsetY
+        {
+            get => _sheetOriginOffsetY;
+            private set
+            {
+                double normalized = NormalizeWorkspaceDimension(value, WorkspaceMargin);
+
+                if (Math.Abs(_sheetOriginOffsetY - normalized) < 0.000001)
+                    return;
+
+                _sheetOriginOffsetY = normalized;
+                OnPropertyChanged();
+                UpdateInstanceOffsets();
+            }
+        }
+
+        public double WorkspaceWidth
+        {
+            get => _workspaceWidth;
+            private set
+            {
+                double normalized = Math.Max(MinimumWorkspaceWidth, NormalizeWorkspaceDimension(value, MinimumWorkspaceWidth));
+
+                if (Math.Abs(_workspaceWidth - normalized) < 0.000001)
+                    return;
+
+                _workspaceWidth = normalized;
+                OnPropertyChanged();
+            }
+        }
+
+        public double WorkspaceHeight
+        {
+            get => _workspaceHeight;
+            private set
+            {
+                double normalized = Math.Max(MinimumWorkspaceHeight, NormalizeWorkspaceDimension(value, MinimumWorkspaceHeight));
+
+                if (Math.Abs(_workspaceHeight - normalized) < 0.000001)
+                    return;
+
+                _workspaceHeight = normalized;
+                OnPropertyChanged();
+            }
+        }
+
+        public double ZoomScale
+        {
+            get => _zoomScale;
+            private set
+            {
+                double normalized = NormalizeZoom(value);
+
+                if (Math.Abs(_zoomScale - normalized) < 0.000001)
+                    return;
+
+                _zoomScale = normalized;
+                OnPropertyChanged();
+                OnPropertyChanged(nameof(ZoomPercentText));
+            }
+        }
+
+        public string ZoomPercentText => $"{Math.Round(ZoomScale * 100):0}%";
 
         public string Titulo
         {
@@ -77,14 +172,18 @@ namespace Araci.ViewModels
                 : $"{_sheet.Numero} - {_sheet.Nome}";
 
             TableInstances.Clear();
+            NormalizeInstances();
+            RecalculateWorkspaceFromDocument();
 
             foreach (ProjectSheetTableInstance instance in _sheet.Tabelas.Where(i => i != null))
             {
                 ProjectTable? table = _document.Tabelas.FirstOrDefault(t => t.Id == instance.TableId);
+
                 var instanceViewModel = new ProjectSheetTableInstanceViewModel(instance, table?.Nome ?? "Tabela nao encontrada")
                 {
                     IsSelected = selectedBeforeRefresh == instance.Id
                 };
+                instanceViewModel.SetSheetOriginOffset(SheetOriginOffsetX, SheetOriginOffsetY);
                 TableInstances.Add(instanceViewModel);
             }
 
@@ -120,6 +219,28 @@ namespace Araci.ViewModels
             OnSelectionChanged();
         }
 
+        public void SetPreviewPosition(ProjectSheetTableInstanceViewModel instance, double x, double y)
+        {
+            ArgumentNullException.ThrowIfNull(instance);
+
+            instance.SetPreviewPosition(
+                MoverTabelaNaPranchaUseCase.NormalizePosition(x),
+                MoverTabelaNaPranchaUseCase.NormalizePosition(y));
+
+            RecalculateWorkspaceFromViewModels();
+        }
+
+        public void SetPreviewSize(ProjectSheetTableInstanceViewModel instance, double width, double height)
+        {
+            ArgumentNullException.ThrowIfNull(instance);
+
+            instance.SetPreviewSize(
+                RedimensionarTabelaNaPranchaUseCase.NormalizeDimension(width, ProjectSheetTableInstance.MinWidth),
+                RedimensionarTabelaNaPranchaUseCase.NormalizeDimension(height, ProjectSheetTableInstance.MinHeight));
+
+            RecalculateWorkspaceFromViewModels();
+        }
+
         public bool MoverInstancia(Guid instanceId, double novoX, double novoY)
         {
             ProjectSheetTableInstanceViewModel? instanceViewModel = TableInstances.FirstOrDefault(i => i.Id == instanceId);
@@ -127,10 +248,19 @@ namespace Araci.ViewModels
             if (instanceViewModel == null)
                 return false;
 
-            bool moved = _moverTabelaNaPrancha?.Mover(SheetId, instanceId, novoX, novoY, Refresh) == true;
+            bool moved = _moverTabelaNaPrancha?.Mover(
+                SheetId,
+                instanceId,
+                novoX,
+                novoY,
+                SheetWidth,
+                SheetHeight,
+                Refresh) == true;
 
             if (moved)
                 SelecionarInstancia(instanceId);
+            else
+                RestoreWorkspaceFromDocument();
 
             return moved;
         }
@@ -142,10 +272,19 @@ namespace Araci.ViewModels
             if (instanceViewModel == null)
                 return false;
 
-            bool resized = _redimensionarTabelaNaPrancha?.Redimensionar(SheetId, instanceId, novaLargura, novaAltura, Refresh) == true;
+            bool resized = _redimensionarTabelaNaPrancha?.Redimensionar(
+                SheetId,
+                instanceId,
+                novaLargura,
+                novaAltura,
+                SheetWidth,
+                SheetHeight,
+                Refresh) == true;
 
             if (resized)
                 SelecionarInstancia(instanceId);
+            else
+                RestoreWorkspaceFromDocument();
 
             return resized;
         }
@@ -167,6 +306,110 @@ namespace Araci.ViewModels
             return removed;
         }
 
+        public void ZoomIn()
+        {
+            ZoomScale += ZoomStep;
+        }
+
+        public void ZoomOut()
+        {
+            ZoomScale -= ZoomStep;
+        }
+
+        public void ResetZoom()
+        {
+            ZoomScale = 1.0;
+        }
+
+        public void RestoreWorkspaceFromDocument()
+        {
+            RecalculateWorkspaceFromDocument();
+            UpdateInstanceOffsets();
+        }
+
+        private void NormalizeInstances()
+        {
+            foreach (ProjectSheetTableInstance instance in _sheet.Tabelas.Where(i => i != null))
+                NormalizeInstance(instance);
+        }
+
+        private void RecalculateWorkspaceFromDocument()
+        {
+            RecalculateWorkspace(_sheet.Tabelas.Where(i => i != null).Select(i => new WorkspaceBoundsItem(i.X, i.Y, i.Width, i.Height)));
+        }
+
+        private void RecalculateWorkspaceFromViewModels()
+        {
+            RecalculateWorkspace(TableInstances.Select(i => new WorkspaceBoundsItem(i.X, i.Y, i.Width, i.Height)));
+        }
+
+        private void RecalculateWorkspace(IEnumerable<WorkspaceBoundsItem> items)
+        {
+            double minX = 0;
+            double minY = 0;
+            double maxX = SheetWidth;
+            double maxY = SheetHeight;
+
+            foreach (WorkspaceBoundsItem item in items)
+            {
+                double x = MoverTabelaNaPranchaUseCase.NormalizePosition(item.X);
+                double y = MoverTabelaNaPranchaUseCase.NormalizePosition(item.Y);
+                double width = RedimensionarTabelaNaPranchaUseCase.NormalizeDimension(item.Width, ProjectSheetTableInstance.MinWidth);
+                double height = RedimensionarTabelaNaPranchaUseCase.NormalizeDimension(item.Height, ProjectSheetTableInstance.MinHeight);
+
+                minX = Math.Min(minX, x);
+                minY = Math.Min(minY, y);
+                maxX = Math.Max(maxX, x + width);
+                maxY = Math.Max(maxY, y + height);
+            }
+
+            double offsetX = WorkspaceMargin + Math.Max(0, -minX);
+            double offsetY = WorkspaceMargin + Math.Max(0, -minY);
+            double widthFinal = offsetX + maxX + WorkspaceMargin;
+            double heightFinal = offsetY + maxY + WorkspaceMargin;
+
+            SheetOriginOffsetX = offsetX;
+            SheetOriginOffsetY = offsetY;
+            WorkspaceWidth = widthFinal;
+            WorkspaceHeight = heightFinal;
+            UpdateInstanceOffsets();
+        }
+
+        private void UpdateInstanceOffsets()
+        {
+            foreach (ProjectSheetTableInstanceViewModel instance in TableInstances)
+                instance.SetSheetOriginOffset(SheetOriginOffsetX, SheetOriginOffsetY);
+        }
+
+        private static void NormalizeInstance(ProjectSheetTableInstance instance)
+        {
+            instance.X = MoverTabelaNaPranchaUseCase.NormalizePosition(instance.X);
+            instance.Y = MoverTabelaNaPranchaUseCase.NormalizePosition(instance.Y);
+            instance.Width = RedimensionarTabelaNaPranchaUseCase.NormalizeDimension(instance.Width, ProjectSheetTableInstance.MinWidth);
+            instance.Height = RedimensionarTabelaNaPranchaUseCase.NormalizeDimension(instance.Height, ProjectSheetTableInstance.MinHeight);
+        }
+
+        private static double NormalizeWorkspaceDimension(double value, double fallback)
+        {
+            return double.IsNaN(value) || double.IsInfinity(value) || value <= 0
+                ? fallback
+                : value;
+        }
+
+        private static double NormalizeZoom(double value)
+        {
+            if (double.IsNaN(value) || double.IsInfinity(value))
+                return 1.0;
+
+            if (value < MinZoomScale)
+                return MinZoomScale;
+
+            if (value > MaxZoomScale)
+                return MaxZoomScale;
+
+            return value;
+        }
+
         public event PropertyChangedEventHandler? PropertyChanged;
 
         private void OnSelectionChanged()
@@ -178,6 +421,22 @@ namespace Araci.ViewModels
         private void OnPropertyChanged([CallerMemberName] string? propertyName = null)
         {
             PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
+        }
+
+        private readonly struct WorkspaceBoundsItem
+        {
+            public WorkspaceBoundsItem(double x, double y, double width, double height)
+            {
+                X = x;
+                Y = y;
+                Width = width;
+                Height = height;
+            }
+
+            public double X { get; }
+            public double Y { get; }
+            public double Width { get; }
+            public double Height { get; }
         }
     }
 }

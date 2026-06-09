@@ -11,6 +11,8 @@ namespace Araci.ViewModels
         private double _y;
         private double _width;
         private double _height;
+        private double _sheetOriginOffsetX;
+        private double _sheetOriginOffsetY;
         private bool _isSelected;
 
         public ProjectSheetTableInstanceViewModel(ProjectSheetTableInstance instance, string tableName)
@@ -20,15 +22,45 @@ namespace Araci.ViewModels
             Id = instance.Id;
             TableId = instance.TableId;
             TableName = string.IsNullOrWhiteSpace(tableName) ? "Tabela sem nome" : tableName;
-            _x = instance.X;
-            _y = instance.Y;
-            _width = instance.Width;
-            _height = instance.Height;
+            _x = NormalizePosition(instance.X);
+            _y = NormalizePosition(instance.Y);
+            _width = NormalizeDimension(instance.Width, ProjectSheetTableInstance.MinWidth);
+            _height = NormalizeDimension(instance.Height, ProjectSheetTableInstance.MinHeight);
         }
 
         public Guid Id { get; }
         public Guid TableId { get; }
         public string TableName { get; }
+        public double ViewX => X + SheetOriginOffsetX;
+        public double ViewY => Y + SheetOriginOffsetY;
+
+        public double SheetOriginOffsetX
+        {
+            get => _sheetOriginOffsetX;
+            private set
+            {
+                if (Math.Abs(_sheetOriginOffsetX - value) < 0.000001)
+                    return;
+
+                _sheetOriginOffsetX = value;
+                OnPropertyChanged();
+                OnPropertyChanged(nameof(ViewX));
+            }
+        }
+
+        public double SheetOriginOffsetY
+        {
+            get => _sheetOriginOffsetY;
+            private set
+            {
+                if (Math.Abs(_sheetOriginOffsetY - value) < 0.000001)
+                    return;
+
+                _sheetOriginOffsetY = value;
+                OnPropertyChanged();
+                OnPropertyChanged(nameof(ViewY));
+            }
+        }
 
         public double X
         {
@@ -40,6 +72,7 @@ namespace Araci.ViewModels
 
                 _x = value;
                 OnPropertyChanged();
+                OnPropertyChanged(nameof(ViewX));
             }
         }
 
@@ -53,6 +86,7 @@ namespace Araci.ViewModels
 
                 _y = value;
                 OnPropertyChanged();
+                OnPropertyChanged(nameof(ViewY));
             }
         }
 
@@ -95,10 +129,16 @@ namespace Araci.ViewModels
             }
         }
 
+        public void SetSheetOriginOffset(double offsetX, double offsetY)
+        {
+            SheetOriginOffsetX = NormalizeDimension(offsetX, 0);
+            SheetOriginOffsetY = NormalizeDimension(offsetY, 0);
+        }
+
         public void SetPreviewPosition(double x, double y)
         {
-            X = x;
-            Y = y;
+            X = NormalizePosition(x);
+            Y = NormalizePosition(y);
         }
 
         public void SetPreviewSize(double width, double height)
@@ -107,10 +147,21 @@ namespace Araci.ViewModels
             Height = NormalizeDimension(height, ProjectSheetTableInstance.MinHeight);
         }
 
+        private static double NormalizePosition(double value)
+        {
+            return double.IsNaN(value) || double.IsInfinity(value)
+                ? 0
+                : value;
+        }
+
         private static double NormalizeDimension(double value, double minimum)
         {
-            return double.IsNaN(value) || double.IsInfinity(value) || value < minimum
-                ? minimum
+            double safeMinimum = double.IsNaN(minimum) || double.IsInfinity(minimum) || minimum < 0
+                ? 0
+                : minimum;
+
+            return double.IsNaN(value) || double.IsInfinity(value) || value < safeMinimum
+                ? safeMinimum
                 : value;
         }
 

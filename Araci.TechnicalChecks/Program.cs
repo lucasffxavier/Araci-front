@@ -125,6 +125,9 @@ namespace Araci.TechnicalChecks
                 ("ProjectSheetViewModel refresh preserva selecao existente", ProjectSheetViewModelRefreshPreservaSelecaoExistente),
                 ("ProjectSheetViewModel refresh remove selecao inexistente", ProjectSheetViewModelRefreshRemoveSelecaoInexistente),
                 ("ProjectSheetView possui superficie de prancha", ProjectSheetViewPossuiSuperficiePrancha),
+                ("ProjectSheetViewModel permite instancia fora da folha", ProjectSheetViewModelPermiteInstanciaForaDaFolha),
+                ("ProjectSheetViewModel zoom altera percentual", ProjectSheetViewModelZoomAlteraPercentual),
+                ("ProjectSheetView aplica zoom no workspace", ProjectSheetViewAplicaZoomNoWorkspace),
                 ("Tabela data view model expoe colunas linhas e celulas", TabelaDataViewModelExpoeColunasLinhasECelulas),
                 ("Tabela data view model trata tabela sem campos", TabelaDataViewModelTrataTabelaSemCampos),
                 ("Tabela data view model trata tabela sem linhas", TabelaDataViewModelTrataTabelaSemLinhas),
@@ -6280,10 +6283,85 @@ namespace Araci.TechnicalChecks
             RunSta(() =>
             {
                 var view = new ProjectSheetView();
-                var sheetSurface = view.FindName("SheetSurface") as Grid;
+                var sheetSurface = view.FindName("SheetSurface") as Canvas;
 
                 Assert(sheetSurface != null, "ProjectSheetView deveria possuir SheetSurface.");
-                Assert(sheetSurface!.ClipToBounds, "SheetSurface deveria manter ClipToBounds.");
+                Assert(!sheetSurface!.ClipToBounds, "SheetSurface nao deveria recortar a area externa da folha.");
+            });
+        }
+
+        private static void ProjectSheetViewModelPermiteInstanciaForaDaFolha()
+        {
+            var document = new AraciDocument();
+            ProjectTable tabela = document.CriarNovaTabela();
+            ProjectSheet prancha = document.CriarNovaPrancha();
+            var instancia = new ProjectSheetTableInstance
+            {
+                TableId = tabela.Id,
+                X = -180,
+                Y = -90,
+                Width = 420,
+                Height = 250
+            };
+            prancha.Tabelas.Add(instancia);
+
+            var viewModel = new ProjectSheetViewModel(document, prancha);
+            ProjectSheetTableInstanceViewModel instanceViewModel = viewModel.TableInstances.Single();
+
+            AssertEqual(-180, instanceViewModel.X, "Instancia fora da folha X dominio");
+            AssertEqual(-90, instanceViewModel.Y, "Instancia fora da folha Y dominio");
+            Assert(instanceViewModel.ViewX >= 0, "Instancia fora a esquerda deveria continuar visivel no workspace.");
+            Assert(instanceViewModel.ViewY >= 0, "Instancia fora acima deveria continuar visivel no workspace.");
+            Assert(instanceViewModel.ViewX < viewModel.SheetOriginOffsetX, "ViewX deveria posicionar tabela antes da folha branca.");
+            Assert(instanceViewModel.ViewY < viewModel.SheetOriginOffsetY, "ViewY deveria posicionar tabela acima da folha branca.");
+            Assert(viewModel.WorkspaceWidth > viewModel.MinimumWorkspaceWidth, "Workspace deveria crescer para coordenada negativa X.");
+            Assert(viewModel.WorkspaceHeight > viewModel.MinimumWorkspaceHeight, "Workspace deveria crescer para coordenada negativa Y.");
+
+            viewModel.SetPreviewPosition(instanceViewModel, viewModel.SheetWidth + 120, viewModel.SheetHeight + 80);
+
+            Assert(instanceViewModel.X > viewModel.SheetWidth, "Preview deveria permitir X alem da folha.");
+            Assert(instanceViewModel.Y > viewModel.SheetHeight, "Preview deveria permitir Y alem da folha.");
+            Assert(viewModel.WorkspaceWidth > instanceViewModel.ViewX + instanceViewModel.Width, "Workspace deveria conter tabela a direita.");
+            Assert(viewModel.WorkspaceHeight > instanceViewModel.ViewY + instanceViewModel.Height, "Workspace deveria conter tabela abaixo.");
+        }
+
+        private static void ProjectSheetViewModelZoomAlteraPercentual()
+        {
+            var document = new AraciDocument();
+            ProjectSheet prancha = document.CriarNovaPrancha();
+            var viewModel = new ProjectSheetViewModel(document, prancha);
+
+            viewModel.ZoomIn();
+
+            AssertEqual(1.1, viewModel.ZoomScale, "ZoomIn ZoomScale");
+            AssertEqual("110%", viewModel.ZoomPercentText, "ZoomIn ZoomPercentText");
+
+            viewModel.ZoomOut();
+            viewModel.ZoomOut();
+
+            AssertEqual(0.9, viewModel.ZoomScale, "ZoomOut ZoomScale");
+            AssertEqual("90%", viewModel.ZoomPercentText, "ZoomOut ZoomPercentText");
+
+            viewModel.ResetZoom();
+
+            AssertEqual(1.0, viewModel.ZoomScale, "ResetZoom ZoomScale");
+            AssertEqual("100%", viewModel.ZoomPercentText, "ResetZoom ZoomPercentText");
+        }
+
+        private static void ProjectSheetViewAplicaZoomNoWorkspace()
+        {
+            RunSta(() =>
+            {
+                var view = new ProjectSheetView();
+                var zoomHost = view.FindName("ZoomHost") as Grid;
+                var sheetSurface = view.FindName("SheetSurface") as Canvas;
+
+                Assert(zoomHost != null, "ProjectSheetView deveria possuir ZoomHost.");
+                Assert(sheetSurface != null, "ProjectSheetView deveria possuir SheetSurface Canvas.");
+                Assert(zoomHost!.LayoutTransform is System.Windows.Media.ScaleTransform, "ZoomHost deveria usar LayoutTransform com ScaleTransform.");
+                Assert(zoomHost.HorizontalAlignment == HorizontalAlignment.Left, "ZoomHost deveria iniciar a esquerda para scroll previsivel.");
+                Assert(zoomHost.VerticalAlignment == VerticalAlignment.Top, "ZoomHost deveria iniciar no topo para scroll previsivel.");
+                Assert(!sheetSurface!.ClipToBounds, "SheetSurface nao deveria recortar tabelas fora da folha.");
             });
         }
 
