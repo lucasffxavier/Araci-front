@@ -2,6 +2,7 @@ using Araci.Applications.Abstractions;
 using Araci.Core.Documents;
 using Araci.Properties;
 using Araci.Services.Simulation;
+using Microsoft.Win32;
 using System.Collections.Generic;
 using System.Windows;
 
@@ -22,6 +23,22 @@ namespace Araci.Services.UI
         public void ShowError(string title, string message)
         {
             Show(title, message, MessageBoxImage.Error);
+        }
+
+        public string? ShowSaveCsvDialog(string suggestedFileName)
+        {
+            var dialog = new SaveFileDialog
+            {
+                Title = "Exportar CSV",
+                Filter = "Arquivos CSV (*.csv)|*.csv",
+                DefaultExt = ".csv",
+                AddExtension = true,
+                FileName = string.IsNullOrWhiteSpace(suggestedFileName) ? "Tabela.csv" : suggestedFileName
+            };
+
+            return dialog.ShowDialog(Application.Current?.MainWindow) == true
+                ? dialog.FileName
+                : null;
         }
 
         public ElementosTabelaDialogResult? ShowElementosTabelaDialog(

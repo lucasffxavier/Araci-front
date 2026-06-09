@@ -4,6 +4,7 @@ using System.IO;
 using System.Linq;
 using System.Reflection;
 using System.Text.Json;
+using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Windows;
@@ -86,6 +87,12 @@ namespace Araci.TechnicalChecks
                 ("Tabela data builder ignora ordenacao invalida sem alterar tabela", TabelaDataBuilderIgnoraOrdenacaoInvalidaSemAlterarTabela),
                 ("Tabela data builder geracao repetida read only", TabelaDataBuilderGeracaoRepetidaReadOnly),
                 ("Tabela data builder ignora categoria nao selecionada", TabelaDataBuilderIgnoraCategoriaNaoSelecionada),
+                ("Tabela CSV exporta cabecalhos linhas e display value", TabelaCsvExportaCabecalhosLinhasEDisplayValue),
+                ("Tabela CSV escapa delimitador aspas e quebra", TabelaCsvEscapaDelimitadorAspasEQuebra),
+                ("Tabela CSV exportacao respeita builder e nao altera estado", TabelaCsvExportacaoRespeitaBuilderENaoAlteraEstado),
+                ("Tabela CSV use case cancela sem escrever", TabelaCsvUseCaseCancelaSemEscrever),
+                ("Tabela CSV use case avisa sem tabela", TabelaCsvUseCaseAvisaSemTabela),
+                ("Tabela CSV use case mostra erro de escrita", TabelaCsvUseCaseMostraErroDeEscrita),
                 ("Tabela data view model expoe colunas linhas e celulas", TabelaDataViewModelExpoeColunasLinhasECelulas),
                 ("Tabela data view model trata tabela sem campos", TabelaDataViewModelTrataTabelaSemCampos),
                 ("Tabela data view model trata tabela sem linhas", TabelaDataViewModelTrataTabelaSemLinhas),
@@ -5422,6 +5429,153 @@ namespace Araci.TechnicalChecks
             Assert(result.Rows.All(r => r.ElementoNome != "Gerador A"), "Categoria nao selecionada nao deveria aparecer.");
         }
 
+        private static void TabelaCsvExportaCabecalhosLinhasEDisplayValue()
+        {
+            var result = new ProjectTableDataResult(
+                new[]
+                {
+                    new ProjectTableDataColumn(ProjectTableElementCategory.Cargas, "Nome", "Nome", 0),
+                    new ProjectTableDataColumn(ProjectTableElementCategory.Cargas, "Corrente", "Corrente", 1)
+                },
+                new[]
+                {
+                    new ProjectTableDataRow(
+                        Guid.NewGuid(),
+                        "Carga 1",
+                        ProjectTableElementCategory.Cargas,
+                        new[]
+                        {
+                            new ProjectTableDataCell(ProjectTableElementCategory.Cargas, "Nome", "Nome", "raw diferente", "Carga 1"),
+                            new ProjectTableDataCell(ProjectTableElementCategory.Cargas, "Corrente", "Corrente", 611.04, "611.04∠0°")
+                        })
+                });
+
+            string csv = new ProjectTableCsvExportService().GenerateCsv(result);
+
+            AssertEqual("Nome;Corrente\r\nCarga 1;611.04∠0°", NormalizarQuebras(csv), "CSV cabecalho linhas display value");
+            Assert(!csv.Contains("raw diferente"), "CSV deveria usar DisplayValue, nao RawValue.");
+        }
+
+        private static void TabelaCsvEscapaDelimitadorAspasEQuebra()
+        {
+            var result = new ProjectTableDataResult(
+                new[]
+                {
+                    new ProjectTableDataColumn(ProjectTableElementCategory.Cargas, "Nome", "Nome", 0),
+                    new ProjectTableDataColumn(ProjectTableElementCategory.Cargas, "Observacao", "Observação", 1)
+                },
+                new[]
+                {
+                    new ProjectTableDataRow(
+                        Guid.NewGuid(),
+                        "Carga 1",
+                        ProjectTableElementCategory.Cargas,
+                        new[]
+                        {
+                            new ProjectTableDataCell(ProjectTableElementCategory.Cargas, "Nome", "Nome", null, "Carga;1"),
+                            new ProjectTableDataCell(ProjectTableElementCategory.Cargas, "Observacao", "Observação", null, "texto com \"aspas\"\ne quebra")
+                        })
+                });
+
+            string csv = new ProjectTableCsvExportService().GenerateCsv(result);
+
+            AssertEqual(
+                NormalizarQuebras("Nome;Observação\n\"Carga;1\";\"texto com \"\"aspas\"\"\ne quebra\""),
+                NormalizarQuebras(csv),
+                "CSV escaping");
+        }
+
+        private static void TabelaCsvExportacaoRespeitaBuilderENaoAlteraEstado()
+        {
+            AraciDocument document = CriarDocumentoTabelaDados();
+            ProjectTable tabela = CriarTabelaDadosCarga(document);
+            tabela.Filtros = new List<ProjectTableFilterRule>
+            {
+                new()
+                {
+                    Ordem = 0,
+                    Categoria = ProjectTableElementCategory.Cargas,
+                    CampoId = "Nome",
+                    NomeExibicao = "Nome",
+                    Operador = ProjectTableFilterOperator.IgualA,
+                    Valor = "Carga B"
+                }
+            };
+            string assinaturaAntes = CriarAssinaturaTabelaDados(document, tabela);
+            string path = Path.Combine(Path.GetTempPath(), $"araci-table-export-{Guid.NewGuid():N}.csv");
+            var dialogs = new FakeDialogService { SaveCsvPath = path };
+            var useCase = new ExportarTabelaUseCase(document, dialogs);
+
+            try
+            {
+                bool exportou = useCase.Executar(tabela);
+                string csv = File.ReadAllText(path, Encoding.UTF8);
+                string assinaturaDepois = CriarAssinaturaTabelaDados(document, tabela);
+
+                Assert(exportou, "Exportacao deveria retornar true.");
+                AssertEqual("Nome;Potencia ativa;Tensao\r\nCarga B;800;13.8", NormalizarQuebras(csv), "CSV filtrado pelo builder");
+                AssertEqual(assinaturaAntes, assinaturaDepois, "Exportacao nao deveria alterar Document ou ProjectTable.");
+                AssertEqual(1, dialogs.SaveCsvChamadas, "ShowSaveCsvDialog chamadas");
+                AssertEqual(1, dialogs.InfoChamadas, "ShowInfo chamadas apos sucesso");
+            }
+            finally
+            {
+                if (File.Exists(path))
+                    File.Delete(path);
+            }
+        }
+
+        private static void TabelaCsvUseCaseCancelaSemEscrever()
+        {
+            AraciDocument document = CriarDocumentoTabelaDados();
+            ProjectTable tabela = CriarTabelaDadosCarga(document);
+            string path = Path.Combine(Path.GetTempPath(), $"araci-table-export-cancel-{Guid.NewGuid():N}.csv");
+            var dialogs = new FakeDialogService { SaveCsvPath = null };
+            var useCase = new ExportarTabelaUseCase(document, dialogs);
+
+            bool exportou = useCase.Executar(tabela);
+
+            Assert(!exportou, "Exportacao cancelada deveria retornar false.");
+            Assert(!File.Exists(path), "Cancelamento nao deveria criar arquivo.");
+            AssertEqual(1, dialogs.SaveCsvChamadas, "ShowSaveCsvDialog chamadas no cancelamento");
+            AssertEqual(0, dialogs.InfoChamadas, "Cancelamento nao deveria mostrar sucesso.");
+            AssertEqual(0, dialogs.ErrorChamadas, "Cancelamento nao deveria mostrar erro.");
+        }
+
+        private static void TabelaCsvUseCaseAvisaSemTabela()
+        {
+            AraciDocument document = CriarDocumentoTabelaDados();
+            var dialogs = new FakeDialogService();
+            var useCase = new ExportarTabelaUseCase(document, dialogs);
+
+            bool exportou = useCase.Executar(null);
+
+            Assert(!exportou, "Exportacao sem tabela deveria retornar false.");
+            AssertEqual(1, dialogs.WarningChamadas, "Warning sem tabela");
+            AssertEqual("Selecione uma tabela para exportar.", dialogs.LastWarningMessage, "Mensagem sem tabela");
+            AssertEqual(0, dialogs.SaveCsvChamadas, "Sem tabela nao deveria abrir dialogo de salvar.");
+        }
+
+        private static void TabelaCsvUseCaseMostraErroDeEscrita()
+        {
+            AraciDocument document = CriarDocumentoTabelaDados();
+            ProjectTable tabela = CriarTabelaDadosCarga(document);
+            string assinaturaAntes = CriarAssinaturaTabelaDados(document, tabela);
+            var dialogs = new FakeDialogService { SaveCsvPath = Path.Combine(Path.GetTempPath(), $"araci-table-export-error-{Guid.NewGuid():N}.csv") };
+            var useCase = new ExportarTabelaUseCase(
+                document,
+                dialogs,
+                new ProjectTableDataBuilder(),
+                new ThrowingCsvExportService());
+
+            bool exportou = useCase.Executar(tabela);
+
+            Assert(!exportou, "Exportacao com erro deveria retornar false.");
+            AssertEqual(1, dialogs.ErrorChamadas, "Erro de escrita deveria mostrar mensagem amigavel.");
+            Assert(dialogs.LastErrorMessage?.Contains("Não foi possível salvar o arquivo CSV") == true, "Mensagem de erro deveria explicar falha ao salvar.");
+            AssertEqual(assinaturaAntes, CriarAssinaturaTabelaDados(document, tabela), "Erro de exportacao nao deveria alterar estado.");
+        }
+
         private static void TabelaDataViewModelExpoeColunasLinhasECelulas()
         {
             AraciDocument document = CriarDocumentoTabelaDados();
@@ -5844,6 +5998,11 @@ namespace Araci.TechnicalChecks
             return $"{document.Elementos.Count}|{elementos}|{tabela.FiltroVistaId}|{tabela.ModoFiltro}|{campos}|{filtros}|{ordenacoes}";
         }
 
+        private static string NormalizarQuebras(string text)
+        {
+            return text.Replace("\r\n", "\n").Replace("\n", "\r\n");
+        }
+
         private static IReadOnlyList<ProjectTableSorting> CriarOrdenacoes(ProjectTable tabela, params string[] campoIds)
         {
             return campoIds
@@ -5921,17 +6080,32 @@ namespace Araci.TechnicalChecks
             }
         }
 
+        private sealed class ThrowingCsvExportService : IProjectTableCsvExportService
+        {
+            public string GenerateCsv(ProjectTableDataResult result)
+            {
+                throw new IOException("falha simulada");
+            }
+        }
+
         private sealed class FakeDialogService : IUserDialogService
         {
+            public int InfoChamadas { get; private set; }
             public int WarningChamadas { get; private set; }
+            public int ErrorChamadas { get; private set; }
             public int ConfirmChamadas { get; private set; }
             public int ShowMessageChamadas { get; private set; }
+            public int SaveCsvChamadas { get; private set; }
+            public string? SaveCsvPath { get; set; }
             public string? LastWarningTitle { get; private set; }
             public string? LastWarningMessage { get; private set; }
+            public string? LastErrorTitle { get; private set; }
+            public string? LastErrorMessage { get; private set; }
             public SimulationMessage? LastSimulationMessage { get; private set; }
 
             public void ShowInfo(string title, string message)
             {
+                InfoChamadas++;
             }
 
             public void ShowWarning(string title, string message)
@@ -5943,6 +6117,15 @@ namespace Araci.TechnicalChecks
 
             public void ShowError(string title, string message)
             {
+                ErrorChamadas++;
+                LastErrorTitle = title;
+                LastErrorMessage = message;
+            }
+
+            public string? ShowSaveCsvDialog(string suggestedFileName)
+            {
+                SaveCsvChamadas++;
+                return SaveCsvPath;
             }
 
             public ElementosTabelaDialogResult? ShowElementosTabelaDialog(

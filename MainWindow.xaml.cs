@@ -93,6 +93,7 @@ namespace Araci
                 tabela,
                 _context.RenomearItemProjeto,
                 _context.EditarPropriedadesTabela,
+                _context.ExportarTabela,
                 _context.Dialogs);
 
             MostrarPropriedades();
@@ -136,6 +137,15 @@ namespace Araci
         {
             _context.CriarItemProjeto.CriarPrancha();
             MostrarNavegadorProjeto();
+        }
+
+        public void ExportarTabelaAtualCsv()
+        {
+            ProjectTable? tabela = _projectTableDataViewModel == null
+                ? null
+                : _context.Document.Tabelas.FirstOrDefault(t => t.Id == _projectTableDataViewModel.TableId);
+
+            _context.ExportarTabela.Executar(tabela);
         }
 
         public void MostrarConfiguracaoUnidades()

@@ -20,6 +20,7 @@ using Araci.Applications.Editar.Deletar;
 using Araci.Applications.Editar.Mover;
 using Araci.Applications.Editar.Selecionar;
 using Araci.Applications.Projects;
+using Araci.Applications.Projects.Tables;
 using Araci.Applications.Simulation;
 using Araci.Applications.UseCases.Analise;
 using Araci.Applications.UseCases.Editar;
@@ -109,6 +110,7 @@ namespace Araci.Services
             DuplicarItemProjeto = new DuplicarItemProjetoUseCase(Document, Commands);
             EditarPropriedadesVista = new EditarPropriedadesVistaUseCase(Document, Commands);
             EditarPropriedadesTabela = new EditarPropriedadesTabelaUseCase(Document, Commands);
+            ExportarTabela = new ExportarTabelaUseCase(Document, Dialogs, new ProjectTableDataBuilder(), new ProjectTableCsvExportService());
 
             var moveServices = EditingComposition.CreateMoveServices(() => Viewport, () => Scene.Elementos, Settings, Connectivity, TerminalLayout, SceneQueries, VisualUpdates, Selection, GeometryUpdates, Commands);
             MoveHud = moveServices.MoveHud;
@@ -205,6 +207,7 @@ namespace Araci.Services
         public DuplicarItemProjetoUseCase DuplicarItemProjeto { get; }
         public EditarPropriedadesVistaUseCase EditarPropriedadesVista { get; }
         public EditarPropriedadesTabelaUseCase EditarPropriedadesTabela { get; }
+        public ExportarTabelaUseCase ExportarTabela { get; }
         public VisualUpdateService VisualUpdates { get; }
         public SelectionService Selection { get; }
         public SelecionarElementosUseCase SelecionarElementos { get; }

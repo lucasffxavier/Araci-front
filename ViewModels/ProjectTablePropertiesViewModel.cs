@@ -17,6 +17,7 @@ namespace Araci.ViewModels
         private readonly ProjectTable _tabela;
         private readonly RenomearItemProjetoUseCase _renomearItemProjeto;
         private readonly EditarPropriedadesTabelaUseCase _editarPropriedadesTabela;
+        private readonly ExportarTabelaUseCase _exportarTabela;
         private readonly IUserDialogService _dialogs;
 
         public ProjectTablePropertiesViewModel(
@@ -24,17 +25,19 @@ namespace Araci.ViewModels
             ProjectTable tabela,
             RenomearItemProjetoUseCase renomearItemProjeto,
             EditarPropriedadesTabelaUseCase editarPropriedadesTabela,
+            ExportarTabelaUseCase exportarTabela,
             IUserDialogService dialogs)
         {
             _document = document ?? throw new ArgumentNullException(nameof(document));
             _tabela = tabela ?? throw new ArgumentNullException(nameof(tabela));
             _renomearItemProjeto = renomearItemProjeto ?? throw new ArgumentNullException(nameof(renomearItemProjeto));
             _editarPropriedadesTabela = editarPropriedadesTabela ?? throw new ArgumentNullException(nameof(editarPropriedadesTabela));
+            _exportarTabela = exportarTabela ?? throw new ArgumentNullException(nameof(exportarTabela));
             _dialogs = dialogs ?? throw new ArgumentNullException(nameof(dialogs));
             _document.ItemProjetoRenomeado += OnItemProjetoRenomeado;
             _document.PropriedadesTabelaAlteradas += OnPropriedadesTabelaAlteradas;
 
-            ExportarCsvCommand = new RelayCommand(MostrarExportarCsvPlaceholder);
+            ExportarCsvCommand = new RelayCommand(ExportarCsv);
             ElementosTabelaCommand = new RelayCommand(MostrarElementosTabelaPlaceholder);
             FiltrosCommand = new RelayCommand(MostrarFiltrosPlaceholder);
             OrdenacaoCommand = new RelayCommand(MostrarOrdenacaoPlaceholder);
@@ -98,11 +101,9 @@ namespace Araci.ViewModels
             OnPropertyChanged(nameof(Disciplina));
         }
 
-        private void MostrarExportarCsvPlaceholder()
+        private void ExportarCsv()
         {
-            _dialogs.ShowInfo(
-                "Exportar CSV",
-                "A exportação CSV será implementada em uma etapa futura.");
+            _exportarTabela.Executar(_tabela);
         }
 
         private void MostrarElementosTabelaPlaceholder()

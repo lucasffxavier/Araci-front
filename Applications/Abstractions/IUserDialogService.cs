@@ -12,6 +12,8 @@ namespace Araci.Applications.Abstractions
 
         void ShowError(string title, string message);
 
+        string? ShowSaveCsvDialog(string suggestedFileName);
+
         ElementosTabelaDialogResult? ShowElementosTabelaDialog(
             IReadOnlyList<ProjectTableElementCategory> categorias,
             IReadOnlyList<ProjectTableFieldSelection> camposSelecionados);

@@ -34,6 +34,12 @@ namespace Araci.Ribbon.Tabs
                 mainWindow.CriarNovaTabelaProjeto();
         }
 
+        private void ExportarTabelaButton_Click(object sender, RoutedEventArgs e)
+        {
+            if (Window.GetWindow(this) is MainWindow mainWindow)
+                mainWindow.ExportarTabelaAtualCsv();
+        }
+
         private void NovaPranchaButton_Click(object sender, RoutedEventArgs e)
         {
             if (Window.GetWindow(this) is MainWindow mainWindow)
