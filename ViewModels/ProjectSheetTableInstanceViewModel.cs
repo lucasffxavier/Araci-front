@@ -10,6 +10,11 @@ namespace Araci.ViewModels
 {
     public sealed class ProjectSheetTableInstanceViewModel : INotifyPropertyChanged
     {
+        private const double DefaultColumnWidth = 112.0;
+        private const double DefaultTitleHeight = 32.0;
+        private const double DefaultHeaderRowHeight = 26.0;
+        private const double DefaultBodyRowHeight = 24.0;
+
         private double _x;
         private double _y;
         private double _width;
@@ -54,6 +59,10 @@ namespace Araci.ViewModels
         public bool HasRenderableTable => HasColumns && HasRows;
         public bool HasEmptyDataMessage => !string.IsNullOrWhiteSpace(EmptyDataMessage);
         public string EmptyDataMessage { get; }
+        public double ColumnWidth => DefaultColumnWidth;
+        public double TitleHeight => DefaultTitleHeight;
+        public double HeaderRowHeight => DefaultHeaderRowHeight;
+        public double BodyRowHeight => DefaultBodyRowHeight;
         public double ViewX => X + SheetOriginOffsetX;
         public double ViewY => Y + SheetOriginOffsetY;
 

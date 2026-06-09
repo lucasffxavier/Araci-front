@@ -132,6 +132,8 @@ namespace Araci.TechnicalChecks
                 ("ProjectSheetView aplica zoom no workspace", ProjectSheetViewAplicaZoomNoWorkspace),
                 ("ProjectSheetView possui folha nomeada para centralizacao", ProjectSheetViewPossuiFolhaNomeadaParaCentralizacao),
                 ("ProjectSheetView possui estilos visuais basicos de tabela", ProjectSheetViewPossuiEstilosVisuaisBasicosTabela),
+                ("ProjectSheetTableInstanceViewModel expoe dimensoes tabulares basicas", ProjectSheetTableInstanceViewModelExpoeDimensoesTabularesBasicas),
+                ("ProjectSheetView usa bindings para dimensoes tabulares", ProjectSheetViewUsaBindingsDimensoesTabulares),
                 ("ProjectSheetViewModel instancia renderiza dados reais da tabela", ProjectSheetViewModelInstanciaRenderizaDadosReaisTabela),
                 ("ProjectSheetViewModel instancia trata tabela sem campos", ProjectSheetViewModelInstanciaTrataTabelaSemCampos),
                 ("ProjectSheetViewModel instancia trata tabela sem linhas", ProjectSheetViewModelInstanciaTrataTabelaSemLinhas),
@@ -6453,6 +6455,36 @@ namespace Araci.TechnicalChecks
                 Assert(view.Resources["SheetTableBodyCellStyle"] is Style, "ProjectSheetView deveria possuir estilo visual para celula de dados.");
                 Assert(view.Resources["SheetTableEmptyMessageTextStyle"] is Style, "ProjectSheetView deveria possuir estilo visual para mensagem vazia.");
             });
+        }
+
+        private static void ProjectSheetTableInstanceViewModelExpoeDimensoesTabularesBasicas()
+        {
+            AraciDocument document = CriarDocumentoTabelaDados();
+            ProjectTable tabela = CriarTabelaDadosCarga(document);
+            ProjectSheet prancha = document.CriarNovaPrancha();
+            prancha.Tabelas.Add(new ProjectSheetTableInstance { TableId = tabela.Id });
+
+            var viewModel = new ProjectSheetViewModel(document, prancha);
+            ProjectSheetTableInstanceViewModel instance = viewModel.TableInstances.Single();
+
+            Assert(instance.ColumnWidth > 0, "ColumnWidth deveria ser positivo.");
+            Assert(instance.HeaderRowHeight > 0, "HeaderRowHeight deveria ser positivo.");
+            Assert(instance.BodyRowHeight > 0, "BodyRowHeight deveria ser positivo.");
+            Assert(instance.TitleHeight > 0, "TitleHeight deveria ser positivo.");
+            Assert(instance.HeaderRowHeight >= instance.BodyRowHeight, "HeaderRowHeight deveria manter cabecalho legivel.");
+        }
+
+        private static void ProjectSheetViewUsaBindingsDimensoesTabulares()
+        {
+            string xaml = File.ReadAllText(FindProjectFile("Views/ProjectSheetView.xaml"), Encoding.UTF8);
+
+            AssertContains(xaml, "Width=\"{Binding DataContext.ColumnWidth", "ProjectSheetView deveria vincular largura das colunas ao ViewModel.");
+            AssertContains(xaml, "Height=\"{Binding DataContext.HeaderRowHeight", "ProjectSheetView deveria vincular altura do cabecalho ao ViewModel.");
+            AssertContains(xaml, "Height=\"{Binding DataContext.BodyRowHeight", "ProjectSheetView deveria vincular altura das linhas ao ViewModel.");
+            AssertContains(xaml, "Height=\"{Binding TitleHeight}\"", "ProjectSheetView deveria vincular altura do titulo ao ViewModel.");
+            Assert(!xaml.Contains("<Setter Property=\"Width\" Value=\"112\"/>", StringComparison.Ordinal), "SheetTableHeaderCellStyle/BodyCellStyle nao deveriam fixar largura principal em XAML.");
+            Assert(!xaml.Contains("<Setter Property=\"Height\" Value=\"26\"/>", StringComparison.Ordinal), "SheetTableHeaderCellStyle nao deveria fixar altura principal em XAML.");
+            Assert(!xaml.Contains("<Setter Property=\"Height\" Value=\"24\"/>", StringComparison.Ordinal), "SheetTableBodyCellStyle nao deveria fixar altura principal em XAML.");
         }
 
         private static void ProjectSheetViewModelInstanciaRenderizaDadosReaisTabela()
