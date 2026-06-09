@@ -11,7 +11,7 @@ namespace Araci.ViewModels
 {
     public sealed class ProjectSheetViewModel : INotifyPropertyChanged
     {
-        private const double WorkspaceMargin = 320.0;
+        private const double WorkspaceMargin = 1600.0;
         private const double MinZoomScale = 0.25;
         private const double MaxZoomScale = 4.0;
         private const double ZoomStep = 0.10;
@@ -24,8 +24,6 @@ namespace Araci.ViewModels
         private string _titulo = string.Empty;
         private string _emptyMessage = string.Empty;
         private Guid? _selectedInstanceId;
-        private double _sheetOriginOffsetX = WorkspaceMargin;
-        private double _sheetOriginOffsetY = WorkspaceMargin;
         private double _workspaceWidth = MoverTabelaNaPranchaUseCase.LarguraPadraoPrancha + WorkspaceMargin * 2;
         private double _workspaceHeight = MoverTabelaNaPranchaUseCase.AlturaPadraoPrancha + WorkspaceMargin * 2;
         private double _zoomScale = 1.0;
@@ -54,40 +52,10 @@ namespace Araci.ViewModels
         public bool HasSelectedInstance => _selectedInstanceId.HasValue;
         public double SheetWidth => MoverTabelaNaPranchaUseCase.LarguraPadraoPrancha;
         public double SheetHeight => MoverTabelaNaPranchaUseCase.AlturaPadraoPrancha;
+        public double SheetOriginOffsetX => WorkspaceMargin;
+        public double SheetOriginOffsetY => WorkspaceMargin;
         public double MinimumWorkspaceWidth => SheetWidth + WorkspaceMargin * 2;
         public double MinimumWorkspaceHeight => SheetHeight + WorkspaceMargin * 2;
-
-        public double SheetOriginOffsetX
-        {
-            get => _sheetOriginOffsetX;
-            private set
-            {
-                double normalized = NormalizeWorkspaceDimension(value, WorkspaceMargin);
-
-                if (Math.Abs(_sheetOriginOffsetX - normalized) < 0.000001)
-                    return;
-
-                _sheetOriginOffsetX = normalized;
-                OnPropertyChanged();
-                UpdateInstanceOffsets();
-            }
-        }
-
-        public double SheetOriginOffsetY
-        {
-            get => _sheetOriginOffsetY;
-            private set
-            {
-                double normalized = NormalizeWorkspaceDimension(value, WorkspaceMargin);
-
-                if (Math.Abs(_sheetOriginOffsetY - normalized) < 0.000001)
-                    return;
-
-                _sheetOriginOffsetY = normalized;
-                OnPropertyChanged();
-                UpdateInstanceOffsets();
-            }
-        }
 
         public double WorkspaceWidth
         {
@@ -226,8 +194,6 @@ namespace Araci.ViewModels
             instance.SetPreviewPosition(
                 MoverTabelaNaPranchaUseCase.NormalizePosition(x),
                 MoverTabelaNaPranchaUseCase.NormalizePosition(y));
-
-            RecalculateWorkspaceFromViewModels();
         }
 
         public void SetPreviewSize(ProjectSheetTableInstanceViewModel instance, double width, double height)
@@ -237,8 +203,6 @@ namespace Araci.ViewModels
             instance.SetPreviewSize(
                 RedimensionarTabelaNaPranchaUseCase.NormalizeDimension(width, ProjectSheetTableInstance.MinWidth),
                 RedimensionarTabelaNaPranchaUseCase.NormalizeDimension(height, ProjectSheetTableInstance.MinHeight));
-
-            RecalculateWorkspaceFromViewModels();
         }
 
         public bool MoverInstancia(Guid instanceId, double novoX, double novoY)
@@ -338,15 +302,8 @@ namespace Araci.ViewModels
             RecalculateWorkspace(_sheet.Tabelas.Where(i => i != null).Select(i => new WorkspaceBoundsItem(i.X, i.Y, i.Width, i.Height)));
         }
 
-        private void RecalculateWorkspaceFromViewModels()
-        {
-            RecalculateWorkspace(TableInstances.Select(i => new WorkspaceBoundsItem(i.X, i.Y, i.Width, i.Height)));
-        }
-
         private void RecalculateWorkspace(IEnumerable<WorkspaceBoundsItem> items)
         {
-            double minX = 0;
-            double minY = 0;
             double maxX = SheetWidth;
             double maxY = SheetHeight;
 
@@ -357,21 +314,12 @@ namespace Araci.ViewModels
                 double width = RedimensionarTabelaNaPranchaUseCase.NormalizeDimension(item.Width, ProjectSheetTableInstance.MinWidth);
                 double height = RedimensionarTabelaNaPranchaUseCase.NormalizeDimension(item.Height, ProjectSheetTableInstance.MinHeight);
 
-                minX = Math.Min(minX, x);
-                minY = Math.Min(minY, y);
                 maxX = Math.Max(maxX, x + width);
                 maxY = Math.Max(maxY, y + height);
             }
 
-            double offsetX = WorkspaceMargin + Math.Max(0, -minX);
-            double offsetY = WorkspaceMargin + Math.Max(0, -minY);
-            double widthFinal = offsetX + maxX + WorkspaceMargin;
-            double heightFinal = offsetY + maxY + WorkspaceMargin;
-
-            SheetOriginOffsetX = offsetX;
-            SheetOriginOffsetY = offsetY;
-            WorkspaceWidth = widthFinal;
-            WorkspaceHeight = heightFinal;
+            WorkspaceWidth = SheetOriginOffsetX + maxX + WorkspaceMargin;
+            WorkspaceHeight = SheetOriginOffsetY + maxY + WorkspaceMargin;
             UpdateInstanceOffsets();
         }
 

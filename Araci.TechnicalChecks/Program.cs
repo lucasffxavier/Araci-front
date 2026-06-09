@@ -126,6 +126,8 @@ namespace Araci.TechnicalChecks
                 ("ProjectSheetViewModel refresh remove selecao inexistente", ProjectSheetViewModelRefreshRemoveSelecaoInexistente),
                 ("ProjectSheetView possui superficie de prancha", ProjectSheetViewPossuiSuperficiePrancha),
                 ("ProjectSheetViewModel permite instancia fora da folha", ProjectSheetViewModelPermiteInstanciaForaDaFolha),
+                ("ProjectSheetViewModel mantem workspace estavel durante preview negativo", ProjectSheetViewModelMantemWorkspaceEstavelDurantePreviewNegativo),
+                ("ProjectSheetViewModel mantem workspace estavel durante preview de resize", ProjectSheetViewModelMantemWorkspaceEstavelDurantePreviewResize),
                 ("ProjectSheetViewModel zoom altera percentual", ProjectSheetViewModelZoomAlteraPercentual),
                 ("ProjectSheetView aplica zoom no workspace", ProjectSheetViewAplicaZoomNoWorkspace),
                 ("Tabela data view model expoe colunas linhas e celulas", TabelaDataViewModelExpoeColunasLinhasECelulas),
@@ -6314,8 +6316,8 @@ namespace Araci.TechnicalChecks
             Assert(instanceViewModel.ViewY >= 0, "Instancia fora acima deveria continuar visivel no workspace.");
             Assert(instanceViewModel.ViewX < viewModel.SheetOriginOffsetX, "ViewX deveria posicionar tabela antes da folha branca.");
             Assert(instanceViewModel.ViewY < viewModel.SheetOriginOffsetY, "ViewY deveria posicionar tabela acima da folha branca.");
-            Assert(viewModel.WorkspaceWidth > viewModel.MinimumWorkspaceWidth, "Workspace deveria crescer para coordenada negativa X.");
-            Assert(viewModel.WorkspaceHeight > viewModel.MinimumWorkspaceHeight, "Workspace deveria crescer para coordenada negativa Y.");
+            AssertEqual(viewModel.MinimumWorkspaceWidth, viewModel.WorkspaceWidth, "Workspace negativo deveria manter largura minima estavel.");
+            AssertEqual(viewModel.MinimumWorkspaceHeight, viewModel.WorkspaceHeight, "Workspace negativo deveria manter altura minima estavel.");
 
             viewModel.SetPreviewPosition(instanceViewModel, viewModel.SheetWidth + 120, viewModel.SheetHeight + 80);
 
@@ -6323,6 +6325,64 @@ namespace Araci.TechnicalChecks
             Assert(instanceViewModel.Y > viewModel.SheetHeight, "Preview deveria permitir Y alem da folha.");
             Assert(viewModel.WorkspaceWidth > instanceViewModel.ViewX + instanceViewModel.Width, "Workspace deveria conter tabela a direita.");
             Assert(viewModel.WorkspaceHeight > instanceViewModel.ViewY + instanceViewModel.Height, "Workspace deveria conter tabela abaixo.");
+        }
+
+        private static void ProjectSheetViewModelMantemWorkspaceEstavelDurantePreviewNegativo()
+        {
+            var document = new AraciDocument();
+            ProjectTable tabela = document.CriarNovaTabela();
+            ProjectSheet prancha = document.CriarNovaPrancha();
+            prancha.Tabelas.Add(new ProjectSheetTableInstance
+            {
+                TableId = tabela.Id,
+                X = 40,
+                Y = 40,
+                Width = 400,
+                Height = 240
+            });
+            var viewModel = new ProjectSheetViewModel(document, prancha);
+            ProjectSheetTableInstanceViewModel instance = viewModel.TableInstances.Single();
+            double workspaceWidth = viewModel.WorkspaceWidth;
+            double workspaceHeight = viewModel.WorkspaceHeight;
+            double sheetOffsetX = viewModel.SheetOriginOffsetX;
+            double sheetOffsetY = viewModel.SheetOriginOffsetY;
+
+            viewModel.SetPreviewPosition(instance, -500, -360);
+
+            AssertEqual(workspaceWidth, viewModel.WorkspaceWidth, "Preview negativo nao deveria alterar WorkspaceWidth");
+            AssertEqual(workspaceHeight, viewModel.WorkspaceHeight, "Preview negativo nao deveria alterar WorkspaceHeight");
+            AssertEqual(sheetOffsetX, viewModel.SheetOriginOffsetX, "Preview negativo nao deveria alterar SheetOriginOffsetX");
+            AssertEqual(sheetOffsetY, viewModel.SheetOriginOffsetY, "Preview negativo nao deveria alterar SheetOriginOffsetY");
+            AssertEqual(-500, instance.X, "Preview negativo X");
+            AssertEqual(-360, instance.Y, "Preview negativo Y");
+            Assert(instance.ViewX >= 0, "Preview negativo deveria permanecer dentro da margem visual esquerda.");
+            Assert(instance.ViewY >= 0, "Preview negativo deveria permanecer dentro da margem visual superior.");
+        }
+
+        private static void ProjectSheetViewModelMantemWorkspaceEstavelDurantePreviewResize()
+        {
+            var document = new AraciDocument();
+            ProjectTable tabela = document.CriarNovaTabela();
+            ProjectSheet prancha = document.CriarNovaPrancha();
+            prancha.Tabelas.Add(new ProjectSheetTableInstance
+            {
+                TableId = tabela.Id,
+                X = 40,
+                Y = 40,
+                Width = 400,
+                Height = 240
+            });
+            var viewModel = new ProjectSheetViewModel(document, prancha);
+            ProjectSheetTableInstanceViewModel instance = viewModel.TableInstances.Single();
+            double workspaceWidth = viewModel.WorkspaceWidth;
+            double workspaceHeight = viewModel.WorkspaceHeight;
+
+            viewModel.SetPreviewSize(instance, 900, 620);
+
+            AssertEqual(workspaceWidth, viewModel.WorkspaceWidth, "Preview resize nao deveria alterar WorkspaceWidth");
+            AssertEqual(workspaceHeight, viewModel.WorkspaceHeight, "Preview resize nao deveria alterar WorkspaceHeight");
+            AssertEqual(900, instance.Width, "Preview resize Width");
+            AssertEqual(620, instance.Height, "Preview resize Height");
         }
 
         private static void ProjectSheetViewModelZoomAlteraPercentual()
