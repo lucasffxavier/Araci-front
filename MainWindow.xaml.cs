@@ -10,6 +10,7 @@ using System.Linq;
 using System.Collections.Specialized;
 using System.Windows;
 using System.Windows.Controls.Primitives;
+using System.Windows.Input;
 
 namespace Araci
 {
@@ -225,6 +226,25 @@ namespace Araci
                 _context.AlterarUnidadesProjeto.Executar(viewModel.ToUnitDisplaySettings());
 
             FocarViewport();
+        }
+
+
+        private void OnWindowPreviewKeyDown(object sender, KeyEventArgs e)
+        {
+            if (e.Handled)
+                return;
+
+            if (!Keyboard.Modifiers.HasFlag(ModifierKeys.Control))
+                return;
+
+            if (e.Key != Key.Z && e.Key != Key.Y)
+                return;
+
+            if (Keyboard.FocusedElement is TextBoxBase)
+                return;
+
+            if (_context.Input.KeyDown(e.Key))
+                e.Handled = true;
         }
 
         private void OnPropertiesCloseRequested(object sender, RoutedEventArgs e)
