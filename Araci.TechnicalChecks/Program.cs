@@ -115,6 +115,16 @@ namespace Araci.TechnicalChecks
                 ("ProjectSheetViewModel trata prancha vazia", ProjectSheetViewModelTrataPranchaVazia),
                 ("ProjectSheetViewModel trata tabela inexistente", ProjectSheetViewModelTrataTabelaInexistente),
                 ("ProjectSheetViewModel refresh nao altera modelo", ProjectSheetViewModelRefreshNaoAlteraModelo),
+                ("Mover tabela na prancha move instancia valida", MoverTabelaNaPranchaMoveInstanciaValida),
+                ("Mover tabela na prancha undo redo", MoverTabelaNaPranchaUndoRedo),
+                ("Mover tabela na prancha ids invalidos nao alteram estado", MoverTabelaNaPranchaIdsInvalidosNaoAlteramEstado),
+                ("Mover tabela na prancha sem alteracao nao cria comando", MoverTabelaNaPranchaSemAlteracaoNaoCriaComando),
+                ("Mover tabela na prancha move apenas instancia alvo", MoverTabelaNaPranchaMoveApenasInstanciaAlvo),
+                ("ProjectSheetViewModel seleciona instancia", ProjectSheetViewModelSelecionaInstancia),
+                ("ProjectSheetViewModel limpa selecao", ProjectSheetViewModelLimpaSelecao),
+                ("ProjectSheetViewModel refresh preserva selecao existente", ProjectSheetViewModelRefreshPreservaSelecaoExistente),
+                ("ProjectSheetViewModel refresh remove selecao inexistente", ProjectSheetViewModelRefreshRemoveSelecaoInexistente),
+                ("ProjectSheetView possui superficie de prancha", ProjectSheetViewPossuiSuperficiePrancha),
                 ("Tabela data view model expoe colunas linhas e celulas", TabelaDataViewModelExpoeColunasLinhasECelulas),
                 ("Tabela data view model trata tabela sem campos", TabelaDataViewModelTrataTabelaSemCampos),
                 ("Tabela data view model trata tabela sem linhas", TabelaDataViewModelTrataTabelaSemLinhas),
@@ -6096,6 +6106,185 @@ namespace Araci.TechnicalChecks
             AssertEqual(tabelaId, prancha.Tabelas[0].TableId, "Refresh nao deveria alterar instancia TableId");
             AssertEqual(40, prancha.Tabelas[0].X, "Refresh nao deveria alterar instancia X");
             AssertEqual("Tabela Renomeada", viewModel.TableInstances.Single().TableName, "Refresh deveria atualizar nome exibido");
+        }
+
+        private static void MoverTabelaNaPranchaMoveInstanciaValida()
+        {
+            var document = new AraciDocument();
+            ProjectTable tabela = document.CriarNovaTabela();
+            ProjectSheet prancha = document.CriarNovaPrancha();
+            var instancia = new ProjectSheetTableInstance { TableId = tabela.Id, X = 10, Y = 20, Width = 200, Height = 100 };
+            prancha.Tabelas.Add(instancia);
+            var commands = new Araci.Core.Commands.CommandManager();
+            var useCase = new MoverTabelaNaPranchaUseCase(document, commands);
+
+            bool moveu = useCase.Mover(prancha.Id, instancia.Id, 75, 95);
+
+            Assert(moveu, "Mover deveria retornar true para instancia valida.");
+            AssertEqual(75, instancia.X, "Mover instancia X");
+            AssertEqual(95, instancia.Y, "Mover instancia Y");
+            AssertEqual(200, instancia.Width, "Mover nao deveria alterar Width");
+            AssertEqual(100, instancia.Height, "Mover nao deveria alterar Height");
+            AssertEqual(tabela.Id, instancia.TableId, "Mover nao deveria alterar TableId");
+        }
+
+        private static void MoverTabelaNaPranchaUndoRedo()
+        {
+            var document = new AraciDocument();
+            ProjectTable tabela = document.CriarNovaTabela();
+            ProjectSheet prancha = document.CriarNovaPrancha();
+            var instancia = new ProjectSheetTableInstance { TableId = tabela.Id, X = 10, Y = 20 };
+            prancha.Tabelas.Add(instancia);
+            var commands = new Araci.Core.Commands.CommandManager();
+            var useCase = new MoverTabelaNaPranchaUseCase(document, commands);
+
+            useCase.Mover(prancha.Id, instancia.Id, 120, 140);
+            commands.Undo();
+
+            AssertEqual(10, instancia.X, "Undo movimento X");
+            AssertEqual(20, instancia.Y, "Undo movimento Y");
+
+            commands.Redo();
+
+            AssertEqual(120, instancia.X, "Redo movimento X");
+            AssertEqual(140, instancia.Y, "Redo movimento Y");
+        }
+
+        private static void MoverTabelaNaPranchaIdsInvalidosNaoAlteramEstado()
+        {
+            var document = new AraciDocument();
+            ProjectTable tabela = document.CriarNovaTabela();
+            ProjectSheet prancha = document.CriarNovaPrancha();
+            var instancia = new ProjectSheetTableInstance { TableId = tabela.Id, X = 10, Y = 20 };
+            prancha.Tabelas.Add(instancia);
+            var commands = new Araci.Core.Commands.CommandManager();
+            var useCase = new MoverTabelaNaPranchaUseCase(document, commands);
+
+            bool semPrancha = useCase.Mover(Guid.NewGuid(), instancia.Id, 30, 40);
+            bool semInstancia = useCase.Mover(prancha.Id, Guid.NewGuid(), 30, 40);
+            bool coordenadaInvalida = useCase.Mover(prancha.Id, instancia.Id, double.NaN, 40);
+
+            Assert(!semPrancha, "Mover com prancha invalida deveria retornar false.");
+            Assert(!semInstancia, "Mover com instancia invalida deveria retornar false.");
+            Assert(!coordenadaInvalida, "Mover com coordenada invalida deveria retornar false.");
+            AssertEqual(10, instancia.X, "Ids invalidos nao deveriam alterar X");
+            AssertEqual(20, instancia.Y, "Ids invalidos nao deveriam alterar Y");
+            Assert(!commands.CanUndo, "Ids invalidos nao deveriam criar historico.");
+        }
+
+        private static void MoverTabelaNaPranchaSemAlteracaoNaoCriaComando()
+        {
+            var document = new AraciDocument();
+            ProjectTable tabela = document.CriarNovaTabela();
+            ProjectSheet prancha = document.CriarNovaPrancha();
+            var instancia = new ProjectSheetTableInstance { TableId = tabela.Id, X = 10, Y = 20 };
+            prancha.Tabelas.Add(instancia);
+            var commands = new Araci.Core.Commands.CommandManager();
+            var useCase = new MoverTabelaNaPranchaUseCase(document, commands);
+
+            bool moveu = useCase.Mover(prancha.Id, instancia.Id, 10, 20);
+
+            Assert(!moveu, "Mover sem alteracao deveria retornar false.");
+            AssertEqual(10, instancia.X, "Mover sem alteracao X");
+            AssertEqual(20, instancia.Y, "Mover sem alteracao Y");
+            Assert(!commands.CanUndo, "Mover sem alteracao nao deveria criar historico.");
+        }
+
+        private static void MoverTabelaNaPranchaMoveApenasInstanciaAlvo()
+        {
+            var document = new AraciDocument();
+            ProjectTable tabela = document.CriarNovaTabela();
+            ProjectSheet prancha = document.CriarNovaPrancha();
+            var instanciaA = new ProjectSheetTableInstance { TableId = tabela.Id, X = 10, Y = 20 };
+            var instanciaB = new ProjectSheetTableInstance { TableId = tabela.Id, X = 30, Y = 40 };
+            prancha.Tabelas.Add(instanciaA);
+            prancha.Tabelas.Add(instanciaB);
+            var commands = new Araci.Core.Commands.CommandManager();
+            var useCase = new MoverTabelaNaPranchaUseCase(document, commands);
+
+            bool moveu = useCase.Mover(prancha.Id, instanciaB.Id, 80, 90);
+
+            Assert(moveu, "Mover instancia alvo deveria retornar true.");
+            AssertEqual(10, instanciaA.X, "Instancia nao alvo X");
+            AssertEqual(20, instanciaA.Y, "Instancia nao alvo Y");
+            AssertEqual(80, instanciaB.X, "Instancia alvo X");
+            AssertEqual(90, instanciaB.Y, "Instancia alvo Y");
+        }
+
+        private static void ProjectSheetViewModelSelecionaInstancia()
+        {
+            var document = new AraciDocument();
+            ProjectTable tabela = document.CriarNovaTabela();
+            ProjectSheet prancha = document.CriarNovaPrancha();
+            var instancia = new ProjectSheetTableInstance { TableId = tabela.Id };
+            prancha.Tabelas.Add(instancia);
+            var viewModel = new ProjectSheetViewModel(document, prancha);
+
+            viewModel.SelecionarInstancia(instancia.Id);
+
+            AssertEqual(instancia.Id, viewModel.SelectedInstanceId, "SelectedInstanceId apos selecionar");
+            Assert(viewModel.TableInstances.Single().IsSelected, "Instancia deveria ficar selecionada.");
+        }
+
+        private static void ProjectSheetViewModelLimpaSelecao()
+        {
+            var document = new AraciDocument();
+            ProjectTable tabela = document.CriarNovaTabela();
+            ProjectSheet prancha = document.CriarNovaPrancha();
+            var instancia = new ProjectSheetTableInstance { TableId = tabela.Id };
+            prancha.Tabelas.Add(instancia);
+            var viewModel = new ProjectSheetViewModel(document, prancha);
+            viewModel.SelecionarInstancia(instancia.Id);
+
+            viewModel.LimparSelecao();
+
+            Assert(viewModel.SelectedInstanceId == null, "SelectedInstanceId deveria ser null apos limpar.");
+            Assert(!viewModel.TableInstances.Single().IsSelected, "Instancia nao deveria ficar selecionada apos limpar.");
+        }
+
+        private static void ProjectSheetViewModelRefreshPreservaSelecaoExistente()
+        {
+            var document = new AraciDocument();
+            ProjectTable tabela = document.CriarNovaTabela();
+            ProjectSheet prancha = document.CriarNovaPrancha();
+            var instancia = new ProjectSheetTableInstance { TableId = tabela.Id };
+            prancha.Tabelas.Add(instancia);
+            var viewModel = new ProjectSheetViewModel(document, prancha);
+            viewModel.SelecionarInstancia(instancia.Id);
+
+            viewModel.Refresh();
+
+            AssertEqual(instancia.Id, viewModel.SelectedInstanceId, "Refresh deveria preservar SelectedInstanceId");
+            Assert(viewModel.TableInstances.Single().IsSelected, "Refresh deveria preservar IsSelected.");
+        }
+
+        private static void ProjectSheetViewModelRefreshRemoveSelecaoInexistente()
+        {
+            var document = new AraciDocument();
+            ProjectTable tabela = document.CriarNovaTabela();
+            ProjectSheet prancha = document.CriarNovaPrancha();
+            var instancia = new ProjectSheetTableInstance { TableId = tabela.Id };
+            prancha.Tabelas.Add(instancia);
+            var viewModel = new ProjectSheetViewModel(document, prancha);
+            viewModel.SelecionarInstancia(instancia.Id);
+
+            prancha.Tabelas.Clear();
+            viewModel.Refresh();
+
+            Assert(viewModel.SelectedInstanceId == null, "Refresh deveria remover selecao inexistente.");
+            AssertEqual(0, viewModel.TableInstances.Count, "Refresh apos remover instancia Count");
+        }
+
+        private static void ProjectSheetViewPossuiSuperficiePrancha()
+        {
+            RunSta(() =>
+            {
+                var view = new ProjectSheetView();
+                var sheetSurface = view.FindName("SheetSurface") as Grid;
+
+                Assert(sheetSurface != null, "ProjectSheetView deveria possuir SheetSurface.");
+                Assert(sheetSurface!.ClipToBounds, "SheetSurface deveria manter ClipToBounds.");
+            });
         }
 
         private static void TabelaDataViewModelExpoeColunasLinhasECelulas()

@@ -3,6 +3,7 @@ using System.Collections.ObjectModel;
 using System.ComponentModel;
 using System.Linq;
 using System.Runtime.CompilerServices;
+using Araci.Applications.UseCases.Projeto;
 using Araci.Core.Documents;
 
 namespace Araci.ViewModels
@@ -11,13 +12,19 @@ namespace Araci.ViewModels
     {
         private readonly AraciDocument _document;
         private readonly ProjectSheet _sheet;
+        private readonly MoverTabelaNaPranchaUseCase? _moverTabelaNaPrancha;
         private string _titulo = string.Empty;
         private string _emptyMessage = string.Empty;
+        private Guid? _selectedInstanceId;
 
-        public ProjectSheetViewModel(AraciDocument document, ProjectSheet sheet)
+        public ProjectSheetViewModel(
+            AraciDocument document,
+            ProjectSheet sheet,
+            MoverTabelaNaPranchaUseCase? moverTabelaNaPrancha = null)
         {
             _document = document ?? throw new ArgumentNullException(nameof(document));
             _sheet = sheet ?? throw new ArgumentNullException(nameof(sheet));
+            _moverTabelaNaPrancha = moverTabelaNaPrancha;
             TableInstances = new ObservableCollection<ProjectSheetTableInstanceViewModel>();
             Refresh();
         }
@@ -26,6 +33,7 @@ namespace Araci.ViewModels
         public ObservableCollection<ProjectSheetTableInstanceViewModel> TableInstances { get; }
         public bool HasInstances => TableInstances.Count > 0;
         public bool HasEmptyMessage => !string.IsNullOrWhiteSpace(EmptyMessage);
+        public Guid? SelectedInstanceId => _selectedInstanceId;
 
         public string Titulo
         {
@@ -56,6 +64,7 @@ namespace Araci.ViewModels
 
         public void Refresh()
         {
+            Guid? selectedBeforeRefresh = _selectedInstanceId;
             Titulo = string.IsNullOrWhiteSpace(_sheet.Numero)
                 ? _sheet.Nome
                 : $"{_sheet.Numero} - {_sheet.Nome}";
@@ -65,11 +74,61 @@ namespace Araci.ViewModels
             foreach (ProjectSheetTableInstance instance in _sheet.Tabelas.Where(i => i != null))
             {
                 ProjectTable? table = _document.Tabelas.FirstOrDefault(t => t.Id == instance.TableId);
-                TableInstances.Add(new ProjectSheetTableInstanceViewModel(instance, table?.Nome ?? "Tabela nao encontrada"));
+                var instanceViewModel = new ProjectSheetTableInstanceViewModel(instance, table?.Nome ?? "Tabela nao encontrada")
+                {
+                    IsSelected = selectedBeforeRefresh == instance.Id
+                };
+                TableInstances.Add(instanceViewModel);
             }
+
+            if (selectedBeforeRefresh.HasValue && !TableInstances.Any(i => i.Id == selectedBeforeRefresh.Value))
+                _selectedInstanceId = null;
 
             EmptyMessage = HasInstances ? string.Empty : "Nenhuma tabela inserida na prancha";
             OnPropertyChanged(nameof(HasInstances));
+            OnPropertyChanged(nameof(SelectedInstanceId));
+        }
+
+        public void SelecionarInstancia(Guid instanceId)
+        {
+            bool encontrou = false;
+
+            foreach (ProjectSheetTableInstanceViewModel instance in TableInstances)
+            {
+                bool selecionada = instance.Id == instanceId;
+                instance.IsSelected = selecionada;
+                encontrou |= selecionada;
+            }
+
+            _selectedInstanceId = encontrou ? instanceId : null;
+            OnPropertyChanged(nameof(SelectedInstanceId));
+        }
+
+        public void LimparSelecao()
+        {
+            foreach (ProjectSheetTableInstanceViewModel instance in TableInstances)
+                instance.IsSelected = false;
+
+            _selectedInstanceId = null;
+            OnPropertyChanged(nameof(SelectedInstanceId));
+        }
+
+        public bool MoverInstancia(Guid instanceId, double novoX, double novoY)
+        {
+            ProjectSheetTableInstanceViewModel? instanceViewModel = TableInstances.FirstOrDefault(i => i.Id == instanceId);
+
+            if (instanceViewModel == null)
+                return false;
+
+            bool moved = _moverTabelaNaPrancha?.Mover(SheetId, instanceId, novoX, novoY) == true;
+
+            if (moved)
+            {
+                Refresh();
+                SelecionarInstancia(instanceId);
+            }
+
+            return moved;
         }
 
         public event PropertyChangedEventHandler? PropertyChanged;
