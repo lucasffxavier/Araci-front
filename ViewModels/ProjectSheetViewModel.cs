@@ -13,6 +13,7 @@ namespace Araci.ViewModels
         private readonly AraciDocument _document;
         private readonly ProjectSheet _sheet;
         private readonly MoverTabelaNaPranchaUseCase? _moverTabelaNaPrancha;
+        private readonly RemoverTabelaDaPranchaUseCase? _removerTabelaDaPrancha;
         private string _titulo = string.Empty;
         private string _emptyMessage = string.Empty;
         private Guid? _selectedInstanceId;
@@ -20,11 +21,13 @@ namespace Araci.ViewModels
         public ProjectSheetViewModel(
             AraciDocument document,
             ProjectSheet sheet,
-            MoverTabelaNaPranchaUseCase? moverTabelaNaPrancha = null)
+            MoverTabelaNaPranchaUseCase? moverTabelaNaPrancha = null,
+            RemoverTabelaDaPranchaUseCase? removerTabelaDaPrancha = null)
         {
             _document = document ?? throw new ArgumentNullException(nameof(document));
             _sheet = sheet ?? throw new ArgumentNullException(nameof(sheet));
             _moverTabelaNaPrancha = moverTabelaNaPrancha;
+            _removerTabelaDaPrancha = removerTabelaDaPrancha;
             TableInstances = new ObservableCollection<ProjectSheetTableInstanceViewModel>();
             Refresh();
         }
@@ -34,6 +37,7 @@ namespace Araci.ViewModels
         public bool HasInstances => TableInstances.Count > 0;
         public bool HasEmptyMessage => !string.IsNullOrWhiteSpace(EmptyMessage);
         public Guid? SelectedInstanceId => _selectedInstanceId;
+        public bool HasSelectedInstance => _selectedInstanceId.HasValue;
 
         public string Titulo
         {
@@ -86,7 +90,7 @@ namespace Araci.ViewModels
 
             EmptyMessage = HasInstances ? string.Empty : "Nenhuma tabela inserida na prancha";
             OnPropertyChanged(nameof(HasInstances));
-            OnPropertyChanged(nameof(SelectedInstanceId));
+            OnSelectionChanged();
         }
 
         public void SelecionarInstancia(Guid instanceId)
@@ -101,7 +105,7 @@ namespace Araci.ViewModels
             }
 
             _selectedInstanceId = encontrou ? instanceId : null;
-            OnPropertyChanged(nameof(SelectedInstanceId));
+            OnSelectionChanged();
         }
 
         public void LimparSelecao()
@@ -110,7 +114,7 @@ namespace Araci.ViewModels
                 instance.IsSelected = false;
 
             _selectedInstanceId = null;
-            OnPropertyChanged(nameof(SelectedInstanceId));
+            OnSelectionChanged();
         }
 
         public bool MoverInstancia(Guid instanceId, double novoX, double novoY)
@@ -131,7 +135,30 @@ namespace Araci.ViewModels
             return moved;
         }
 
+        public bool RemoverInstanciaSelecionada()
+        {
+            if (!_selectedInstanceId.HasValue)
+                return false;
+
+            Guid instanceId = _selectedInstanceId.Value;
+            bool removed = _removerTabelaDaPrancha?.Remover(SheetId, instanceId) == true;
+
+            if (removed)
+            {
+                _selectedInstanceId = null;
+                Refresh();
+            }
+
+            return removed;
+        }
+
         public event PropertyChangedEventHandler? PropertyChanged;
+
+        private void OnSelectionChanged()
+        {
+            OnPropertyChanged(nameof(SelectedInstanceId));
+            OnPropertyChanged(nameof(HasSelectedInstance));
+        }
 
         private void OnPropertyChanged([CallerMemberName] string? propertyName = null)
         {

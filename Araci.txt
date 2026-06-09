@@ -57,6 +57,7 @@ Araci-front
 │   │   ├── DeleteProjectItemCommand.cs
 │   │   ├── DuplicateProjectItemCommand.cs
 │   │   ├── IUndoableCommand.cs
+│   │   ├── MoveProjectSheetTableInstanceCommand.cs
 │   │   ├── RenameProjectItemCommand.cs
 │   │   ├── TransactionScope.cs
 │   │   ├── UpdateProjectTableElementsCommand.cs
@@ -144,6 +145,7 @@ Araci-front
 │           ├── ExcluirItemProjetoUseCase.cs
 │           ├── ExportarTabelaUseCase.cs
 │           ├── InserirTabelaNaPranchaUseCase.cs
+│           ├── MoverTabelaNaPranchaUseCase.cs
 │           ├── NovoProjetoUseCase.cs
 │           ├── RenomearItemProjetoUseCase.cs
 │           └── SalvarProjetoUseCase.cs
@@ -652,6 +654,16 @@ namespace Araci.TechnicalChecks
                 ("ProjectSheetViewModel trata prancha vazia", ProjectSheetViewModelTrataPranchaVazia),
                 ("ProjectSheetViewModel trata tabela inexistente", ProjectSheetViewModelTrataTabelaInexistente),
                 ("ProjectSheetViewModel refresh nao altera modelo", ProjectSheetViewModelRefreshNaoAlteraModelo),
+                ("Mover tabela na prancha move instancia valida", MoverTabelaNaPranchaMoveInstanciaValida),
+                ("Mover tabela na prancha undo redo", MoverTabelaNaPranchaUndoRedo),
+                ("Mover tabela na prancha ids invalidos nao alteram estado", MoverTabelaNaPranchaIdsInvalidosNaoAlteramEstado),
+                ("Mover tabela na prancha sem alteracao nao cria comando", MoverTabelaNaPranchaSemAlteracaoNaoCriaComando),
+                ("Mover tabela na prancha move apenas instancia alvo", MoverTabelaNaPranchaMoveApenasInstanciaAlvo),
+                ("ProjectSheetViewModel seleciona instancia", ProjectSheetViewModelSelecionaInstancia),
+                ("ProjectSheetViewModel limpa selecao", ProjectSheetViewModelLimpaSelecao),
+                ("ProjectSheetViewModel refresh preserva selecao existente", ProjectSheetViewModelRefreshPreservaSelecaoExistente),
+                ("ProjectSheetViewModel refresh remove selecao inexistente", ProjectSheetViewModelRefreshRemoveSelecaoInexistente),
+                ("ProjectSheetView possui superficie de prancha", ProjectSheetViewPossuiSuperficiePrancha),
                 ("Tabela data view model expoe colunas linhas e celulas", TabelaDataViewModelExpoeColunasLinhasECelulas),
                 ("Tabela data view model trata tabela sem campos", TabelaDataViewModelTrataTabelaSemCampos),
                 ("Tabela data view model trata tabela sem linhas", TabelaDataViewModelTrataTabelaSemLinhas),
@@ -6635,6 +6647,185 @@ namespace Araci.TechnicalChecks
             AssertEqual("Tabela Renomeada", viewModel.TableInstances.Single().TableName, "Refresh deveria atualizar nome exibido");
         }
 
+        private static void MoverTabelaNaPranchaMoveInstanciaValida()
+        {
+            var document = new AraciDocument();
+            ProjectTable tabela = document.CriarNovaTabela();
+            ProjectSheet prancha = document.CriarNovaPrancha();
+            var instancia = new ProjectSheetTableInstance { TableId = tabela.Id, X = 10, Y = 20, Width = 200, Height = 100 };
+            prancha.Tabelas.Add(instancia);
+            var commands = new Araci.Core.Commands.CommandManager();
+            var useCase = new MoverTabelaNaPranchaUseCase(document, commands);
+
+            bool moveu = useCase.Mover(prancha.Id, instancia.Id, 75, 95);
+
+            Assert(moveu, "Mover deveria retornar true para instancia valida.");
+            AssertEqual(75, instancia.X, "Mover instancia X");
+            AssertEqual(95, instancia.Y, "Mover instancia Y");
+            AssertEqual(200, instancia.Width, "Mover nao deveria alterar Width");
+            AssertEqual(100, instancia.Height, "Mover nao deveria alterar Height");
+            AssertEqual(tabela.Id, instancia.TableId, "Mover nao deveria alterar TableId");
+        }
+
+        private static void MoverTabelaNaPranchaUndoRedo()
+        {
+            var document = new AraciDocument();
+            ProjectTable tabela = document.CriarNovaTabela();
+            ProjectSheet prancha = document.CriarNovaPrancha();
+            var instancia = new ProjectSheetTableInstance { TableId = tabela.Id, X = 10, Y = 20 };
+            prancha.Tabelas.Add(instancia);
+            var commands = new Araci.Core.Commands.CommandManager();
+            var useCase = new MoverTabelaNaPranchaUseCase(document, commands);
+
+            useCase.Mover(prancha.Id, instancia.Id, 120, 140);
+            commands.Undo();
+
+            AssertEqual(10, instancia.X, "Undo movimento X");
+            AssertEqual(20, instancia.Y, "Undo movimento Y");
+
+            commands.Redo();
+
+            AssertEqual(120, instancia.X, "Redo movimento X");
+            AssertEqual(140, instancia.Y, "Redo movimento Y");
+        }
+
+        private static void MoverTabelaNaPranchaIdsInvalidosNaoAlteramEstado()
+        {
+            var document = new AraciDocument();
+            ProjectTable tabela = document.CriarNovaTabela();
+            ProjectSheet prancha = document.CriarNovaPrancha();
+            var instancia = new ProjectSheetTableInstance { TableId = tabela.Id, X = 10, Y = 20 };
+            prancha.Tabelas.Add(instancia);
+            var commands = new Araci.Core.Commands.CommandManager();
+            var useCase = new MoverTabelaNaPranchaUseCase(document, commands);
+
+            bool semPrancha = useCase.Mover(Guid.NewGuid(), instancia.Id, 30, 40);
+            bool semInstancia = useCase.Mover(prancha.Id, Guid.NewGuid(), 30, 40);
+            bool coordenadaInvalida = useCase.Mover(prancha.Id, instancia.Id, double.NaN, 40);
+
+            Assert(!semPrancha, "Mover com prancha invalida deveria retornar false.");
+            Assert(!semInstancia, "Mover com instancia invalida deveria retornar false.");
+            Assert(!coordenadaInvalida, "Mover com coordenada invalida deveria retornar false.");
+            AssertEqual(10, instancia.X, "Ids invalidos nao deveriam alterar X");
+            AssertEqual(20, instancia.Y, "Ids invalidos nao deveriam alterar Y");
+            Assert(!commands.CanUndo, "Ids invalidos nao deveriam criar historico.");
+        }
+
+        private static void MoverTabelaNaPranchaSemAlteracaoNaoCriaComando()
+        {
+            var document = new AraciDocument();
+            ProjectTable tabela = document.CriarNovaTabela();
+            ProjectSheet prancha = document.CriarNovaPrancha();
+            var instancia = new ProjectSheetTableInstance { TableId = tabela.Id, X = 10, Y = 20 };
+            prancha.Tabelas.Add(instancia);
+            var commands = new Araci.Core.Commands.CommandManager();
+            var useCase = new MoverTabelaNaPranchaUseCase(document, commands);
+
+            bool moveu = useCase.Mover(prancha.Id, instancia.Id, 10, 20);
+
+            Assert(!moveu, "Mover sem alteracao deveria retornar false.");
+            AssertEqual(10, instancia.X, "Mover sem alteracao X");
+            AssertEqual(20, instancia.Y, "Mover sem alteracao Y");
+            Assert(!commands.CanUndo, "Mover sem alteracao nao deveria criar historico.");
+        }
+
+        private static void MoverTabelaNaPranchaMoveApenasInstanciaAlvo()
+        {
+            var document = new AraciDocument();
+            ProjectTable tabela = document.CriarNovaTabela();
+            ProjectSheet prancha = document.CriarNovaPrancha();
+            var instanciaA = new ProjectSheetTableInstance { TableId = tabela.Id, X = 10, Y = 20 };
+            var instanciaB = new ProjectSheetTableInstance { TableId = tabela.Id, X = 30, Y = 40 };
+            prancha.Tabelas.Add(instanciaA);
+            prancha.Tabelas.Add(instanciaB);
+            var commands = new Araci.Core.Commands.CommandManager();
+            var useCase = new MoverTabelaNaPranchaUseCase(document, commands);
+
+            bool moveu = useCase.Mover(prancha.Id, instanciaB.Id, 80, 90);
+
+            Assert(moveu, "Mover instancia alvo deveria retornar true.");
+            AssertEqual(10, instanciaA.X, "Instancia nao alvo X");
+            AssertEqual(20, instanciaA.Y, "Instancia nao alvo Y");
+            AssertEqual(80, instanciaB.X, "Instancia alvo X");
+            AssertEqual(90, instanciaB.Y, "Instancia alvo Y");
+        }
+
+        private static void ProjectSheetViewModelSelecionaInstancia()
+        {
+            var document = new AraciDocument();
+            ProjectTable tabela = document.CriarNovaTabela();
+            ProjectSheet prancha = document.CriarNovaPrancha();
+            var instancia = new ProjectSheetTableInstance { TableId = tabela.Id };
+            prancha.Tabelas.Add(instancia);
+            var viewModel = new ProjectSheetViewModel(document, prancha);
+
+            viewModel.SelecionarInstancia(instancia.Id);
+
+            AssertEqual(instancia.Id, viewModel.SelectedInstanceId, "SelectedInstanceId apos selecionar");
+            Assert(viewModel.TableInstances.Single().IsSelected, "Instancia deveria ficar selecionada.");
+        }
+
+        private static void ProjectSheetViewModelLimpaSelecao()
+        {
+            var document = new AraciDocument();
+            ProjectTable tabela = document.CriarNovaTabela();
+            ProjectSheet prancha = document.CriarNovaPrancha();
+            var instancia = new ProjectSheetTableInstance { TableId = tabela.Id };
+            prancha.Tabelas.Add(instancia);
+            var viewModel = new ProjectSheetViewModel(document, prancha);
+            viewModel.SelecionarInstancia(instancia.Id);
+
+            viewModel.LimparSelecao();
+
+            Assert(viewModel.SelectedInstanceId == null, "SelectedInstanceId deveria ser null apos limpar.");
+            Assert(!viewModel.TableInstances.Single().IsSelected, "Instancia nao deveria ficar selecionada apos limpar.");
+        }
+
+        private static void ProjectSheetViewModelRefreshPreservaSelecaoExistente()
+        {
+            var document = new AraciDocument();
+            ProjectTable tabela = document.CriarNovaTabela();
+            ProjectSheet prancha = document.CriarNovaPrancha();
+            var instancia = new ProjectSheetTableInstance { TableId = tabela.Id };
+            prancha.Tabelas.Add(instancia);
+            var viewModel = new ProjectSheetViewModel(document, prancha);
+            viewModel.SelecionarInstancia(instancia.Id);
+
+            viewModel.Refresh();
+
+            AssertEqual(instancia.Id, viewModel.SelectedInstanceId, "Refresh deveria preservar SelectedInstanceId");
+            Assert(viewModel.TableInstances.Single().IsSelected, "Refresh deveria preservar IsSelected.");
+        }
+
+        private static void ProjectSheetViewModelRefreshRemoveSelecaoInexistente()
+        {
+            var document = new AraciDocument();
+            ProjectTable tabela = document.CriarNovaTabela();
+            ProjectSheet prancha = document.CriarNovaPrancha();
+            var instancia = new ProjectSheetTableInstance { TableId = tabela.Id };
+            prancha.Tabelas.Add(instancia);
+            var viewModel = new ProjectSheetViewModel(document, prancha);
+            viewModel.SelecionarInstancia(instancia.Id);
+
+            prancha.Tabelas.Clear();
+            viewModel.Refresh();
+
+            Assert(viewModel.SelectedInstanceId == null, "Refresh deveria remover selecao inexistente.");
+            AssertEqual(0, viewModel.TableInstances.Count, "Refresh apos remover instancia Count");
+        }
+
+        private static void ProjectSheetViewPossuiSuperficiePrancha()
+        {
+            RunSta(() =>
+            {
+                var view = new ProjectSheetView();
+                var sheetSurface = view.FindName("SheetSurface") as Grid;
+
+                Assert(sheetSurface != null, "ProjectSheetView deveria possuir SheetSurface.");
+                Assert(sheetSurface!.ClipToBounds, "SheetSurface deveria manter ClipToBounds.");
+            });
+        }
+
         private static void TabelaDataViewModelExpoeColunasLinhasECelulas()
         {
             AraciDocument document = CriarDocumentoTabelaDados();
@@ -7851,6 +8042,7 @@ namespace Araci.Services
             EditarPropriedadesTabela = new EditarPropriedadesTabelaUseCase(Document, Commands);
             ExportarTabela = new ExportarTabelaUseCase(Document, Dialogs, new ProjectTableDataBuilder(), new ProjectTableCsvExportService());
             InserirTabelaNaPrancha = new InserirTabelaNaPranchaUseCase(Document, Commands);
+            MoverTabelaNaPrancha = new MoverTabelaNaPranchaUseCase(Document, Commands);
 
             var moveServices = EditingComposition.CreateMoveServices(() => Viewport, () => Scene.Elementos, Settings, Connectivity, TerminalLayout, SceneQueries, VisualUpdates, Selection, GeometryUpdates, Commands);
             MoveHud = moveServices.MoveHud;
@@ -7949,6 +8141,7 @@ namespace Araci.Services
         public EditarPropriedadesTabelaUseCase EditarPropriedadesTabela { get; }
         public ExportarTabelaUseCase ExportarTabela { get; }
         public InserirTabelaNaPranchaUseCase InserirTabelaNaPrancha { get; }
+        public MoverTabelaNaPranchaUseCase MoverTabelaNaPrancha { get; }
         public VisualUpdateService VisualUpdates { get; }
         public SelectionService Selection { get; }
         public SelecionarElementosUseCase SelecionarElementos { get; }
@@ -8149,12 +8342,18 @@ ARQUIVO: C:\Users\User\source\repos\lucasffxavier\Araci-front\ViewModels\Project
 ====================================================================================================
 
 using System;
+using System.ComponentModel;
+using System.Runtime.CompilerServices;
 using Araci.Core.Documents;
 
 namespace Araci.ViewModels
 {
-    public sealed class ProjectSheetTableInstanceViewModel
+    public sealed class ProjectSheetTableInstanceViewModel : INotifyPropertyChanged
     {
+        private double _x;
+        private double _y;
+        private bool _isSelected;
+
         public ProjectSheetTableInstanceViewModel(ProjectSheetTableInstance instance, string tableName)
         {
             ArgumentNullException.ThrowIfNull(instance);
@@ -8162,8 +8361,8 @@ namespace Araci.ViewModels
             Id = instance.Id;
             TableId = instance.TableId;
             TableName = string.IsNullOrWhiteSpace(tableName) ? "Tabela sem nome" : tableName;
-            X = instance.X;
-            Y = instance.Y;
+            _x = instance.X;
+            _y = instance.Y;
             Width = instance.Width;
             Height = instance.Height;
         }
@@ -8171,10 +8370,61 @@ namespace Araci.ViewModels
         public Guid Id { get; }
         public Guid TableId { get; }
         public string TableName { get; }
-        public double X { get; }
-        public double Y { get; }
+
+        public double X
+        {
+            get => _x;
+            private set
+            {
+                if (Math.Abs(_x - value) < 0.000001)
+                    return;
+
+                _x = value;
+                OnPropertyChanged();
+            }
+        }
+
+        public double Y
+        {
+            get => _y;
+            private set
+            {
+                if (Math.Abs(_y - value) < 0.000001)
+                    return;
+
+                _y = value;
+                OnPropertyChanged();
+            }
+        }
+
         public double Width { get; }
         public double Height { get; }
+
+        public bool IsSelected
+        {
+            get => _isSelected;
+            set
+            {
+                if (_isSelected == value)
+                    return;
+
+                _isSelected = value;
+                OnPropertyChanged();
+            }
+        }
+
+        public void SetPreviewPosition(double x, double y)
+        {
+            X = x;
+            Y = y;
+        }
+
+        public event PropertyChangedEventHandler? PropertyChanged;
+
+        private void OnPropertyChanged([CallerMemberName] string? propertyName = null)
+        {
+            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
+        }
     }
 }
 
@@ -8189,6 +8439,7 @@ using System.Collections.ObjectModel;
 using System.ComponentModel;
 using System.Linq;
 using System.Runtime.CompilerServices;
+using Araci.Applications.UseCases.Projeto;
 using Araci.Core.Documents;
 
 namespace Araci.ViewModels
@@ -8197,13 +8448,19 @@ namespace Araci.ViewModels
     {
         private readonly AraciDocument _document;
         private readonly ProjectSheet _sheet;
+        private readonly MoverTabelaNaPranchaUseCase? _moverTabelaNaPrancha;
         private string _titulo = string.Empty;
         private string _emptyMessage = string.Empty;
+        private Guid? _selectedInstanceId;
 
-        public ProjectSheetViewModel(AraciDocument document, ProjectSheet sheet)
+        public ProjectSheetViewModel(
+            AraciDocument document,
+            ProjectSheet sheet,
+            MoverTabelaNaPranchaUseCase? moverTabelaNaPrancha = null)
         {
             _document = document ?? throw new ArgumentNullException(nameof(document));
             _sheet = sheet ?? throw new ArgumentNullException(nameof(sheet));
+            _moverTabelaNaPrancha = moverTabelaNaPrancha;
             TableInstances = new ObservableCollection<ProjectSheetTableInstanceViewModel>();
             Refresh();
         }
@@ -8212,6 +8469,7 @@ namespace Araci.ViewModels
         public ObservableCollection<ProjectSheetTableInstanceViewModel> TableInstances { get; }
         public bool HasInstances => TableInstances.Count > 0;
         public bool HasEmptyMessage => !string.IsNullOrWhiteSpace(EmptyMessage);
+        public Guid? SelectedInstanceId => _selectedInstanceId;
 
         public string Titulo
         {
@@ -8242,6 +8500,7 @@ namespace Araci.ViewModels
 
         public void Refresh()
         {
+            Guid? selectedBeforeRefresh = _selectedInstanceId;
             Titulo = string.IsNullOrWhiteSpace(_sheet.Numero)
                 ? _sheet.Nome
                 : $"{_sheet.Numero} - {_sheet.Nome}";
@@ -8251,11 +8510,61 @@ namespace Araci.ViewModels
             foreach (ProjectSheetTableInstance instance in _sheet.Tabelas.Where(i => i != null))
             {
                 ProjectTable? table = _document.Tabelas.FirstOrDefault(t => t.Id == instance.TableId);
-                TableInstances.Add(new ProjectSheetTableInstanceViewModel(instance, table?.Nome ?? "Tabela nao encontrada"));
+                var instanceViewModel = new ProjectSheetTableInstanceViewModel(instance, table?.Nome ?? "Tabela nao encontrada")
+                {
+                    IsSelected = selectedBeforeRefresh == instance.Id
+                };
+                TableInstances.Add(instanceViewModel);
             }
+
+            if (selectedBeforeRefresh.HasValue && !TableInstances.Any(i => i.Id == selectedBeforeRefresh.Value))
+                _selectedInstanceId = null;
 
             EmptyMessage = HasInstances ? string.Empty : "Nenhuma tabela inserida na prancha";
             OnPropertyChanged(nameof(HasInstances));
+            OnPropertyChanged(nameof(SelectedInstanceId));
+        }
+
+        public void SelecionarInstancia(Guid instanceId)
+        {
+            bool encontrou = false;
+
+            foreach (ProjectSheetTableInstanceViewModel instance in TableInstances)
+            {
+                bool selecionada = instance.Id == instanceId;
+                instance.IsSelected = selecionada;
+                encontrou |= selecionada;
+            }
+
+            _selectedInstanceId = encontrou ? instanceId : null;
+            OnPropertyChanged(nameof(SelectedInstanceId));
+        }
+
+        public void LimparSelecao()
+        {
+            foreach (ProjectSheetTableInstanceViewModel instance in TableInstances)
+                instance.IsSelected = false;
+
+            _selectedInstanceId = null;
+            OnPropertyChanged(nameof(SelectedInstanceId));
+        }
+
+        public bool MoverInstancia(Guid instanceId, double novoX, double novoY)
+        {
+            ProjectSheetTableInstanceViewModel? instanceViewModel = TableInstances.FirstOrDefault(i => i.Id == instanceId);
+
+            if (instanceViewModel == null)
+                return false;
+
+            bool moved = _moverTabelaNaPrancha?.Mover(SheetId, instanceId, novoX, novoY) == true;
+
+            if (moved)
+            {
+                Refresh();
+                SelecionarInstancia(instanceId);
+            }
+
+            return moved;
         }
 
         public event PropertyChangedEventHandler? PropertyChanged;
@@ -8300,9 +8609,12 @@ ARQUIVO: C:\Users\User\source\repos\lucasffxavier\Araci-front\Views\ProjectSheet
                            Margin="12,0"/>
             </Border>
 
-            <Grid Grid.Row="1"
+            <Grid x:Name="SheetSurface"
+                  Grid.Row="1"
                   Margin="18"
-                  ClipToBounds="True">
+                  ClipToBounds="True"
+                  MouseLeftButtonDown="SheetSurface_MouseLeftButtonDown"
+                  LostMouseCapture="SheetSurface_LostMouseCapture">
                 <Border Background="#FFFFFF"
                         BorderBrush="#A8A8A8"
                         BorderThickness="1"/>
@@ -8324,9 +8636,24 @@ ARQUIVO: C:\Users\User\source\repos\lucasffxavier\Araci-front\Views\ProjectSheet
                             <Border Width="{Binding Width}"
                                     Height="{Binding Height}"
                                     Background="#FAFAFA"
-                                    BorderBrush="#303030"
-                                    BorderThickness="1"
-                                    ClipToBounds="True">
+                                    ClipToBounds="True"
+                                    Cursor="SizeAll"
+                                    MouseLeftButtonDown="TableInstance_MouseLeftButtonDown"
+                                    MouseMove="TableInstance_MouseMove"
+                                    MouseLeftButtonUp="TableInstance_MouseLeftButtonUp"
+                                    LostMouseCapture="TableInstance_LostMouseCapture">
+                                <Border.Style>
+                                    <Style TargetType="{x:Type Border}">
+                                        <Setter Property="BorderBrush" Value="#303030"/>
+                                        <Setter Property="BorderThickness" Value="1"/>
+                                        <Style.Triggers>
+                                            <DataTrigger Binding="{Binding IsSelected}" Value="True">
+                                                <Setter Property="BorderBrush" Value="#1E90FF"/>
+                                                <Setter Property="BorderThickness" Value="2"/>
+                                            </DataTrigger>
+                                        </Style.Triggers>
+                                    </Style>
+                                </Border.Style>
                                 <Grid>
                                     <Grid.RowDefinitions>
                                         <RowDefinition Height="30"/>
@@ -8378,15 +8705,119 @@ ARQUIVO: C:\Users\User\source\repos\lucasffxavier\Araci-front\Views\ProjectSheet
 ARQUIVO: C:\Users\User\source\repos\lucasffxavier\Araci-front\Views\ProjectSheetView.xaml.cs
 ====================================================================================================
 
+using System;
+using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Input;
+using Araci.ViewModels;
 
 namespace Araci.Views
 {
     public partial class ProjectSheetView : UserControl
     {
+        private ProjectSheetTableInstanceViewModel? _draggedInstance;
+        private FrameworkElement? _dragElement;
+        private Point _dragStartPoint;
+        private double _dragStartX;
+        private double _dragStartY;
+        private bool _isDragging;
+
         public ProjectSheetView()
         {
             InitializeComponent();
+        }
+
+        private ProjectSheetViewModel? ViewModel => DataContext as ProjectSheetViewModel;
+
+        private void SheetSurface_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
+        {
+            ViewModel?.LimparSelecao();
+        }
+
+        private void TableInstance_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
+        {
+            if (sender is not FrameworkElement element ||
+                element.DataContext is not ProjectSheetTableInstanceViewModel instance ||
+                ViewModel == null)
+                return;
+
+            ViewModel.SelecionarInstancia(instance.Id);
+            _draggedInstance = instance;
+            _dragElement = element;
+            _dragStartPoint = e.GetPosition(SheetSurface);
+            _dragStartX = instance.X;
+            _dragStartY = instance.Y;
+            _isDragging = true;
+            element.CaptureMouse();
+            e.Handled = true;
+        }
+
+        private void TableInstance_MouseMove(object sender, MouseEventArgs e)
+        {
+            if (!_isDragging || _draggedInstance == null || e.LeftButton != MouseButtonState.Pressed)
+                return;
+
+            Point current = e.GetPosition(SheetSurface);
+            double newX = _dragStartX + current.X - _dragStartPoint.X;
+            double newY = _dragStartY + current.Y - _dragStartPoint.Y;
+            _draggedInstance.SetPreviewPosition(newX, newY);
+            e.Handled = true;
+        }
+
+        private void TableInstance_MouseLeftButtonUp(object sender, MouseButtonEventArgs e)
+        {
+            CommitDrag();
+            e.Handled = true;
+        }
+
+        private void TableInstance_LostMouseCapture(object sender, MouseEventArgs e)
+        {
+            if (_isDragging)
+                CancelDragPreview();
+        }
+
+        private void SheetSurface_LostMouseCapture(object sender, MouseEventArgs e)
+        {
+            if (_isDragging)
+                CancelDragPreview();
+        }
+
+        private void CommitDrag()
+        {
+            if (!_isDragging || _draggedInstance == null)
+                return;
+
+            ProjectSheetTableInstanceViewModel instance = _draggedInstance;
+            double newX = instance.X;
+            double newY = instance.Y;
+            ReleaseDrag();
+
+            if (Math.Abs(newX - _dragStartX) < 0.000001 && Math.Abs(newY - _dragStartY) < 0.000001)
+                return;
+
+            bool moved = ViewModel?.MoverInstancia(instance.Id, newX, newY) == true;
+
+            if (!moved)
+                instance.SetPreviewPosition(_dragStartX, _dragStartY);
+        }
+
+        private void CancelDragPreview()
+        {
+            if (_draggedInstance != null)
+                _draggedInstance.SetPreviewPosition(_dragStartX, _dragStartY);
+
+            ReleaseDrag();
+        }
+
+        private void ReleaseDrag()
+        {
+            _isDragging = false;
+
+            if (_dragElement?.IsMouseCaptured == true)
+                _dragElement.ReleaseMouseCapture();
+
+            _dragElement = null;
+            _draggedInstance = null;
         }
     }
 }

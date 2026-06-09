@@ -25,6 +25,7 @@ namespace Araci.Views
         private void SheetSurface_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
         {
             ViewModel?.LimparSelecao();
+            Focus();
         }
 
         private void TableInstance_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
@@ -35,6 +36,7 @@ namespace Araci.Views
                 return;
 
             ViewModel.SelecionarInstancia(instance.Id);
+            Focus();
             _draggedInstance = instance;
             _dragElement = element;
             _dragStartPoint = e.GetPosition(SheetSurface);
@@ -73,6 +75,27 @@ namespace Araci.Views
         {
             if (_isDragging)
                 CancelDragPreview();
+        }
+
+        private void RemoveSelectedButton_Click(object sender, RoutedEventArgs e)
+        {
+            RemoveSelectedInstance();
+            Focus();
+        }
+
+        private void ProjectSheetView_KeyDown(object sender, KeyEventArgs e)
+        {
+            if (e.Key != Key.Delete)
+                return;
+
+            if (RemoveSelectedInstance())
+                e.Handled = true;
+        }
+
+        private bool RemoveSelectedInstance()
+        {
+            CancelDragPreview();
+            return ViewModel?.RemoverInstanciaSelecionada() == true;
         }
 
         private void CommitDrag()
