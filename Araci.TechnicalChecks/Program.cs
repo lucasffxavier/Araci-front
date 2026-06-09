@@ -6,6 +6,7 @@ using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Windows;
+using System.Windows.Controls;
 using System.Windows.Input;
 using System.Windows.Media;
 using Araci.API;
@@ -34,6 +35,7 @@ using Araci.Services.Editing;
 using Araci.Services.Catalog;
 using Araci.Services.Settings;
 using Araci.Services.Simulation;
+using Araci.Views;
 
 namespace Araci.TechnicalChecks
 {
@@ -87,7 +89,10 @@ namespace Araci.TechnicalChecks
                 ("Tabela data view model trata tabela sem campos", TabelaDataViewModelTrataTabelaSemCampos),
                 ("Tabela data view model trata tabela sem linhas", TabelaDataViewModelTrataTabelaSemLinhas),
                 ("Tabela data view model refresh atualiza dados", TabelaDataViewModelRefreshAtualizaDados),
+                ("Tabela data view model refresh reativo apos use cases", TabelaDataViewModelRefreshReativoAposUseCases),
                 ("Project Browser seleciona tabela e solicita visualizacao", ProjectBrowserSelecionaTabelaESolicitaVisualizacao),
+                ("Project Browser seleciona vista e restaura viewport", ProjectBrowserSelecionaVistaERestauraViewport),
+                ("ProjectTableGridView recria colunas dinamicas", ProjectTableGridViewRecriaColunasDinamicas),
                 ("DTO permanece equivalente apos reload", DtoPermaneceEquivalenteAposReload),
                 ("IDs permanecem estaveis apos reload", IdsPermanecemEstaveisAposReload),
                 ("Builds repetidos apos reload nao alteram Document", BuildsRepetidosAposReloadNaoAlteramDocument),
@@ -5472,6 +5477,86 @@ namespace Araci.TechnicalChecks
             AssertEqual("Carga A", viewModel.Rows[0][0], "Refresh Rows[0][0]");
         }
 
+        private static void TabelaDataViewModelRefreshReativoAposUseCases()
+        {
+            AraciDocument document = CriarDocumentoTabelaDados();
+            ProjectTable tabela = CriarTabelaDadosCarga(document);
+            var commands = new Araci.Core.Commands.CommandManager();
+            var useCase = new EditarPropriedadesTabelaUseCase(document, commands);
+            var viewModel = new ProjectTableDataViewModel(document, tabela);
+            document.PropriedadesTabelaAlteradas += tabelaAlterada =>
+            {
+                if (tabelaAlterada.Id == viewModel.TableId)
+                    viewModel.Refresh();
+            };
+
+            useCase.AlterarElementosTabela(
+                tabela.Id,
+                tabela.CategoriasElementos,
+                tabela.CamposSelecionados.Take(1).ToList());
+
+            AssertEqual(1, viewModel.Columns.Count, "Refresh reativo apos campos Columns.Count");
+            AssertEqual("Nome", viewModel.Columns[0].CampoId, "Refresh reativo apos campos Columns[0].CampoId");
+
+            useCase.AlterarElementosTabela(
+                tabela.Id,
+                tabela.CategoriasElementos,
+                CriarCamposTabelaDadosCarga());
+
+            useCase.AlterarFiltrosTabela(
+                tabela.Id,
+                null,
+                ProjectTableFilterLogicalMode.Todas,
+                new[]
+                {
+                    new ProjectTableFilterRule
+                    {
+                        Ordem = 0,
+                        Categoria = ProjectTableElementCategory.Cargas,
+                        CampoId = "Nome",
+                        NomeExibicao = "Nome",
+                        Operador = ProjectTableFilterOperator.IgualA,
+                        Valor = "Carga B"
+                    }
+                });
+
+            AssertEqual(1, viewModel.Rows.Count, "Refresh reativo apos filtros Rows.Count");
+            AssertEqual("Carga B", viewModel.Rows[0][0], "Refresh reativo apos filtros Rows[0][0]");
+
+            useCase.AlterarFiltrosTabela(
+                tabela.Id,
+                null,
+                ProjectTableFilterLogicalMode.Todas,
+                Array.Empty<ProjectTableFilterRule>());
+
+            useCase.AlterarOrdenacaoTabela(
+                tabela.Id,
+                new[]
+                {
+                    new ProjectTableSorting
+                    {
+                        Ordem = 0,
+                        Categoria = ProjectTableElementCategory.Cargas,
+                        CampoId = "PotenciaAtiva",
+                        NomeExibicao = "Potencia ativa",
+                        Direcao = ProjectTableSortDirection.Decrescente
+                    }
+                });
+
+            AssertEqual("Carga B", viewModel.Rows[0][0], "Refresh reativo apos ordenacao Rows[0][0]");
+            AssertEqual("800", viewModel.Rows[0][1], "Refresh reativo apos ordenacao Rows[0][1]");
+
+            ProjectView vistaAtiva = document.Vistas[0];
+            useCase.AlterarFiltrosTabela(
+                tabela.Id,
+                vistaAtiva.Id,
+                ProjectTableFilterLogicalMode.Todas,
+                Array.Empty<ProjectTableFilterRule>());
+
+            AssertEqual(2, viewModel.Rows.Count, "Refresh reativo apos filtro de vista Rows.Count");
+            Assert(viewModel.Rows.All(row => row[0] != "Carga B"), "Filtro de vista deveria remover Carga B.");
+        }
+
         private static void ProjectBrowserSelecionaTabelaESolicitaVisualizacao()
         {
             var document = new AraciDocument();
@@ -5491,6 +5576,81 @@ namespace Araci.TechnicalChecks
 
             AssertEqual(tabela.Id, tabelaVisualizada, "Tabela visualizada");
             AssertEqual(tabela.Id, tabelaPropriedades, "Tabela propriedades");
+        }
+
+        private static void ProjectBrowserSelecionaVistaERestauraViewport()
+        {
+            var document = new AraciDocument();
+            ProjectTable tabela = document.CriarNovaTabela();
+            ProjectView vista = document.Vistas[0];
+            Guid? tabelaVisualizada = null;
+            Guid? vistaAtiva = null;
+            Guid? vistaPropriedades = null;
+            var viewModel = new ProjectBrowserViewModel(
+                document,
+                definirVistaAtiva: id =>
+                {
+                    document.DefinirVistaAtiva(id);
+                    vistaAtiva = id;
+                },
+                abrirTabela: id => tabelaVisualizada = id,
+                abrirPropriedadesVista: id => vistaPropriedades = id);
+
+            ProjectBrowserItemViewModel itemTabela = viewModel.Secoes
+                .SelectMany(secao => secao.Itens)
+                .Single(item => item.Tipo == "Tabela" && item.Id == tabela.Id);
+            ProjectBrowserItemViewModel itemVista = viewModel.Secoes
+                .SelectMany(secao => secao.Itens)
+                .Single(item => item.Tipo == "Vista" && item.Id == vista.Id);
+
+            itemTabela.SelecionarCommand.Execute(null);
+            itemVista.SelecionarCommand.Execute(null);
+
+            AssertEqual(tabela.Id, tabelaVisualizada, "Tabela visualizada antes de voltar para vista");
+            AssertEqual(vista.Id, vistaAtiva, "Vista ativa apos selecionar vista");
+            AssertEqual(vista.Id, vistaPropriedades, "Vista propriedades apos selecionar vista");
+            Assert(itemVista.IsSelected, "Vista deveria ficar selecionada no Project Browser.");
+            Assert(!itemTabela.IsSelected, "Tabela deveria deixar de ficar selecionada no Project Browser.");
+            Assert(itemVista.IsActiveView, "Vista selecionada deveria ficar marcada como ativa.");
+        }
+
+        private static void ProjectTableGridViewRecriaColunasDinamicas()
+        {
+            RunSta(() =>
+            {
+                AraciDocument document = CriarDocumentoTabelaDados();
+                ProjectTable tabelaA = CriarTabelaDadosCarga(document);
+                ProjectTable tabelaB = CriarTabelaDadosCarga(document);
+                tabelaB.Nome = "Tabela B";
+                tabelaB.CamposSelecionados = CriarCamposTabelaDadosCarga().Take(1).ToList();
+
+                var view = new ProjectTableGridView();
+                var vmA = new ProjectTableDataViewModel(document, tabelaA);
+                var vmB = new ProjectTableDataViewModel(document, tabelaB);
+                var grid = (DataGrid)view.FindName("TableDataGrid");
+
+                view.DataContext = vmA;
+                AssertEqual(3, grid.Columns.Count, "Grid colunas tabela A");
+                AssertEqual("Nome", grid.Columns[0].Header, "Grid tabela A coluna 0");
+                Assert(grid.IsReadOnly, "DataGrid deveria permanecer read-only.");
+                Assert(!grid.CanUserAddRows, "DataGrid nao deveria permitir adicionar linhas.");
+                Assert(!grid.CanUserDeleteRows, "DataGrid nao deveria permitir deletar linhas.");
+                Assert(!grid.CanUserSortColumns, "DataGrid nao deveria ordenar pelo cabecalho.");
+
+                view.DataContext = vmB;
+                AssertEqual(1, grid.Columns.Count, "Grid colunas tabela B apos troca");
+                AssertEqual("Nome", grid.Columns[0].Header, "Grid tabela B coluna 0");
+
+                tabelaB.CamposSelecionados = CriarCamposTabelaDadosCarga().Take(2).ToList();
+                vmB.Refresh();
+
+                AssertEqual(2, grid.Columns.Count, "Grid colunas tabela B apos refresh");
+                AssertEqual("Nome", grid.Columns[0].Header, "Grid tabela B refresh coluna 0");
+                AssertEqual("Potencia ativa", grid.Columns[1].Header, "Grid tabela B refresh coluna 1");
+
+                view.DataContext = null;
+                AssertEqual(0, grid.Columns.Count, "Grid colunas apos limpar DataContext");
+            });
         }
 
         private static ProjectTable CriarTabelaComCampos(AraciDocument document)
@@ -5556,14 +5716,19 @@ namespace Araci.TechnicalChecks
             {
                 ProjectTableElementCategory.Cargas
             };
-            tabela.CamposSelecionados = new List<ProjectTableFieldSelection>
+            tabela.CamposSelecionados = CriarCamposTabelaDadosCarga();
+
+            return tabela;
+        }
+
+        private static List<ProjectTableFieldSelection> CriarCamposTabelaDadosCarga()
+        {
+            return new List<ProjectTableFieldSelection>
             {
                 new() { Categoria = ProjectTableElementCategory.Cargas, CampoId = "Nome", NomeExibicao = "Nome", Ordem = 0 },
                 new() { Categoria = ProjectTableElementCategory.Cargas, CampoId = "PotenciaAtiva", NomeExibicao = "Potencia ativa", Ordem = 1 },
                 new() { Categoria = ProjectTableElementCategory.Cargas, CampoId = "Tensao", NomeExibicao = "Tensao", Ordem = 2 }
             };
-
-            return tabela;
         }
 
         private static string CriarAssinaturaTabelaDados(AraciDocument document, ProjectTable tabela)

@@ -46,7 +46,7 @@ namespace Araci.Views
                 TableDataGrid.Columns.Add(new DataGridTextColumn
                 {
                     Header = _viewModel.Columns[i].NomeExibicao,
-                    Binding = new Binding($"[{i}]"),
+                    Binding = new Binding($"[{i}]") { Mode = BindingMode.OneWay },
                     IsReadOnly = true
                 });
             }

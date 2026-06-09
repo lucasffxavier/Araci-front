@@ -210,6 +210,7 @@ namespace Araci
             ProjectTableGrid.DataContext = null;
             _projectTableDataViewModel = null;
             Viewport.Visibility = Visibility.Visible;
+            FocarViewport();
         }
     }
 }

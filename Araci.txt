@@ -467,6 +467,7 @@ Araci-front
 │   ├── LinhaEndpointHandleViewModel.cs
 │   ├── ParameterViewModel.cs
 │   ├── ProjectBrowserViewModel.cs
+│   ├── ProjectTableDataViewModel.cs
 │   ├── ProjectTablePropertiesViewModel.cs
 │   ├── ProjectViewPropertiesViewModel.cs
 │   ├── PropertiesViewModel.cs
@@ -492,6 +493,8 @@ Araci-front
 ├── Views
 │   ├── ProjectBrowserView.xaml
 │   ├── ProjectBrowserView.xaml.cs
+│   ├── ProjectTableGridView.xaml
+│   ├── ProjectTableGridView.xaml.cs
 │   ├── ViewportView.xaml
 │   └── ViewportView.xaml.cs
 ├── .gitattributes
@@ -512,543 +515,6 @@ Araci-front
 ├── README.md
 ├── ROADMAP.md
 └── SECURITY.md
-
-
-====================================================================================================
-ARQUIVO: C:\Users\User\source\repos\lucasffxavier\Araci-front\Applications\Projects\Tables\ProjectTableDataBuilder.cs
-====================================================================================================
-
-using System;
-using System.Collections.Generic;
-using System.Globalization;
-using System.Linq;
-using Araci.Core.Documents;
-using Araci.Models;
-
-namespace Araci.Applications.Projects.Tables
-{
-    public sealed class ProjectTableDataBuilder
-    {
-        public ProjectTableDataResult Build(AraciDocument document, ProjectTable table)
-        {
-            ArgumentNullException.ThrowIfNull(document);
-            ArgumentNullException.ThrowIfNull(table);
-
-            List<ProjectTableDataColumn> columns = CriarColunas(table);
-
-            if (columns.Count == 0 || table.CategoriasElementos.Count == 0)
-                return new ProjectTableDataResult(columns, new List<ProjectTableDataRow>());
-
-            HashSet<ProjectTableElementCategory> categorias = table.CategoriasElementos.ToHashSet();
-            Guid? filtroVistaId = ObterFiltroVistaValido(document, table.FiltroVistaId);
-
-            List<RowBuildData> rows = document.Elementos
-                .Select((elemento, index) => new { Elemento = elemento, Index = index, Categoria = ObterCategoria(elemento) })
-                .Where(item => item.Categoria.HasValue && categorias.Contains(item.Categoria.Value))
-                .Where(item => PassaFiltroVista(item.Elemento, filtroVistaId))
-                .Select(item => CriarLinha(item.Elemento, item.Categoria!.Value, item.Index, columns))
-                .Where(row => PassaFiltros(row, table))
-                .ToList();
-
-            rows = OrdenarLinhas(rows, table, columns);
-
-            return new ProjectTableDataResult(
-                columns,
-                rows.Select(row => row.Row).ToList());
-        }
-
-        private static List<ProjectTableDataColumn> CriarColunas(ProjectTable table)
-        {
-            return (table.CamposSelecionados ?? new List<ProjectTableFieldSelection>())
-                .Where(c => !string.IsNullOrWhiteSpace(c.CampoId))
-                .OrderBy(c => c.Ordem)
-                .GroupBy(c => CriarChaveCampo(c.Categoria, c.CampoId))
-                .Select((g, index) =>
-                {
-                    ProjectTableFieldSelection campo = g.First();
-                    string campoId = campo.CampoId.Trim();
-                    return new ProjectTableDataColumn(
-                        campo.Categoria,
-                        campoId,
-                        string.IsNullOrWhiteSpace(campo.NomeExibicao) ? campoId : campo.NomeExibicao.Trim(),
-                        index);
-                })
-                .ToList();
-        }
-
-        private static Guid? ObterFiltroVistaValido(AraciDocument document, Guid? filtroVistaId)
-        {
-            if (!filtroVistaId.HasValue || filtroVistaId.Value == Guid.Empty)
-                return null;
-
-            return document.Vistas.Any(v => v.Id == filtroVistaId.Value)
-                ? filtroVistaId
-                : null;
-        }
-
-        private static bool PassaFiltroVista(Elemento elemento, Guid? filtroVistaId)
-        {
-            return !filtroVistaId.HasValue || elemento.ViewId == filtroVistaId.Value;
-        }
-
-        private static RowBuildData CriarLinha(
-            Elemento elemento,
-            ProjectTableElementCategory categoria,
-            int documentIndex,
-            IReadOnlyList<ProjectTableDataColumn> columns)
-        {
-            List<ProjectTableDataCell> cells = columns
-                .Select(column =>
-                {
-                    object? valor = ExtrairValor(elemento, categoria, column);
-                    return new ProjectTableDataCell(
-                        column.Categoria,
-                        column.CampoId,
-                        column.NomeExibicao,
-                        valor,
-                        FormatarValor(valor));
-                })
-                .ToList();
-
-            var row = new ProjectTableDataRow(
-                elemento.Id,
-                elemento.Nome,
-                categoria,
-                cells);
-
-            return new RowBuildData(elemento, documentIndex, row);
-        }
-
-        private static bool PassaFiltros(RowBuildData row, ProjectTable table)
-        {
-            List<ProjectTableFilterRule> filtros = NormalizarFiltros(table.Filtros, row.Row.Cells);
-
-            if (filtros.Count == 0)
-                return true;
-
-            return table.ModoFiltro == ProjectTableFilterLogicalMode.Qualquer
-                ? filtros.Any(f => AvaliarFiltro(row, f))
-                : filtros.All(f => AvaliarFiltro(row, f));
-        }
-
-        private static List<ProjectTableFilterRule> NormalizarFiltros(
-            IEnumerable<ProjectTableFilterRule>? filtros,
-            IReadOnlyList<ProjectTableDataCell> cells)
-        {
-            HashSet<string> campos = cells
-                .Select(c => CriarChaveCampo(c.Categoria, c.CampoId))
-                .ToHashSet(StringComparer.Ordinal);
-
-            return (filtros ?? Enumerable.Empty<ProjectTableFilterRule>())
-                .Where(f => !string.IsNullOrWhiteSpace(f.CampoId))
-                .OrderBy(f => f.Ordem)
-                .Where(f => campos.Contains(CriarChaveCampo(f.Categoria, f.CampoId)))
-                .Take(5)
-                .ToList();
-        }
-
-        private static bool AvaliarFiltro(RowBuildData row, ProjectTableFilterRule filtro)
-        {
-            ProjectTableDataCell? cell = ObterCell(row, filtro.Categoria, filtro.CampoId);
-
-            if (cell == null)
-                return false;
-
-            string valorFiltro = filtro.Valor?.Trim() ?? string.Empty;
-            string display = cell.DisplayValue ?? string.Empty;
-
-            if (filtro.Operador is ProjectTableFilterOperator.IgualA or ProjectTableFilterOperator.DiferenteDe &&
-                TentarConverterNumero(cell.RawValue, out double numeroCelula) &&
-                TentarConverterNumero(valorFiltro, out double numeroFiltro))
-            {
-                bool igualNumero = Math.Abs(numeroCelula - numeroFiltro) < 0.0000001;
-                return filtro.Operador == ProjectTableFilterOperator.IgualA ? igualNumero : !igualNumero;
-            }
-
-            int comparacao = string.Compare(display, valorFiltro, StringComparison.OrdinalIgnoreCase);
-            bool resultado = filtro.Operador switch
-            {
-                ProjectTableFilterOperator.Contem => display.Contains(valorFiltro, StringComparison.OrdinalIgnoreCase),
-                ProjectTableFilterOperator.NaoContem => !display.Contains(valorFiltro, StringComparison.OrdinalIgnoreCase),
-                ProjectTableFilterOperator.ComecaCom => display.StartsWith(valorFiltro, StringComparison.OrdinalIgnoreCase),
-                ProjectTableFilterOperator.TerminaCom => display.EndsWith(valorFiltro, StringComparison.OrdinalIgnoreCase),
-                ProjectTableFilterOperator.IgualA => comparacao == 0,
-                ProjectTableFilterOperator.DiferenteDe => comparacao != 0,
-                _ => display.Contains(valorFiltro, StringComparison.OrdinalIgnoreCase)
-            };
-
-            return resultado;
-        }
-
-        private static List<RowBuildData> OrdenarLinhas(
-            List<RowBuildData> rows,
-            ProjectTable table,
-            IReadOnlyList<ProjectTableDataColumn> columns)
-        {
-            List<ProjectTableSorting> ordenacoes = NormalizarOrdenacoes(table.Ordenacoes, columns);
-
-            if (ordenacoes.Count == 0)
-                return rows.OrderBy(row => row.DocumentIndex).ToList();
-
-            return rows
-                .OrderBy(row => row, new RowBuildDataComparer(ordenacoes))
-                .ToList();
-        }
-
-        private static List<ProjectTableSorting> NormalizarOrdenacoes(
-            IEnumerable<ProjectTableSorting>? ordenacoes,
-            IReadOnlyList<ProjectTableDataColumn> columns)
-        {
-            HashSet<string> campos = columns
-                .Select(c => CriarChaveCampo(c.Categoria, c.CampoId))
-                .ToHashSet(StringComparer.Ordinal);
-
-            var chavesUsadas = new HashSet<string>(StringComparer.Ordinal);
-            var resultado = new List<ProjectTableSorting>();
-
-            foreach (ProjectTableSorting ordenacao in (ordenacoes ?? Enumerable.Empty<ProjectTableSorting>())
-                .Where(o => !string.IsNullOrWhiteSpace(o.CampoId))
-                .OrderBy(o => o.Ordem))
-            {
-                string chave = CriarChaveCampo(ordenacao.Categoria, ordenacao.CampoId);
-
-                if (!campos.Contains(chave) || !chavesUsadas.Add(chave))
-                    continue;
-
-                resultado.Add(new ProjectTableSorting
-                {
-                    Ordem = resultado.Count,
-                    Categoria = ordenacao.Categoria,
-                    CampoId = ordenacao.CampoId.Trim(),
-                    NomeExibicao = ordenacao.NomeExibicao,
-                    Direcao = Enum.IsDefined(typeof(ProjectTableSortDirection), ordenacao.Direcao)
-                        ? ordenacao.Direcao
-                        : ProjectTableSortDirection.Crescente
-                });
-
-                if (resultado.Count == 5)
-                    break;
-            }
-
-            return resultado;
-        }
-
-        private static object? ExtrairValor(
-            Elemento elemento,
-            ProjectTableElementCategory categoriaElemento,
-            ProjectTableDataColumn column)
-        {
-            if (categoriaElemento != column.Categoria)
-                return null;
-
-            string campoId = column.CampoId.Trim();
-
-            if (string.Equals(campoId, Elemento.PARAM_NOME, StringComparison.Ordinal))
-                return elemento.Nome;
-
-            if (string.Equals(campoId, "Tipo", StringComparison.Ordinal))
-                return elemento.Tipo?.NomeTipo ?? string.Empty;
-
-            string? parametro = ObterParametroAlias(categoriaElemento, campoId);
-
-            if (parametro != null && elemento.Parametros.TryGetValue(parametro, out Parameter? aliasParameter))
-                return aliasParameter.ValorObjeto;
-
-            return elemento.Parametros.TryGetValue(campoId, out Parameter? parameter)
-                ? parameter.ValorObjeto
-                : null;
-        }
-
-        private static string? ObterParametroAlias(ProjectTableElementCategory categoria, string campoId)
-        {
-            return categoria switch
-            {
-                ProjectTableElementCategory.Barras when campoId == "TensaoNominal" => Barra.PARAM_TENSAO,
-                ProjectTableElementCategory.Cabos when campoId == "Corrente" => Cabo.PARAM_CORRENTE_LINHA,
-                ProjectTableElementCategory.Cargas when campoId == "Tensao" => ElementoEquipamento.PARAM_TENSAO_LINHA,
-                ProjectTableElementCategory.Geradores when campoId == "Tensao" => ElementoEquipamento.PARAM_TENSAO_LINHA,
-                ProjectTableElementCategory.Transformadores when campoId == "PotenciaNominal" => Transformador.PARAM_POTENCIA_APARENTE,
-                ProjectTableElementCategory.Transformadores when campoId == "TensaoPrimaria" => Transformador.PARAM_TENSAO_PRIMARIO_KV,
-                ProjectTableElementCategory.Transformadores when campoId == "TensaoSecundaria" => Transformador.PARAM_TENSAO_SECUNDARIO_KV,
-                ProjectTableElementCategory.Sin when campoId == "Tensao" => ElementoEquipamento.PARAM_TENSAO_LINHA,
-                _ => null
-            };
-        }
-
-        private static ProjectTableElementCategory? ObterCategoria(Elemento elemento)
-        {
-            return elemento switch
-            {
-                Barra => ProjectTableElementCategory.Barras,
-                Cabo => ProjectTableElementCategory.Cabos,
-                Carga => ProjectTableElementCategory.Cargas,
-                Gerador => ProjectTableElementCategory.Geradores,
-                Transformador => ProjectTableElementCategory.Transformadores,
-                Sin => ProjectTableElementCategory.Sin,
-                _ => null
-            };
-        }
-
-        private static ProjectTableDataCell? ObterCell(
-            RowBuildData row,
-            ProjectTableElementCategory categoria,
-            string campoId)
-        {
-            string chave = CriarChaveCampo(categoria, campoId);
-            return row.Row.Cells.FirstOrDefault(c =>
-                string.Equals(CriarChaveCampo(c.Categoria, c.CampoId), chave, StringComparison.Ordinal));
-        }
-
-        private static int CompararValores(object? a, object? b, bool decrescente)
-        {
-            bool vazioA = ValorVazio(a);
-            bool vazioB = ValorVazio(b);
-
-            if (vazioA && vazioB)
-                return 0;
-
-            if (vazioA)
-                return 1;
-
-            if (vazioB)
-                return -1;
-
-            int comparacao;
-
-            if (TentarConverterNumero(a, out double numeroA) &&
-                TentarConverterNumero(b, out double numeroB))
-                comparacao = numeroA.CompareTo(numeroB);
-            else
-                comparacao = string.Compare(FormatarValor(a), FormatarValor(b), StringComparison.OrdinalIgnoreCase);
-
-            return decrescente ? -comparacao : comparacao;
-        }
-
-        private static bool ValorVazio(object? valor)
-        {
-            return valor == null || valor is string texto && string.IsNullOrWhiteSpace(texto);
-        }
-
-        private static bool TentarConverterNumero(object? valor, out double numero)
-        {
-            numero = 0;
-
-            if (valor == null)
-                return false;
-
-            if (valor is double d)
-            {
-                numero = d;
-                return true;
-            }
-
-            if (valor is int i)
-            {
-                numero = i;
-                return true;
-            }
-
-            string texto = Convert.ToString(valor, CultureInfo.InvariantCulture)?.Trim() ?? string.Empty;
-
-            return double.TryParse(texto, NumberStyles.Float, CultureInfo.InvariantCulture, out numero) ||
-                double.TryParse(texto, NumberStyles.Float, CultureInfo.GetCultureInfo("pt-BR"), out numero);
-        }
-
-        private static string FormatarValor(object? valor)
-        {
-            return valor switch
-            {
-                null => string.Empty,
-                double d => d.ToString(CultureInfo.InvariantCulture),
-                float f => f.ToString(CultureInfo.InvariantCulture),
-                decimal m => m.ToString(CultureInfo.InvariantCulture),
-                _ => Convert.ToString(valor, CultureInfo.InvariantCulture) ?? string.Empty
-            };
-        }
-
-        private static string CriarChaveCampo(ProjectTableElementCategory categoria, string campoId)
-        {
-            return $"{categoria}|{campoId.Trim()}";
-        }
-
-        private sealed class RowBuildData
-        {
-            public RowBuildData(Elemento elemento, int documentIndex, ProjectTableDataRow row)
-            {
-                Elemento = elemento;
-                DocumentIndex = documentIndex;
-                Row = row;
-            }
-
-            public Elemento Elemento { get; }
-            public int DocumentIndex { get; }
-            public ProjectTableDataRow Row { get; }
-        }
-
-        private sealed class RowBuildDataComparer : IComparer<RowBuildData>
-        {
-            private readonly IReadOnlyList<ProjectTableSorting> _ordenacoes;
-
-            public RowBuildDataComparer(IReadOnlyList<ProjectTableSorting> ordenacoes)
-            {
-                _ordenacoes = ordenacoes;
-            }
-
-            public int Compare(RowBuildData? x, RowBuildData? y)
-            {
-                if (ReferenceEquals(x, y))
-                    return 0;
-
-                if (x == null)
-                    return 1;
-
-                if (y == null)
-                    return -1;
-
-                foreach (ProjectTableSorting ordenacao in _ordenacoes)
-                {
-                    ProjectTableDataCell? cellX = ObterCell(x, ordenacao.Categoria, ordenacao.CampoId);
-                    ProjectTableDataCell? cellY = ObterCell(y, ordenacao.Categoria, ordenacao.CampoId);
-                    int comparacao = CompararValores(
-                        cellX?.RawValue,
-                        cellY?.RawValue,
-                        ordenacao.Direcao == ProjectTableSortDirection.Decrescente);
-
-                    if (comparacao == 0)
-                        continue;
-
-                    return comparacao;
-                }
-
-                return x.DocumentIndex.CompareTo(y.DocumentIndex);
-            }
-        }
-    }
-}
-
-
-
-====================================================================================================
-ARQUIVO: C:\Users\User\source\repos\lucasffxavier\Araci-front\Applications\Projects\Tables\ProjectTableDataCell.cs
-====================================================================================================
-
-using Araci.Core.Documents;
-
-namespace Araci.Applications.Projects.Tables
-{
-    public sealed class ProjectTableDataCell
-    {
-        public ProjectTableDataCell(
-            ProjectTableElementCategory categoria,
-            string campoId,
-            string nomeExibicao,
-            object? rawValue,
-            string displayValue)
-        {
-            Categoria = categoria;
-            CampoId = campoId;
-            NomeExibicao = nomeExibicao;
-            RawValue = rawValue;
-            DisplayValue = displayValue;
-        }
-
-        public ProjectTableElementCategory Categoria { get; }
-        public string CampoId { get; }
-        public string NomeExibicao { get; }
-        public object? RawValue { get; }
-        public string DisplayValue { get; }
-    }
-}
-
-
-
-====================================================================================================
-ARQUIVO: C:\Users\User\source\repos\lucasffxavier\Araci-front\Applications\Projects\Tables\ProjectTableDataColumn.cs
-====================================================================================================
-
-using Araci.Core.Documents;
-
-namespace Araci.Applications.Projects.Tables
-{
-    public sealed class ProjectTableDataColumn
-    {
-        public ProjectTableDataColumn(
-            ProjectTableElementCategory categoria,
-            string campoId,
-            string nomeExibicao,
-            int ordem)
-        {
-            Categoria = categoria;
-            CampoId = campoId;
-            NomeExibicao = nomeExibicao;
-            Ordem = ordem;
-        }
-
-        public ProjectTableElementCategory Categoria { get; }
-        public string CampoId { get; }
-        public string NomeExibicao { get; }
-        public int Ordem { get; }
-    }
-}
-
-
-
-====================================================================================================
-ARQUIVO: C:\Users\User\source\repos\lucasffxavier\Araci-front\Applications\Projects\Tables\ProjectTableDataResult.cs
-====================================================================================================
-
-using System.Collections.Generic;
-
-namespace Araci.Applications.Projects.Tables
-{
-    public sealed class ProjectTableDataResult
-    {
-        public ProjectTableDataResult(
-            IReadOnlyList<ProjectTableDataColumn> columns,
-            IReadOnlyList<ProjectTableDataRow> rows)
-        {
-            Columns = columns;
-            Rows = rows;
-        }
-
-        public IReadOnlyList<ProjectTableDataColumn> Columns { get; }
-        public IReadOnlyList<ProjectTableDataRow> Rows { get; }
-    }
-}
-
-
-
-====================================================================================================
-ARQUIVO: C:\Users\User\source\repos\lucasffxavier\Araci-front\Applications\Projects\Tables\ProjectTableDataRow.cs
-====================================================================================================
-
-using System;
-using System.Collections.Generic;
-using Araci.Core.Documents;
-
-namespace Araci.Applications.Projects.Tables
-{
-    public sealed class ProjectTableDataRow
-    {
-        public ProjectTableDataRow(
-            Guid elementoId,
-            string elementoNome,
-            ProjectTableElementCategory categoria,
-            IReadOnlyList<ProjectTableDataCell> cells)
-        {
-            ElementoId = elementoId;
-            ElementoNome = elementoNome;
-            Categoria = categoria;
-            Cells = cells;
-        }
-
-        public Guid ElementoId { get; }
-        public string ElementoNome { get; }
-        public ProjectTableElementCategory Categoria { get; }
-        public IReadOnlyList<ProjectTableDataCell> Cells { get; }
-    }
-}
-
 
 
 ====================================================================================================
@@ -1140,6 +606,11 @@ namespace Araci.TechnicalChecks
                 ("Tabela data builder ignora ordenacao invalida sem alterar tabela", TabelaDataBuilderIgnoraOrdenacaoInvalidaSemAlterarTabela),
                 ("Tabela data builder geracao repetida read only", TabelaDataBuilderGeracaoRepetidaReadOnly),
                 ("Tabela data builder ignora categoria nao selecionada", TabelaDataBuilderIgnoraCategoriaNaoSelecionada),
+                ("Tabela data view model expoe colunas linhas e celulas", TabelaDataViewModelExpoeColunasLinhasECelulas),
+                ("Tabela data view model trata tabela sem campos", TabelaDataViewModelTrataTabelaSemCampos),
+                ("Tabela data view model trata tabela sem linhas", TabelaDataViewModelTrataTabelaSemLinhas),
+                ("Tabela data view model refresh atualiza dados", TabelaDataViewModelRefreshAtualizaDados),
+                ("Project Browser seleciona tabela e solicita visualizacao", ProjectBrowserSelecionaTabelaESolicitaVisualizacao),
                 ("DTO permanece equivalente apos reload", DtoPermaneceEquivalenteAposReload),
                 ("IDs permanecem estaveis apos reload", IdsPermanecemEstaveisAposReload),
                 ("Builds repetidos apos reload nao alteram Document", BuildsRepetidosAposReloadNaoAlteramDocument),
@@ -6466,6 +5937,85 @@ namespace Araci.TechnicalChecks
             Assert(result.Rows.All(r => r.ElementoNome != "Gerador A"), "Categoria nao selecionada nao deveria aparecer.");
         }
 
+        private static void TabelaDataViewModelExpoeColunasLinhasECelulas()
+        {
+            AraciDocument document = CriarDocumentoTabelaDados();
+            ProjectTable tabela = CriarTabelaDadosCarga(document);
+            var viewModel = new ProjectTableDataViewModel(document, tabela);
+
+            AssertEqual(tabela.Nome, viewModel.Titulo, "ViewModel.Titulo");
+            AssertEqual(3, viewModel.Columns.Count, "ViewModel.Columns.Count");
+            AssertEqual(3, viewModel.Rows.Count, "ViewModel.Rows.Count");
+            AssertEqual("Carga A", viewModel.Rows[0][0], "ViewModel.Rows[0][0]");
+            AssertEqual("500", viewModel.Rows[0][1], "ViewModel.Rows[0][1]");
+            Assert(!viewModel.HasEmptyMessage, "ViewModel nao deveria exibir estado vazio.");
+        }
+
+        private static void TabelaDataViewModelTrataTabelaSemCampos()
+        {
+            AraciDocument document = CriarDocumentoTabelaDados();
+            ProjectTable tabela = CriarTabelaDadosCarga(document);
+            tabela.CamposSelecionados.Clear();
+
+            var viewModel = new ProjectTableDataViewModel(document, tabela);
+
+            AssertEqual(0, viewModel.Columns.Count, "Tabela sem campos Columns.Count");
+            AssertEqual(0, viewModel.Rows.Count, "Tabela sem campos Rows.Count");
+            AssertEqual("Nenhum campo selecionado", viewModel.EmptyMessage, "Tabela sem campos EmptyMessage");
+            Assert(viewModel.HasEmptyMessage, "Tabela sem campos deveria exibir estado vazio.");
+        }
+
+        private static void TabelaDataViewModelTrataTabelaSemLinhas()
+        {
+            AraciDocument document = CriarDocumentoTabelaDados();
+            ProjectTable tabela = CriarTabelaDadosCarga(document);
+            tabela.Filtros = new List<ProjectTableFilterRule>
+            {
+                new() { Ordem = 0, Categoria = ProjectTableElementCategory.Cargas, CampoId = "Nome", NomeExibicao = "Nome", Operador = ProjectTableFilterOperator.IgualA, Valor = "Nao existe" }
+            };
+
+            var viewModel = new ProjectTableDataViewModel(document, tabela);
+
+            AssertEqual(3, viewModel.Columns.Count, "Tabela sem linhas Columns.Count");
+            AssertEqual(0, viewModel.Rows.Count, "Tabela sem linhas Rows.Count");
+            AssertEqual("Nenhum item encontrado", viewModel.EmptyMessage, "Tabela sem linhas EmptyMessage");
+        }
+
+        private static void TabelaDataViewModelRefreshAtualizaDados()
+        {
+            AraciDocument document = CriarDocumentoTabelaDados();
+            ProjectTable tabela = CriarTabelaDadosCarga(document);
+            var viewModel = new ProjectTableDataViewModel(document, tabela);
+
+            tabela.CamposSelecionados = tabela.CamposSelecionados.Take(1).ToList();
+            viewModel.Refresh();
+
+            AssertEqual(1, viewModel.Columns.Count, "Refresh Columns.Count");
+            AssertEqual("Nome", viewModel.Columns[0].CampoId, "Refresh Columns[0].CampoId");
+            AssertEqual("Carga A", viewModel.Rows[0][0], "Refresh Rows[0][0]");
+        }
+
+        private static void ProjectBrowserSelecionaTabelaESolicitaVisualizacao()
+        {
+            var document = new AraciDocument();
+            ProjectTable tabela = document.CriarNovaTabela();
+            Guid? tabelaVisualizada = null;
+            Guid? tabelaPropriedades = null;
+            var viewModel = new ProjectBrowserViewModel(
+                document,
+                abrirTabela: id => tabelaVisualizada = id,
+                abrirPropriedadesTabela: id => tabelaPropriedades = id);
+
+            ProjectBrowserItemViewModel itemTabela = viewModel.Secoes
+                .SelectMany(secao => secao.Itens)
+                .Single(item => item.Tipo == "Tabela" && item.Id == tabela.Id);
+
+            itemTabela.SelecionarCommand.Execute(null);
+
+            AssertEqual(tabela.Id, tabelaVisualizada, "Tabela visualizada");
+            AssertEqual(tabela.Id, tabelaPropriedades, "Tabela propriedades");
+        }
+
         private static ProjectTable CriarTabelaComCampos(AraciDocument document)
         {
             ProjectTable tabela = document.CriarNovaTabela();
@@ -7023,6 +6573,9 @@ ARQUIVO: C:\Users\User\source\repos\lucasffxavier\Araci-front\MainWindow.xaml
                 <views:ViewportView x:Name="Viewport"
                                     Grid.Column="1"
                                     Margin="10"/>
+                <views:ProjectTableGridView x:Name="ProjectTableGrid"
+                                            Grid.Column="1"
+                                            Visibility="Collapsed"/>
                 <properties:PropertiesHostView x:Name="PropertiesHost"
                                                Grid.Column="2"
                                                CloseRequested="OnPropertiesCloseRequested"/>
@@ -7047,8 +6600,11 @@ ARQUIVO: C:\Users\User\source\repos\lucasffxavier\Araci-front\MainWindow.xaml.cs
 using Araci.Services;
 using Araci.Properties;
 using Araci.ViewModels;
+using Araci.Applications.Projects.Tables;
+using Araci.Core.Documents;
 using System.ComponentModel;
 using System.Linq;
+using System.Collections.Specialized;
 using System.Windows;
 using System.Windows.Controls.Primitives;
 
@@ -7059,14 +6615,17 @@ namespace Araci
         private readonly EditorContext _context;
         private readonly GridLength _projectBrowserColumnWidth = new(260);
         private readonly GridLength _propertiesColumnWidth = new(320);
+        private ProjectTableDataViewModel? _projectTableDataViewModel;
 
         public MainWindow()
         {
             InitializeComponent();
             _context = new EditorContext();
             UnitValueConverter.CurrentUnits = _context.Settings.Units;
-            ProjectBrowser.DataContext = new ProjectBrowserViewModel(_context.Document, _context.DefinirVistaAtiva, _context.RenomearItemProjeto, _context.ExcluirItemProjeto, _context.DuplicarItemProjeto, MostrarPropriedadesVista, MostrarPropriedadesTabela);
+            ProjectBrowser.DataContext = new ProjectBrowserViewModel(_context.Document, _context.DefinirVistaAtiva, _context.RenomearItemProjeto, _context.ExcluirItemProjeto, _context.DuplicarItemProjeto, MostrarTabela, MostrarPropriedadesVista, MostrarPropriedadesTabela);
             _context.Editor.PropertyChanged += OnEditorStatePropertyChanged;
+            _context.Document.PropriedadesTabelaAlteradas += OnPropriedadesTabelaAlteradas;
+            _context.Document.Tabelas.CollectionChanged += OnTabelasCollectionChanged;
             Viewport.Inicializar(_context);
             InicializarRibbon();
             AtualizarVisibilidadeNavegadorProjeto();
@@ -7105,10 +6664,12 @@ namespace Araci
 
         public void MostrarPropriedadesVista(System.Guid vistaId)
         {
-            Core.Documents.ProjectView? vista = _context.Document.Vistas.FirstOrDefault(v => v.Id == vistaId);
+            ProjectView? vista = _context.Document.Vistas.FirstOrDefault(v => v.Id == vistaId);
 
             if (vista == null)
                 return;
+
+            MostrarViewport();
 
             _context.Editor.ElementoSelecionado = new ProjectViewPropertiesViewModel(
                 _context.Document,
@@ -7121,7 +6682,7 @@ namespace Araci
 
         public void MostrarPropriedadesTabela(System.Guid tabelaId)
         {
-            Core.Documents.ProjectTable? tabela = _context.Document.Tabelas.FirstOrDefault(t => t.Id == tabelaId);
+            ProjectTable? tabela = _context.Document.Tabelas.FirstOrDefault(t => t.Id == tabelaId);
 
             if (tabela == null)
                 return;
@@ -7134,6 +6695,23 @@ namespace Araci
                 _context.Dialogs);
 
             MostrarPropriedades();
+        }
+
+        public void MostrarTabela(System.Guid tabelaId)
+        {
+            ProjectTable? tabela = _context.Document.Tabelas.FirstOrDefault(t => t.Id == tabelaId);
+
+            if (tabela == null)
+                return;
+
+            _projectTableDataViewModel = new ProjectTableDataViewModel(
+                _context.Document,
+                tabela,
+                new ProjectTableDataBuilder());
+
+            ProjectTableGrid.DataContext = _projectTableDataViewModel;
+            ProjectTableGrid.Visibility = Visibility.Visible;
+            Viewport.Visibility = Visibility.Collapsed;
         }
 
         public void AlternarNavegadorProjeto()
@@ -7186,6 +6764,21 @@ namespace Araci
             FocarViewport();
         }
 
+        private void OnPropriedadesTabelaAlteradas(ProjectTable tabela)
+        {
+            if (_projectTableDataViewModel?.TableId == tabela.Id)
+                _projectTableDataViewModel.Refresh();
+        }
+
+        private void OnTabelasCollectionChanged(object? sender, NotifyCollectionChangedEventArgs e)
+        {
+            if (_projectTableDataViewModel == null ||
+                _context.Document.Tabelas.Any(t => t.Id == _projectTableDataViewModel.TableId))
+                return;
+
+            MostrarViewport();
+        }
+
         private void OnEditorStatePropertyChanged(object? sender, PropertyChangedEventArgs e)
         {
             if (string.IsNullOrEmpty(e.PropertyName) || e.PropertyName == nameof(EditorState.NavegadorProjetoVisivel))
@@ -7209,411 +6802,13 @@ namespace Araci
         {
             _context.Editor.NavegadorProjetoVisivel = true;
         }
-    }
-}
 
-
-
-====================================================================================================
-ARQUIVO: C:\Users\User\source\repos\lucasffxavier\Araci-front\Service\EditorContext.cs
-====================================================================================================
-
-using System.Collections.Generic;
-using System.ComponentModel;
-using System.Linq;
-using System.Windows;
-using Araci.Applications.Abstractions;
-using Araci.Applications.Editor;
-using Araci.Applications.Factories;
-using Araci.Core.Commands;
-using Araci.Core.Documents;
-using Araci.Core.Events;
-using Araci.Core.SceneQueries;
-using Araci.Core.Transactions;
-using Araci.Applications.Anotar.InserirLinha;
-using Araci.Applications.Anotar.InserirRetangulo;
-using Araci.Applications.Anotar.InserirCirculo;
-using Araci.Applications.Diagrama.InserirCabo;
-using Araci.Applications.Diagrama.InserirElemento;
-using Araci.Applications.Editar.Alinhar;
-using Araci.Applications.Editar.Deletar;
-using Araci.Applications.Editar.Mover;
-using Araci.Applications.Editar.Selecionar;
-using Araci.Applications.Projects;
-using Araci.Applications.Simulation;
-using Araci.Applications.UseCases.Analise;
-using Araci.Applications.UseCases.Editar;
-using Araci.Applications.UseCases.Diagrama;
-using Araci.Applications.UseCases.Projeto;
-using Araci.Models;
-using Araci.Services.Composition;
-using Araci.ViewModels;
-using CoreScene = Araci.Core.Scenes.Scene;
-using Araci.Services.Geometry;
-using Araci.Services.Topology;
-using Araci.Services.Editing;
-using Araci.Services.Viewport;
-using Araci.Services.Simulation;
-using Araci.Services.UI;
-using Araci.Services.Settings;
-using Araci.Services.Catalog;
-using Araci.Services.Naming;
-using Araci.Services.Interaction;
-
-namespace Araci.Services
-{
-    public class EditorContext : IEditorSession
-    {
-        private bool _aplicandoCameraVista;
-
-        public EditorContext()
-            : this(new EventBus())
+        private void MostrarViewport()
         {
-        }
-
-        public EditorContext(IEventBus eventBus)
-        {
-            Events = eventBus;
-            Document.VistaAtivaAlterada += OnDocumentoVistaAtivaAlterada;
-
-            var core = EditorCoreComposition.Create(Document, Settings, Types);
-            Scene = core.Scene;
-            SceneQueries = core.SceneQueries;
-            Hover = core.Hover;
-            Snap = core.Snap;
-            TypePropertiesDialogs = core.TypePropertiesDialogs;
-            Dialogs = core.Dialogs;
-            Elements = core.Elements;
-            Connectivity = core.Connectivity;
-            ElectricGraph = core.ElectricGraph;
-            OperationalState = core.OperationalState;
-            Topology = core.Topology;
-            Geometry = core.Geometry;
-            TerminalLayout = core.TerminalLayout;
-            TypePropertiesDialogs.Configure(Commands, NotifyTextAnnotationTypeLibraryChanged, () => Document.Elementos.OfType<TextoAnotativo>());
-
-            var simulation = SimulationComposition.Create(Document, NotifySimulationResultViewModels, Dialogs);
-            SimulationResults = simulation.Results;
-            Simulation = simulation.Pipeline;
-            SimulationExport = simulation.Export;
-            SimulationMessages = simulation.Messages;
-            ExecutarSimulacao = simulation.ExecutarSimulacao;
-
-            VisualUpdates = EditingComposition.CreateVisualUpdates(() => Viewport, TerminalLayout, Connectivity, SceneQueries, TerminalSnap, RefreshEditingHandles);
-            Names = new NameService(Document, Elements);
-            GeometryUpdates = new ElementGeometryUpdateService(TerminalLayout, Connectivity, VisualUpdates);
-            var elementoModelFactory = new ElementoModelFactory(Elements);
-            var elementoViewModelFactory = new ElementoViewModelFactory(Elements, elementoModelFactory, Names, TypePropertiesDialogs, TerminalLayout, GeometryUpdates);
-            ElementoFactory = new ElementoFactory(elementoModelFactory, elementoViewModelFactory);
-            InserirElemento = new InserirElementoUseCase(ElementoFactory, TerminalLayout, Commands, Document, Names);
-            InserirCabo = new InserirCaboUseCase(ElementoFactory, Commands, Document, Names, cabo => Viewport?.ObterViewModel(cabo) as CaboViewModel);
-            CopiarElementos = new CopiarElementosUseCase();
-            ColarElementos = new ColarElementosUseCase(CopiarElementos, Document, Names, Commands, ObterDestinoColagem);
-            ExcluirElemento = new ExcluirElementoUseCase(Document, Connectivity, Commands);
-            EditarPropriedades = new EditarPropriedadesUseCase(Commands);
-            Selection = EditingComposition.CreateSelection(Editor, Events, EditarPropriedades, Settings);
-            SelecionarElementos = new SelecionarElementosUseCase(Selection);
-            AtualizarPropriedadesSelecionadas = new AtualizarPropriedadesSelecionadasUseCase(Selection);
-            EditarVerticesCabo = new EditarVerticesCaboUseCase(Commands);
-            CableVertexEdit = EditingComposition.CreateCableVertexEdit(Selection, SceneQueries, VisualUpdates, EditarVerticesCabo);
-            Selection.SelectionChanged += CableVertexEdit.Refresh;
-            SafeDelete = EditingComposition.CreateSafeDelete(Selection, CableVertexEdit, ExcluirElemento, Hover, TerminalSnap, SceneQueries);
-            Clipboard = EditingComposition.CreateClipboard(CopiarElementos, ColarElementos, Selection, () => Viewport, SceneQueries, CableVertexEdit);
-            Projects = PersistenceComposition.CreateProjects(Document, Commands, Elements, elementoModelFactory, TerminalLayout, Geometry, Dialogs, Settings, LimparEstadoTransitorioProjeto);
-            NovoProjeto = new NovoProjetoUseCase(Projects);
-            AbrirProjeto = new AbrirProjetoUseCase(Projects);
-            SalvarProjeto = new SalvarProjetoUseCase(Projects);
-            CriarItemProjeto = new CriarItemProjetoUseCase(Document, Commands);
-            RenomearItemProjeto = new RenomearItemProjetoUseCase(Document, Commands);
-            ExcluirItemProjeto = new ExcluirItemProjetoUseCase(Document, Commands);
-            DuplicarItemProjeto = new DuplicarItemProjetoUseCase(Document, Commands);
-            EditarPropriedadesVista = new EditarPropriedadesVistaUseCase(Document, Commands);
-            EditarPropriedadesTabela = new EditarPropriedadesTabelaUseCase(Document, Commands);
-
-            var moveServices = EditingComposition.CreateMoveServices(() => Viewport, () => Scene.Elementos, Settings, Connectivity, TerminalLayout, SceneQueries, VisualUpdates, Selection, GeometryUpdates, Commands);
-            MoveHud = moveServices.MoveHud;
-            AlignmentGuides = moveServices.AlignmentGuides;
-            MoveConstraints = moveServices.MoveConstraints;
-            MoverElemento = moveServices.MoverElemento;
-            RotacionarElemento = moveServices.RotacionarElemento;
-            RedimensionarBarra = moveServices.RedimensionarBarra;
-            Move = moveServices.Move;
-            BarraResize = moveServices.BarraResize;
-            Rotation = moveServices.Rotation;
-            LinhaEndpointEdit = EditingComposition.CreateLinhaEndpointEdit(Selection, SceneQueries, MoverElemento, VisualUpdates);
-            Selection.SelectionChanged += LinhaEndpointEdit.Refresh;
-            RetanguloResize = EditingComposition.CreateRetanguloResize(Selection, SceneQueries, MoverElemento, VisualUpdates);
-            Selection.SelectionChanged += RetanguloResize.Refresh;
-            CirculoResize = EditingComposition.CreateCirculoResize(Selection, SceneQueries, MoverElemento, VisualUpdates);
-            Selection.SelectionChanged += CirculoResize.Refresh;
-
-            Tools = new ToolService(
-                Elements,
-                CriarSelecionarTool,
-                CriarMoverTool,
-                CriarAlinharTool,
-                () => new DeletarTool(SafeDelete),
-                CriarInserirCaboTool,
-                CriarInserirElementoGenericoTool,
-                CriarInserirLinhaAnotativaTool,
-                CriarInserirRetanguloAnotativoTool,
-                CriarInserirCirculoAnotativoTool);
-
-            Input = EditingComposition.CreateInput(Tools, Commands, SafeDelete, Selection, Elements, Hover, Clipboard.CopiarSelecionados, Clipboard.Colar);
-            AlterarUnidadesProjeto = new AlterarUnidadesProjetoUseCase(Settings, RefreshProperties);
-            Navigation = ViewportComposition.CreateNavigation(() => Viewport);
-        }
-
-        public IEventBus Events { get; }
-        public AraciDocument Document { get; } = new AraciDocument();
-        public CoreScene Scene { get; }
-        public ISceneQueryService SceneQueries { get; }
-        public HoverService Hover { get; }
-        public ToolService Tools { get; }
-        public InputRouter Input { get; }
-        public ViewportNavigationService Navigation { get; }
-        public ViewportService? Viewport { get; private set; }
-
-        public ViewportViewModel CriarViewportViewModel()
-        {
-            return ViewportComposition.CreateViewModel(Document, Scene, SelectionBox, TerminalSnap, CableVertexEdit, LinhaEndpointEdit, RetanguloResize, CirculoResize, MoveHud, AlignmentGuides, ElementoFactory, Selection, Hover, SceneQueries);
-        }
-
-        public void InicializarViewport(ViewportViewModel viewportViewModel)
-        {
-            if (Viewport != null)
-                Viewport.Camera.PropertyChanged -= OnCameraChanged;
-
-            Viewport = new ViewportService(viewportViewModel);
-            Viewport.Camera.PropertyChanged += OnCameraChanged;
-            AplicarCameraVistaAtiva();
-        }
-
-        public void DefinirVistaAtiva(Guid vistaId)
-        {
-            SalvarCameraVistaAtiva();
-            Document.DefinirVistaAtiva(vistaId);
-        }
-
-        public void RefreshProperties()
-        {
-            AtualizarPropriedadesSelecionadas.Executar();
-        }
-
-        public EditorState Editor { get; } = new EditorState();
-        public EditorSettings Settings { get; } = new EditorSettings();
-        public MoveHudService MoveHud { get; }
-        public AlignmentGuideService AlignmentGuides { get; }
-        public MoveConstraintService MoveConstraints { get; }
-        public SelectionBoxViewModel SelectionBox { get; } = new SelectionBoxViewModel();
-        public TerminalSnapState TerminalSnap { get; } = new TerminalSnapState();
-        public CableVertexEditService CableVertexEdit { get; }
-        public LinhaEndpointEditService LinhaEndpointEdit { get; }
-        public RetanguloResizeService RetanguloResize { get; }
-        public CirculoResizeService CirculoResize { get; }
-        public CommandManager Commands { get; } = new CommandManager();
-        ICommandHistory IEditorSession.Commands => Commands;
-        public SafeDeleteService SafeDelete { get; }
-        public ClipboardService Clipboard { get; }
-        public ProjectPersistenceService Projects { get; }
-        public NovoProjetoUseCase NovoProjeto { get; }
-        public AbrirProjetoUseCase AbrirProjeto { get; }
-        public SalvarProjetoUseCase SalvarProjeto { get; }
-        public CriarItemProjetoUseCase CriarItemProjeto { get; }
-        public RenomearItemProjetoUseCase RenomearItemProjeto { get; }
-        public ExcluirItemProjetoUseCase ExcluirItemProjeto { get; }
-        public DuplicarItemProjetoUseCase DuplicarItemProjeto { get; }
-        public EditarPropriedadesVistaUseCase EditarPropriedadesVista { get; }
-        public EditarPropriedadesTabelaUseCase EditarPropriedadesTabela { get; }
-        public VisualUpdateService VisualUpdates { get; }
-        public SelectionService Selection { get; }
-        public SelecionarElementosUseCase SelecionarElementos { get; }
-        public AtualizarPropriedadesSelecionadasUseCase AtualizarPropriedadesSelecionadas { get; }
-        public MoveService Move { get; }
-        public BarraResizeService BarraResize { get; }
-        public RotationService Rotation { get; }
-        public SnapService Snap { get; }
-        public NameService Names { get; }
-        public ConnectivityService Connectivity { get; }
-        public ElectricGraphBuilder ElectricGraph { get; }
-        public OperationalGraphStateBuilder OperationalState { get; }
-        public TopologyValidator Topology { get; }
-        public SimulationResultApplier SimulationResults { get; }
-        public SimulationPipeline Simulation { get; }
-        public SimulationExportService SimulationExport { get; }
-        public SimulationMessageBuilder SimulationMessages { get; }
-        public ExecutarSimulacaoUseCase ExecutarSimulacao { get; }
-        public TypePropertiesDialogService TypePropertiesDialogs { get; }
-        public DialogService Dialogs { get; }
-        public ElementGeometryService Geometry { get; }
-        public TerminalLayoutService TerminalLayout { get; }
-        public ElementGeometryUpdateService GeometryUpdates { get; }
-        public ElementRegistryService Elements { get; }
-        public TypeLibraryService Types { get; } = new TypeLibraryService();
-        public ElementoFactory ElementoFactory { get; }
-        public InserirElementoUseCase InserirElemento { get; }
-        public InserirCaboUseCase InserirCabo { get; }
-        public CopiarElementosUseCase CopiarElementos { get; }
-        public ColarElementosUseCase ColarElementos { get; }
-        public ExcluirElementoUseCase ExcluirElemento { get; }
-        public EditarPropriedadesUseCase EditarPropriedades { get; }
-        public MoverElementoUseCase MoverElemento { get; }
-        public RotacionarElementoUseCase RotacionarElemento { get; }
-        public RedimensionarBarraUseCase RedimensionarBarra { get; }
-        public EditarVerticesCaboUseCase EditarVerticesCabo { get; }
-        public AlterarUnidadesProjetoUseCase AlterarUnidadesProjeto { get; }
-
-        public TransactionScope BeginTransaction()
-        {
-            return Commands.BeginTransaction();
-        }
-
-        private void NotifySimulationResultViewModels()
-        {
-            if (Viewport == null)
-                return;
-
-            foreach (ElementoViewModel vm in Viewport.Elementos)
-            {
-                if (vm.Modelo is Cabo or Carga)
-                    vm.NotificarPropriedades("CorrenteLinha", "CorrenteFaseA", "CorrenteFaseB", "CorrenteFaseC");
-            }
-        }
-
-        private void OnDocumentoVistaAtivaAlterada()
-        {
-            AplicarCameraVistaAtiva();
-        }
-
-        private void OnCameraChanged(object? sender, PropertyChangedEventArgs e)
-        {
-            if (_aplicandoCameraVista)
-                return;
-
-            SalvarCameraVistaAtiva();
-        }
-
-        private void SalvarCameraVistaAtiva()
-        {
-            if (Viewport == null || Document.VistaAtiva == null)
-                return;
-
-            Document.VistaAtiva.CameraX = Viewport.Camera.Offset.X;
-            Document.VistaAtiva.CameraY = Viewport.Camera.Offset.Y;
-            Document.VistaAtiva.Zoom = Viewport.Camera.Zoom;
-        }
-
-        private void AplicarCameraVistaAtiva()
-        {
-            if (Viewport == null || Document.VistaAtiva == null)
-                return;
-
-            double cameraX = Document.VistaAtiva.CameraX;
-            double cameraY = Document.VistaAtiva.CameraY;
-            double zoom = Document.VistaAtiva.Zoom;
-
-            _aplicandoCameraVista = true;
-
-            try
-            {
-                Viewport.Camera.Offset = new Point(cameraX, cameraY);
-                Viewport.Camera.Zoom = zoom;
-            }
-            finally
-            {
-                _aplicandoCameraVista = false;
-            }
-        }
-
-        private void NotifyTextAnnotationTypeLibraryChanged()
-        {
-            if (Viewport == null)
-                return;
-
-            foreach (ElementoViewModel vm in Viewport.Elementos)
-            {
-                if (vm is TextoAnotativoViewModel texto)
-                    texto.AtualizarAposTipoAlterado();
-            }
-
-            RefreshProperties();
-            SceneQueries.Invalidate();
-        }
-
-        private SelecionarTool CriarSelecionarTool()
-        {
-            return new SelecionarTool(SceneQueries, Selection, SelectionBox, CableVertexEdit, LinhaEndpointEdit, RetanguloResize, CirculoResize, BarraResize, Move, MoveHud, AlignmentGuides, MoveConstraints, Rotation);
-        }
-
-        private MoverTool CriarMoverTool()
-        {
-            return new MoverTool(SceneQueries, Selection, SelectionBox, CableVertexEdit, LinhaEndpointEdit, RetanguloResize, CirculoResize, BarraResize, Move, MoveHud, AlignmentGuides, MoveConstraints, Rotation);
-        }
-
-        private AlinharTool CriarAlinharTool()
-        {
-            return new AlinharTool(Hover, AlignmentGuides, Commands, SceneQueries);
-        }
-
-        private InserirCaboTool CriarInserirCaboTool()
-        {
-            return new InserirCaboTool(Commands, ElementoFactory, InserirCabo, Snap, Connectivity, AlignmentGuides, Scene, SceneQueries, TerminalSnap, () => Tools.VoltarParaSelecao());
-        }
-
-        private InserirElementoGenericoTool CriarInserirElementoGenericoTool(ElementDefinition definition)
-        {
-            return new InserirElementoGenericoTool(definition, ElementoFactory, InserirElemento, Snap, Geometry, TerminalLayout, AlignmentGuides, Scene, SceneQueries, () => Tools.VoltarParaSelecao());
-        }
-
-        private InserirLinhaAnotativaTool CriarInserirLinhaAnotativaTool()
-        {
-            return new InserirLinhaAnotativaTool(Commands, Document, Names, ElementoFactory, Scene, SceneQueries, LinhaEndpointEdit, () => Tools.VoltarParaSelecao());
-        }
-
-        private InserirRetanguloAnotativoTool CriarInserirRetanguloAnotativoTool()
-        {
-            return new InserirRetanguloAnotativoTool(Commands, Document, Names, ElementoFactory, Scene, SceneQueries, () => Tools.VoltarParaSelecao());
-        }
-
-        private InserirCirculoAnotativoTool CriarInserirCirculoAnotativoTool()
-        {
-            return new InserirCirculoAnotativoTool(Commands, Document, Names, ElementoFactory, Scene, SceneQueries, () => Tools.VoltarParaSelecao());
-        }
-
-        private Point ObterDestinoColagem(IReadOnlyList<Elemento> copiados)
-        {
-            if (Input.PossuiUltimaPosicaoMouseMundo)
-                return Input.UltimaPosicaoMouseMundo;
-
-            if (Viewport != null)
-                return Viewport.ScreenToWorld(Viewport.CentroTela);
-
-            Point centro = ColarElementosUseCase.CalcularCentro(copiados);
-            return new Point(centro.X + ColarElementosUseCase.OffsetPadrao, centro.Y + ColarElementosUseCase.OffsetPadrao);
-        }
-
-        private void RefreshEditingHandles()
-        {
-            CableVertexEdit?.Refresh();
-            LinhaEndpointEdit?.Refresh();
-            RetanguloResize?.Refresh();
-            CirculoResize?.Refresh();
-        }
-
-        private void LimparEstadoTransitorioProjeto()
-        {
-            Selection.Limpar();
-            Hover.Clear();
-            CableVertexEdit.Clear();
-            LinhaEndpointEdit.Clear();
-            RetanguloResize.Clear();
-            CirculoResize.Clear();
-            TerminalSnap.Limpar();
-            SelectionBox.Visivel = false;
-            MoveHud.Visivel = false;
-            MoveHud.Reset();
-            SceneQueries.Invalidate();
-            Tools.VoltarParaSelecao();
+            ProjectTableGrid.Visibility = Visibility.Collapsed;
+            ProjectTableGrid.DataContext = null;
+            _projectTableDataViewModel = null;
+            Viewport.Visibility = Visibility.Visible;
         }
     }
 }
@@ -7645,6 +6840,7 @@ namespace Araci.ViewModels
         private readonly RenomearItemProjetoUseCase? _renomearItemProjeto;
         private readonly ExcluirItemProjetoUseCase? _excluirItemProjeto;
         private readonly DuplicarItemProjetoUseCase? _duplicarItemProjeto;
+        private readonly Action<Guid>? _abrirTabela;
         private readonly Action<Guid>? _abrirPropriedadesVista;
         private readonly Action<Guid>? _abrirPropriedadesTabela;
         private Guid? _selectedItemId;
@@ -7656,6 +6852,7 @@ namespace Araci.ViewModels
             RenomearItemProjetoUseCase? renomearItemProjeto = null,
             ExcluirItemProjetoUseCase? excluirItemProjeto = null,
             DuplicarItemProjetoUseCase? duplicarItemProjeto = null,
+            Action<Guid>? abrirTabela = null,
             Action<Guid>? abrirPropriedadesVista = null,
             Action<Guid>? abrirPropriedadesTabela = null)
         {
@@ -7664,6 +6861,7 @@ namespace Araci.ViewModels
             _renomearItemProjeto = renomearItemProjeto;
             _excluirItemProjeto = excluirItemProjeto;
             _duplicarItemProjeto = duplicarItemProjeto;
+            _abrirTabela = abrirTabela;
             _abrirPropriedadesVista = abrirPropriedadesVista;
             _abrirPropriedadesTabela = abrirPropriedadesTabela;
             Secoes = new ObservableCollection<ProjectBrowserSectionViewModel>
@@ -7772,6 +6970,7 @@ namespace Araci.ViewModels
             }
             else if (item.Tipo == "Tabela")
             {
+                _abrirTabela?.Invoke(item.Id);
                 _abrirPropriedadesTabela?.Invoke(item.Id);
             }
 
@@ -8086,6 +7285,140 @@ namespace Araci.ViewModels
 
 
 ====================================================================================================
+ARQUIVO: C:\Users\User\source\repos\lucasffxavier\Araci-front\ViewModels\ProjectTableDataViewModel.cs
+====================================================================================================
+
+using System;
+using System.Collections.Generic;
+using System.Collections.ObjectModel;
+using System.ComponentModel;
+using System.Linq;
+using System.Runtime.CompilerServices;
+using Araci.Applications.Projects.Tables;
+using Araci.Core.Documents;
+
+namespace Araci.ViewModels
+{
+    public sealed class ProjectTableDataViewModel : INotifyPropertyChanged
+    {
+        private readonly AraciDocument _document;
+        private readonly ProjectTable _table;
+        private readonly ProjectTableDataBuilder _builder;
+        private string _titulo = string.Empty;
+        private IReadOnlyList<ProjectTableDataColumn> _columns = new List<ProjectTableDataColumn>();
+        private string _emptyMessage = string.Empty;
+
+        public ProjectTableDataViewModel(
+            AraciDocument document,
+            ProjectTable table,
+            ProjectTableDataBuilder? builder = null)
+        {
+            _document = document;
+            _table = table;
+            _builder = builder ?? new ProjectTableDataBuilder();
+            Rows = new ObservableCollection<ProjectTableDataRowViewModel>();
+            Refresh();
+        }
+
+        public Guid TableId => _table.Id;
+        public ObservableCollection<ProjectTableDataRowViewModel> Rows { get; }
+
+        public string Titulo
+        {
+            get => _titulo;
+            private set
+            {
+                if (_titulo == value)
+                    return;
+
+                _titulo = value;
+                OnPropertyChanged();
+            }
+        }
+
+        public IReadOnlyList<ProjectTableDataColumn> Columns
+        {
+            get => _columns;
+            private set
+            {
+                _columns = value;
+                OnPropertyChanged();
+                OnPropertyChanged(nameof(HasColumns));
+            }
+        }
+
+        public bool HasColumns => Columns.Count > 0;
+        public bool HasRows => Rows.Count > 0;
+        public bool HasEmptyMessage => !string.IsNullOrWhiteSpace(EmptyMessage);
+
+        public string EmptyMessage
+        {
+            get => _emptyMessage;
+            private set
+            {
+                if (_emptyMessage == value)
+                    return;
+
+                _emptyMessage = value;
+                OnPropertyChanged();
+                OnPropertyChanged(nameof(HasEmptyMessage));
+            }
+        }
+
+        public void Refresh()
+        {
+            Titulo = _table.Nome;
+            ProjectTableDataResult result = _builder.Build(_document, _table);
+            Columns = result.Columns.ToList();
+
+            Rows.Clear();
+
+            foreach (ProjectTableDataRow row in result.Rows)
+                Rows.Add(new ProjectTableDataRowViewModel(row));
+
+            EmptyMessage = !HasColumns
+                ? "Nenhum campo selecionado"
+                : !HasRows
+                    ? "Nenhum item encontrado"
+                    : string.Empty;
+
+            OnPropertyChanged(nameof(HasRows));
+        }
+
+        public event PropertyChangedEventHandler? PropertyChanged;
+
+        private void OnPropertyChanged([CallerMemberName] string? propertyName = null)
+        {
+            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
+        }
+    }
+
+    public sealed class ProjectTableDataRowViewModel
+    {
+        private readonly IReadOnlyList<ProjectTableDataCell> _cells;
+
+        public ProjectTableDataRowViewModel(ProjectTableDataRow row)
+        {
+            ElementoId = row.ElementoId;
+            ElementoNome = row.ElementoNome;
+            Categoria = row.Categoria;
+            _cells = row.Cells;
+        }
+
+        public Guid ElementoId { get; }
+        public string ElementoNome { get; }
+        public ProjectTableElementCategory Categoria { get; }
+
+        public string this[int index] =>
+            index >= 0 && index < _cells.Count
+                ? _cells[index].DisplayValue
+                : string.Empty;
+    }
+}
+
+
+
+====================================================================================================
 ARQUIVO: C:\Users\User\source\repos\lucasffxavier\Araci-front\ViewModels\ProjectTablePropertiesViewModel.cs
 ====================================================================================================
 
@@ -8245,6 +7578,131 @@ namespace Araci.ViewModels
         private void OnPropertyChanged([CallerMemberName] string? propertyName = null)
         {
             PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
+        }
+    }
+}
+
+
+
+====================================================================================================
+ARQUIVO: C:\Users\User\source\repos\lucasffxavier\Araci-front\Views\ProjectTableGridView.xaml
+====================================================================================================
+
+<UserControl x:Class="Araci.Views.ProjectTableGridView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+    <UserControl.Resources>
+        <BooleanToVisibilityConverter x:Key="BooleanToVisibilityConverter"/>
+    </UserControl.Resources>
+    <Border Margin="10"
+            BorderBrush="#252526"
+            BorderThickness="1"
+            Background="#F4F4F4">
+        <Grid>
+            <Grid.RowDefinitions>
+                <RowDefinition Height="42"/>
+                <RowDefinition Height="*"/>
+            </Grid.RowDefinitions>
+
+            <Border Grid.Row="0"
+                    Background="#252526"
+                    BorderBrush="#3A3A3A"
+                    BorderThickness="0,0,0,1">
+                <TextBlock Text="{Binding Titulo}"
+                           Foreground="#F4F4F4"
+                           FontWeight="SemiBold"
+                           VerticalAlignment="Center"
+                           Margin="12,0"/>
+            </Border>
+
+            <Grid Grid.Row="1">
+                <DataGrid x:Name="TableDataGrid"
+                          ItemsSource="{Binding Rows}"
+                          AutoGenerateColumns="False"
+                          IsReadOnly="True"
+                          CanUserAddRows="False"
+                          CanUserDeleteRows="False"
+                          CanUserReorderColumns="False"
+                          HeadersVisibility="Column"
+                          GridLinesVisibility="All"
+                          Background="#FFFFFF"
+                          BorderThickness="0"
+                          RowHeaderWidth="0"
+                          SelectionMode="Single"
+                          SelectionUnit="FullRow"/>
+
+                <Border Background="#CCF4F4F4"
+                        Visibility="{Binding HasEmptyMessage, Converter={StaticResource BooleanToVisibilityConverter}}">
+                    <TextBlock Text="{Binding EmptyMessage}"
+                               Foreground="#404040"
+                               FontSize="14"
+                               FontWeight="SemiBold"
+                               HorizontalAlignment="Center"
+                               VerticalAlignment="Center"/>
+                </Border>
+            </Grid>
+        </Grid>
+    </Border>
+</UserControl>
+
+
+
+====================================================================================================
+ARQUIVO: C:\Users\User\source\repos\lucasffxavier\Araci-front\Views\ProjectTableGridView.xaml.cs
+====================================================================================================
+
+using System.ComponentModel;
+using System.Windows.Controls;
+using System.Windows.Data;
+using Araci.ViewModels;
+
+namespace Araci.Views
+{
+    public partial class ProjectTableGridView : UserControl
+    {
+        private ProjectTableDataViewModel? _viewModel;
+
+        public ProjectTableGridView()
+        {
+            InitializeComponent();
+            DataContextChanged += OnDataContextChanged;
+        }
+
+        private void OnDataContextChanged(object sender, System.Windows.DependencyPropertyChangedEventArgs e)
+        {
+            if (_viewModel != null)
+                _viewModel.PropertyChanged -= OnViewModelPropertyChanged;
+
+            _viewModel = e.NewValue as ProjectTableDataViewModel;
+
+            if (_viewModel != null)
+                _viewModel.PropertyChanged += OnViewModelPropertyChanged;
+
+            AtualizarColunas();
+        }
+
+        private void OnViewModelPropertyChanged(object? sender, PropertyChangedEventArgs e)
+        {
+            if (string.IsNullOrEmpty(e.PropertyName) || e.PropertyName == nameof(ProjectTableDataViewModel.Columns))
+                AtualizarColunas();
+        }
+
+        private void AtualizarColunas()
+        {
+            TableDataGrid.Columns.Clear();
+
+            if (_viewModel == null)
+                return;
+
+            for (int i = 0; i < _viewModel.Columns.Count; i++)
+            {
+                TableDataGrid.Columns.Add(new DataGridTextColumn
+                {
+                    Header = _viewModel.Columns[i].NomeExibicao,
+                    Binding = new Binding($"[{i}]"),
+                    IsReadOnly = true
+                });
+            }
         }
     }
 }
