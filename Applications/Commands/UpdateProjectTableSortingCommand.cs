@@ -1,4 +1,6 @@
 using System;
+using System.Collections.Generic;
+using System.Linq;
 using Araci.Core.Documents;
 
 namespace Araci.Core.Commands
@@ -7,29 +9,29 @@ namespace Araci.Core.Commands
     {
         private readonly AraciDocument _document;
         private readonly ProjectTable _tabela;
-        private readonly ProjectTableSorting? _ordenacaoAnterior;
-        private readonly ProjectTableSorting? _ordenacaoNova;
+        private readonly IReadOnlyList<ProjectTableSorting> _ordenacoesAnteriores;
+        private readonly IReadOnlyList<ProjectTableSorting> _ordenacoesNovas;
 
         public UpdateProjectTableSortingCommand(
             AraciDocument document,
             ProjectTable tabela,
-            ProjectTableSorting? ordenacaoAnterior,
-            ProjectTableSorting? ordenacaoNova)
+            IReadOnlyList<ProjectTableSorting> ordenacoesAnteriores,
+            IReadOnlyList<ProjectTableSorting> ordenacoesNovas)
         {
             _document = document ?? throw new ArgumentNullException(nameof(document));
             _tabela = tabela ?? throw new ArgumentNullException(nameof(tabela));
-            _ordenacaoAnterior = CopiarOrdenacao(ordenacaoAnterior);
-            _ordenacaoNova = CopiarOrdenacao(ordenacaoNova);
+            _ordenacoesAnteriores = CopiarOrdenacoes(ordenacoesAnteriores);
+            _ordenacoesNovas = CopiarOrdenacoes(ordenacoesNovas);
         }
 
         public void Execute()
         {
-            Aplicar(_ordenacaoNova);
+            Aplicar(_ordenacoesNovas);
         }
 
         public void Undo()
         {
-            Aplicar(_ordenacaoAnterior);
+            Aplicar(_ordenacoesAnteriores);
         }
 
         public void Redo()
@@ -37,23 +39,24 @@ namespace Araci.Core.Commands
             Execute();
         }
 
-        private void Aplicar(ProjectTableSorting? ordenacao)
+        private void Aplicar(IReadOnlyList<ProjectTableSorting> ordenacoes)
         {
-            _tabela.Ordenacao = CopiarOrdenacao(ordenacao);
+            _tabela.Ordenacoes = CopiarOrdenacoes(ordenacoes).ToList();
             _document.AtualizarPropriedadesTabela(_tabela);
         }
 
-        private static ProjectTableSorting? CopiarOrdenacao(ProjectTableSorting? ordenacao)
+        private static IReadOnlyList<ProjectTableSorting> CopiarOrdenacoes(IReadOnlyList<ProjectTableSorting> ordenacoes)
         {
-            return ordenacao == null
-                ? null
-                : new ProjectTableSorting
+            return (ordenacoes ?? Array.Empty<ProjectTableSorting>())
+                .Select(ordenacao => new ProjectTableSorting
                 {
+                    Ordem = ordenacao.Ordem,
                     Categoria = ordenacao.Categoria,
                     CampoId = ordenacao.CampoId,
                     NomeExibicao = ordenacao.NomeExibicao,
                     Direcao = ordenacao.Direcao
-                };
+                })
+                .ToList();
         }
     }
 }

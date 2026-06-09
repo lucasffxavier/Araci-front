@@ -77,13 +77,13 @@ namespace Araci.Applications.UseCases.Projeto
             List<ProjectTableFieldSelection> camposAnteriores = NormalizarCampos(tabela.CamposSelecionados, categoriasAnteriores);
             List<ProjectTableFilterRule> filtrosNovos = NormalizarFiltros(tabela.Filtros, camposNovos);
             List<ProjectTableFilterRule> filtrosAnteriores = NormalizarFiltros(tabela.Filtros, camposAnteriores);
-            ProjectTableSorting? ordenacaoNova = NormalizarOrdenacao(tabela.Ordenacao, camposNovos);
-            ProjectTableSorting? ordenacaoAnterior = NormalizarOrdenacao(tabela.Ordenacao, camposAnteriores);
+            List<ProjectTableSorting> ordenacoesNovas = NormalizarOrdenacoes(tabela.Ordenacoes, camposNovos);
+            List<ProjectTableSorting> ordenacoesAnteriores = NormalizarOrdenacoes(tabela.Ordenacoes, camposAnteriores);
 
             if (categoriasAnteriores.SequenceEqual(categoriasNovas) &&
                 CamposIguais(camposAnteriores, camposNovos) &&
                 FiltrosIguais(filtrosAnteriores, filtrosNovos) &&
-                OrdenacoesIguais(ordenacaoAnterior, ordenacaoNova))
+                OrdenacoesIguais(ordenacoesAnteriores, ordenacoesNovas))
                 return true;
 
             _commands.Execute(new UpdateProjectTableElementsCommand(
@@ -95,30 +95,30 @@ namespace Araci.Applications.UseCases.Projeto
                 camposNovos,
                 filtrosAnteriores,
                 filtrosNovos,
-                ordenacaoAnterior,
-                ordenacaoNova));
+                ordenacoesAnteriores,
+                ordenacoesNovas));
 
             return true;
         }
 
-        public bool AlterarOrdenacaoTabela(Guid id, ProjectTableSorting? ordenacao)
+        public bool AlterarOrdenacaoTabela(Guid id, IReadOnlyList<ProjectTableSorting> ordenacoes)
         {
             ProjectTable? tabela = _document.Tabelas.FirstOrDefault(t => t.Id == id);
 
             if (tabela == null)
                 return false;
 
-            ProjectTableSorting? ordenacaoNova = NormalizarOrdenacao(ordenacao, tabela.CamposSelecionados);
-            ProjectTableSorting? ordenacaoAnterior = NormalizarOrdenacao(tabela.Ordenacao, tabela.CamposSelecionados);
+            List<ProjectTableSorting> ordenacoesNovas = NormalizarOrdenacoes(ordenacoes, tabela.CamposSelecionados);
+            List<ProjectTableSorting> ordenacoesAnteriores = NormalizarOrdenacoes(tabela.Ordenacoes, tabela.CamposSelecionados);
 
-            if (OrdenacoesIguais(ordenacaoAnterior, ordenacaoNova))
+            if (OrdenacoesIguais(ordenacoesAnteriores, ordenacoesNovas))
                 return true;
 
             _commands.Execute(new UpdateProjectTableSortingCommand(
                 _document,
                 tabela,
-                ordenacaoAnterior,
-                ordenacaoNova));
+                ordenacoesAnteriores,
+                ordenacoesNovas));
 
             return true;
         }
@@ -277,43 +277,61 @@ namespace Araci.Applications.UseCases.Projeto
             return true;
         }
 
-        private static ProjectTableSorting? NormalizarOrdenacao(
-            ProjectTableSorting? ordenacao,
+        private static List<ProjectTableSorting> NormalizarOrdenacoes(
+            IEnumerable<ProjectTableSorting>? ordenacoes,
             IReadOnlyList<ProjectTableFieldSelection> camposSelecionados)
         {
-            if (ordenacao == null || string.IsNullOrWhiteSpace(ordenacao.CampoId))
-                return null;
+            Dictionary<string, ProjectTableFieldSelection> camposPermitidos = camposSelecionados
+                .GroupBy(c => CriarChaveCampo(c.Categoria, c.CampoId))
+                .ToDictionary(g => g.Key, g => g.First(), StringComparer.Ordinal);
 
-            string chave = CriarChaveCampo(ordenacao.Categoria, ordenacao.CampoId);
-            ProjectTableFieldSelection? campo = camposSelecionados.FirstOrDefault(c =>
-                string.Equals(CriarChaveCampo(c.Categoria, c.CampoId), chave, StringComparison.Ordinal));
+            var chavesUsadas = new HashSet<string>(StringComparer.Ordinal);
+            var resultado = new List<ProjectTableSorting>();
 
-            if (campo == null)
-                return null;
-
-            return new ProjectTableSorting
+            foreach (ProjectTableSorting ordenacao in (ordenacoes ?? Enumerable.Empty<ProjectTableSorting>())
+                .Where(o => !string.IsNullOrWhiteSpace(o.CampoId))
+                .OrderBy(o => o.Ordem))
             {
-                Categoria = campo.Categoria,
-                CampoId = campo.CampoId,
-                NomeExibicao = campo.NomeExibicao,
-                Direcao = Enum.IsDefined(typeof(ProjectTableSortDirection), ordenacao.Direcao)
-                    ? ordenacao.Direcao
-                    : ProjectTableSortDirection.Crescente
-            };
+                string chave = CriarChaveCampo(ordenacao.Categoria, ordenacao.CampoId);
+
+                if (!camposPermitidos.TryGetValue(chave, out ProjectTableFieldSelection? campo) ||
+                    !chavesUsadas.Add(chave))
+                    continue;
+
+                resultado.Add(new ProjectTableSorting
+                {
+                    Ordem = resultado.Count,
+                    Categoria = campo.Categoria,
+                    CampoId = campo.CampoId,
+                    NomeExibicao = campo.NomeExibicao,
+                    Direcao = Enum.IsDefined(typeof(ProjectTableSortDirection), ordenacao.Direcao)
+                        ? ordenacao.Direcao
+                        : ProjectTableSortDirection.Crescente
+                });
+
+                if (resultado.Count == 5)
+                    break;
+            }
+
+            return resultado;
         }
 
-        private static bool OrdenacoesIguais(ProjectTableSorting? a, ProjectTableSorting? b)
+        private static bool OrdenacoesIguais(IReadOnlyList<ProjectTableSorting> a, IReadOnlyList<ProjectTableSorting> b)
         {
-            if (a == null && b == null)
-                return true;
-
-            if (a == null || b == null)
+            if (a.Count != b.Count)
                 return false;
 
-            return a.Categoria == b.Categoria &&
-                string.Equals(a.CampoId, b.CampoId, StringComparison.Ordinal) &&
-                string.Equals(a.NomeExibicao, b.NomeExibicao, StringComparison.Ordinal) &&
-                a.Direcao == b.Direcao;
+            for (int i = 0; i < a.Count; i++)
+            {
+                if (a[i].Ordem != b[i].Ordem ||
+                    a[i].Categoria != b[i].Categoria ||
+                    !string.Equals(a[i].CampoId, b[i].CampoId, StringComparison.Ordinal) ||
+                    !string.Equals(a[i].NomeExibicao, b[i].NomeExibicao, StringComparison.Ordinal) ||
+                    a[i].Direcao != b[i].Direcao)
+                    return false;
+            }
+
+            return true;
         }
 
         private static string CriarChaveCampo(ProjectTableElementCategory categoria, string campoId)

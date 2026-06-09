@@ -15,8 +15,8 @@ namespace Araci.Core.Commands
         private readonly IReadOnlyList<ProjectTableFieldSelection> _camposNovos;
         private readonly IReadOnlyList<ProjectTableFilterRule> _filtrosAnteriores;
         private readonly IReadOnlyList<ProjectTableFilterRule> _filtrosNovos;
-        private readonly ProjectTableSorting? _ordenacaoAnterior;
-        private readonly ProjectTableSorting? _ordenacaoNova;
+        private readonly IReadOnlyList<ProjectTableSorting> _ordenacoesAnteriores;
+        private readonly IReadOnlyList<ProjectTableSorting> _ordenacoesNovas;
 
         public UpdateProjectTableElementsCommand(
             AraciDocument document,
@@ -27,8 +27,8 @@ namespace Araci.Core.Commands
             IReadOnlyList<ProjectTableFieldSelection> camposNovos,
             IReadOnlyList<ProjectTableFilterRule> filtrosAnteriores,
             IReadOnlyList<ProjectTableFilterRule> filtrosNovos,
-            ProjectTableSorting? ordenacaoAnterior,
-            ProjectTableSorting? ordenacaoNova)
+            IReadOnlyList<ProjectTableSorting> ordenacoesAnteriores,
+            IReadOnlyList<ProjectTableSorting> ordenacoesNovas)
         {
             _document = document ?? throw new ArgumentNullException(nameof(document));
             _tabela = tabela ?? throw new ArgumentNullException(nameof(tabela));
@@ -38,18 +38,18 @@ namespace Araci.Core.Commands
             _camposNovos = CopiarCampos(camposNovos);
             _filtrosAnteriores = CopiarFiltros(filtrosAnteriores);
             _filtrosNovos = CopiarFiltros(filtrosNovos);
-            _ordenacaoAnterior = CopiarOrdenacao(ordenacaoAnterior);
-            _ordenacaoNova = CopiarOrdenacao(ordenacaoNova);
+            _ordenacoesAnteriores = CopiarOrdenacoes(ordenacoesAnteriores);
+            _ordenacoesNovas = CopiarOrdenacoes(ordenacoesNovas);
         }
 
         public void Execute()
         {
-            Aplicar(_categoriasNovas, _camposNovos, _filtrosNovos, _ordenacaoNova);
+            Aplicar(_categoriasNovas, _camposNovos, _filtrosNovos, _ordenacoesNovas);
         }
 
         public void Undo()
         {
-            Aplicar(_categoriasAnteriores, _camposAnteriores, _filtrosAnteriores, _ordenacaoAnterior);
+            Aplicar(_categoriasAnteriores, _camposAnteriores, _filtrosAnteriores, _ordenacoesAnteriores);
         }
 
         public void Redo()
@@ -61,12 +61,12 @@ namespace Araci.Core.Commands
             IReadOnlyList<ProjectTableElementCategory> categorias,
             IReadOnlyList<ProjectTableFieldSelection> campos,
             IReadOnlyList<ProjectTableFilterRule> filtros,
-            ProjectTableSorting? ordenacao)
+            IReadOnlyList<ProjectTableSorting> ordenacoes)
         {
             _tabela.CategoriasElementos = categorias.ToList();
             _tabela.CamposSelecionados = CopiarCampos(campos).ToList();
             _tabela.Filtros = CopiarFiltros(filtros).ToList();
-            _tabela.Ordenacao = CopiarOrdenacao(ordenacao);
+            _tabela.Ordenacoes = CopiarOrdenacoes(ordenacoes).ToList();
             _document.AtualizarPropriedadesTabela(_tabela);
         }
 
@@ -98,17 +98,18 @@ namespace Araci.Core.Commands
                 .ToList();
         }
 
-        private static ProjectTableSorting? CopiarOrdenacao(ProjectTableSorting? ordenacao)
+        private static IReadOnlyList<ProjectTableSorting> CopiarOrdenacoes(IReadOnlyList<ProjectTableSorting> ordenacoes)
         {
-            return ordenacao == null
-                ? null
-                : new ProjectTableSorting
+            return (ordenacoes ?? Array.Empty<ProjectTableSorting>())
+                .Select(o => new ProjectTableSorting
                 {
-                    Categoria = ordenacao.Categoria,
-                    CampoId = ordenacao.CampoId,
-                    NomeExibicao = ordenacao.NomeExibicao,
-                    Direcao = ordenacao.Direcao
-                };
+                    Ordem = o.Ordem,
+                    Categoria = o.Categoria,
+                    CampoId = o.CampoId,
+                    NomeExibicao = o.NomeExibicao,
+                    Direcao = o.Direcao
+                })
+                .ToList();
         }
     }
 }

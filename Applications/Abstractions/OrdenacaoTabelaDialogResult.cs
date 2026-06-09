@@ -1,14 +1,16 @@
 using Araci.Core.Documents;
+using System.Collections.Generic;
+using System.Linq;
 
 namespace Araci.Applications.Abstractions
 {
     public sealed class OrdenacaoTabelaDialogResult
     {
-        public OrdenacaoTabelaDialogResult(ProjectTableSorting? ordenacao)
+        public OrdenacaoTabelaDialogResult(IReadOnlyList<ProjectTableSorting> ordenacoes)
         {
-            Ordenacao = ordenacao;
+            Ordenacoes = ordenacoes.ToList();
         }
 
-        public ProjectTableSorting? Ordenacao { get; }
+        public IReadOnlyList<ProjectTableSorting> Ordenacoes { get; }
     }
 }

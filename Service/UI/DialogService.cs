@@ -57,15 +57,15 @@ namespace Araci.Services.UI
 
         public OrdenacaoTabelaDialogResult? ShowOrdenacaoTabelaDialog(
             IReadOnlyList<ProjectTableFieldSelection> camposSelecionados,
-            ProjectTableSorting? ordenacao)
+            IReadOnlyList<ProjectTableSorting> ordenacoes)
         {
-            var window = new OrdenacaoTabelaWindow(camposSelecionados, ordenacao)
+            var window = new OrdenacaoTabelaWindow(camposSelecionados, ordenacoes)
             {
                 Owner = Application.Current?.MainWindow
             };
 
             return window.ShowDialog() == true
-                ? new OrdenacaoTabelaDialogResult(window.Ordenacao)
+                ? new OrdenacaoTabelaDialogResult(window.Ordenacoes)
                 : null;
         }
 

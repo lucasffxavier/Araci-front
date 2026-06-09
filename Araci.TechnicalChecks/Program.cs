@@ -66,9 +66,12 @@ namespace Araci.TechnicalChecks
                 ("Persistencia preserva ramificacao", PersistenciaPreservaRamificacao),
                 ("Tabela remove filtros de campos removidos com undo redo", TabelaRemoveFiltrosCamposRemovidosComUndoRedo),
                 ("Excluir vista limpa filtro de vista da tabela com undo redo", ExcluirVistaLimpaFiltroTabelaComUndoRedo),
-                ("Tabela altera ordenacao com undo redo", TabelaAlteraOrdenacaoComUndoRedo),
-                ("Tabela limpa ordenacao ao remover campo ordenado", TabelaLimpaOrdenacaoAoRemoverCampoOrdenado),
-                ("Tabela duplica e persiste ordenacao", TabelaDuplicaEPersisteOrdenacao),
+                ("Tabela altera multiplas ordenacoes com undo redo", TabelaAlteraMultiplasOrdenacoesComUndoRedo),
+                ("Tabela limita ordenacao a cinco regras", TabelaLimitaOrdenacaoACincoRegras),
+                ("Tabela remove ordenacoes duplicadas", TabelaRemoveOrdenacoesDuplicadas),
+                ("Tabela limpa apenas ordenacao de campo removido", TabelaLimpaApenasOrdenacaoDeCampoRemovido),
+                ("Tabela duplica e persiste multiplas ordenacoes", TabelaDuplicaEPersisteMultiplasOrdenacoes),
+                ("Tabela converte ordenacao unica legada", TabelaConverteOrdenacaoUnicaLegada),
                 ("DTO permanece equivalente apos reload", DtoPermaneceEquivalenteAposReload),
                 ("IDs permanecem estaveis apos reload", IdsPermanecemEstaveisAposReload),
                 ("Builds repetidos apos reload nao alteram Document", BuildsRepetidosAposReloadNaoAlteramDocument),
@@ -5072,87 +5075,104 @@ namespace Araci.TechnicalChecks
             AssertEqual(null, tabelaAfetada.FiltroVistaId, "Redo deveria limpar filtro da Vista B novamente.");
         }
 
-        private static void TabelaAlteraOrdenacaoComUndoRedo()
+        private static void TabelaAlteraMultiplasOrdenacoesComUndoRedo()
         {
             var document = new AraciDocument();
             var commands = new Araci.Core.Commands.CommandManager();
             var useCase = new EditarPropriedadesTabelaUseCase(document, commands);
             ProjectTable tabela = CriarTabelaComCampos(document);
-            ProjectTableFieldSelection campoNome = tabela.CamposSelecionados[0];
 
             bool alterado = useCase.AlterarOrdenacaoTabela(
                 tabela.Id,
-                new ProjectTableSorting
-                {
-                    Categoria = campoNome.Categoria,
-                    CampoId = campoNome.CampoId,
-                    NomeExibicao = campoNome.NomeExibicao,
-                    Direcao = ProjectTableSortDirection.Decrescente
-                });
+                CriarOrdenacoes(tabela, "Tensao", "Nome"));
 
             Assert(alterado, "AlterarOrdenacaoTabela deveria retornar true.");
-            Assert(tabela.Ordenacao != null, "Ordenacao deveria existir.");
-            AssertEqual("Nome", tabela.Ordenacao!.CampoId, "Ordenacao.CampoId");
-            AssertEqual(ProjectTableSortDirection.Decrescente, tabela.Ordenacao.Direcao, "Ordenacao.Direcao");
+            AssertEqual(2, tabela.Ordenacoes.Count, "Ordenacoes.Count");
+            AssertEqual("Tensao", tabela.Ordenacoes[0].CampoId, "Ordenacoes[0].CampoId");
+            AssertEqual("Nome", tabela.Ordenacoes[1].CampoId, "Ordenacoes[1].CampoId");
+            AssertEqual(0, tabela.Ordenacoes[0].Ordem, "Ordenacoes[0].Ordem");
+            AssertEqual(1, tabela.Ordenacoes[1].Ordem, "Ordenacoes[1].Ordem");
 
             commands.Undo();
-            Assert(tabela.Ordenacao == null, "Undo deveria limpar ordenacao inicial.");
+            AssertEqual(0, tabela.Ordenacoes.Count, "Undo deveria limpar ordenacao inicial.");
 
             commands.Redo();
-            Assert(tabela.Ordenacao != null, "Redo deveria restaurar ordenacao.");
-            AssertEqual(ProjectTableSortDirection.Decrescente, tabela.Ordenacao!.Direcao, "Redo.Ordenacao.Direcao");
+            AssertEqual(2, tabela.Ordenacoes.Count, "Redo deveria restaurar ordenacoes.");
+            AssertEqual("Nome", tabela.Ordenacoes[1].CampoId, "Redo.Ordenacoes[1].CampoId");
         }
 
-        private static void TabelaLimpaOrdenacaoAoRemoverCampoOrdenado()
+        private static void TabelaLimitaOrdenacaoACincoRegras()
         {
             var document = new AraciDocument();
             var commands = new Araci.Core.Commands.CommandManager();
             var useCase = new EditarPropriedadesTabelaUseCase(document, commands);
             ProjectTable tabela = CriarTabelaComCampos(document);
-            ProjectTableFieldSelection campoNome = tabela.CamposSelecionados[0];
-            ProjectTableFieldSelection campoTensao = tabela.CamposSelecionados[1];
 
-            tabela.Ordenacao = new ProjectTableSorting
-            {
-                Categoria = campoTensao.Categoria,
-                CampoId = campoTensao.CampoId,
-                NomeExibicao = campoTensao.NomeExibicao,
-                Direcao = ProjectTableSortDirection.Crescente
-            };
+            useCase.AlterarOrdenacaoTabela(
+                tabela.Id,
+                CriarOrdenacoes(tabela, "Nome", "Tensao", "Corrente", "PotenciaAtiva", "Tipo", "Comprimento"));
+
+            AssertEqual(5, tabela.Ordenacoes.Count, "Ordenacoes deveria ser limitada a cinco regras.");
+            AssertEqual("Tipo", tabela.Ordenacoes[4].CampoId, "Quinta regra preservada.");
+            Assert(tabela.Ordenacoes.Select((o, index) => o.Ordem == index).All(ok => ok), "Ordenacoes deveriam ser reindexadas.");
+        }
+
+        private static void TabelaRemoveOrdenacoesDuplicadas()
+        {
+            var document = new AraciDocument();
+            var commands = new Araci.Core.Commands.CommandManager();
+            var useCase = new EditarPropriedadesTabelaUseCase(document, commands);
+            ProjectTable tabela = CriarTabelaComCampos(document);
+
+            useCase.AlterarOrdenacaoTabela(
+                tabela.Id,
+                CriarOrdenacoes(tabela, "Nome", "Tensao", "Nome", "Corrente"));
+
+            AssertEqual(3, tabela.Ordenacoes.Count, "Duplicidade deveria ser removida.");
+            AssertEqual("Nome", tabela.Ordenacoes[0].CampoId, "Primeira ocorrencia duplicada deveria ser preservada.");
+            AssertEqual("Tensao", tabela.Ordenacoes[1].CampoId, "Ordem apos remover duplicidade.");
+            AssertEqual("Corrente", tabela.Ordenacoes[2].CampoId, "Regra valida posterior deveria ser preservada.");
+        }
+
+        private static void TabelaLimpaApenasOrdenacaoDeCampoRemovido()
+        {
+            var document = new AraciDocument();
+            var commands = new Araci.Core.Commands.CommandManager();
+            var useCase = new EditarPropriedadesTabelaUseCase(document, commands);
+            ProjectTable tabela = CriarTabelaComCampos(document);
+            tabela.Ordenacoes = CriarOrdenacoes(tabela, "Nome", "Tensao", "Corrente").ToList();
 
             useCase.AlterarElementosTabela(
                 tabela.Id,
                 tabela.CategoriasElementos,
-                new[] { campoNome });
+                tabela.CamposSelecionados.Where(c => c.CampoId != "Tensao").ToList());
 
-            Assert(tabela.Ordenacao == null, "Ordenacao deveria ser limpa ao remover campo ordenado.");
+            AssertEqual(2, tabela.Ordenacoes.Count, "Apenas uma ordenacao deveria ser removida.");
+            AssertEqual("Nome", tabela.Ordenacoes[0].CampoId, "Ordenacao valida anterior preservada.");
+            AssertEqual("Corrente", tabela.Ordenacoes[1].CampoId, "Ordenacao valida posterior preservada.");
+            AssertEqual(1, tabela.Ordenacoes[1].Ordem, "Ordenacao remanescente deveria ser reindexada.");
 
             commands.Undo();
-            Assert(tabela.Ordenacao != null, "Undo deveria restaurar ordenacao.");
-            AssertEqual("Tensao", tabela.Ordenacao!.CampoId, "Undo.Ordenacao.CampoId");
+            AssertEqual(3, tabela.Ordenacoes.Count, "Undo deveria restaurar todas as ordenacoes.");
+            AssertEqual("Tensao", tabela.Ordenacoes[1].CampoId, "Undo.Ordenacoes[1].CampoId");
 
             commands.Redo();
-            Assert(tabela.Ordenacao == null, "Redo deveria limpar ordenacao novamente.");
+            AssertEqual(2, tabela.Ordenacoes.Count, "Redo deveria remover novamente apenas a regra invalida.");
+            Assert(tabela.Ordenacoes.All(o => o.CampoId != "Tensao"), "Redo nao deveria manter regra do campo removido.");
         }
 
-        private static void TabelaDuplicaEPersisteOrdenacao()
+        private static void TabelaDuplicaEPersisteMultiplasOrdenacoes()
         {
             var document = new AraciDocument();
             ProjectTable tabela = CriarTabelaComCampos(document);
-            ProjectTableFieldSelection campoNome = tabela.CamposSelecionados[0];
-            tabela.Ordenacao = new ProjectTableSorting
-            {
-                Categoria = campoNome.Categoria,
-                CampoId = campoNome.CampoId,
-                NomeExibicao = campoNome.NomeExibicao,
-                Direcao = ProjectTableSortDirection.Decrescente
-            };
+            tabela.Ordenacoes = CriarOrdenacoes(tabela, "Nome", "Tensao", "Corrente").ToList();
 
             ProjectTable duplicata = document.CriarDuplicataTabela(tabela);
 
-            Assert(duplicata.Ordenacao != null, "Duplicata deveria copiar ordenacao.");
-            AssertEqual("Nome", duplicata.Ordenacao!.CampoId, "Duplicata.Ordenacao.CampoId");
-            AssertEqual(ProjectTableSortDirection.Decrescente, duplicata.Ordenacao.Direcao, "Duplicata.Ordenacao.Direcao");
+            AssertEqual(3, duplicata.Ordenacoes.Count, "Duplicata deveria copiar ordenacoes.");
+            AssertEqual("Tensao", duplicata.Ordenacoes[1].CampoId, "Duplicata.Ordenacoes[1].CampoId");
+            duplicata.Ordenacoes[1].CampoId = "Alterado";
+            AssertEqual("Tensao", tabela.Ordenacoes[1].CampoId, "Duplicata deveria usar copia profunda.");
 
             string path = CreateTempProjectPath();
 
@@ -5161,22 +5181,8 @@ namespace Araci.TechnicalChecks
                 var context = new EditorContext();
                 ProjectTable persistentTable = context.Document.CriarNovaTabela();
                 persistentTable.CategoriasElementos = tabela.CategoriasElementos.ToList();
-                persistentTable.CamposSelecionados = tabela.CamposSelecionados
-                    .Select(c => new ProjectTableFieldSelection
-                    {
-                        Categoria = c.Categoria,
-                        CampoId = c.CampoId,
-                        NomeExibicao = c.NomeExibicao,
-                        Ordem = c.Ordem
-                    })
-                    .ToList();
-                persistentTable.Ordenacao = new ProjectTableSorting
-                {
-                    Categoria = campoNome.Categoria,
-                    CampoId = campoNome.CampoId,
-                    NomeExibicao = campoNome.NomeExibicao,
-                    Direcao = ProjectTableSortDirection.Decrescente
-                };
+                persistentTable.CamposSelecionados = CopiarCamposTabela(tabela.CamposSelecionados).ToList();
+                persistentTable.Ordenacoes = CriarOrdenacoes(tabela, "Nome", "Tensao", "Corrente").ToList();
 
                 context.Projects.Salvar(path);
 
@@ -5184,9 +5190,66 @@ namespace Araci.TechnicalChecks
                 loadedContext.Projects.Abrir(path);
                 ProjectTable loadedTable = loadedContext.Document.Tabelas.Single(t => t.Id == persistentTable.Id);
 
-                Assert(loadedTable.Ordenacao != null, "Reload deveria preservar ordenacao.");
-                AssertEqual("Nome", loadedTable.Ordenacao!.CampoId, "Reload.Ordenacao.CampoId");
-                AssertEqual(ProjectTableSortDirection.Decrescente, loadedTable.Ordenacao.Direcao, "Reload.Ordenacao.Direcao");
+                AssertEqual(3, loadedTable.Ordenacoes.Count, "Reload deveria preservar multiplas ordenacoes.");
+                AssertEqual("Nome", loadedTable.Ordenacoes[0].CampoId, "Reload.Ordenacoes[0].CampoId");
+                AssertEqual("Corrente", loadedTable.Ordenacoes[2].CampoId, "Reload.Ordenacoes[2].CampoId");
+            }
+            finally
+            {
+                DeleteIfExists(path);
+            }
+        }
+
+        private static void TabelaConverteOrdenacaoUnicaLegada()
+        {
+            var dto = new ProjectFileDto
+            {
+                Version = ProjectSerializer.CurrentVersion,
+                AppName = ProjectSerializer.AppName,
+                ProjectName = "Tabela legada",
+                CreatedAt = DateTimeOffset.UtcNow,
+                SavedAt = DateTimeOffset.UtcNow,
+                Tables =
+                {
+                    new ProjectTableDto
+                    {
+                        Id = Guid.NewGuid(),
+                        Nome = "Tabela legada",
+                        CategoriasElementos = { ProjectTableElementCategory.Barras.ToString() },
+                        CamposSelecionados =
+                        {
+                            new ProjectTableFieldSelectionDto
+                            {
+                                Categoria = ProjectTableElementCategory.Barras.ToString(),
+                                CampoId = "Nome",
+                                NomeExibicao = "Nome",
+                                Ordem = 0
+                            }
+                        },
+                        Ordenacao = new ProjectTableSortingDto
+                        {
+                            Categoria = ProjectTableElementCategory.Barras.ToString(),
+                            CampoId = "Nome",
+                            NomeExibicao = "Nome",
+                            Direcao = ProjectTableSortDirection.Decrescente.ToString()
+                        }
+                    }
+                }
+            };
+
+            string path = CreateTempProjectPath();
+
+            try
+            {
+                File.WriteAllText(path, JsonSerializer.Serialize(dto));
+
+                var context = new EditorContext();
+                context.Projects.Abrir(path);
+                ProjectTable tabela = context.Document.Tabelas.Single();
+
+                AssertEqual(1, tabela.Ordenacoes.Count, "Ordenacao unica legada deveria virar lista com uma regra.");
+                AssertEqual("Nome", tabela.Ordenacoes[0].CampoId, "Ordenacao legada CampoId.");
+                AssertEqual(ProjectTableSortDirection.Decrescente, tabela.Ordenacoes[0].Direcao, "Ordenacao legada Direcao.");
             }
             finally
             {
@@ -5201,10 +5264,47 @@ namespace Araci.TechnicalChecks
             tabela.CamposSelecionados = new List<ProjectTableFieldSelection>
             {
                 new() { Categoria = ProjectTableElementCategory.Barras, CampoId = "Nome", NomeExibicao = "Nome", Ordem = 0 },
-                new() { Categoria = ProjectTableElementCategory.Barras, CampoId = "Tensao", NomeExibicao = "Tensao", Ordem = 1 }
+                new() { Categoria = ProjectTableElementCategory.Barras, CampoId = "Tensao", NomeExibicao = "Tensao", Ordem = 1 },
+                new() { Categoria = ProjectTableElementCategory.Barras, CampoId = "Corrente", NomeExibicao = "Corrente", Ordem = 2 },
+                new() { Categoria = ProjectTableElementCategory.Barras, CampoId = "PotenciaAtiva", NomeExibicao = "Potencia ativa", Ordem = 3 },
+                new() { Categoria = ProjectTableElementCategory.Barras, CampoId = "Tipo", NomeExibicao = "Tipo", Ordem = 4 },
+                new() { Categoria = ProjectTableElementCategory.Barras, CampoId = "Comprimento", NomeExibicao = "Comprimento", Ordem = 5 }
             };
 
             return tabela;
+        }
+
+        private static IReadOnlyList<ProjectTableSorting> CriarOrdenacoes(ProjectTable tabela, params string[] campoIds)
+        {
+            return campoIds
+                .Select((campoId, index) =>
+                {
+                    ProjectTableFieldSelection campo = tabela.CamposSelecionados.Single(c => c.CampoId == campoId);
+                    return new ProjectTableSorting
+                    {
+                        Ordem = index,
+                        Categoria = campo.Categoria,
+                        CampoId = campo.CampoId,
+                        NomeExibicao = campo.NomeExibicao,
+                        Direcao = index % 2 == 0
+                            ? ProjectTableSortDirection.Crescente
+                            : ProjectTableSortDirection.Decrescente
+                    };
+                })
+                .ToList();
+        }
+
+        private static IReadOnlyList<ProjectTableFieldSelection> CopiarCamposTabela(IReadOnlyList<ProjectTableFieldSelection> campos)
+        {
+            return campos
+                .Select(c => new ProjectTableFieldSelection
+                {
+                    Categoria = c.Categoria,
+                    CampoId = c.CampoId,
+                    NomeExibicao = c.NomeExibicao,
+                    Ordem = c.Ordem
+                })
+                .ToList();
         }
 
         private static ExecutarSimulacaoUseCase CriarExecutarSimulacaoUseCase(
@@ -5294,9 +5394,9 @@ namespace Araci.TechnicalChecks
 
             public OrdenacaoTabelaDialogResult? ShowOrdenacaoTabelaDialog(
                 IReadOnlyList<ProjectTableFieldSelection> camposSelecionados,
-                ProjectTableSorting? ordenacao)
+                IReadOnlyList<ProjectTableSorting> ordenacoes)
             {
-                return new OrdenacaoTabelaDialogResult(ordenacao);
+                return new OrdenacaoTabelaDialogResult(ordenacoes);
             }
 
             public bool Confirm(string title, string message)

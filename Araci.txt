@@ -28,6 +28,7 @@ Araci-front
 │   │   ├── ISimulationResultApplier.cs
 │   │   ├── ITypePropertiesDialogService.cs
 │   │   ├── IUserDialogService.cs
+│   │   ├── OrdenacaoTabelaDialogResult.cs
 │   │   └── ProjectViewDialogOption.cs
 │   ├── Analisar
 │   │   ├── FluxoDeCorrente
@@ -58,6 +59,7 @@ Araci-front
 │   │   ├── UpdateProjectTableElementsCommand.cs
 │   │   ├── UpdateProjectTableFiltersCommand.cs
 │   │   ├── UpdateProjectTablePropertyCommand.cs
+│   │   ├── UpdateProjectTableSortingCommand.cs
 │   │   └── UpdateProjectViewPropertyCommand.cs
 │   ├── Diagrama
 │   │   ├── InserirCabo
@@ -535,11 +537,221 @@ namespace Araci.Applications.Abstractions
             ProjectTableFilterLogicalMode modo,
             IReadOnlyList<ProjectTableFilterRule> filtros);
 
-        void ShowOrdenacaoTabelaDialog();
+        OrdenacaoTabelaDialogResult? ShowOrdenacaoTabelaDialog(
+            IReadOnlyList<ProjectTableFieldSelection> camposSelecionados,
+            ProjectTableSorting? ordenacao);
 
         bool Confirm(string title, string message);
 
         void Show(SimulationMessage message);
+    }
+}
+
+
+
+====================================================================================================
+ARQUIVO: C:\Users\User\source\repos\lucasffxavier\Araci-front\Applications\Abstractions\OrdenacaoTabelaDialogResult.cs
+====================================================================================================
+
+using Araci.Core.Documents;
+
+namespace Araci.Applications.Abstractions
+{
+    public sealed class OrdenacaoTabelaDialogResult
+    {
+        public OrdenacaoTabelaDialogResult(ProjectTableSorting? ordenacao)
+        {
+            Ordenacao = ordenacao;
+        }
+
+        public ProjectTableSorting? Ordenacao { get; }
+    }
+}
+
+
+
+====================================================================================================
+ARQUIVO: C:\Users\User\source\repos\lucasffxavier\Araci-front\Applications\Commands\UpdateProjectTableElementsCommand.cs
+====================================================================================================
+
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using Araci.Core.Documents;
+
+namespace Araci.Core.Commands
+{
+    public class UpdateProjectTableElementsCommand : IUndoableCommand
+    {
+        private readonly AraciDocument _document;
+        private readonly ProjectTable _tabela;
+        private readonly IReadOnlyList<ProjectTableElementCategory> _categoriasAnteriores;
+        private readonly IReadOnlyList<ProjectTableElementCategory> _categoriasNovas;
+        private readonly IReadOnlyList<ProjectTableFieldSelection> _camposAnteriores;
+        private readonly IReadOnlyList<ProjectTableFieldSelection> _camposNovos;
+        private readonly IReadOnlyList<ProjectTableFilterRule> _filtrosAnteriores;
+        private readonly IReadOnlyList<ProjectTableFilterRule> _filtrosNovos;
+        private readonly ProjectTableSorting? _ordenacaoAnterior;
+        private readonly ProjectTableSorting? _ordenacaoNova;
+
+        public UpdateProjectTableElementsCommand(
+            AraciDocument document,
+            ProjectTable tabela,
+            IReadOnlyList<ProjectTableElementCategory> categoriasAnteriores,
+            IReadOnlyList<ProjectTableElementCategory> categoriasNovas,
+            IReadOnlyList<ProjectTableFieldSelection> camposAnteriores,
+            IReadOnlyList<ProjectTableFieldSelection> camposNovos,
+            IReadOnlyList<ProjectTableFilterRule> filtrosAnteriores,
+            IReadOnlyList<ProjectTableFilterRule> filtrosNovos,
+            ProjectTableSorting? ordenacaoAnterior,
+            ProjectTableSorting? ordenacaoNova)
+        {
+            _document = document ?? throw new ArgumentNullException(nameof(document));
+            _tabela = tabela ?? throw new ArgumentNullException(nameof(tabela));
+            _categoriasAnteriores = categoriasAnteriores.ToList();
+            _categoriasNovas = categoriasNovas.ToList();
+            _camposAnteriores = CopiarCampos(camposAnteriores);
+            _camposNovos = CopiarCampos(camposNovos);
+            _filtrosAnteriores = CopiarFiltros(filtrosAnteriores);
+            _filtrosNovos = CopiarFiltros(filtrosNovos);
+            _ordenacaoAnterior = CopiarOrdenacao(ordenacaoAnterior);
+            _ordenacaoNova = CopiarOrdenacao(ordenacaoNova);
+        }
+
+        public void Execute()
+        {
+            Aplicar(_categoriasNovas, _camposNovos, _filtrosNovos, _ordenacaoNova);
+        }
+
+        public void Undo()
+        {
+            Aplicar(_categoriasAnteriores, _camposAnteriores, _filtrosAnteriores, _ordenacaoAnterior);
+        }
+
+        public void Redo()
+        {
+            Execute();
+        }
+
+        private void Aplicar(
+            IReadOnlyList<ProjectTableElementCategory> categorias,
+            IReadOnlyList<ProjectTableFieldSelection> campos,
+            IReadOnlyList<ProjectTableFilterRule> filtros,
+            ProjectTableSorting? ordenacao)
+        {
+            _tabela.CategoriasElementos = categorias.ToList();
+            _tabela.CamposSelecionados = CopiarCampos(campos).ToList();
+            _tabela.Filtros = CopiarFiltros(filtros).ToList();
+            _tabela.Ordenacao = CopiarOrdenacao(ordenacao);
+            _document.AtualizarPropriedadesTabela(_tabela);
+        }
+
+        private static IReadOnlyList<ProjectTableFieldSelection> CopiarCampos(IReadOnlyList<ProjectTableFieldSelection> campos)
+        {
+            return campos
+                .Select(c => new ProjectTableFieldSelection
+                {
+                    Categoria = c.Categoria,
+                    CampoId = c.CampoId,
+                    NomeExibicao = c.NomeExibicao,
+                    Ordem = c.Ordem
+                })
+                .ToList();
+        }
+
+        private static IReadOnlyList<ProjectTableFilterRule> CopiarFiltros(IReadOnlyList<ProjectTableFilterRule> filtros)
+        {
+            return filtros
+                .Select(f => new ProjectTableFilterRule
+                {
+                    Ordem = f.Ordem,
+                    Categoria = f.Categoria,
+                    CampoId = f.CampoId,
+                    NomeExibicao = f.NomeExibicao,
+                    Operador = f.Operador,
+                    Valor = f.Valor
+                })
+                .ToList();
+        }
+
+        private static ProjectTableSorting? CopiarOrdenacao(ProjectTableSorting? ordenacao)
+        {
+            return ordenacao == null
+                ? null
+                : new ProjectTableSorting
+                {
+                    Categoria = ordenacao.Categoria,
+                    CampoId = ordenacao.CampoId,
+                    NomeExibicao = ordenacao.NomeExibicao,
+                    Direcao = ordenacao.Direcao
+                };
+        }
+    }
+}
+
+
+
+====================================================================================================
+ARQUIVO: C:\Users\User\source\repos\lucasffxavier\Araci-front\Applications\Commands\UpdateProjectTableSortingCommand.cs
+====================================================================================================
+
+using System;
+using Araci.Core.Documents;
+
+namespace Araci.Core.Commands
+{
+    public class UpdateProjectTableSortingCommand : IUndoableCommand
+    {
+        private readonly AraciDocument _document;
+        private readonly ProjectTable _tabela;
+        private readonly ProjectTableSorting? _ordenacaoAnterior;
+        private readonly ProjectTableSorting? _ordenacaoNova;
+
+        public UpdateProjectTableSortingCommand(
+            AraciDocument document,
+            ProjectTable tabela,
+            ProjectTableSorting? ordenacaoAnterior,
+            ProjectTableSorting? ordenacaoNova)
+        {
+            _document = document ?? throw new ArgumentNullException(nameof(document));
+            _tabela = tabela ?? throw new ArgumentNullException(nameof(tabela));
+            _ordenacaoAnterior = CopiarOrdenacao(ordenacaoAnterior);
+            _ordenacaoNova = CopiarOrdenacao(ordenacaoNova);
+        }
+
+        public void Execute()
+        {
+            Aplicar(_ordenacaoNova);
+        }
+
+        public void Undo()
+        {
+            Aplicar(_ordenacaoAnterior);
+        }
+
+        public void Redo()
+        {
+            Execute();
+        }
+
+        private void Aplicar(ProjectTableSorting? ordenacao)
+        {
+            _tabela.Ordenacao = CopiarOrdenacao(ordenacao);
+            _document.AtualizarPropriedadesTabela(_tabela);
+        }
+
+        private static ProjectTableSorting? CopiarOrdenacao(ProjectTableSorting? ordenacao)
+        {
+            return ordenacao == null
+                ? null
+                : new ProjectTableSorting
+                {
+                    Categoria = ordenacao.Categoria,
+                    CampoId = ordenacao.CampoId,
+                    NomeExibicao = ordenacao.NomeExibicao,
+                    Direcao = ordenacao.Direcao
+                };
+        }
     }
 }
 
@@ -628,10 +840,13 @@ namespace Araci.Applications.UseCases.Projeto
             List<ProjectTableFieldSelection> camposAnteriores = NormalizarCampos(tabela.CamposSelecionados, categoriasAnteriores);
             List<ProjectTableFilterRule> filtrosNovos = NormalizarFiltros(tabela.Filtros, camposNovos);
             List<ProjectTableFilterRule> filtrosAnteriores = NormalizarFiltros(tabela.Filtros, camposAnteriores);
+            ProjectTableSorting? ordenacaoNova = NormalizarOrdenacao(tabela.Ordenacao, camposNovos);
+            ProjectTableSorting? ordenacaoAnterior = NormalizarOrdenacao(tabela.Ordenacao, camposAnteriores);
 
             if (categoriasAnteriores.SequenceEqual(categoriasNovas) &&
                 CamposIguais(camposAnteriores, camposNovos) &&
-                FiltrosIguais(filtrosAnteriores, filtrosNovos))
+                FiltrosIguais(filtrosAnteriores, filtrosNovos) &&
+                OrdenacoesIguais(ordenacaoAnterior, ordenacaoNova))
                 return true;
 
             _commands.Execute(new UpdateProjectTableElementsCommand(
@@ -642,7 +857,31 @@ namespace Araci.Applications.UseCases.Projeto
                 camposAnteriores,
                 camposNovos,
                 filtrosAnteriores,
-                filtrosNovos));
+                filtrosNovos,
+                ordenacaoAnterior,
+                ordenacaoNova));
+
+            return true;
+        }
+
+        public bool AlterarOrdenacaoTabela(Guid id, ProjectTableSorting? ordenacao)
+        {
+            ProjectTable? tabela = _document.Tabelas.FirstOrDefault(t => t.Id == id);
+
+            if (tabela == null)
+                return false;
+
+            ProjectTableSorting? ordenacaoNova = NormalizarOrdenacao(ordenacao, tabela.CamposSelecionados);
+            ProjectTableSorting? ordenacaoAnterior = NormalizarOrdenacao(tabela.Ordenacao, tabela.CamposSelecionados);
+
+            if (OrdenacoesIguais(ordenacaoAnterior, ordenacaoNova))
+                return true;
+
+            _commands.Execute(new UpdateProjectTableSortingCommand(
+                _document,
+                tabela,
+                ordenacaoAnterior,
+                ordenacaoNova));
 
             return true;
         }
@@ -801,6 +1040,45 @@ namespace Araci.Applications.UseCases.Projeto
             return true;
         }
 
+        private static ProjectTableSorting? NormalizarOrdenacao(
+            ProjectTableSorting? ordenacao,
+            IReadOnlyList<ProjectTableFieldSelection> camposSelecionados)
+        {
+            if (ordenacao == null || string.IsNullOrWhiteSpace(ordenacao.CampoId))
+                return null;
+
+            string chave = CriarChaveCampo(ordenacao.Categoria, ordenacao.CampoId);
+            ProjectTableFieldSelection? campo = camposSelecionados.FirstOrDefault(c =>
+                string.Equals(CriarChaveCampo(c.Categoria, c.CampoId), chave, StringComparison.Ordinal));
+
+            if (campo == null)
+                return null;
+
+            return new ProjectTableSorting
+            {
+                Categoria = campo.Categoria,
+                CampoId = campo.CampoId,
+                NomeExibicao = campo.NomeExibicao,
+                Direcao = Enum.IsDefined(typeof(ProjectTableSortDirection), ordenacao.Direcao)
+                    ? ordenacao.Direcao
+                    : ProjectTableSortDirection.Crescente
+            };
+        }
+
+        private static bool OrdenacoesIguais(ProjectTableSorting? a, ProjectTableSorting? b)
+        {
+            if (a == null && b == null)
+                return true;
+
+            if (a == null || b == null)
+                return false;
+
+            return a.Categoria == b.Categoria &&
+                string.Equals(a.CampoId, b.CampoId, StringComparison.Ordinal) &&
+                string.Equals(a.NomeExibicao, b.NomeExibicao, StringComparison.Ordinal) &&
+                a.Direcao == b.Direcao;
+        }
+
         private static string CriarChaveCampo(ProjectTableElementCategory categoria, string campoId)
         {
             return $"{categoria}|{campoId.Trim()}";
@@ -882,6 +1160,9 @@ namespace Araci.TechnicalChecks
                 ("Persistencia preserva ramificacao", PersistenciaPreservaRamificacao),
                 ("Tabela remove filtros de campos removidos com undo redo", TabelaRemoveFiltrosCamposRemovidosComUndoRedo),
                 ("Excluir vista limpa filtro de vista da tabela com undo redo", ExcluirVistaLimpaFiltroTabelaComUndoRedo),
+                ("Tabela altera ordenacao com undo redo", TabelaAlteraOrdenacaoComUndoRedo),
+                ("Tabela limpa ordenacao ao remover campo ordenado", TabelaLimpaOrdenacaoAoRemoverCampoOrdenado),
+                ("Tabela duplica e persiste ordenacao", TabelaDuplicaEPersisteOrdenacao),
                 ("DTO permanece equivalente apos reload", DtoPermaneceEquivalenteAposReload),
                 ("IDs permanecem estaveis apos reload", IdsPermanecemEstaveisAposReload),
                 ("Builds repetidos apos reload nao alteram Document", BuildsRepetidosAposReloadNaoAlteramDocument),
@@ -5885,6 +6166,141 @@ namespace Araci.TechnicalChecks
             AssertEqual(null, tabelaAfetada.FiltroVistaId, "Redo deveria limpar filtro da Vista B novamente.");
         }
 
+        private static void TabelaAlteraOrdenacaoComUndoRedo()
+        {
+            var document = new AraciDocument();
+            var commands = new Araci.Core.Commands.CommandManager();
+            var useCase = new EditarPropriedadesTabelaUseCase(document, commands);
+            ProjectTable tabela = CriarTabelaComCampos(document);
+            ProjectTableFieldSelection campoNome = tabela.CamposSelecionados[0];
+
+            bool alterado = useCase.AlterarOrdenacaoTabela(
+                tabela.Id,
+                new ProjectTableSorting
+                {
+                    Categoria = campoNome.Categoria,
+                    CampoId = campoNome.CampoId,
+                    NomeExibicao = campoNome.NomeExibicao,
+                    Direcao = ProjectTableSortDirection.Decrescente
+                });
+
+            Assert(alterado, "AlterarOrdenacaoTabela deveria retornar true.");
+            Assert(tabela.Ordenacao != null, "Ordenacao deveria existir.");
+            AssertEqual("Nome", tabela.Ordenacao!.CampoId, "Ordenacao.CampoId");
+            AssertEqual(ProjectTableSortDirection.Decrescente, tabela.Ordenacao.Direcao, "Ordenacao.Direcao");
+
+            commands.Undo();
+            Assert(tabela.Ordenacao == null, "Undo deveria limpar ordenacao inicial.");
+
+            commands.Redo();
+            Assert(tabela.Ordenacao != null, "Redo deveria restaurar ordenacao.");
+            AssertEqual(ProjectTableSortDirection.Decrescente, tabela.Ordenacao!.Direcao, "Redo.Ordenacao.Direcao");
+        }
+
+        private static void TabelaLimpaOrdenacaoAoRemoverCampoOrdenado()
+        {
+            var document = new AraciDocument();
+            var commands = new Araci.Core.Commands.CommandManager();
+            var useCase = new EditarPropriedadesTabelaUseCase(document, commands);
+            ProjectTable tabela = CriarTabelaComCampos(document);
+            ProjectTableFieldSelection campoNome = tabela.CamposSelecionados[0];
+            ProjectTableFieldSelection campoTensao = tabela.CamposSelecionados[1];
+
+            tabela.Ordenacao = new ProjectTableSorting
+            {
+                Categoria = campoTensao.Categoria,
+                CampoId = campoTensao.CampoId,
+                NomeExibicao = campoTensao.NomeExibicao,
+                Direcao = ProjectTableSortDirection.Crescente
+            };
+
+            useCase.AlterarElementosTabela(
+                tabela.Id,
+                tabela.CategoriasElementos,
+                new[] { campoNome });
+
+            Assert(tabela.Ordenacao == null, "Ordenacao deveria ser limpa ao remover campo ordenado.");
+
+            commands.Undo();
+            Assert(tabela.Ordenacao != null, "Undo deveria restaurar ordenacao.");
+            AssertEqual("Tensao", tabela.Ordenacao!.CampoId, "Undo.Ordenacao.CampoId");
+
+            commands.Redo();
+            Assert(tabela.Ordenacao == null, "Redo deveria limpar ordenacao novamente.");
+        }
+
+        private static void TabelaDuplicaEPersisteOrdenacao()
+        {
+            var document = new AraciDocument();
+            ProjectTable tabela = CriarTabelaComCampos(document);
+            ProjectTableFieldSelection campoNome = tabela.CamposSelecionados[0];
+            tabela.Ordenacao = new ProjectTableSorting
+            {
+                Categoria = campoNome.Categoria,
+                CampoId = campoNome.CampoId,
+                NomeExibicao = campoNome.NomeExibicao,
+                Direcao = ProjectTableSortDirection.Decrescente
+            };
+
+            ProjectTable duplicata = document.CriarDuplicataTabela(tabela);
+
+            Assert(duplicata.Ordenacao != null, "Duplicata deveria copiar ordenacao.");
+            AssertEqual("Nome", duplicata.Ordenacao!.CampoId, "Duplicata.Ordenacao.CampoId");
+            AssertEqual(ProjectTableSortDirection.Decrescente, duplicata.Ordenacao.Direcao, "Duplicata.Ordenacao.Direcao");
+
+            string path = CreateTempProjectPath();
+
+            try
+            {
+                var context = new EditorContext();
+                ProjectTable persistentTable = context.Document.CriarNovaTabela();
+                persistentTable.CategoriasElementos = tabela.CategoriasElementos.ToList();
+                persistentTable.CamposSelecionados = tabela.CamposSelecionados
+                    .Select(c => new ProjectTableFieldSelection
+                    {
+                        Categoria = c.Categoria,
+                        CampoId = c.CampoId,
+                        NomeExibicao = c.NomeExibicao,
+                        Ordem = c.Ordem
+                    })
+                    .ToList();
+                persistentTable.Ordenacao = new ProjectTableSorting
+                {
+                    Categoria = campoNome.Categoria,
+                    CampoId = campoNome.CampoId,
+                    NomeExibicao = campoNome.NomeExibicao,
+                    Direcao = ProjectTableSortDirection.Decrescente
+                };
+
+                context.Projects.Salvar(path);
+
+                var loadedContext = new EditorContext();
+                loadedContext.Projects.Abrir(path);
+                ProjectTable loadedTable = loadedContext.Document.Tabelas.Single(t => t.Id == persistentTable.Id);
+
+                Assert(loadedTable.Ordenacao != null, "Reload deveria preservar ordenacao.");
+                AssertEqual("Nome", loadedTable.Ordenacao!.CampoId, "Reload.Ordenacao.CampoId");
+                AssertEqual(ProjectTableSortDirection.Decrescente, loadedTable.Ordenacao.Direcao, "Reload.Ordenacao.Direcao");
+            }
+            finally
+            {
+                DeleteIfExists(path);
+            }
+        }
+
+        private static ProjectTable CriarTabelaComCampos(AraciDocument document)
+        {
+            ProjectTable tabela = document.CriarNovaTabela();
+            tabela.CategoriasElementos = new List<ProjectTableElementCategory> { ProjectTableElementCategory.Barras };
+            tabela.CamposSelecionados = new List<ProjectTableFieldSelection>
+            {
+                new() { Categoria = ProjectTableElementCategory.Barras, CampoId = "Nome", NomeExibicao = "Nome", Ordem = 0 },
+                new() { Categoria = ProjectTableElementCategory.Barras, CampoId = "Tensao", NomeExibicao = "Tensao", Ordem = 1 }
+            };
+
+            return tabela;
+        }
+
         private static ExecutarSimulacaoUseCase CriarExecutarSimulacaoUseCase(
             FakeSimulationPipeline pipeline,
             FakeDialogService dialogs)
@@ -5970,8 +6386,11 @@ namespace Araci.TechnicalChecks
                 return new FiltrosTabelaDialogResult(filtroVistaId, modo, filtros);
             }
 
-            public void ShowOrdenacaoTabelaDialog()
+            public OrdenacaoTabelaDialogResult? ShowOrdenacaoTabelaDialog(
+                IReadOnlyList<ProjectTableFieldSelection> camposSelecionados,
+                ProjectTableSorting? ordenacao)
             {
+                return new OrdenacaoTabelaDialogResult(ordenacao);
             }
 
             public bool Confirm(string title, string message)
@@ -6426,7 +6845,16 @@ namespace Araci.Core.Documents
                         Operador = f.Operador,
                         Valor = f.Valor
                     })
-                    .ToList() ?? new List<ProjectTableFilterRule>()
+                    .ToList() ?? new List<ProjectTableFilterRule>(),
+                Ordenacao = origem?.Ordenacao == null
+                    ? null
+                    : new ProjectTableSorting
+                    {
+                        Categoria = origem.Ordenacao.Categoria,
+                        CampoId = origem.Ordenacao.CampoId,
+                        NomeExibicao = origem.Ordenacao.NomeExibicao,
+                        Direcao = origem.Ordenacao.Direcao
+                    }
             };
         }
 
@@ -6763,6 +7191,20 @@ namespace Araci.Core.Documents
         public string Valor { get; set; } = string.Empty;
     }
 
+    public enum ProjectTableSortDirection
+    {
+        Crescente,
+        Decrescente
+    }
+
+    public class ProjectTableSorting
+    {
+        public ProjectTableElementCategory Categoria { get; set; }
+        public string CampoId { get; set; } = string.Empty;
+        public string NomeExibicao { get; set; } = string.Empty;
+        public ProjectTableSortDirection Direcao { get; set; } = ProjectTableSortDirection.Crescente;
+    }
+
     public class ProjectTable
     {
         public Guid Id { get; set; } = Guid.NewGuid();
@@ -6773,6 +7215,7 @@ namespace Araci.Core.Documents
         public Guid? FiltroVistaId { get; set; }
         public ProjectTableFilterLogicalMode ModoFiltro { get; set; } = ProjectTableFilterLogicalMode.Todas;
         public List<ProjectTableFilterRule> Filtros { get; set; } = new();
+        public ProjectTableSorting? Ordenacao { get; set; }
     }
 }
 
@@ -6829,6 +7272,7 @@ namespace Araci.Infrastructure.Persistence
         public Guid? FiltroVistaId { get; set; }
         public string ModoFiltro { get; set; } = "Todas";
         public List<ProjectTableFilterRuleDto> Filtros { get; set; } = new();
+        public ProjectTableSortingDto? Ordenacao { get; set; }
     }
 
     public sealed class ProjectTableFieldSelectionDto
@@ -6847,6 +7291,14 @@ namespace Araci.Infrastructure.Persistence
         public string NomeExibicao { get; set; } = string.Empty;
         public string Operador { get; set; } = string.Empty;
         public string Valor { get; set; } = string.Empty;
+    }
+
+    public sealed class ProjectTableSortingDto
+    {
+        public string Categoria { get; set; } = string.Empty;
+        public string CampoId { get; set; } = string.Empty;
+        public string NomeExibicao { get; set; } = string.Empty;
+        public string Direcao { get; set; } = string.Empty;
     }
 
     public sealed class ProjectSheetDto
@@ -7314,6 +7766,7 @@ namespace Araci.Infrastructure.Persistence
         {
             List<ProjectTableFieldSelection> campos = NormalizarProjectTableFields(tabela.CamposSelecionados, tabela.CategoriasElementos);
             Guid? filtroVistaId = NormalizarProjectTableViewFilter(tabela.FiltroVistaId, vistasIds);
+            ProjectTableSorting? ordenacao = NormalizarProjectTableSorting(tabela.Ordenacao, campos);
 
             return new ProjectTableDto
             {
@@ -7345,7 +7798,16 @@ namespace Araci.Infrastructure.Persistence
                         Operador = f.Operador.ToString(),
                         Valor = f.Valor
                     })
-                    .ToList()
+                    .ToList(),
+                Ordenacao = ordenacao == null
+                    ? null
+                    : new ProjectTableSortingDto
+                    {
+                        Categoria = ordenacao.Categoria.ToString(),
+                        CampoId = ordenacao.CampoId,
+                        NomeExibicao = ordenacao.NomeExibicao,
+                        Direcao = ordenacao.Direcao.ToString()
+                    }
             };
         }
 
@@ -7395,7 +7857,8 @@ namespace Araci.Infrastructure.Persistence
                 CamposSelecionados = campos,
                 FiltroVistaId = NormalizarProjectTableViewFilter(dto.FiltroVistaId, vistasIds),
                 ModoFiltro = ParseEnum(dto.ModoFiltro, ProjectTableFilterLogicalMode.Todas),
-                Filtros = ParseProjectTableFilters(dto.Filtros, campos)
+                Filtros = ParseProjectTableFilters(dto.Filtros, campos),
+                Ordenacao = ParseProjectTableSorting(dto.Ordenacao, campos)
             };
         }
 
@@ -7780,6 +8243,52 @@ namespace Araci.Infrastructure.Persistence
                 .ToList();
         }
 
+        private static ProjectTableSorting? ParseProjectTableSorting(
+            ProjectTableSortingDto? dto,
+            IReadOnlyList<ProjectTableFieldSelection> camposSelecionados)
+        {
+            if (dto == null || string.IsNullOrWhiteSpace(dto.CampoId))
+                return null;
+
+            if (!Enum.TryParse(dto.Categoria, ignoreCase: true, out ProjectTableElementCategory categoria))
+                return null;
+
+            return NormalizarProjectTableSorting(
+                new ProjectTableSorting
+                {
+                    Categoria = categoria,
+                    CampoId = dto.CampoId.Trim(),
+                    NomeExibicao = string.IsNullOrWhiteSpace(dto.NomeExibicao) ? dto.CampoId.Trim() : dto.NomeExibicao.Trim(),
+                    Direcao = ParseEnum(dto.Direcao, ProjectTableSortDirection.Crescente)
+                },
+                camposSelecionados);
+        }
+
+        private static ProjectTableSorting? NormalizarProjectTableSorting(
+            ProjectTableSorting? ordenacao,
+            IReadOnlyList<ProjectTableFieldSelection> camposSelecionados)
+        {
+            if (ordenacao == null || string.IsNullOrWhiteSpace(ordenacao.CampoId))
+                return null;
+
+            string chave = CriarChaveCampoTabela(ordenacao.Categoria, ordenacao.CampoId);
+            ProjectTableFieldSelection? campo = camposSelecionados.FirstOrDefault(c =>
+                string.Equals(CriarChaveCampoTabela(c.Categoria, c.CampoId), chave, StringComparison.Ordinal));
+
+            if (campo == null)
+                return null;
+
+            return new ProjectTableSorting
+            {
+                Categoria = campo.Categoria,
+                CampoId = campo.CampoId,
+                NomeExibicao = campo.NomeExibicao,
+                Direcao = Enum.IsDefined(typeof(ProjectTableSortDirection), ordenacao.Direcao)
+                    ? ordenacao.Direcao
+                    : ProjectTableSortDirection.Crescente
+            };
+        }
+
         private static string CriarChaveCampoTabela(ProjectTableElementCategory categoria, string campoId)
         {
             return $"{categoria}|{campoId.Trim()}";
@@ -7832,7 +8341,7 @@ ARQUIVO: C:\Users\User\source\repos\lucasffxavier\Araci-front\Properties\Ordenac
                            FontWeight="SemiBold"
                            TextAlignment="Center"
                            Margin="0,0,0,16"/>
-                <TextBlock Text="A ordenação permitirá definir a sequência das linhas da tabela. A configuração completa será implementada em uma etapa futura."
+                <TextBlock Text="Configure um campo selecionado da tabela para definir a futura sequência das linhas."
                            Foreground="#DCDCDC"
                            TextWrapping="Wrap"
                            Margin="0,0,0,14"/>
@@ -7843,27 +8352,19 @@ ARQUIVO: C:\Users\User\source\repos\lucasffxavier\Araci-front\Properties\Ordenac
                         Background="#1E1E1E">
                     <Grid>
                         <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="150"/>
                             <ColumnDefinition Width="*"/>
-                            <ColumnDefinition Width="160"/>
                         </Grid.ColumnDefinitions>
                         <Grid.RowDefinitions>
-                            <RowDefinition Height="Auto"/>
-                            <RowDefinition Height="Auto"/>
                             <RowDefinition Height="Auto"/>
                             <RowDefinition Height="Auto"/>
                         </Grid.RowDefinitions>
 
                         <TextBlock Grid.Row="0" Grid.Column="0" Text="Campo" Foreground="#F4F4F4" FontWeight="SemiBold" Margin="0,0,12,8"/>
-                        <TextBlock Grid.Row="0" Grid.Column="1" Text="Direção" Foreground="#F4F4F4" FontWeight="SemiBold" Margin="0,0,0,8"/>
+                        <ComboBox x:Name="CampoComboBox" Grid.Row="0" Grid.Column="1" DisplayMemberPath="Texto" Margin="0,0,0,8" SelectionChanged="CampoComboBox_SelectionChanged"/>
 
-                        <TextBlock Grid.Row="1" Grid.Column="0" Text="Nome" Foreground="#DCDCDC" Margin="0,0,12,6"/>
-                        <TextBlock Grid.Row="1" Grid.Column="1" Text="Crescente" Foreground="#DCDCDC" Margin="0,0,0,6"/>
-
-                        <TextBlock Grid.Row="2" Grid.Column="0" Text="Potência ativa" Foreground="#DCDCDC" Margin="0,0,12,6"/>
-                        <TextBlock Grid.Row="2" Grid.Column="1" Text="Decrescente" Foreground="#DCDCDC" Margin="0,0,0,6"/>
-
-                        <TextBlock Grid.Row="3" Grid.Column="0" Text="Tensão" Foreground="#DCDCDC" Margin="0,0,12,0"/>
-                        <TextBlock Grid.Row="3" Grid.Column="1" Text="Crescente" Foreground="#DCDCDC"/>
+                        <TextBlock Grid.Row="1" Grid.Column="0" Text="Direção" Foreground="#F4F4F4" FontWeight="SemiBold" Margin="0,0,12,0"/>
+                        <ComboBox x:Name="DirecaoComboBox" Grid.Row="1" Grid.Column="1" DisplayMemberPath="Texto"/>
                     </Grid>
                 </Border>
             </StackPanel>
@@ -7877,25 +8378,141 @@ ARQUIVO: C:\Users\User\source\repos\lucasffxavier\Araci-front\Properties\Ordenac
 ARQUIVO: C:\Users\User\source\repos\lucasffxavier\Araci-front\Properties\OrdenacaoTabelaWindow.xaml.cs
 ====================================================================================================
 
+using System;
+using System.Collections.Generic;
+using System.Linq;
 using System.Windows;
+using System.Windows.Controls;
+using Araci.Core.Documents;
 
 namespace Araci.Properties
 {
     public partial class OrdenacaoTabelaWindow : Window
     {
-        public OrdenacaoTabelaWindow()
+        private readonly List<CampoOrdenacaoItem> _campos;
+        private readonly List<DirecaoOrdenacaoItem> _direcoes;
+
+        public OrdenacaoTabelaWindow(
+            IReadOnlyList<ProjectTableFieldSelection> camposSelecionados,
+            ProjectTableSorting? ordenacao)
         {
             InitializeComponent();
+
+            _campos = CriarCampos(camposSelecionados);
+            _direcoes = CriarDirecoes();
+
+            CampoComboBox.ItemsSource = _campos;
+            DirecaoComboBox.ItemsSource = _direcoes;
+            DirecaoComboBox.SelectedItem = _direcoes.First();
+
+            AplicarOrdenacao(ordenacao);
+            AtualizarEstadoDirecao();
         }
+
+        public ProjectTableSorting? Ordenacao { get; private set; }
 
         private void OkButton_Click(object sender, RoutedEventArgs e)
         {
+            if (CampoComboBox.SelectedItem is CampoOrdenacaoItem { Campo: not null } campo)
+            {
+                ProjectTableSortDirection direcao = DirecaoComboBox.SelectedItem is DirecaoOrdenacaoItem direcaoItem
+                    ? direcaoItem.Direcao
+                    : ProjectTableSortDirection.Crescente;
+
+                Ordenacao = new ProjectTableSorting
+                {
+                    Categoria = campo.Campo.Categoria,
+                    CampoId = campo.Campo.CampoId,
+                    NomeExibicao = campo.Campo.NomeExibicao,
+                    Direcao = direcao
+                };
+            }
+            else
+            {
+                Ordenacao = null;
+            }
+
             DialogResult = true;
         }
 
         private void CancelButton_Click(object sender, RoutedEventArgs e)
         {
             DialogResult = false;
+        }
+
+        private void CampoComboBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
+        {
+            AtualizarEstadoDirecao();
+        }
+
+        private void AplicarOrdenacao(ProjectTableSorting? ordenacao)
+        {
+            CampoComboBox.SelectedItem = _campos.FirstOrDefault(c =>
+                c.Campo != null &&
+                ordenacao != null &&
+                c.Campo.Categoria == ordenacao.Categoria &&
+                string.Equals(c.Campo.CampoId, ordenacao.CampoId, StringComparison.Ordinal)) ?? _campos.First();
+
+            DirecaoComboBox.SelectedItem = _direcoes.FirstOrDefault(d =>
+                ordenacao != null &&
+                d.Direcao == ordenacao.Direcao) ?? _direcoes.First();
+        }
+
+        private void AtualizarEstadoDirecao()
+        {
+            DirecaoComboBox.IsEnabled = CampoComboBox.SelectedItem is CampoOrdenacaoItem { Campo: not null };
+        }
+
+        private static List<CampoOrdenacaoItem> CriarCampos(IReadOnlyList<ProjectTableFieldSelection> camposSelecionados)
+        {
+            var itens = new List<CampoOrdenacaoItem>
+            {
+                new(null, "Sem ordenação")
+            };
+
+            itens.AddRange(camposSelecionados
+                .OrderBy(c => c.Ordem)
+                .Select(c => new CampoOrdenacaoItem(c, $"{ObterRotuloCategoria(c.Categoria)} - {c.NomeExibicao}")));
+
+            return itens;
+        }
+
+        private static List<DirecaoOrdenacaoItem> CriarDirecoes()
+        {
+            return new List<DirecaoOrdenacaoItem>
+            {
+                new(ProjectTableSortDirection.Crescente, "Crescente"),
+                new(ProjectTableSortDirection.Decrescente, "Decrescente")
+            };
+        }
+
+        private static string ObterRotuloCategoria(ProjectTableElementCategory categoria)
+        {
+            return categoria == ProjectTableElementCategory.Sin ? "SIN" : categoria.ToString();
+        }
+
+        private sealed class CampoOrdenacaoItem
+        {
+            public CampoOrdenacaoItem(ProjectTableFieldSelection? campo, string texto)
+            {
+                Campo = campo;
+                Texto = texto;
+            }
+
+            public ProjectTableFieldSelection? Campo { get; }
+            public string Texto { get; }
+        }
+
+        private sealed class DirecaoOrdenacaoItem
+        {
+            public DirecaoOrdenacaoItem(ProjectTableSortDirection direcao, string texto)
+            {
+                Direcao = direcao;
+                Texto = texto;
+            }
+
+            public ProjectTableSortDirection Direcao { get; }
+            public string Texto { get; }
         }
     }
 }
@@ -7963,14 +8580,18 @@ namespace Araci.Services.UI
                 : null;
         }
 
-        public void ShowOrdenacaoTabelaDialog()
+        public OrdenacaoTabelaDialogResult? ShowOrdenacaoTabelaDialog(
+            IReadOnlyList<ProjectTableFieldSelection> camposSelecionados,
+            ProjectTableSorting? ordenacao)
         {
-            var window = new OrdenacaoTabelaWindow
+            var window = new OrdenacaoTabelaWindow(camposSelecionados, ordenacao)
             {
                 Owner = Application.Current?.MainWindow
             };
 
-            window.ShowDialog();
+            return window.ShowDialog() == true
+                ? new OrdenacaoTabelaDialogResult(window.Ordenacao)
+                : null;
         }
 
         public bool Confirm(string title, string message)
@@ -8148,7 +8769,11 @@ namespace Araci.ViewModels
 
         private void MostrarOrdenacaoPlaceholder()
         {
-            _dialogs.ShowOrdenacaoTabelaDialog();
+            OrdenacaoTabelaDialogResult? resultado =
+                _dialogs.ShowOrdenacaoTabelaDialog(_tabela.CamposSelecionados, _tabela.Ordenacao);
+
+            if (resultado != null)
+                _editarPropriedadesTabela.AlterarOrdenacaoTabela(_tabela.Id, resultado.Ordenacao);
         }
 
         private void MostrarExibicaoPlaceholder()

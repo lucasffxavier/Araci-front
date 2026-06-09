@@ -55,6 +55,7 @@ namespace Araci.Core.Documents
 
     public class ProjectTableSorting
     {
+        public int Ordem { get; set; }
         public ProjectTableElementCategory Categoria { get; set; }
         public string CampoId { get; set; } = string.Empty;
         public string NomeExibicao { get; set; } = string.Empty;
@@ -71,6 +72,6 @@ namespace Araci.Core.Documents
         public Guid? FiltroVistaId { get; set; }
         public ProjectTableFilterLogicalMode ModoFiltro { get; set; } = ProjectTableFilterLogicalMode.Todas;
         public List<ProjectTableFilterRule> Filtros { get; set; } = new();
-        public ProjectTableSorting? Ordenacao { get; set; }
+        public List<ProjectTableSorting> Ordenacoes { get; set; } = new();
     }
 }

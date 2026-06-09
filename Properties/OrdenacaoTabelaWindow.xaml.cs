@@ -11,47 +11,78 @@ namespace Araci.Properties
     {
         private readonly List<CampoOrdenacaoItem> _campos;
         private readonly List<DirecaoOrdenacaoItem> _direcoes;
+        private readonly List<ComboBox> _campoComboBoxes;
+        private readonly List<ComboBox> _direcaoComboBoxes;
 
         public OrdenacaoTabelaWindow(
             IReadOnlyList<ProjectTableFieldSelection> camposSelecionados,
-            ProjectTableSorting? ordenacao)
+            IReadOnlyList<ProjectTableSorting> ordenacoes)
         {
             InitializeComponent();
 
             _campos = CriarCampos(camposSelecionados);
             _direcoes = CriarDirecoes();
+            _campoComboBoxes = new List<ComboBox>
+            {
+                Campo0ComboBox,
+                Campo1ComboBox,
+                Campo2ComboBox,
+                Campo3ComboBox,
+                Campo4ComboBox
+            };
+            _direcaoComboBoxes = new List<ComboBox>
+            {
+                Direcao0ComboBox,
+                Direcao1ComboBox,
+                Direcao2ComboBox,
+                Direcao3ComboBox,
+                Direcao4ComboBox
+            };
 
-            CampoComboBox.ItemsSource = _campos;
-            DirecaoComboBox.ItemsSource = _direcoes;
-            DirecaoComboBox.SelectedItem = _direcoes.First();
+            for (int i = 0; i < _campoComboBoxes.Count; i++)
+            {
+                _campoComboBoxes[i].ItemsSource = _campos;
+                _campoComboBoxes[i].SelectedItem = _campos.First();
+                _direcaoComboBoxes[i].ItemsSource = _direcoes;
+                _direcaoComboBoxes[i].SelectedItem = _direcoes.First();
+            }
 
-            AplicarOrdenacao(ordenacao);
-            AtualizarEstadoDirecao();
+            AplicarOrdenacoes(ordenacoes);
+            AtualizarEstadoDirecoes();
         }
 
-        public ProjectTableSorting? Ordenacao { get; private set; }
+        public IReadOnlyList<ProjectTableSorting> Ordenacoes { get; private set; } = new List<ProjectTableSorting>();
 
         private void OkButton_Click(object sender, RoutedEventArgs e)
         {
-            if (CampoComboBox.SelectedItem is CampoOrdenacaoItem { Campo: not null } campo)
+            var resultado = new List<ProjectTableSorting>();
+            var chavesUsadas = new HashSet<string>(StringComparer.Ordinal);
+
+            for (int i = 0; i < _campoComboBoxes.Count; i++)
             {
-                ProjectTableSortDirection direcao = DirecaoComboBox.SelectedItem is DirecaoOrdenacaoItem direcaoItem
+                if (_campoComboBoxes[i].SelectedItem is not CampoOrdenacaoItem { Campo: not null } campo)
+                    continue;
+
+                string chave = CriarChaveCampo(campo.Campo.Categoria, campo.Campo.CampoId);
+
+                if (!chavesUsadas.Add(chave))
+                    continue;
+
+                ProjectTableSortDirection direcao = _direcaoComboBoxes[i].SelectedItem is DirecaoOrdenacaoItem direcaoItem
                     ? direcaoItem.Direcao
                     : ProjectTableSortDirection.Crescente;
 
-                Ordenacao = new ProjectTableSorting
+                resultado.Add(new ProjectTableSorting
                 {
+                    Ordem = resultado.Count,
                     Categoria = campo.Campo.Categoria,
                     CampoId = campo.Campo.CampoId,
                     NomeExibicao = campo.Campo.NomeExibicao,
                     Direcao = direcao
-                };
-            }
-            else
-            {
-                Ordenacao = null;
+                });
             }
 
+            Ordenacoes = resultado;
             DialogResult = true;
         }
 
@@ -62,25 +93,32 @@ namespace Araci.Properties
 
         private void CampoComboBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
         {
-            AtualizarEstadoDirecao();
+            AtualizarEstadoDirecoes();
         }
 
-        private void AplicarOrdenacao(ProjectTableSorting? ordenacao)
+        private void AplicarOrdenacoes(IReadOnlyList<ProjectTableSorting> ordenacoes)
         {
-            CampoComboBox.SelectedItem = _campos.FirstOrDefault(c =>
-                c.Campo != null &&
-                ordenacao != null &&
-                c.Campo.Categoria == ordenacao.Categoria &&
-                string.Equals(c.Campo.CampoId, ordenacao.CampoId, StringComparison.Ordinal)) ?? _campos.First();
+            foreach (ProjectTableSorting ordenacao in (ordenacoes ?? Array.Empty<ProjectTableSorting>())
+                .Where(o => !string.IsNullOrWhiteSpace(o.CampoId))
+                .OrderBy(o => o.Ordem)
+                .Take(5))
+            {
+                int indice = Math.Max(0, Math.Min(4, ordenacao.Ordem));
 
-            DirecaoComboBox.SelectedItem = _direcoes.FirstOrDefault(d =>
-                ordenacao != null &&
-                d.Direcao == ordenacao.Direcao) ?? _direcoes.First();
+                _campoComboBoxes[indice].SelectedItem = _campos.FirstOrDefault(c =>
+                    c.Campo != null &&
+                    c.Campo.Categoria == ordenacao.Categoria &&
+                    string.Equals(c.Campo.CampoId, ordenacao.CampoId, StringComparison.Ordinal)) ?? _campos.First();
+
+                _direcaoComboBoxes[indice].SelectedItem = _direcoes.FirstOrDefault(d =>
+                    d.Direcao == ordenacao.Direcao) ?? _direcoes.First();
+            }
         }
 
-        private void AtualizarEstadoDirecao()
+        private void AtualizarEstadoDirecoes()
         {
-            DirecaoComboBox.IsEnabled = CampoComboBox.SelectedItem is CampoOrdenacaoItem { Campo: not null };
+            for (int i = 0; i < _campoComboBoxes.Count; i++)
+                _direcaoComboBoxes[i].IsEnabled = _campoComboBoxes[i].SelectedItem is CampoOrdenacaoItem { Campo: not null };
         }
 
         private static List<CampoOrdenacaoItem> CriarCampos(IReadOnlyList<ProjectTableFieldSelection> camposSelecionados)
@@ -90,7 +128,7 @@ namespace Araci.Properties
                 new(null, "Sem ordenação")
             };
 
-            itens.AddRange(camposSelecionados
+            itens.AddRange((camposSelecionados ?? Array.Empty<ProjectTableFieldSelection>())
                 .OrderBy(c => c.Ordem)
                 .Select(c => new CampoOrdenacaoItem(c, $"{ObterRotuloCategoria(c.Categoria)} - {c.NomeExibicao}")));
 
@@ -109,6 +147,11 @@ namespace Araci.Properties
         private static string ObterRotuloCategoria(ProjectTableElementCategory categoria)
         {
             return categoria == ProjectTableElementCategory.Sin ? "SIN" : categoria.ToString();
+        }
+
+        private static string CriarChaveCampo(ProjectTableElementCategory categoria, string campoId)
+        {
+            return $"{categoria}|{campoId.Trim()}";
         }
 
         private sealed class CampoOrdenacaoItem

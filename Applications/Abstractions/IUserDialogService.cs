@@ -25,7 +25,7 @@ namespace Araci.Applications.Abstractions
 
         OrdenacaoTabelaDialogResult? ShowOrdenacaoTabelaDialog(
             IReadOnlyList<ProjectTableFieldSelection> camposSelecionados,
-            ProjectTableSorting? ordenacao);
+            IReadOnlyList<ProjectTableSorting> ordenacoes);
 
         bool Confirm(string title, string message);
 
