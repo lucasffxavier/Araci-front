@@ -538,6 +538,724 @@ Araci-front
 
 
 ====================================================================================================
+ARQUIVO: C:\Users\User\source\repos\lucasffxavier\Araci-front\Applications\Projects\Tables\ProjectTableDataBuilder.cs
+====================================================================================================
+
+using System;
+using System.Collections.Generic;
+using System.Globalization;
+using System.Linq;
+using Araci.Core.Documents;
+using Araci.Models;
+
+namespace Araci.Applications.Projects.Tables
+{
+    public sealed class ProjectTableDataBuilder
+    {
+        public ProjectTableDataResult Build(AraciDocument document, ProjectTable table)
+        {
+            ArgumentNullException.ThrowIfNull(document);
+            ArgumentNullException.ThrowIfNull(table);
+
+            List<ProjectTableDataColumn> columns = CriarColunas(table);
+
+            if (columns.Count == 0 || table.CategoriasElementos.Count == 0)
+                return new ProjectTableDataResult(columns, new List<ProjectTableDataRow>());
+
+            HashSet<ProjectTableElementCategory> categorias = table.CategoriasElementos.ToHashSet();
+            Guid? filtroVistaId = ObterFiltroVistaValido(document, table.FiltroVistaId);
+
+            List<RowBuildData> rows = document.Elementos
+                .Select((elemento, index) => new { Elemento = elemento, Index = index, Categoria = ObterCategoria(elemento) })
+                .Where(item => item.Categoria.HasValue && categorias.Contains(item.Categoria.Value))
+                .Where(item => PassaFiltroVista(item.Elemento, filtroVistaId))
+                .Select(item => CriarLinha(item.Elemento, item.Categoria!.Value, item.Index, columns))
+                .Where(row => PassaFiltros(row, table))
+                .ToList();
+
+            rows = OrdenarLinhas(rows, table, columns);
+
+            return new ProjectTableDataResult(
+                columns,
+                rows.Select(row => row.Row).ToList());
+        }
+
+        private static List<ProjectTableDataColumn> CriarColunas(ProjectTable table)
+        {
+            return (table.CamposSelecionados ?? new List<ProjectTableFieldSelection>())
+                .Where(c => !string.IsNullOrWhiteSpace(c.CampoId))
+                .OrderBy(c => c.Ordem)
+                .GroupBy(c => CriarChaveCampo(c.Categoria, c.CampoId))
+                .Select((g, index) =>
+                {
+                    ProjectTableFieldSelection campo = g.First();
+                    string campoId = campo.CampoId.Trim();
+                    return new ProjectTableDataColumn(
+                        campo.Categoria,
+                        campoId,
+                        string.IsNullOrWhiteSpace(campo.NomeExibicao) ? campoId : campo.NomeExibicao.Trim(),
+                        index);
+                })
+                .ToList();
+        }
+
+        private static Guid? ObterFiltroVistaValido(AraciDocument document, Guid? filtroVistaId)
+        {
+            if (!filtroVistaId.HasValue || filtroVistaId.Value == Guid.Empty)
+                return null;
+
+            return document.Vistas.Any(v => v.Id == filtroVistaId.Value)
+                ? filtroVistaId
+                : null;
+        }
+
+        private static bool PassaFiltroVista(Elemento elemento, Guid? filtroVistaId)
+        {
+            return !filtroVistaId.HasValue || elemento.ViewId == filtroVistaId.Value;
+        }
+
+        private static RowBuildData CriarLinha(
+            Elemento elemento,
+            ProjectTableElementCategory categoria,
+            int documentIndex,
+            IReadOnlyList<ProjectTableDataColumn> columns)
+        {
+            List<ProjectTableDataCell> cells = columns
+                .Select(column =>
+                {
+                    object? valor = ExtrairValor(elemento, categoria, column);
+                    return new ProjectTableDataCell(
+                        column.Categoria,
+                        column.CampoId,
+                        column.NomeExibicao,
+                        valor,
+                        FormatarValor(valor));
+                })
+                .ToList();
+
+            var row = new ProjectTableDataRow(
+                elemento.Id,
+                elemento.Nome,
+                categoria,
+                cells);
+
+            return new RowBuildData(elemento, documentIndex, row);
+        }
+
+        private static bool PassaFiltros(RowBuildData row, ProjectTable table)
+        {
+            List<ProjectTableFilterRule> filtros = NormalizarFiltros(table.Filtros, row.Row.Cells);
+
+            if (filtros.Count == 0)
+                return true;
+
+            return table.ModoFiltro == ProjectTableFilterLogicalMode.Qualquer
+                ? filtros.Any(f => AvaliarFiltro(row, f))
+                : filtros.All(f => AvaliarFiltro(row, f));
+        }
+
+        private static List<ProjectTableFilterRule> NormalizarFiltros(
+            IEnumerable<ProjectTableFilterRule>? filtros,
+            IReadOnlyList<ProjectTableDataCell> cells)
+        {
+            HashSet<string> campos = cells
+                .Select(c => CriarChaveCampo(c.Categoria, c.CampoId))
+                .ToHashSet(StringComparer.Ordinal);
+
+            return (filtros ?? Enumerable.Empty<ProjectTableFilterRule>())
+                .Where(f => !string.IsNullOrWhiteSpace(f.CampoId))
+                .OrderBy(f => f.Ordem)
+                .Where(f => campos.Contains(CriarChaveCampo(f.Categoria, f.CampoId)))
+                .Take(5)
+                .ToList();
+        }
+
+        private static bool AvaliarFiltro(RowBuildData row, ProjectTableFilterRule filtro)
+        {
+            ProjectTableDataCell? cell = ObterCell(row, filtro.Categoria, filtro.CampoId);
+
+            if (cell == null)
+                return false;
+
+            string valorFiltro = filtro.Valor?.Trim() ?? string.Empty;
+            string display = cell.DisplayValue ?? string.Empty;
+
+            if (filtro.Operador is ProjectTableFilterOperator.IgualA or ProjectTableFilterOperator.DiferenteDe &&
+                TentarConverterNumero(cell.RawValue, out double numeroCelula) &&
+                TentarConverterNumero(valorFiltro, out double numeroFiltro))
+            {
+                bool igualNumero = Math.Abs(numeroCelula - numeroFiltro) < 0.0000001;
+                return filtro.Operador == ProjectTableFilterOperator.IgualA ? igualNumero : !igualNumero;
+            }
+
+            int comparacao = string.Compare(display, valorFiltro, StringComparison.OrdinalIgnoreCase);
+            bool resultado = filtro.Operador switch
+            {
+                ProjectTableFilterOperator.Contem => display.Contains(valorFiltro, StringComparison.OrdinalIgnoreCase),
+                ProjectTableFilterOperator.NaoContem => !display.Contains(valorFiltro, StringComparison.OrdinalIgnoreCase),
+                ProjectTableFilterOperator.ComecaCom => display.StartsWith(valorFiltro, StringComparison.OrdinalIgnoreCase),
+                ProjectTableFilterOperator.TerminaCom => display.EndsWith(valorFiltro, StringComparison.OrdinalIgnoreCase),
+                ProjectTableFilterOperator.IgualA => comparacao == 0,
+                ProjectTableFilterOperator.DiferenteDe => comparacao != 0,
+                _ => display.Contains(valorFiltro, StringComparison.OrdinalIgnoreCase)
+            };
+
+            return resultado;
+        }
+
+        private static List<RowBuildData> OrdenarLinhas(
+            List<RowBuildData> rows,
+            ProjectTable table,
+            IReadOnlyList<ProjectTableDataColumn> columns)
+        {
+            List<ProjectTableSorting> ordenacoes = NormalizarOrdenacoes(table.Ordenacoes, columns);
+
+            if (ordenacoes.Count == 0)
+                return rows.OrderBy(row => row.DocumentIndex).ToList();
+
+            return rows
+                .OrderBy(row => row, new RowBuildDataComparer(ordenacoes))
+                .ToList();
+        }
+
+        private static List<ProjectTableSorting> NormalizarOrdenacoes(
+            IEnumerable<ProjectTableSorting>? ordenacoes,
+            IReadOnlyList<ProjectTableDataColumn> columns)
+        {
+            HashSet<string> campos = columns
+                .Select(c => CriarChaveCampo(c.Categoria, c.CampoId))
+                .ToHashSet(StringComparer.Ordinal);
+
+            var chavesUsadas = new HashSet<string>(StringComparer.Ordinal);
+            var resultado = new List<ProjectTableSorting>();
+
+            foreach (ProjectTableSorting ordenacao in (ordenacoes ?? Enumerable.Empty<ProjectTableSorting>())
+                .Where(o => !string.IsNullOrWhiteSpace(o.CampoId))
+                .OrderBy(o => o.Ordem))
+            {
+                string chave = CriarChaveCampo(ordenacao.Categoria, ordenacao.CampoId);
+
+                if (!campos.Contains(chave) || !chavesUsadas.Add(chave))
+                    continue;
+
+                resultado.Add(new ProjectTableSorting
+                {
+                    Ordem = resultado.Count,
+                    Categoria = ordenacao.Categoria,
+                    CampoId = ordenacao.CampoId.Trim(),
+                    NomeExibicao = ordenacao.NomeExibicao,
+                    Direcao = Enum.IsDefined(typeof(ProjectTableSortDirection), ordenacao.Direcao)
+                        ? ordenacao.Direcao
+                        : ProjectTableSortDirection.Crescente
+                });
+
+                if (resultado.Count == 5)
+                    break;
+            }
+
+            return resultado;
+        }
+
+        private static object? ExtrairValor(
+            Elemento elemento,
+            ProjectTableElementCategory categoriaElemento,
+            ProjectTableDataColumn column)
+        {
+            if (categoriaElemento != column.Categoria)
+                return null;
+
+            string campoId = column.CampoId.Trim();
+
+            if (string.Equals(campoId, Elemento.PARAM_NOME, StringComparison.Ordinal))
+                return elemento.Nome;
+
+            if (string.Equals(campoId, "Tipo", StringComparison.Ordinal))
+                return elemento.Tipo?.NomeTipo ?? string.Empty;
+
+            string? parametro = ObterParametroAlias(categoriaElemento, campoId);
+
+            if (parametro != null && elemento.Parametros.TryGetValue(parametro, out Parameter? aliasParameter))
+                return aliasParameter.ValorObjeto;
+
+            return elemento.Parametros.TryGetValue(campoId, out Parameter? parameter)
+                ? parameter.ValorObjeto
+                : null;
+        }
+
+        private static string? ObterParametroAlias(ProjectTableElementCategory categoria, string campoId)
+        {
+            return categoria switch
+            {
+                ProjectTableElementCategory.Barras when campoId == "TensaoNominal" => Barra.PARAM_TENSAO,
+                ProjectTableElementCategory.Cabos when campoId == "Corrente" => Cabo.PARAM_CORRENTE_LINHA,
+                ProjectTableElementCategory.Cargas when campoId == "Tensao" => ElementoEquipamento.PARAM_TENSAO_LINHA,
+                ProjectTableElementCategory.Geradores when campoId == "Tensao" => ElementoEquipamento.PARAM_TENSAO_LINHA,
+                ProjectTableElementCategory.Transformadores when campoId == "PotenciaNominal" => Transformador.PARAM_POTENCIA_APARENTE,
+                ProjectTableElementCategory.Transformadores when campoId == "TensaoPrimaria" => Transformador.PARAM_TENSAO_PRIMARIO_KV,
+                ProjectTableElementCategory.Transformadores when campoId == "TensaoSecundaria" => Transformador.PARAM_TENSAO_SECUNDARIO_KV,
+                ProjectTableElementCategory.Sin when campoId == "Tensao" => ElementoEquipamento.PARAM_TENSAO_LINHA,
+                _ => null
+            };
+        }
+
+        private static ProjectTableElementCategory? ObterCategoria(Elemento elemento)
+        {
+            return elemento switch
+            {
+                Barra => ProjectTableElementCategory.Barras,
+                Cabo => ProjectTableElementCategory.Cabos,
+                Carga => ProjectTableElementCategory.Cargas,
+                Gerador => ProjectTableElementCategory.Geradores,
+                Transformador => ProjectTableElementCategory.Transformadores,
+                Sin => ProjectTableElementCategory.Sin,
+                _ => null
+            };
+        }
+
+        private static ProjectTableDataCell? ObterCell(
+            RowBuildData row,
+            ProjectTableElementCategory categoria,
+            string campoId)
+        {
+            string chave = CriarChaveCampo(categoria, campoId);
+            return row.Row.Cells.FirstOrDefault(c =>
+                string.Equals(CriarChaveCampo(c.Categoria, c.CampoId), chave, StringComparison.Ordinal));
+        }
+
+        private static int CompararValores(object? a, object? b, bool decrescente)
+        {
+            bool vazioA = ValorVazio(a);
+            bool vazioB = ValorVazio(b);
+
+            if (vazioA && vazioB)
+                return 0;
+
+            if (vazioA)
+                return 1;
+
+            if (vazioB)
+                return -1;
+
+            int comparacao;
+
+            if (TentarConverterNumero(a, out double numeroA) &&
+                TentarConverterNumero(b, out double numeroB))
+                comparacao = numeroA.CompareTo(numeroB);
+            else
+                comparacao = string.Compare(FormatarValor(a), FormatarValor(b), StringComparison.OrdinalIgnoreCase);
+
+            return decrescente ? -comparacao : comparacao;
+        }
+
+        private static bool ValorVazio(object? valor)
+        {
+            return valor == null || valor is string texto && string.IsNullOrWhiteSpace(texto);
+        }
+
+        private static bool TentarConverterNumero(object? valor, out double numero)
+        {
+            numero = 0;
+
+            if (valor == null)
+                return false;
+
+            if (valor is double d)
+            {
+                numero = d;
+                return true;
+            }
+
+            if (valor is int i)
+            {
+                numero = i;
+                return true;
+            }
+
+            string texto = Convert.ToString(valor, CultureInfo.InvariantCulture)?.Trim() ?? string.Empty;
+
+            return double.TryParse(texto, NumberStyles.Float, CultureInfo.InvariantCulture, out numero) ||
+                double.TryParse(texto, NumberStyles.Float, CultureInfo.GetCultureInfo("pt-BR"), out numero);
+        }
+
+        private static string FormatarValor(object? valor)
+        {
+            return valor switch
+            {
+                null => string.Empty,
+                double d => d.ToString(CultureInfo.InvariantCulture),
+                float f => f.ToString(CultureInfo.InvariantCulture),
+                decimal m => m.ToString(CultureInfo.InvariantCulture),
+                _ => Convert.ToString(valor, CultureInfo.InvariantCulture) ?? string.Empty
+            };
+        }
+
+        private static string CriarChaveCampo(ProjectTableElementCategory categoria, string campoId)
+        {
+            return $"{categoria}|{campoId.Trim()}";
+        }
+
+        private sealed class RowBuildData
+        {
+            public RowBuildData(Elemento elemento, int documentIndex, ProjectTableDataRow row)
+            {
+                Elemento = elemento;
+                DocumentIndex = documentIndex;
+                Row = row;
+            }
+
+            public Elemento Elemento { get; }
+            public int DocumentIndex { get; }
+            public ProjectTableDataRow Row { get; }
+        }
+
+        private sealed class RowBuildDataComparer : IComparer<RowBuildData>
+        {
+            private readonly IReadOnlyList<ProjectTableSorting> _ordenacoes;
+
+            public RowBuildDataComparer(IReadOnlyList<ProjectTableSorting> ordenacoes)
+            {
+                _ordenacoes = ordenacoes;
+            }
+
+            public int Compare(RowBuildData? x, RowBuildData? y)
+            {
+                if (ReferenceEquals(x, y))
+                    return 0;
+
+                if (x == null)
+                    return 1;
+
+                if (y == null)
+                    return -1;
+
+                foreach (ProjectTableSorting ordenacao in _ordenacoes)
+                {
+                    ProjectTableDataCell? cellX = ObterCell(x, ordenacao.Categoria, ordenacao.CampoId);
+                    ProjectTableDataCell? cellY = ObterCell(y, ordenacao.Categoria, ordenacao.CampoId);
+                    int comparacao = CompararValores(
+                        cellX?.RawValue,
+                        cellY?.RawValue,
+                        ordenacao.Direcao == ProjectTableSortDirection.Decrescente);
+
+                    if (comparacao == 0)
+                        continue;
+
+                    return comparacao;
+                }
+
+                return x.DocumentIndex.CompareTo(y.DocumentIndex);
+            }
+        }
+    }
+}
+
+
+
+====================================================================================================
+ARQUIVO: C:\Users\User\source\repos\lucasffxavier\Araci-front\Applications\Projects\Tables\ProjectTableDataCell.cs
+====================================================================================================
+
+using Araci.Core.Documents;
+
+namespace Araci.Applications.Projects.Tables
+{
+    public sealed class ProjectTableDataCell
+    {
+        public ProjectTableDataCell(
+            ProjectTableElementCategory categoria,
+            string campoId,
+            string nomeExibicao,
+            object? rawValue,
+            string displayValue)
+        {
+            Categoria = categoria;
+            CampoId = campoId;
+            NomeExibicao = nomeExibicao;
+            RawValue = rawValue;
+            DisplayValue = displayValue;
+        }
+
+        public ProjectTableElementCategory Categoria { get; }
+        public string CampoId { get; }
+        public string NomeExibicao { get; }
+        public object? RawValue { get; }
+        public string DisplayValue { get; }
+    }
+}
+
+
+
+====================================================================================================
+ARQUIVO: C:\Users\User\source\repos\lucasffxavier\Araci-front\Applications\Projects\Tables\ProjectTableDataColumn.cs
+====================================================================================================
+
+using Araci.Core.Documents;
+
+namespace Araci.Applications.Projects.Tables
+{
+    public sealed class ProjectTableDataColumn
+    {
+        public ProjectTableDataColumn(
+            ProjectTableElementCategory categoria,
+            string campoId,
+            string nomeExibicao,
+            int ordem)
+        {
+            Categoria = categoria;
+            CampoId = campoId;
+            NomeExibicao = nomeExibicao;
+            Ordem = ordem;
+        }
+
+        public ProjectTableElementCategory Categoria { get; }
+        public string CampoId { get; }
+        public string NomeExibicao { get; }
+        public int Ordem { get; }
+    }
+}
+
+
+
+====================================================================================================
+ARQUIVO: C:\Users\User\source\repos\lucasffxavier\Araci-front\Applications\Projects\Tables\ProjectTableDataResult.cs
+====================================================================================================
+
+using System.Collections.Generic;
+
+namespace Araci.Applications.Projects.Tables
+{
+    public sealed class ProjectTableDataResult
+    {
+        public ProjectTableDataResult(
+            IReadOnlyList<ProjectTableDataColumn> columns,
+            IReadOnlyList<ProjectTableDataRow> rows)
+        {
+            Columns = columns;
+            Rows = rows;
+        }
+
+        public IReadOnlyList<ProjectTableDataColumn> Columns { get; }
+        public IReadOnlyList<ProjectTableDataRow> Rows { get; }
+    }
+}
+
+
+
+====================================================================================================
+ARQUIVO: C:\Users\User\source\repos\lucasffxavier\Araci-front\Applications\Projects\Tables\ProjectTableDataRow.cs
+====================================================================================================
+
+using System;
+using System.Collections.Generic;
+using Araci.Core.Documents;
+
+namespace Araci.Applications.Projects.Tables
+{
+    public sealed class ProjectTableDataRow
+    {
+        public ProjectTableDataRow(
+            Guid elementoId,
+            string elementoNome,
+            ProjectTableElementCategory categoria,
+            IReadOnlyList<ProjectTableDataCell> cells)
+        {
+            ElementoId = elementoId;
+            ElementoNome = elementoNome;
+            Categoria = categoria;
+            Cells = cells;
+        }
+
+        public Guid ElementoId { get; }
+        public string ElementoNome { get; }
+        public ProjectTableElementCategory Categoria { get; }
+        public IReadOnlyList<ProjectTableDataCell> Cells { get; }
+    }
+}
+
+
+
+====================================================================================================
+ARQUIVO: C:\Users\User\source\repos\lucasffxavier\Araci-front\ViewModels\ProjectSheetTableInstanceViewModel.cs
+====================================================================================================
+
+using System;
+using System.ComponentModel;
+using System.Runtime.CompilerServices;
+using Araci.Core.Documents;
+
+namespace Araci.ViewModels
+{
+    public sealed class ProjectSheetTableInstanceViewModel : INotifyPropertyChanged
+    {
+        private double _x;
+        private double _y;
+        private double _width;
+        private double _height;
+        private double _sheetOriginOffsetX;
+        private double _sheetOriginOffsetY;
+        private bool _isSelected;
+
+        public ProjectSheetTableInstanceViewModel(ProjectSheetTableInstance instance, string tableName)
+        {
+            ArgumentNullException.ThrowIfNull(instance);
+
+            Id = instance.Id;
+            TableId = instance.TableId;
+            TableName = string.IsNullOrWhiteSpace(tableName) ? "Tabela sem nome" : tableName;
+            _x = NormalizePosition(instance.X);
+            _y = NormalizePosition(instance.Y);
+            _width = NormalizeDimension(instance.Width, ProjectSheetTableInstance.MinWidth);
+            _height = NormalizeDimension(instance.Height, ProjectSheetTableInstance.MinHeight);
+        }
+
+        public Guid Id { get; }
+        public Guid TableId { get; }
+        public string TableName { get; }
+        public double ViewX => X + SheetOriginOffsetX;
+        public double ViewY => Y + SheetOriginOffsetY;
+
+        public double SheetOriginOffsetX
+        {
+            get => _sheetOriginOffsetX;
+            private set
+            {
+                if (Math.Abs(_sheetOriginOffsetX - value) < 0.000001)
+                    return;
+
+                _sheetOriginOffsetX = value;
+                OnPropertyChanged();
+                OnPropertyChanged(nameof(ViewX));
+            }
+        }
+
+        public double SheetOriginOffsetY
+        {
+            get => _sheetOriginOffsetY;
+            private set
+            {
+                if (Math.Abs(_sheetOriginOffsetY - value) < 0.000001)
+                    return;
+
+                _sheetOriginOffsetY = value;
+                OnPropertyChanged();
+                OnPropertyChanged(nameof(ViewY));
+            }
+        }
+
+        public double X
+        {
+            get => _x;
+            private set
+            {
+                if (Math.Abs(_x - value) < 0.000001)
+                    return;
+
+                _x = value;
+                OnPropertyChanged();
+                OnPropertyChanged(nameof(ViewX));
+            }
+        }
+
+        public double Y
+        {
+            get => _y;
+            private set
+            {
+                if (Math.Abs(_y - value) < 0.000001)
+                    return;
+
+                _y = value;
+                OnPropertyChanged();
+                OnPropertyChanged(nameof(ViewY));
+            }
+        }
+
+        public double Width
+        {
+            get => _width;
+            private set
+            {
+                if (Math.Abs(_width - value) < 0.000001)
+                    return;
+
+                _width = value;
+                OnPropertyChanged();
+            }
+        }
+
+        public double Height
+        {
+            get => _height;
+            private set
+            {
+                if (Math.Abs(_height - value) < 0.000001)
+                    return;
+
+                _height = value;
+                OnPropertyChanged();
+            }
+        }
+
+        public bool IsSelected
+        {
+            get => _isSelected;
+            set
+            {
+                if (_isSelected == value)
+                    return;
+
+                _isSelected = value;
+                OnPropertyChanged();
+            }
+        }
+
+        public void SetSheetOriginOffset(double offsetX, double offsetY)
+        {
+            SheetOriginOffsetX = NormalizeDimension(offsetX, 0);
+            SheetOriginOffsetY = NormalizeDimension(offsetY, 0);
+        }
+
+        public void SetPreviewPosition(double x, double y)
+        {
+            X = NormalizePosition(x);
+            Y = NormalizePosition(y);
+        }
+
+        public void SetPreviewSize(double width, double height)
+        {
+            Width = NormalizeDimension(width, ProjectSheetTableInstance.MinWidth);
+            Height = NormalizeDimension(height, ProjectSheetTableInstance.MinHeight);
+        }
+
+        private static double NormalizePosition(double value)
+        {
+            return double.IsNaN(value) || double.IsInfinity(value)
+                ? 0
+                : value;
+        }
+
+        private static double NormalizeDimension(double value, double minimum)
+        {
+            double safeMinimum = double.IsNaN(minimum) || double.IsInfinity(minimum) || minimum < 0
+                ? 0
+                : minimum;
+
+            return double.IsNaN(value) || double.IsInfinity(value) || value < safeMinimum
+                ? safeMinimum
+                : value;
+        }
+
+        public event PropertyChangedEventHandler? PropertyChanged;
+
+        private void OnPropertyChanged([CallerMemberName] string? propertyName = null)
+        {
+            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
+        }
+    }
+}
+
+
+====================================================================================================
 ARQUIVO: C:\Users\User\source\repos\lucasffxavier\Araci-front\ViewModels\ProjectSheetViewModel.cs
 ====================================================================================================
 
@@ -935,6 +1653,140 @@ namespace Araci.ViewModels
 
 
 ====================================================================================================
+ARQUIVO: C:\Users\User\source\repos\lucasffxavier\Araci-front\ViewModels\ProjectTableDataViewModel.cs
+====================================================================================================
+
+using System;
+using System.Collections.Generic;
+using System.Collections.ObjectModel;
+using System.ComponentModel;
+using System.Linq;
+using System.Runtime.CompilerServices;
+using Araci.Applications.Projects.Tables;
+using Araci.Core.Documents;
+
+namespace Araci.ViewModels
+{
+    public sealed class ProjectTableDataViewModel : INotifyPropertyChanged
+    {
+        private readonly AraciDocument _document;
+        private readonly ProjectTable _table;
+        private readonly ProjectTableDataBuilder _builder;
+        private string _titulo = string.Empty;
+        private IReadOnlyList<ProjectTableDataColumn> _columns = new List<ProjectTableDataColumn>();
+        private string _emptyMessage = string.Empty;
+
+        public ProjectTableDataViewModel(
+            AraciDocument document,
+            ProjectTable table,
+            ProjectTableDataBuilder? builder = null)
+        {
+            _document = document;
+            _table = table;
+            _builder = builder ?? new ProjectTableDataBuilder();
+            Rows = new ObservableCollection<ProjectTableDataRowViewModel>();
+            Refresh();
+        }
+
+        public Guid TableId => _table.Id;
+        public ObservableCollection<ProjectTableDataRowViewModel> Rows { get; }
+
+        public string Titulo
+        {
+            get => _titulo;
+            private set
+            {
+                if (_titulo == value)
+                    return;
+
+                _titulo = value;
+                OnPropertyChanged();
+            }
+        }
+
+        public IReadOnlyList<ProjectTableDataColumn> Columns
+        {
+            get => _columns;
+            private set
+            {
+                _columns = value;
+                OnPropertyChanged();
+                OnPropertyChanged(nameof(HasColumns));
+            }
+        }
+
+        public bool HasColumns => Columns.Count > 0;
+        public bool HasRows => Rows.Count > 0;
+        public bool HasEmptyMessage => !string.IsNullOrWhiteSpace(EmptyMessage);
+
+        public string EmptyMessage
+        {
+            get => _emptyMessage;
+            private set
+            {
+                if (_emptyMessage == value)
+                    return;
+
+                _emptyMessage = value;
+                OnPropertyChanged();
+                OnPropertyChanged(nameof(HasEmptyMessage));
+            }
+        }
+
+        public void Refresh()
+        {
+            Titulo = _table.Nome;
+            ProjectTableDataResult result = _builder.Build(_document, _table);
+            Columns = result.Columns.ToList();
+
+            Rows.Clear();
+
+            foreach (ProjectTableDataRow row in result.Rows)
+                Rows.Add(new ProjectTableDataRowViewModel(row));
+
+            EmptyMessage = !HasColumns
+                ? "Nenhum campo selecionado"
+                : !HasRows
+                    ? "Nenhum item encontrado"
+                    : string.Empty;
+
+            OnPropertyChanged(nameof(HasRows));
+        }
+
+        public event PropertyChangedEventHandler? PropertyChanged;
+
+        private void OnPropertyChanged([CallerMemberName] string? propertyName = null)
+        {
+            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
+        }
+    }
+
+    public sealed class ProjectTableDataRowViewModel
+    {
+        private readonly IReadOnlyList<ProjectTableDataCell> _cells;
+
+        public ProjectTableDataRowViewModel(ProjectTableDataRow row)
+        {
+            ElementoId = row.ElementoId;
+            ElementoNome = row.ElementoNome;
+            Categoria = row.Categoria;
+            _cells = row.Cells;
+        }
+
+        public Guid ElementoId { get; }
+        public string ElementoNome { get; }
+        public ProjectTableElementCategory Categoria { get; }
+
+        public string this[int index] =>
+            index >= 0 && index < _cells.Count
+                ? _cells[index].DisplayValue
+                : string.Empty;
+    }
+}
+
+
+
+====================================================================================================
 ARQUIVO: C:\Users\User\source\repos\lucasffxavier\Araci-front\Views\ProjectSheetView.xaml
 ====================================================================================================
 
@@ -1039,7 +1891,8 @@ ARQUIVO: C:\Users\User\source\repos\lucasffxavier\Araci-front\Views\ProjectSheet
                             ClipToBounds="False"
                             MouseLeftButtonDown="SheetSurface_MouseLeftButtonDown"
                             LostMouseCapture="SheetSurface_LostMouseCapture">
-						<Border Canvas.Left="{Binding SheetOriginOffsetX}"
+						<Border x:Name="SheetPageBorder"
+                                Canvas.Left="{Binding SheetOriginOffsetX}"
                                 Canvas.Top="{Binding SheetOriginOffsetY}"
                                 Width="{Binding SheetWidth}"
                                 Height="{Binding SheetHeight}"
@@ -1175,6 +2028,7 @@ ARQUIVO: C:\Users\User\source\repos\lucasffxavier\Araci-front\Views\ProjectSheet
 		</Grid>
 	</Border>
 </UserControl>
+
 
 
 ====================================================================================================
@@ -1497,27 +2351,37 @@ namespace Araci.Views
                 return;
 
             zoomAction();
-            CenterSheetInViewport();
-            CenterSheetInViewportDeferred();
+            CenterSheetInViewport(updateLayout: true);
         }
 
         private void CenterSheetInViewportDeferred()
         {
             Dispatcher.BeginInvoke(
                 DispatcherPriority.Loaded,
-                new Action(CenterSheetInViewport));
+                new Action(() => CenterSheetInViewport(updateLayout: true)));
         }
 
-        private void CenterSheetInViewport()
+        private void CenterSheetInViewport(bool updateLayout = false)
         {
-            ProjectSheetViewModel? viewModel = ViewModel;
-
-            if (viewModel == null)
+            if (!IsLoaded || SheetPageBorder.ActualWidth <= 0 || SheetPageBorder.ActualHeight <= 0)
                 return;
 
-            double zoom = NormalizeZoom(viewModel.ZoomScale);
-            double sheetCenterX = viewModel.SheetOriginOffsetX + viewModel.SheetWidth / 2.0;
-            double sheetCenterY = viewModel.SheetOriginOffsetY + viewModel.SheetHeight / 2.0;
+            if (updateLayout)
+                SheetScrollViewer.UpdateLayout();
+
+            Rect sheetBounds;
+
+            try
+            {
+                sheetBounds = SheetPageBorder
+                    .TransformToAncestor(SheetScrollViewer)
+                    .TransformBounds(new Rect(0, 0, SheetPageBorder.ActualWidth, SheetPageBorder.ActualHeight));
+            }
+            catch (InvalidOperationException)
+            {
+                return;
+            }
+
             double viewportWidth = SheetScrollViewer.ViewportWidth;
             double viewportHeight = SheetScrollViewer.ViewportHeight;
 
@@ -1527,25 +2391,25 @@ namespace Araci.Views
             if (double.IsNaN(viewportHeight) || double.IsInfinity(viewportHeight) || viewportHeight <= 0)
                 viewportHeight = SheetScrollViewer.ActualHeight;
 
-            double targetHorizontal = sheetCenterX * zoom - viewportWidth / 2.0;
-            double targetVertical = sheetCenterY * zoom - viewportHeight / 2.0;
+            if (viewportWidth <= 0 || viewportHeight <= 0)
+                return;
 
-            SheetScrollViewer.ScrollToHorizontalOffset(NormalizeScrollOffset(targetHorizontal));
-            SheetScrollViewer.ScrollToVerticalOffset(NormalizeScrollOffset(targetVertical));
+            double targetHorizontal = SheetScrollViewer.HorizontalOffset + sheetBounds.Left + sheetBounds.Width / 2.0 - viewportWidth / 2.0;
+            double targetVertical = SheetScrollViewer.VerticalOffset + sheetBounds.Top + sheetBounds.Height / 2.0 - viewportHeight / 2.0;
+
+            SheetScrollViewer.ScrollToHorizontalOffset(NormalizeScrollOffset(targetHorizontal, SheetScrollViewer.ScrollableWidth));
+            SheetScrollViewer.ScrollToVerticalOffset(NormalizeScrollOffset(targetVertical, SheetScrollViewer.ScrollableHeight));
         }
 
-        private static double NormalizeScrollOffset(double value)
+        private static double NormalizeScrollOffset(double value, double maximum)
         {
-            return double.IsNaN(value) || double.IsInfinity(value) || value < 0
-                ? 0
-                : value;
-        }
+            if (double.IsNaN(value) || double.IsInfinity(value) || value < 0)
+                return 0;
 
-        private static double NormalizeZoom(double value)
-        {
-            return double.IsNaN(value) || double.IsInfinity(value) || value <= 0
-                ? 1.0
-                : value;
+            if (double.IsNaN(maximum) || double.IsInfinity(maximum) || maximum < 0)
+                return value;
+
+            return Math.Min(value, maximum);
         }
 
         private static SheetTableResizeMode ObterModoRedimensionamento(object? tag)
@@ -1570,5 +2434,6 @@ namespace Araci.Views
         }
     }
 }
+
 
 

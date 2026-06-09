@@ -314,24 +314,23 @@ namespace Araci.Views
                 return;
 
             zoomAction();
-            CenterSheetInViewportDeferred();
+            CenterSheetInViewport(updateLayout: true);
         }
 
         private void CenterSheetInViewportDeferred()
         {
             Dispatcher.BeginInvoke(
                 DispatcherPriority.Loaded,
-                new Action(CenterSheetInViewport));
+                new Action(() => CenterSheetInViewport(updateLayout: true)));
         }
 
-        private void CenterSheetInViewport()
+        private void CenterSheetInViewport(bool updateLayout = false)
         {
             if (!IsLoaded || SheetPageBorder.ActualWidth <= 0 || SheetPageBorder.ActualHeight <= 0)
                 return;
 
-            UpdateLayout();
-            SheetScrollViewer.UpdateLayout();
-            ZoomHost.UpdateLayout();
+            if (updateLayout)
+                SheetScrollViewer.UpdateLayout();
 
             Rect sheetBounds;
 

@@ -1,6 +1,9 @@
 using System;
+using System.Collections.Generic;
 using System.ComponentModel;
+using System.Linq;
 using System.Runtime.CompilerServices;
+using Araci.Applications.Projects.Tables;
 using Araci.Core.Documents;
 
 namespace Araci.ViewModels
@@ -15,7 +18,10 @@ namespace Araci.ViewModels
         private double _sheetOriginOffsetY;
         private bool _isSelected;
 
-        public ProjectSheetTableInstanceViewModel(ProjectSheetTableInstance instance, string tableName)
+        public ProjectSheetTableInstanceViewModel(
+            ProjectSheetTableInstance instance,
+            string tableName,
+            ProjectTableDataResult? tableData = null)
         {
             ArgumentNullException.ThrowIfNull(instance);
 
@@ -26,11 +32,28 @@ namespace Araci.ViewModels
             _y = NormalizePosition(instance.Y);
             _width = NormalizeDimension(instance.Width, ProjectSheetTableInstance.MinWidth);
             _height = NormalizeDimension(instance.Height, ProjectSheetTableInstance.MinHeight);
+            Columns = tableData?.Columns.ToList() ?? new List<ProjectTableDataColumn>();
+            Rows = tableData?.Rows.Select(row => new ProjectSheetTableRowViewModel(row)).ToList() ??
+                new List<ProjectSheetTableRowViewModel>();
+            EmptyDataMessage = tableData == null
+                ? "Tabela nao encontrada"
+                : Columns.Count == 0
+                    ? "Nenhum campo selecionado"
+                    : Rows.Count == 0
+                        ? "Nenhum item encontrado"
+                        : string.Empty;
         }
 
         public Guid Id { get; }
         public Guid TableId { get; }
         public string TableName { get; }
+        public IReadOnlyList<ProjectTableDataColumn> Columns { get; }
+        public IReadOnlyList<ProjectSheetTableRowViewModel> Rows { get; }
+        public bool HasColumns => Columns.Count > 0;
+        public bool HasRows => Rows.Count > 0;
+        public bool HasRenderableTable => HasColumns && HasRows;
+        public bool HasEmptyDataMessage => !string.IsNullOrWhiteSpace(EmptyDataMessage);
+        public string EmptyDataMessage { get; }
         public double ViewX => X + SheetOriginOffsetX;
         public double ViewY => Y + SheetOriginOffsetY;
 
@@ -171,5 +194,29 @@ namespace Araci.ViewModels
         {
             PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
         }
+    }
+
+    public sealed class ProjectSheetTableRowViewModel
+    {
+        public ProjectSheetTableRowViewModel(ProjectTableDataRow row)
+        {
+            ElementoId = row.ElementoId;
+            Cells = row.Cells
+                .Select(cell => new ProjectSheetTableCellViewModel(cell.DisplayValue))
+                .ToList();
+        }
+
+        public Guid ElementoId { get; }
+        public IReadOnlyList<ProjectSheetTableCellViewModel> Cells { get; }
+    }
+
+    public sealed class ProjectSheetTableCellViewModel
+    {
+        public ProjectSheetTableCellViewModel(string displayValue)
+        {
+            DisplayValue = displayValue ?? string.Empty;
+        }
+
+        public string DisplayValue { get; }
     }
 }

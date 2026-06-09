@@ -131,6 +131,9 @@ namespace Araci.TechnicalChecks
                 ("ProjectSheetViewModel zoom altera percentual", ProjectSheetViewModelZoomAlteraPercentual),
                 ("ProjectSheetView aplica zoom no workspace", ProjectSheetViewAplicaZoomNoWorkspace),
                 ("ProjectSheetView possui folha nomeada para centralizacao", ProjectSheetViewPossuiFolhaNomeadaParaCentralizacao),
+                ("ProjectSheetViewModel instancia renderiza dados reais da tabela", ProjectSheetViewModelInstanciaRenderizaDadosReaisTabela),
+                ("ProjectSheetViewModel instancia trata tabela sem campos", ProjectSheetViewModelInstanciaTrataTabelaSemCampos),
+                ("ProjectSheetViewModel instancia trata tabela sem linhas", ProjectSheetViewModelInstanciaTrataTabelaSemLinhas),
                 ("Tabela data view model expoe colunas linhas e celulas", TabelaDataViewModelExpoeColunasLinhasECelulas),
                 ("Tabela data view model trata tabela sem campos", TabelaDataViewModelTrataTabelaSemCampos),
                 ("Tabela data view model trata tabela sem linhas", TabelaDataViewModelTrataTabelaSemLinhas),
@@ -6435,6 +6438,61 @@ namespace Araci.TechnicalChecks
 
                 Assert(sheetPageBorder != null, "ProjectSheetView deveria possuir SheetPageBorder para centralizar a folha real.");
             });
+        }
+
+        private static void ProjectSheetViewModelInstanciaRenderizaDadosReaisTabela()
+        {
+            AraciDocument document = CriarDocumentoTabelaDados();
+            ProjectTable tabela = CriarTabelaDadosCarga(document);
+            ProjectSheet prancha = document.CriarNovaPrancha();
+            prancha.Tabelas.Add(new ProjectSheetTableInstance { TableId = tabela.Id });
+
+            var viewModel = new ProjectSheetViewModel(document, prancha);
+            ProjectSheetTableInstanceViewModel instance = viewModel.TableInstances.Single();
+
+            AssertEqual(3, instance.Columns.Count, "Prancha tabela Columns.Count");
+            AssertEqual("Nome", instance.Columns[0].CampoId, "Prancha tabela coluna 0 CampoId");
+            AssertEqual(3, instance.Rows.Count, "Prancha tabela Rows.Count");
+            AssertEqual("Carga A", instance.Rows[0].Cells[0].DisplayValue, "Prancha tabela primeira celula");
+            Assert(instance.HasRenderableTable, "Prancha tabela deveria ter dados renderizaveis.");
+            Assert(!instance.HasEmptyDataMessage, "Prancha tabela com dados nao deveria exibir mensagem vazia.");
+        }
+
+        private static void ProjectSheetViewModelInstanciaTrataTabelaSemCampos()
+        {
+            AraciDocument document = CriarDocumentoTabelaDados();
+            ProjectTable tabela = CriarTabelaDadosCarga(document);
+            tabela.CamposSelecionados.Clear();
+            ProjectSheet prancha = document.CriarNovaPrancha();
+            prancha.Tabelas.Add(new ProjectSheetTableInstance { TableId = tabela.Id });
+
+            var viewModel = new ProjectSheetViewModel(document, prancha);
+            ProjectSheetTableInstanceViewModel instance = viewModel.TableInstances.Single();
+
+            AssertEqual(0, instance.Columns.Count, "Prancha tabela sem campos Columns.Count");
+            AssertEqual(0, instance.Rows.Count, "Prancha tabela sem campos Rows.Count");
+            Assert(!instance.HasRenderableTable, "Prancha tabela sem campos nao deveria renderizar grade.");
+            AssertEqual("Nenhum campo selecionado", instance.EmptyDataMessage, "Prancha tabela sem campos EmptyDataMessage");
+        }
+
+        private static void ProjectSheetViewModelInstanciaTrataTabelaSemLinhas()
+        {
+            AraciDocument document = CriarDocumentoTabelaDados();
+            ProjectTable tabela = CriarTabelaDadosCarga(document);
+            tabela.Filtros = new List<ProjectTableFilterRule>
+            {
+                new() { Ordem = 0, Categoria = ProjectTableElementCategory.Cargas, CampoId = "Nome", NomeExibicao = "Nome", Operador = ProjectTableFilterOperator.IgualA, Valor = "Nao existe" }
+            };
+            ProjectSheet prancha = document.CriarNovaPrancha();
+            prancha.Tabelas.Add(new ProjectSheetTableInstance { TableId = tabela.Id });
+
+            var viewModel = new ProjectSheetViewModel(document, prancha);
+            ProjectSheetTableInstanceViewModel instance = viewModel.TableInstances.Single();
+
+            AssertEqual(3, instance.Columns.Count, "Prancha tabela sem linhas Columns.Count");
+            AssertEqual(0, instance.Rows.Count, "Prancha tabela sem linhas Rows.Count");
+            Assert(!instance.HasRenderableTable, "Prancha tabela sem linhas nao deveria renderizar grade.");
+            AssertEqual("Nenhum item encontrado", instance.EmptyDataMessage, "Prancha tabela sem linhas EmptyDataMessage");
         }
 
         private static void TabelaDataViewModelExpoeColunasLinhasECelulas()

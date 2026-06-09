@@ -4,6 +4,7 @@ using System.Collections.ObjectModel;
 using System.ComponentModel;
 using System.Linq;
 using System.Runtime.CompilerServices;
+using Araci.Applications.Projects.Tables;
 using Araci.Applications.UseCases.Projeto;
 using Araci.Core.Documents;
 
@@ -21,6 +22,7 @@ namespace Araci.ViewModels
         private readonly MoverTabelaNaPranchaUseCase? _moverTabelaNaPrancha;
         private readonly RedimensionarTabelaNaPranchaUseCase? _redimensionarTabelaNaPrancha;
         private readonly RemoverTabelaDaPranchaUseCase? _removerTabelaDaPrancha;
+        private readonly ProjectTableDataBuilder _tableDataBuilder = new();
         private string _titulo = string.Empty;
         private string _emptyMessage = string.Empty;
         private Guid? _selectedInstanceId;
@@ -146,8 +148,14 @@ namespace Araci.ViewModels
             foreach (ProjectSheetTableInstance instance in _sheet.Tabelas.Where(i => i != null))
             {
                 ProjectTable? table = _document.Tabelas.FirstOrDefault(t => t.Id == instance.TableId);
+                ProjectTableDataResult? tableData = table == null
+                    ? null
+                    : _tableDataBuilder.Build(_document, table);
 
-                var instanceViewModel = new ProjectSheetTableInstanceViewModel(instance, table?.Nome ?? "Tabela nao encontrada")
+                var instanceViewModel = new ProjectSheetTableInstanceViewModel(
+                    instance,
+                    table?.Nome ?? "Tabela nao encontrada",
+                    tableData)
                 {
                     IsSelected = selectedBeforeRefresh == instance.Id
                 };
