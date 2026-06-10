@@ -1,12 +1,15 @@
 using System;
+using System.ComponentModel;
+using System.Runtime.CompilerServices;
 using System.Windows.Media;
 using Araci.Core.Documents;
 
 namespace Araci.ViewModels
 {
-    public sealed class ProjectSheetTemplateLineViewModel
+    public sealed class ProjectSheetTemplateLineViewModel : INotifyPropertyChanged
     {
         private readonly ProjectSheetTemplateLine _linha;
+        private bool _isSelected;
 
         public ProjectSheetTemplateLineViewModel(ProjectSheetTemplateLine linha)
         {
@@ -22,6 +25,26 @@ namespace Araci.ViewModels
         public double StrokeThickness => _linha.StrokeThickness;
         public bool Visible => _linha.Visible;
 
+        public bool IsSelected
+        {
+            get => _isSelected;
+            set
+            {
+                if (_isSelected == value)
+                    return;
+
+                _isSelected = value;
+                OnPropertyChanged();
+                OnPropertyChanged(nameof(SelectionStrokeBrush));
+                OnPropertyChanged(nameof(SelectionStrokeThickness));
+            }
+        }
+
+        public Brush SelectionStrokeBrush => IsSelected ? Brushes.DodgerBlue : StrokeBrush;
+        public double SelectionStrokeThickness => IsSelected ? Math.Max(StrokeThickness + 3.0, 4.0) : StrokeThickness;
+
+        public event PropertyChangedEventHandler? PropertyChanged;
+
         private static Brush CriarBrush(string stroke)
         {
             try
@@ -34,6 +57,11 @@ namespace Araci.ViewModels
             }
 
             return Brushes.Black;
+        }
+
+        private void OnPropertyChanged([CallerMemberName] string? propertyName = null)
+        {
+            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
         }
     }
 }

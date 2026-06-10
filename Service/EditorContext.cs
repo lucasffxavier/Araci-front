@@ -113,6 +113,7 @@ namespace Araci.Services
             EditarPropriedadesPrancha = new EditarPropriedadesPranchaUseCase(Document, Commands);
             EditarPropriedadesTipoPrancha = new EditarPropriedadesTipoPranchaUseCase(Document, Commands);
             InserirLinhaNoTipoPrancha = new InserirLinhaNoTipoPranchaUseCase(Document, Commands);
+            ExcluirLinhaDoTipoPrancha = new ExcluirLinhaDoTipoPranchaUseCase(Document, Commands);
             ExportarTabela = new ExportarTabelaUseCase(Document, Dialogs, new ProjectTableDataBuilder(), new ProjectTableCsvExportService());
             InserirTabelaNaPrancha = new InserirTabelaNaPranchaUseCase(Document, Commands);
             MoverTabelaNaPrancha = new MoverTabelaNaPranchaUseCase(Document, Commands);
@@ -221,6 +222,7 @@ namespace Araci.Services
         public EditarPropriedadesPranchaUseCase EditarPropriedadesPrancha { get; }
         public EditarPropriedadesTipoPranchaUseCase EditarPropriedadesTipoPrancha { get; }
         public InserirLinhaNoTipoPranchaUseCase InserirLinhaNoTipoPrancha { get; }
+        public ExcluirLinhaDoTipoPranchaUseCase ExcluirLinhaDoTipoPrancha { get; }
         public ExportarTabelaUseCase ExportarTabela { get; }
         public InserirTabelaNaPranchaUseCase InserirTabelaNaPrancha { get; }
         public MoverTabelaNaPranchaUseCase MoverTabelaNaPrancha { get; }

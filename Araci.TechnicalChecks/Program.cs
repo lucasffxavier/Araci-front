@@ -131,6 +131,11 @@ namespace Araci.TechnicalChecks
                 ("ProjectSheetTypeView renderiza bindings de linhas", ProjectSheetTypeViewRenderizaBindingsLinhas),
                 ("ToolService linha em contexto tipo ativa ferramenta template", ToolServiceLinhaContextoTipoAtivaFerramentaTemplate),
                 ("Ferramenta linha template insere linha por dois cliques", FerramentaLinhaTemplateInsereLinhaPorDoisCliques),
+                ("Linha template seleciona por hit test", LinhaTemplateSelecionaPorHitTest),
+                ("Linha template limpa selecao ao clicar vazio", LinhaTemplateLimpaSelecaoCliqueVazio),
+                ("Excluir linha template undo redo", ExcluirLinhaTemplateUndoRedo),
+                ("ProjectSheetTypeView usa destaque de selecao de linha", ProjectSheetTypeViewUsaDestaqueSelecaoLinha),
+                ("EditorContext expoe excluir linha do tipo prancha", EditorContextExpoeExcluirLinhaDoTipoPrancha),
                 ("ToolService linha em contexto diagrama preserva ferramenta anotativa", ToolServiceLinhaContextoDiagramaPreservaFerramentaAnotativa),
                 ("Project Browser seleciona tipo abre visualizacao de tipo", ProjectBrowserSelecionaTipoAbreVisualizacaoTipo),
                 ("Project Browser seleciona tipo nao altera vista ativa", ProjectBrowserSelecionaTipoNaoAlteraVistaAtiva),
@@ -6361,6 +6366,91 @@ namespace Araci.TechnicalChecks
             AssertEqual(80, linha.X2, "Ferramenta template linha X2");
             AssertEqual(20, linha.Y2, "Ferramenta template linha Y2");
             AssertEqual(0, context.Document.Elementos.Count, "Ferramenta template nao deveria criar Elemento.");
+        }
+
+
+        private static void LinhaTemplateSelecionaPorHitTest()
+        {
+            var document = new AraciDocument();
+            ProjectSheetType tipo = document.TipoPranchaPadrao;
+            ProjectSheetTemplateLine linha = new()
+            {
+                X1 = 10,
+                Y1 = 20,
+                X2 = 100,
+                Y2 = 20
+            };
+            tipo.Linhas.Add(linha);
+            var viewModel = new ProjectSheetTypeViewModel(document, tipo);
+
+            bool selecionou = viewModel.SelectLineAt(new Point(55, 23), 6);
+
+            Assert(selecionou, "Hit-test deveria selecionar linha proxima ao segmento.");
+            Assert(viewModel.HasSelectedLine, "ViewModel deveria indicar linha selecionada.");
+            AssertEqual(linha.Id, viewModel.SelectedLineId!.Value, "SelectedLineId");
+            Assert(viewModel.Lines.Single().IsSelected, "Linha ViewModel deveria ficar selecionada.");
+        }
+
+        private static void LinhaTemplateLimpaSelecaoCliqueVazio()
+        {
+            var document = new AraciDocument();
+            ProjectSheetType tipo = document.TipoPranchaPadrao;
+            ProjectSheetTemplateLine linha = new()
+            {
+                X1 = 10,
+                Y1 = 20,
+                X2 = 100,
+                Y2 = 20
+            };
+            tipo.Linhas.Add(linha);
+            var viewModel = new ProjectSheetTypeViewModel(document, tipo);
+
+            viewModel.SelectLineAt(new Point(55, 20), 6);
+            bool selecionou = viewModel.SelectLineAt(new Point(55, 80), 6);
+
+            Assert(!selecionou, "Clique longe da linha nao deveria selecionar.");
+            Assert(!viewModel.HasSelectedLine, "Clique vazio deveria limpar selecao.");
+            Assert(!viewModel.Lines.Single().IsSelected, "Linha ViewModel deveria perder destaque.");
+        }
+
+        private static void ExcluirLinhaTemplateUndoRedo()
+        {
+            var document = new AraciDocument();
+            var commands = new Araci.Core.Commands.CommandManager();
+            var inserir = new InserirLinhaNoTipoPranchaUseCase(document, commands);
+            var excluir = new ExcluirLinhaDoTipoPranchaUseCase(document, commands);
+            ProjectSheetType tipo = document.TipoPranchaPadrao;
+            ProjectSheetTemplateLine linha = inserir.Inserir(tipo.Id, 10, 20, 80, 20)!;
+            Guid linhaId = linha.Id;
+
+            bool excluiu = excluir.Excluir(tipo.Id, linha.Id);
+
+            Assert(excluiu, "Excluir linha deveria retornar true.");
+            AssertEqual(0, tipo.Linhas.Count, "Linha deveria ser removida.");
+
+            commands.Undo();
+
+            AssertEqual(1, tipo.Linhas.Count, "Undo deveria restaurar linha.");
+            AssertEqual(linhaId, tipo.Linhas[0].Id, "Undo deveria preservar Id.");
+
+            commands.Redo();
+
+            AssertEqual(0, tipo.Linhas.Count, "Redo deveria remover linha novamente.");
+        }
+
+        private static void ProjectSheetTypeViewUsaDestaqueSelecaoLinha()
+        {
+            string xaml = File.ReadAllText(FindProjectFile("Views/ProjectSheetTypeView.xaml"));
+
+            AssertContains(xaml, "SelectionStrokeBrush", "ProjectSheetTypeView selecao StrokeBrush");
+            AssertContains(xaml, "SelectionStrokeThickness", "ProjectSheetTypeView selecao StrokeThickness");
+        }
+
+        private static void EditorContextExpoeExcluirLinhaDoTipoPrancha()
+        {
+            var context = new EditorContext();
+
+            Assert(context.ExcluirLinhaDoTipoPrancha != null, "EditorContext deveria expor ExcluirLinhaDoTipoPranchaUseCase.");
         }
 
         private static void ToolServiceLinhaContextoDiagramaPreservaFerramentaAnotativa()

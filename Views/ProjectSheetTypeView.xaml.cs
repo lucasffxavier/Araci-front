@@ -10,6 +10,8 @@ namespace Araci.Views
 {
     public partial class ProjectSheetTypeView : UserControl
     {
+        private const double LineHitTolerance = 6.0;
+
         private EditorContext? _context;
 
         public ProjectSheetTypeView()
@@ -31,6 +33,13 @@ namespace Araci.Views
             Focus();
             Keyboard.Focus(this);
             Point position = e.GetPosition(TemplatePageBorder);
+
+            if (TentarSelecionarLinhaTemplate(position))
+            {
+                e.Handled = true;
+                return;
+            }
+
             ToolInputState inputState = CriarInputState(e, position, e.ChangedButton, e.ClickCount);
             _context.Tools.FerramentaAtual.OnMouseDown(null, position, inputState);
             TemplatePageBorder.CaptureMouse();
@@ -66,8 +75,49 @@ namespace Araci.Views
 
         private void OnPreviewKeyDown(object sender, KeyEventArgs e)
         {
-            if (_context?.Input.KeyDown(e.Key) == true)
+            if (_context == null)
+                return;
+
+            if (e.Key == Key.Delete && ExcluirLinhaSelecionada())
+            {
                 e.Handled = true;
+                return;
+            }
+
+            if (_context.Input.KeyDown(e.Key))
+                e.Handled = true;
+        }
+
+        private bool TentarSelecionarLinhaTemplate(Point position)
+        {
+            if (_context == null || _context.ProjectSheetTypeViewModelAtivo == null)
+                return false;
+
+            ITool ferramentaAtual = _context.Tools.FerramentaAtual;
+
+            if (!string.Equals(ferramentaAtual.Nome, "Selecionar", StringComparison.OrdinalIgnoreCase) || ferramentaAtual.IsBusy)
+                return false;
+
+            _context.ProjectSheetTypeViewModelAtivo.SelectLineAt(position, LineHitTolerance);
+            return true;
+        }
+
+        private bool ExcluirLinhaSelecionada()
+        {
+            if (_context == null || _context.ProjectSheetTypeViewModelAtivo == null)
+                return false;
+
+            ProjectSheetTypeViewModel viewModel = _context.ProjectSheetTypeViewModelAtivo;
+
+            if (!viewModel.TryGetSelectedLineId(out Guid lineId))
+                return false;
+
+            bool excluiu = _context.ExcluirLinhaDoTipoPrancha.Excluir(viewModel.Id, lineId);
+
+            if (excluiu)
+                viewModel.ClearLineSelection();
+
+            return excluiu;
         }
 
         private static ToolInputState CriarInputState(MouseEventArgs e, Point localPosition, MouseButton? button = null, int clickCount = 0)
