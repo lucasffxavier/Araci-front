@@ -16,6 +16,7 @@ namespace Araci.Applications.Editor
         private readonly Func<ElementDefinition, ITool> _criarInserirElementoTool;
         private readonly Func<ITool> _criarInserirLinhaAnotativaTool;
         private readonly Func<ITool>? _criarInserirLinhaTipoPranchaTool;
+        private readonly Func<ITool>? _criarInserirRetanguloTipoPranchaTool;
         private readonly Func<bool>? _isTipoPranchaAtivo;
         private readonly Func<ITool> _criarInserirRetanguloAnotativoTool;
         private readonly Func<ITool> _criarInserirCirculoAnotativoTool;
@@ -33,6 +34,7 @@ namespace Araci.Applications.Editor
             Func<ITool> criarInserirRetanguloAnotativoTool,
             Func<ITool> criarInserirCirculoAnotativoTool,
             Func<ITool>? criarInserirLinhaTipoPranchaTool = null,
+            Func<ITool>? criarInserirRetanguloTipoPranchaTool = null,
             Func<bool>? isTipoPranchaAtivo = null)
         {
             _elements = elements ?? throw new ArgumentNullException(nameof(elements));
@@ -44,6 +46,7 @@ namespace Araci.Applications.Editor
             _criarInserirElementoTool = criarInserirElementoTool ?? throw new ArgumentNullException(nameof(criarInserirElementoTool));
             _criarInserirLinhaAnotativaTool = criarInserirLinhaAnotativaTool ?? throw new ArgumentNullException(nameof(criarInserirLinhaAnotativaTool));
             _criarInserirLinhaTipoPranchaTool = criarInserirLinhaTipoPranchaTool;
+            _criarInserirRetanguloTipoPranchaTool = criarInserirRetanguloTipoPranchaTool;
             _isTipoPranchaAtivo = isTipoPranchaAtivo;
             _criarInserirRetanguloAnotativoTool = criarInserirRetanguloAnotativoTool ?? throw new ArgumentNullException(nameof(criarInserirRetanguloAnotativoTool));
             _criarInserirCirculoAnotativoTool = criarInserirCirculoAnotativoTool ?? throw new ArgumentNullException(nameof(criarInserirCirculoAnotativoTool));
@@ -103,7 +106,9 @@ namespace Araci.Applications.Editor
 
         public void AtivarInserirRetanguloAnotativo()
         {
-            FerramentaAtual = _criarInserirRetanguloAnotativoTool();
+            FerramentaAtual = _isTipoPranchaAtivo?.Invoke() == true && _criarInserirRetanguloTipoPranchaTool != null
+                ? _criarInserirRetanguloTipoPranchaTool()
+                : _criarInserirRetanguloAnotativoTool();
         }
 
         public void AtivarInserirCirculoAnotativo()

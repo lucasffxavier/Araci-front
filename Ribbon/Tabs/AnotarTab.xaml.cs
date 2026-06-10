@@ -140,7 +140,7 @@ namespace Araci.Ribbon.Tabs
         private void RetanguloButton_Click(object sender, RoutedEventArgs e)
         {
             Context?.Tools.AtivarInserirRetanguloAnotativo();
-            FocarViewport();
+            FocarSuperficieAtiva();
         }
 
         private void CirculoButton_Click(object sender, RoutedEventArgs e)

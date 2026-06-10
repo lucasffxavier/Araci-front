@@ -32,6 +32,7 @@ namespace Araci.Infrastructure.Persistence
         public double? LarguraFolha { get; set; }
         public double? AlturaFolha { get; set; }
         public List<ProjectSheetTemplateLineDto> Linhas { get; set; } = new();
+        public List<ProjectSheetTemplateRectangleDto> Retangulos { get; set; } = new();
     }
 
     public sealed class ProjectSheetTemplateLineDto
@@ -42,6 +43,20 @@ namespace Araci.Infrastructure.Persistence
         public double Y1 { get; set; }
         public double X2 { get; set; }
         public double Y2 { get; set; }
+        public TypeRefDto? Type { get; set; }
+        public string Stroke { get; set; } = "#FF000000";
+        public double StrokeThickness { get; set; } = 1.0;
+        public bool Visible { get; set; } = true;
+    }
+
+    public sealed class ProjectSheetTemplateRectangleDto
+    {
+        public Guid Id { get; set; }
+        public string Nome { get; set; } = string.Empty;
+        public double X { get; set; }
+        public double Y { get; set; }
+        public double Largura { get; set; } = 100.0;
+        public double Altura { get; set; } = 50.0;
         public TypeRefDto? Type { get; set; }
         public string Stroke { get; set; } = "#FF000000";
         public double StrokeThickness { get; set; } = 1.0;

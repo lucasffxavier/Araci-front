@@ -530,6 +530,10 @@ namespace Araci.Infrastructure.Persistence
                 Linhas = (tipo.Linhas ?? new List<ProjectSheetTemplateLine>())
                     .Where(l => l != null)
                     .Select(CriarProjectSheetTemplateLineDto)
+                    .ToList(),
+                Retangulos = (tipo.Retangulos ?? new List<ProjectSheetTemplateRectangle>())
+                    .Where(r => r != null)
+                    .Select(CriarProjectSheetTemplateRectangleDto)
                     .ToList()
             };
         }
@@ -559,6 +563,35 @@ namespace Araci.Infrastructure.Persistence
                     NomeTipo = linha.TipoLinhaNome,
                     Familia = linha.TipoLinhaFamilia,
                     Categoria = linha.TipoLinhaCategoria
+                }
+                : null;
+        }
+
+        private static ProjectSheetTemplateRectangleDto CriarProjectSheetTemplateRectangleDto(ProjectSheetTemplateRectangle retangulo)
+        {
+            return new ProjectSheetTemplateRectangleDto
+            {
+                Id = retangulo.Id,
+                Nome = retangulo.Nome,
+                X = retangulo.X,
+                Y = retangulo.Y,
+                Largura = retangulo.Largura,
+                Altura = retangulo.Altura,
+                Type = CriarProjectSheetTemplateRectangleTypeRef(retangulo),
+                Stroke = string.IsNullOrWhiteSpace(retangulo.Stroke) ? "#FF000000" : retangulo.Stroke,
+                StrokeThickness = NormalizarEspessuraLinha(retangulo.StrokeThickness),
+                Visible = retangulo.Visible
+            };
+        }
+
+        private static TypeRefDto? CriarProjectSheetTemplateRectangleTypeRef(ProjectSheetTemplateRectangle retangulo)
+        {
+            return retangulo.PossuiTipoLinha
+                ? new TypeRefDto
+                {
+                    NomeTipo = retangulo.TipoLinhaNome,
+                    Familia = retangulo.TipoLinhaFamilia,
+                    Categoria = retangulo.TipoLinhaCategoria
                 }
                 : null;
         }
@@ -638,7 +671,8 @@ namespace Araci.Infrastructure.Persistence
                 OrientacaoFolha = ParseEnum(dto.OrientacaoFolha, ProjectSheetOrientation.Paisagem),
                 LarguraFolha = NormalizarDimensaoFolha(dto.LarguraFolha, ProjectSheet.DefaultWidth),
                 AlturaFolha = NormalizarDimensaoFolha(dto.AlturaFolha, ProjectSheet.DefaultHeight),
-                Linhas = ParseProjectSheetTemplateLines(dto.Linhas)
+                Linhas = ParseProjectSheetTemplateLines(dto.Linhas),
+                Retangulos = ParseProjectSheetTemplateRectangles(dto.Retangulos)
             };
         }
 
@@ -682,6 +716,48 @@ namespace Araci.Infrastructure.Persistence
                 linha.DefinirTipoLinha(null, null, null);
 
             return linha;
+        }
+
+        private static List<ProjectSheetTemplateRectangle> ParseProjectSheetTemplateRectangles(IEnumerable<ProjectSheetTemplateRectangleDto>? valores)
+        {
+            if (valores == null)
+                return new List<ProjectSheetTemplateRectangle>();
+
+            return valores
+                .Where(v => v != null)
+                .Select(CriarProjectSheetTemplateRectangle)
+                .ToList();
+        }
+
+        private static ProjectSheetTemplateRectangle CriarProjectSheetTemplateRectangle(ProjectSheetTemplateRectangleDto dto)
+        {
+            var retangulo = new ProjectSheetTemplateRectangle
+            {
+                Id = dto.Id == Guid.Empty ? Guid.NewGuid() : dto.Id,
+                Nome = NormalizarNomeTemplate(dto.Nome),
+                X = NormalizarCoordenada(dto.X),
+                Y = NormalizarCoordenada(dto.Y),
+                Largura = NormalizarDimensaoTemplate(dto.Largura, ProjectSheetTemplateRectangle.DefaultWidth),
+                Altura = NormalizarDimensaoTemplate(dto.Altura, ProjectSheetTemplateRectangle.DefaultHeight),
+                Stroke = string.IsNullOrWhiteSpace(dto.Stroke) ? "#FF000000" : dto.Stroke,
+                StrokeThickness = NormalizarEspessuraLinha(dto.StrokeThickness),
+                Visible = dto.Visible
+            };
+
+            if (dto.Type != null && !string.IsNullOrWhiteSpace(dto.Type.NomeTipo))
+            {
+                retangulo.DefinirTipoLinha(dto.Type.NomeTipo, dto.Type.Familia, dto.Type.Categoria);
+                return retangulo;
+            }
+
+            bool possuiEstiloLegadoCustomizado =
+                !string.Equals(retangulo.Stroke, "#FF000000", StringComparison.OrdinalIgnoreCase) ||
+                Math.Abs(retangulo.StrokeThickness - 1.0) > 0.000001;
+
+            if (possuiEstiloLegadoCustomizado)
+                retangulo.DefinirTipoLinha(null, null, null);
+
+            return retangulo;
         }
 
         private Elemento? CriarElemento(ElementDto dto)
@@ -897,6 +973,11 @@ namespace Araci.Infrastructure.Persistence
 
         private static string NormalizarNomeLinhaTemplate(string? valor)
         {
+            return NormalizarNomeTemplate(valor);
+        }
+
+        private static string NormalizarNomeTemplate(string? valor)
+        {
             return string.IsNullOrWhiteSpace(valor) ? string.Empty : valor.Trim();
         }
 
@@ -943,6 +1024,13 @@ namespace Araci.Infrastructure.Persistence
         {
             return double.IsNaN(valor) || double.IsInfinity(valor) || valor <= 0
                 ? 1.0
+                : valor;
+        }
+
+        private static double NormalizarDimensaoTemplate(double valor, double fallback)
+        {
+            return double.IsNaN(valor) || double.IsInfinity(valor) || valor < ProjectSheetTemplateRectangle.MinDimension
+                ? fallback
                 : valor;
         }
 

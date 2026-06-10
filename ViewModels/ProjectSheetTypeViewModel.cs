@@ -32,6 +32,7 @@ namespace Araci.ViewModels
             _tipo = tipo ?? throw new ArgumentNullException(nameof(tipo));
             _types = types ?? throw new ArgumentNullException(nameof(types));
             Lines = new ObservableCollection<ProjectSheetTemplateLineViewModel>();
+            Rectangles = new ObservableCollection<ProjectSheetTemplateRectangleViewModel>();
             EndpointHandles = new ObservableCollection<ProjectSheetTemplateLineEndpointHandleViewModel>();
             _document.PropriedadesTipoPranchaAlteradas += OnPropriedadesTipoPranchaAlteradas;
             _document.ItemProjetoRenomeado += OnItemProjetoRenomeado;
@@ -54,6 +55,7 @@ namespace Araci.ViewModels
         public string Titulo => $"Tipo de Prancha - {Nome}";
         public string Descricao => $"{FormatoFolha} {OrientacaoFolha} - {LarguraFolha:0.#} x {AlturaFolha:0.#}";
         public ObservableCollection<ProjectSheetTemplateLineViewModel> Lines { get; }
+        public ObservableCollection<ProjectSheetTemplateRectangleViewModel> Rectangles { get; }
         public ObservableCollection<ProjectSheetTemplateLineEndpointHandleViewModel> EndpointHandles { get; }
         public Guid? SelectedLineId => _selectedLineId;
         public bool HasSelectedLine => _selectedLineId.HasValue;
@@ -88,6 +90,7 @@ namespace Araci.ViewModels
             OnPropertyChanged(nameof(WorkspaceHeight));
             OnPropertyChanged(nameof(Titulo));
             OnPropertyChanged(nameof(Descricao));
+            RefreshRectangles();
             RefreshLines();
         }
 
@@ -297,6 +300,14 @@ namespace Araci.ViewModels
                 return;
 
             Refresh();
+        }
+
+        private void RefreshRectangles()
+        {
+            Rectangles.Clear();
+
+            foreach (ProjectSheetTemplateRectangle retangulo in (_tipo.Retangulos ?? new()).Where(r => r != null && r.Visible))
+                Rectangles.Add(new ProjectSheetTemplateRectangleViewModel(retangulo, _types));
         }
 
         private void RefreshLines()
