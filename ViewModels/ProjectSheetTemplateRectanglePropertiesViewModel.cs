@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.ComponentModel;
 using System.Linq;
 using System.Runtime.CompilerServices;
@@ -7,7 +8,10 @@ using System.Windows.Input;
 using System.Windows.Media;
 using Araci.Applications.UseCases.Projeto;
 using Araci.Core.Documents;
+using Araci.Models.Tipos;
 using Araci.Properties;
+using Araci.Services.Catalog;
+using Araci.Services.UI;
 
 namespace Araci.ViewModels
 {
@@ -16,21 +20,48 @@ namespace Araci.ViewModels
         private readonly ProjectSheetType _tipo;
         private readonly ProjectSheetTemplateRectangle _retangulo;
         private readonly MoverRetanguloDoTipoPranchaUseCase _editarRetangulo;
+        private readonly TypeLibraryService _types;
+        private readonly TypePropertiesDialogService _typePropertiesDialogs;
+        private SimpleCommand? _abrirPropriedadesTipoCommand;
         private SimpleCommand? _escolherCorCommand;
 
         public ProjectSheetTemplateRectanglePropertiesViewModel(
             ProjectSheetType tipo,
             ProjectSheetTemplateRectangle retangulo,
-            MoverRetanguloDoTipoPranchaUseCase editarRetangulo)
+            MoverRetanguloDoTipoPranchaUseCase editarRetangulo,
+            TypeLibraryService types,
+            TypePropertiesDialogService typePropertiesDialogs)
         {
             _tipo = tipo ?? throw new ArgumentNullException(nameof(tipo));
             _retangulo = retangulo ?? throw new ArgumentNullException(nameof(retangulo));
             _editarRetangulo = editarRetangulo ?? throw new ArgumentNullException(nameof(editarRetangulo));
+            _types = types ?? throw new ArgumentNullException(nameof(types));
+            _typePropertiesDialogs = typePropertiesDialogs ?? throw new ArgumentNullException(nameof(typePropertiesDialogs));
+
+            foreach (TipoLinhaAnotativa tipoLinha in _types.TiposLinhasAnotativas)
+                tipoLinha.PropertyChanged += OnTipoLinhaPropertyChanged;
         }
 
         public Guid Id => _retangulo.Id;
         public string Titulo => "Retângulo do Tipo de Prancha";
+        public IReadOnlyList<TipoLinhaAnotativa> TiposDisponiveis => _types.TiposLinhasAnotativas;
+        public ICommand AbrirPropriedadesTipoCommand => _abrirPropriedadesTipoCommand ??= new SimpleCommand(AbrirPropriedadesTipo, () => PodeAbrirPropriedadesTipo);
         public ICommand EscolherCorCommand => _escolherCorCommand ??= new SimpleCommand(EscolherCor);
+
+        public bool PodeAbrirPropriedadesTipo => TipoLinha != null;
+
+        public TipoLinhaAnotativa? TipoLinha
+        {
+            get => ResolverTipoLinha();
+            set
+            {
+                if (value == null)
+                    return;
+
+                if (_editarRetangulo.AlterarTipoGrafico(_tipo.Id, _retangulo.Id, value))
+                    Refresh();
+            }
+        }
 
         public string Nome
         {
@@ -39,26 +70,6 @@ namespace Araci.ViewModels
             {
                 if (_editarRetangulo.AlterarNome(_tipo.Id, _retangulo.Id, value))
                     OnPropertyChanged();
-            }
-        }
-
-        public double X
-        {
-            get => _retangulo.X;
-            set
-            {
-                if (_editarRetangulo.AlterarPosicao(_tipo.Id, _retangulo.Id, value, _retangulo.Y))
-                    OnPositionPropertiesChanged();
-            }
-        }
-
-        public double Y
-        {
-            get => _retangulo.Y;
-            set
-            {
-                if (_editarRetangulo.AlterarPosicao(_tipo.Id, _retangulo.Id, _retangulo.X, value))
-                    OnPositionPropertiesChanged();
             }
         }
 
@@ -110,12 +121,26 @@ namespace Araci.ViewModels
 
         public void Refresh()
         {
+            OnPropertyChanged(nameof(TipoLinha));
+            OnPropertyChanged(nameof(PodeAbrirPropriedadesTipo));
             OnPropertyChanged(nameof(Nome));
-            OnPositionPropertiesChanged();
             OnPropertyChanged(nameof(Largura));
             OnPropertyChanged(nameof(Altura));
             OnStylePropertiesChanged();
             OnPropertyChanged(nameof(AindaExiste));
+            _abrirPropriedadesTipoCommand?.RaiseCanExecuteChanged();
+        }
+
+        private void AbrirPropriedadesTipo()
+        {
+            TipoLinhaAnotativa? tipoLinha = TipoLinha;
+
+            if (tipoLinha == null)
+                return;
+
+            _typePropertiesDialogs.Show(new TipoLinhaAnotativaViewModel(tipoLinha, Refresh));
+            _editarRetangulo.AlterarTipoGrafico(_tipo.Id, _retangulo.Id, tipoLinha);
+            Refresh();
         }
 
         private void EscolherCor()
@@ -127,6 +152,22 @@ namespace Araci.ViewModels
 
             if (window.ShowDialog() == true)
                 CorLinha = window.SelectedColorHex;
+        }
+
+        private TipoLinhaAnotativa? ResolverTipoLinha()
+        {
+            if (_retangulo.PossuiTipoLinha)
+            {
+                TipoLinhaAnotativa? tipo = _types.TiposLinhasAnotativas.FirstOrDefault(t =>
+                    string.Equals(t.NomeTipo, _retangulo.TipoLinhaNome, StringComparison.OrdinalIgnoreCase) &&
+                    string.Equals(t.Familia, _retangulo.TipoLinhaFamilia, StringComparison.OrdinalIgnoreCase) &&
+                    string.Equals(t.Categoria, _retangulo.TipoLinhaCategoria, StringComparison.OrdinalIgnoreCase));
+
+                if (tipo != null)
+                    return tipo;
+            }
+
+            return _types.TipoLinhaAnotativaPadrao;
         }
 
         private string NomeAtual()
@@ -141,10 +182,19 @@ namespace Araci.ViewModels
                 : "RETANGULO";
         }
 
-        private void OnPositionPropertiesChanged()
+        private void OnTipoLinhaPropertyChanged(object? sender, PropertyChangedEventArgs e)
         {
-            OnPropertyChanged(nameof(X));
-            OnPropertyChanged(nameof(Y));
+            TipoLinhaAnotativa? tipoLinha = TipoLinha;
+
+            if (tipoLinha == null || !ReferenceEquals(sender, tipoLinha))
+                return;
+
+            if (string.IsNullOrEmpty(e.PropertyName) ||
+                e.PropertyName == nameof(TipoLinhaAnotativa.EstiloLinha) ||
+                e.PropertyName == nameof(TipoLinhaAnotativa.NomeTipo))
+            {
+                Refresh();
+            }
         }
 
         private void OnStylePropertiesChanged()
@@ -193,6 +243,11 @@ namespace Araci.ViewModels
             {
                 if (CanExecute(parameter))
                     _execute();
+            }
+
+            public void RaiseCanExecuteChanged()
+            {
+                CanExecuteChanged?.Invoke(this, EventArgs.Empty);
             }
 
             public event EventHandler? CanExecuteChanged;

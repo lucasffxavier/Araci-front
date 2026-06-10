@@ -61,6 +61,34 @@ namespace Araci.Applications.UseCases.Projeto
             return true;
         }
 
+        public bool AlterarTipoGrafico(Guid tipoId, Guid retanguloId, TipoLinhaAnotativa tipoLinha)
+        {
+            if (tipoLinha == null)
+                return false;
+
+            if (!TryGetRetangulo(tipoId, retanguloId, out ProjectSheetType tipo, out ProjectSheetTemplateRectangle retangulo))
+                return false;
+
+            if (retangulo.TipoLinhaIgual(tipoLinha.NomeTipo, tipoLinha.Familia, tipoLinha.Categoria))
+                return false;
+
+            var estadoAnterior = ProjectSheetTemplateRectangleGraphicTypeState.FromRectangle(retangulo);
+            var estadoNovo = new ProjectSheetTemplateRectangleGraphicTypeState(
+                tipoLinha.NomeTipo,
+                tipoLinha.Familia,
+                tipoLinha.Categoria);
+
+            _commands.Execute(new UpdateProjectSheetTypeRectanglePropertyCommand<ProjectSheetTemplateRectangleGraphicTypeState>(
+                _document,
+                tipo,
+                retangulo.Id,
+                (r, value) => value.Aplicar(r),
+                estadoAnterior,
+                estadoNovo));
+
+            return true;
+        }
+
         public bool AlterarLargura(Guid tipoId, Guid retanguloId, double largura)
         {
             if (!DimensaoValida(largura))

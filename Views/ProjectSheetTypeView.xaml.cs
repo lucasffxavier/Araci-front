@@ -673,7 +673,9 @@ namespace Araci.Views
                 _context.Editor.ElementoSelecionado = new ProjectSheetTemplateRectanglePropertiesViewModel(
                     viewModel.Tipo,
                     retangulo,
-                    _context.MoverRetanguloDoTipoPrancha);
+                    _context.MoverRetanguloDoTipoPrancha,
+                    _context.Types,
+                    _context.TypePropertiesDialogs);
                 return;
             }
 
