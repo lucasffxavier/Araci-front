@@ -136,6 +136,10 @@ namespace Araci.TechnicalChecks
                 ("Excluir linha template undo redo", ExcluirLinhaTemplateUndoRedo),
                 ("ProjectSheetTypeView usa destaque de selecao de linha", ProjectSheetTypeViewUsaDestaqueSelecaoLinha),
                 ("EditorContext expoe excluir linha do tipo prancha", EditorContextExpoeExcluirLinhaDoTipoPrancha),
+                ("Mover linha template undo redo", MoverLinhaTemplateUndoRedo),
+                ("ProjectSheetTypeViewModel aplica preview de movimento de linha", ProjectSheetTypeViewModelAplicaPreviewMovimentoLinha),
+                ("ProjectSheetTypeView possui interacao de arraste de linha", ProjectSheetTypeViewPossuiInteracaoArrasteLinha),
+                ("EditorContext expoe mover linha do tipo prancha", EditorContextExpoeMoverLinhaDoTipoPrancha),
                 ("ToolService linha em contexto diagrama preserva ferramenta anotativa", ToolServiceLinhaContextoDiagramaPreservaFerramentaAnotativa),
                 ("Project Browser seleciona tipo abre visualizacao de tipo", ProjectBrowserSelecionaTipoAbreVisualizacaoTipo),
                 ("Project Browser seleciona tipo nao altera vista ativa", ProjectBrowserSelecionaTipoNaoAlteraVistaAtiva),
@@ -6451,6 +6455,87 @@ namespace Araci.TechnicalChecks
             var context = new EditorContext();
 
             Assert(context.ExcluirLinhaDoTipoPrancha != null, "EditorContext deveria expor ExcluirLinhaDoTipoPranchaUseCase.");
+        }
+
+        private static void MoverLinhaTemplateUndoRedo()
+        {
+            var document = new AraciDocument();
+            var commands = new Araci.Core.Commands.CommandManager();
+            var inserir = new InserirLinhaNoTipoPranchaUseCase(document, commands);
+            var mover = new MoverLinhaDoTipoPranchaUseCase(document, commands);
+            ProjectSheetType tipo = document.TipoPranchaPadrao;
+            ProjectSheetTemplateLine linha = inserir.Inserir(tipo.Id, 10, 20, 80, 25)!;
+
+            bool moveu = mover.Mover(tipo.Id, linha.Id, 15, -5);
+
+            Assert(moveu, "Mover linha deveria retornar true.");
+            AssertEqual(25, linha.X1, "Linha.X1 apos move");
+            AssertEqual(15, linha.Y1, "Linha.Y1 apos move");
+            AssertEqual(95, linha.X2, "Linha.X2 apos move");
+            AssertEqual(20, linha.Y2, "Linha.Y2 apos move");
+
+            commands.Undo();
+
+            AssertEqual(10, linha.X1, "Linha.X1 apos undo");
+            AssertEqual(20, linha.Y1, "Linha.Y1 apos undo");
+            AssertEqual(80, linha.X2, "Linha.X2 apos undo");
+            AssertEqual(25, linha.Y2, "Linha.Y2 apos undo");
+
+            commands.Redo();
+
+            AssertEqual(25, linha.X1, "Linha.X1 apos redo");
+            AssertEqual(15, linha.Y1, "Linha.Y1 apos redo");
+            AssertEqual(95, linha.X2, "Linha.X2 apos redo");
+            AssertEqual(20, linha.Y2, "Linha.Y2 apos redo");
+        }
+
+        private static void ProjectSheetTypeViewModelAplicaPreviewMovimentoLinha()
+        {
+            var document = new AraciDocument();
+            ProjectSheetType tipo = document.TipoPranchaPadrao;
+            ProjectSheetTemplateLine linha = new()
+            {
+                X1 = 10,
+                Y1 = 20,
+                X2 = 80,
+                Y2 = 25
+            };
+            tipo.Linhas.Add(linha);
+            var viewModel = new ProjectSheetTypeViewModel(document, tipo);
+
+            bool aplicado = viewModel.SetLinePreviewOffset(linha.Id, 15, -5);
+
+            Assert(aplicado, "Preview de movimento deveria ser aplicado.");
+            AssertEqual(25, viewModel.Lines[0].X1, "Preview X1");
+            AssertEqual(15, viewModel.Lines[0].Y1, "Preview Y1");
+            AssertEqual(95, viewModel.Lines[0].X2, "Preview X2");
+            AssertEqual(20, viewModel.Lines[0].Y2, "Preview Y2");
+            AssertEqual(10, linha.X1, "Preview nao deve alterar modelo X1");
+            AssertEqual(20, linha.Y1, "Preview nao deve alterar modelo Y1");
+
+            viewModel.ClearLinePreviewOffset(linha.Id);
+
+            AssertEqual(10, viewModel.Lines[0].X1, "Preview limpo X1");
+            AssertEqual(20, viewModel.Lines[0].Y1, "Preview limpo Y1");
+            AssertEqual(80, viewModel.Lines[0].X2, "Preview limpo X2");
+            AssertEqual(25, viewModel.Lines[0].Y2, "Preview limpo Y2");
+        }
+
+        private static void ProjectSheetTypeViewPossuiInteracaoArrasteLinha()
+        {
+            string code = File.ReadAllText(FindProjectFile("Views/ProjectSheetTypeView.xaml.cs"));
+
+            AssertContains(code, "TentarIniciarInteracaoLinhaTemplate", "ProjectSheetTypeView iniciar arraste linha");
+            AssertContains(code, "AtualizarArrasteLinhaTemplate", "ProjectSheetTypeView atualizar arraste linha");
+            AssertContains(code, "FinalizarArrasteLinhaTemplate", "ProjectSheetTypeView finalizar arraste linha");
+            AssertContains(code, "MoverLinhaDoTipoPrancha", "ProjectSheetTypeView deve chamar use case de movimento");
+        }
+
+        private static void EditorContextExpoeMoverLinhaDoTipoPrancha()
+        {
+            var context = new EditorContext();
+
+            Assert(context.MoverLinhaDoTipoPrancha != null, "EditorContext deveria expor MoverLinhaDoTipoPranchaUseCase.");
         }
 
         private static void ToolServiceLinhaContextoDiagramaPreservaFerramentaAnotativa()

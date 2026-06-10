@@ -61,6 +61,7 @@ Araci-front
 │   │   ├── IUndoableCommand.cs
 │   │   ├── MoveProjectSheetTableInstanceCommand.cs
 │   │   ├── RemoveProjectSheetTableInstanceCommand.cs
+│   │   ├── RemoveProjectSheetTypeLineCommand.cs
 │   │   ├── RenameProjectItemCommand.cs
 │   │   ├── ResizeProjectSheetTableInstanceCommand.cs
 │   │   ├── SplitProjectSheetTableInstanceCommand.cs
@@ -153,6 +154,7 @@ Araci-front
 │           ├── EditarPropriedadesTipoPranchaUseCase.cs
 │           ├── EditarPropriedadesVistaUseCase.cs
 │           ├── ExcluirItemProjetoUseCase.cs
+│           ├── ExcluirLinhaDoTipoPranchaUseCase.cs
 │           ├── ExportarTabelaUseCase.cs
 │           ├── InserirLinhaNoTipoPranchaUseCase.cs
 │           ├── InserirTabelaNaPranchaUseCase.cs
@@ -555,55 +557,6 @@ Araci-front
 
 
 ====================================================================================================
-ARQUIVO: C:\Users\User\source\repos\lucasffxavier\Araci-front\Applications\Commands\AddProjectSheetTypeLineCommand.cs
-====================================================================================================
-
-using System;
-using System.Linq;
-using Araci.Core.Documents;
-
-namespace Araci.Core.Commands
-{
-    public class AddProjectSheetTypeLineCommand : IUndoableCommand
-    {
-        private readonly AraciDocument _document;
-        private readonly ProjectSheetType _tipo;
-        private readonly ProjectSheetTemplateLine _linha;
-
-        public AddProjectSheetTypeLineCommand(
-            AraciDocument document,
-            ProjectSheetType tipo,
-            ProjectSheetTemplateLine linha)
-        {
-            _document = document ?? throw new ArgumentNullException(nameof(document));
-            _tipo = tipo ?? throw new ArgumentNullException(nameof(tipo));
-            _linha = linha ?? throw new ArgumentNullException(nameof(linha));
-        }
-
-        public void Execute()
-        {
-            if (!_tipo.Linhas.Any(l => l.Id == _linha.Id))
-                _tipo.Linhas.Add(_linha);
-
-            _document.AtualizarPropriedadesTipoPrancha(_tipo);
-        }
-
-        public void Undo()
-        {
-            _tipo.Linhas.RemoveAll(l => l.Id == _linha.Id);
-            _document.AtualizarPropriedadesTipoPrancha(_tipo);
-        }
-
-        public void Redo()
-        {
-            Execute();
-        }
-    }
-}
-
-
-
-====================================================================================================
 ARQUIVO: C:\Users\User\source\repos\lucasffxavier\Araci-front\Applications\Commands\IUndoableCommand.cs
 ====================================================================================================
 
@@ -618,334 +571,6 @@ ARQUIVO: C:\Users\User\source\repos\lucasffxavier\Araci-front\Applications\Comma
         void Redo();
     }
 }
-
-
-====================================================================================================
-ARQUIVO: C:\Users\User\source\repos\lucasffxavier\Araci-front\Applications\Editor\InputRouter.cs
-====================================================================================================
-
-using System;
-using System.Linq;
-using System.Windows;
-using System.Windows.Controls;
-using System.Windows.Input;
-using Araci.Applications.Abstractions;
-using Araci.Applications.Editar.Base;
-using Araci.Applications.Editar.Selecionar;
-using Araci.Services;
-using Araci.ViewModels;
-using Araci.Services.Editing;
-using Araci.Services.Interaction;
-
-namespace Araci.Applications.Editor
-{
-    public class InputRouter
-    {
-        private readonly ToolService _tools;
-        private readonly ICommandHistory _commands;
-        private readonly ISafeDeleteService _safeDelete;
-        private readonly ISelectionService _selection;
-        private readonly IElementCatalog _elements;
-        private readonly IHoverService _hover;
-        private readonly Action _copiarSelecionados;
-        private readonly Action _colar;
-        private string _shortcutBuffer = string.Empty;
-        private DateTime _lastShortcutKeyTime = DateTime.MinValue;
-        private static readonly TimeSpan ShortcutTimeout = TimeSpan.FromSeconds(1);
-
-        public InputRouter(
-            ToolService tools,
-            ICommandHistory commands,
-            ISafeDeleteService safeDelete,
-            ISelectionService selection,
-            IElementCatalog elements,
-            IHoverService hover,
-            Action copiarSelecionados,
-            Action colar)
-        {
-            _tools = tools ?? throw new ArgumentNullException(nameof(tools));
-            _commands = commands ?? throw new ArgumentNullException(nameof(commands));
-            _safeDelete = safeDelete ?? throw new ArgumentNullException(nameof(safeDelete));
-            _selection = selection ?? throw new ArgumentNullException(nameof(selection));
-            _elements = elements ?? throw new ArgumentNullException(nameof(elements));
-            _hover = hover ?? throw new ArgumentNullException(nameof(hover));
-            _copiarSelecionados = copiarSelecionados ?? throw new ArgumentNullException(nameof(copiarSelecionados));
-            _colar = colar ?? throw new ArgumentNullException(nameof(colar));
-        }
-
-        public Point UltimaPosicaoMouseMundo { get; private set; }
-        public bool PossuiUltimaPosicaoMouseMundo { get; private set; }
-
-        public ITool ToolAtual
-        {
-            get => _tools.FerramentaAtual;
-            set => _tools.AtivarFerramenta(value);
-        }
-
-        public void MouseDown(ElementoViewModel? vm, Point position)
-        {
-            AtualizarUltimaPosicao(position);
-            ToolAtual.OnMouseDown(vm, position, CapturarEstadoAtual(position));
-        }
-
-        public void MouseDown(ElementoViewModel? vm, Point position, ToolInputState inputState)
-        {
-            AtualizarUltimaPosicao(position);
-            ToolAtual.OnMouseDown(vm, position, inputState);
-        }
-
-        public void MouseMove(Point position)
-        {
-            MouseMove(position, CapturarEstadoAtual(position));
-        }
-
-        public void MouseMove(Point position, ToolInputState inputState)
-        {
-            AtualizarUltimaPosicao(position);
-
-            if (ToolAtual.IsBusy)
-                _hover.Clear();
-            else
-                _hover.Update(position);
-
-            ToolAtual.OnMouseMove(position, inputState);
-        }
-
-        public void MouseUp(Point position)
-        {
-            MouseUp(position, CapturarEstadoAtual(position));
-        }
-
-        public void MouseUp(Point position, ToolInputState inputState)
-        {
-            AtualizarUltimaPosicao(position);
-            ToolAtual.OnMouseUp(position, inputState);
-        }
-
-        public bool KeyDown(Key key)
-        {
-            bool control = Keyboard.Modifiers.HasFlag(ModifierKeys.Control);
-
-            if (control && key == Key.Z)
-            {
-                LimparAtalho();
-                _commands.Undo();
-                return true;
-            }
-
-            if (control && key == Key.Y)
-            {
-                LimparAtalho();
-                _commands.Redo();
-                return true;
-            }
-
-            if (control && key == Key.C)
-            {
-                LimparAtalho();
-                _copiarSelecionados();
-                return true;
-            }
-
-            if (control && key == Key.V)
-            {
-                LimparAtalho();
-                _colar();
-                return true;
-            }
-
-            if (key == Key.Delete)
-            {
-                LimparAtalho();
-                _safeDelete.DeleteActiveHandleOrSelection();
-                return true;
-            }
-
-            if (key == Key.Escape)
-            {
-                LimparAtalho();
-                return HandleEscape();
-            }
-
-            if (key == Key.Space)
-            {
-                LimparAtalho();
-
-                if (ToolAtual.IsBusy || ToolAtual.HandlesKey(key) || _selection.Selecionados.Any(RotationService.PodeRotacionar))
-                {
-                    ToolAtual.OnKeyDown(key);
-                    return true;
-                }
-
-                return false;
-            }
-
-            if (TryHandleTwoKeyShortcut(key))
-                return true;
-
-            ToolAtual.OnKeyDown(key);
-            return false;
-        }
-
-        private bool TryHandleTwoKeyShortcut(Key key)
-        {
-            if (Keyboard.Modifiers != ModifierKeys.None)
-            {
-                LimparAtalho();
-                return false;
-            }
-
-            if (Keyboard.FocusedElement is TextBox)
-            {
-                LimparAtalho();
-                return false;
-            }
-
-            char? c = KeyToChar(key);
-
-            if (c == null)
-                return false;
-
-            DateTime now = DateTime.Now;
-
-            if (now - _lastShortcutKeyTime > ShortcutTimeout)
-                _shortcutBuffer = string.Empty;
-
-            _lastShortcutKeyTime = now;
-            _shortcutBuffer = (_shortcutBuffer + c.Value).ToUpperInvariant();
-
-            if (_shortcutBuffer.Length > 2)
-                _shortcutBuffer = _shortcutBuffer[^2..];
-
-            if (_shortcutBuffer.Length < 2)
-                return true;
-
-            bool handled = ExecutarAtalho(_shortcutBuffer);
-            LimparAtalho();
-            return handled;
-        }
-
-        private bool ExecutarAtalho(string shortcut)
-        {
-            ElementDefinition? definition = _elements.FindByShortcut(shortcut);
-
-            if (definition != null)
-                return _tools.AtivarInsercaoElemento(definition.Kind);
-
-            switch (shortcut)
-            {
-                case "SE":
-                    _tools.VoltarParaSelecao();
-                    return true;
-                case "MV":
-                    _tools.AtivarMover();
-                    return true;
-                case "AL":
-                    _tools.AtivarAlinhar();
-                    return true;
-                default:
-                    return false;
-            }
-        }
-
-        private static char? KeyToChar(Key key)
-        {
-            if (key >= Key.A && key <= Key.Z)
-                return (char)('A' + (key - Key.A));
-
-            return null;
-        }
-
-        private void LimparAtalho()
-        {
-            _shortcutBuffer = string.Empty;
-            _lastShortcutKeyTime = DateTime.MinValue;
-        }
-
-        private bool HandleEscape()
-        {
-            if (ToolAtual is SelecionarTool)
-            {
-                if (ToolAtual.IsBusy)
-                    ToolAtual.Cancelar();
-                else
-                    _selection.Limpar();
-
-                return true;
-            }
-
-            _tools.VoltarParaSelecao();
-            return true;
-        }
-
-        private void AtualizarUltimaPosicao(Point position)
-        {
-            UltimaPosicaoMouseMundo = position;
-            PossuiUltimaPosicaoMouseMundo = true;
-        }
-
-        private static ToolInputState CapturarEstadoAtual(Point worldPosition)
-        {
-            return new ToolInputState(Keyboard.Modifiers, null, 0, worldPosition, default);
-        }
-    }
-}
-
-
-
-====================================================================================================
-ARQUIVO: C:\Users\User\source\repos\lucasffxavier\Araci-front\Applications\UseCases\Projeto\InserirLinhaNoTipoPranchaUseCase.cs
-====================================================================================================
-
-using System;
-using System.Linq;
-using Araci.Applications.Abstractions;
-using Araci.Core.Commands;
-using Araci.Core.Documents;
-
-namespace Araci.Applications.UseCases.Projeto
-{
-    public sealed class InserirLinhaNoTipoPranchaUseCase
-    {
-        private const double MinLengthSquared = 0.0001;
-
-        private readonly AraciDocument _document;
-        private readonly ICommandHistory _commands;
-
-        public InserirLinhaNoTipoPranchaUseCase(AraciDocument document, ICommandHistory commands)
-        {
-            _document = document ?? throw new ArgumentNullException(nameof(document));
-            _commands = commands ?? throw new ArgumentNullException(nameof(commands));
-        }
-
-        public ProjectSheetTemplateLine? Inserir(Guid tipoId, double x1, double y1, double x2, double y2)
-        {
-            ProjectSheetType? tipo = _document.TiposPrancha.FirstOrDefault(t => t.Id == tipoId);
-
-            if (tipo == null || !TemComprimentoValido(x1, y1, x2, y2))
-                return null;
-
-            var linha = new ProjectSheetTemplateLine
-            {
-                X1 = x1,
-                Y1 = y1,
-                X2 = x2,
-                Y2 = y2
-            };
-
-            _commands.Execute(new AddProjectSheetTypeLineCommand(_document, tipo, linha));
-            return linha;
-        }
-
-        private static bool TemComprimentoValido(double x1, double y1, double x2, double y2)
-        {
-            double dx = x2 - x1;
-            double dy = y2 - y1;
-            return dx * dx + dy * dy >= MinLengthSquared;
-        }
-    }
-}
-
 
 
 ====================================================================================================
@@ -1085,6 +710,11 @@ namespace Araci.TechnicalChecks
                 ("ProjectSheetTypeView renderiza bindings de linhas", ProjectSheetTypeViewRenderizaBindingsLinhas),
                 ("ToolService linha em contexto tipo ativa ferramenta template", ToolServiceLinhaContextoTipoAtivaFerramentaTemplate),
                 ("Ferramenta linha template insere linha por dois cliques", FerramentaLinhaTemplateInsereLinhaPorDoisCliques),
+                ("Linha template seleciona por hit test", LinhaTemplateSelecionaPorHitTest),
+                ("Linha template limpa selecao ao clicar vazio", LinhaTemplateLimpaSelecaoCliqueVazio),
+                ("Excluir linha template undo redo", ExcluirLinhaTemplateUndoRedo),
+                ("ProjectSheetTypeView usa destaque de selecao de linha", ProjectSheetTypeViewUsaDestaqueSelecaoLinha),
+                ("EditorContext expoe excluir linha do tipo prancha", EditorContextExpoeExcluirLinhaDoTipoPrancha),
                 ("ToolService linha em contexto diagrama preserva ferramenta anotativa", ToolServiceLinhaContextoDiagramaPreservaFerramentaAnotativa),
                 ("Project Browser seleciona tipo abre visualizacao de tipo", ProjectBrowserSelecionaTipoAbreVisualizacaoTipo),
                 ("Project Browser seleciona tipo nao altera vista ativa", ProjectBrowserSelecionaTipoNaoAlteraVistaAtiva),
@@ -7317,6 +6947,91 @@ namespace Araci.TechnicalChecks
             AssertEqual(0, context.Document.Elementos.Count, "Ferramenta template nao deveria criar Elemento.");
         }
 
+
+        private static void LinhaTemplateSelecionaPorHitTest()
+        {
+            var document = new AraciDocument();
+            ProjectSheetType tipo = document.TipoPranchaPadrao;
+            ProjectSheetTemplateLine linha = new()
+            {
+                X1 = 10,
+                Y1 = 20,
+                X2 = 100,
+                Y2 = 20
+            };
+            tipo.Linhas.Add(linha);
+            var viewModel = new ProjectSheetTypeViewModel(document, tipo);
+
+            bool selecionou = viewModel.SelectLineAt(new Point(55, 23), 6);
+
+            Assert(selecionou, "Hit-test deveria selecionar linha proxima ao segmento.");
+            Assert(viewModel.HasSelectedLine, "ViewModel deveria indicar linha selecionada.");
+            AssertEqual(linha.Id, viewModel.SelectedLineId!.Value, "SelectedLineId");
+            Assert(viewModel.Lines.Single().IsSelected, "Linha ViewModel deveria ficar selecionada.");
+        }
+
+        private static void LinhaTemplateLimpaSelecaoCliqueVazio()
+        {
+            var document = new AraciDocument();
+            ProjectSheetType tipo = document.TipoPranchaPadrao;
+            ProjectSheetTemplateLine linha = new()
+            {
+                X1 = 10,
+                Y1 = 20,
+                X2 = 100,
+                Y2 = 20
+            };
+            tipo.Linhas.Add(linha);
+            var viewModel = new ProjectSheetTypeViewModel(document, tipo);
+
+            viewModel.SelectLineAt(new Point(55, 20), 6);
+            bool selecionou = viewModel.SelectLineAt(new Point(55, 80), 6);
+
+            Assert(!selecionou, "Clique longe da linha nao deveria selecionar.");
+            Assert(!viewModel.HasSelectedLine, "Clique vazio deveria limpar selecao.");
+            Assert(!viewModel.Lines.Single().IsSelected, "Linha ViewModel deveria perder destaque.");
+        }
+
+        private static void ExcluirLinhaTemplateUndoRedo()
+        {
+            var document = new AraciDocument();
+            var commands = new Araci.Core.Commands.CommandManager();
+            var inserir = new InserirLinhaNoTipoPranchaUseCase(document, commands);
+            var excluir = new ExcluirLinhaDoTipoPranchaUseCase(document, commands);
+            ProjectSheetType tipo = document.TipoPranchaPadrao;
+            ProjectSheetTemplateLine linha = inserir.Inserir(tipo.Id, 10, 20, 80, 20)!;
+            Guid linhaId = linha.Id;
+
+            bool excluiu = excluir.Excluir(tipo.Id, linha.Id);
+
+            Assert(excluiu, "Excluir linha deveria retornar true.");
+            AssertEqual(0, tipo.Linhas.Count, "Linha deveria ser removida.");
+
+            commands.Undo();
+
+            AssertEqual(1, tipo.Linhas.Count, "Undo deveria restaurar linha.");
+            AssertEqual(linhaId, tipo.Linhas[0].Id, "Undo deveria preservar Id.");
+
+            commands.Redo();
+
+            AssertEqual(0, tipo.Linhas.Count, "Redo deveria remover linha novamente.");
+        }
+
+        private static void ProjectSheetTypeViewUsaDestaqueSelecaoLinha()
+        {
+            string xaml = File.ReadAllText(FindProjectFile("Views/ProjectSheetTypeView.xaml"));
+
+            AssertContains(xaml, "SelectionStrokeBrush", "ProjectSheetTypeView selecao StrokeBrush");
+            AssertContains(xaml, "SelectionStrokeThickness", "ProjectSheetTypeView selecao StrokeThickness");
+        }
+
+        private static void EditorContextExpoeExcluirLinhaDoTipoPrancha()
+        {
+            var context = new EditorContext();
+
+            Assert(context.ExcluirLinhaDoTipoPrancha != null, "EditorContext deveria expor ExcluirLinhaDoTipoPranchaUseCase.");
+        }
+
         private static void ToolServiceLinhaContextoDiagramaPreservaFerramentaAnotativa()
         {
             var context = new EditorContext();
@@ -9731,7 +9446,6 @@ namespace Araci.TechnicalChecks
 }
 
 
-
 ====================================================================================================
 ARQUIVO: C:\Users\User\source\repos\lucasffxavier\Araci-front\Core\Documents\ProjectSheetTemplateLine.cs
 ====================================================================================================
@@ -9939,6 +9653,7 @@ namespace Araci.Services
             EditarPropriedadesPrancha = new EditarPropriedadesPranchaUseCase(Document, Commands);
             EditarPropriedadesTipoPrancha = new EditarPropriedadesTipoPranchaUseCase(Document, Commands);
             InserirLinhaNoTipoPrancha = new InserirLinhaNoTipoPranchaUseCase(Document, Commands);
+            ExcluirLinhaDoTipoPrancha = new ExcluirLinhaDoTipoPranchaUseCase(Document, Commands);
             ExportarTabela = new ExportarTabelaUseCase(Document, Dialogs, new ProjectTableDataBuilder(), new ProjectTableCsvExportService());
             InserirTabelaNaPrancha = new InserirTabelaNaPranchaUseCase(Document, Commands);
             MoverTabelaNaPrancha = new MoverTabelaNaPranchaUseCase(Document, Commands);
@@ -10047,6 +9762,7 @@ namespace Araci.Services
         public EditarPropriedadesPranchaUseCase EditarPropriedadesPrancha { get; }
         public EditarPropriedadesTipoPranchaUseCase EditarPropriedadesTipoPrancha { get; }
         public InserirLinhaNoTipoPranchaUseCase InserirLinhaNoTipoPrancha { get; }
+        public ExcluirLinhaDoTipoPranchaUseCase ExcluirLinhaDoTipoPrancha { get; }
         public ExportarTabelaUseCase ExportarTabela { get; }
         public InserirTabelaNaPranchaUseCase InserirTabelaNaPrancha { get; }
         public MoverTabelaNaPranchaUseCase MoverTabelaNaPrancha { get; }
@@ -10252,121 +9968,22 @@ namespace Araci.Services
 }
 
 
-
-====================================================================================================
-ARQUIVO: C:\Users\User\source\repos\lucasffxavier\Araci-front\Service\EditorState.cs
-====================================================================================================
-
-﻿using System.ComponentModel;
-using System.Runtime.CompilerServices;
-
-namespace Araci.ViewModels
-{
-    public enum EditorSurfaceKind
-    {
-        Diagram,
-        ProjectTable,
-        ProjectSheet,
-        ProjectSheetType
-    }
-
-    public class EditorState
-        : INotifyPropertyChanged
-    {
-        // =========================
-        // ELEMENTO SELECIONADO
-        // =========================
-
-        private object?
-            _elementoSelecionado;
-
-        private bool
-            _navegadorProjetoVisivel;
-
-        private EditorSurfaceKind
-            _superficieAtiva = EditorSurfaceKind.Diagram;
-
-        public object?
-            ElementoSelecionado
-        {
-            get => _elementoSelecionado;
-
-            set
-            {
-                if (_elementoSelecionado == value)
-                    return;
-
-                _elementoSelecionado = value;
-
-                OnPropertyChanged();
-            }
-        }
-
-        public bool
-            NavegadorProjetoVisivel
-        {
-            get => _navegadorProjetoVisivel;
-
-            set
-            {
-                if (_navegadorProjetoVisivel == value)
-                    return;
-
-                _navegadorProjetoVisivel = value;
-
-                OnPropertyChanged();
-            }
-        }
-
-        public EditorSurfaceKind
-            SuperficieAtiva
-        {
-            get => _superficieAtiva;
-
-            set
-            {
-                if (_superficieAtiva == value)
-                    return;
-
-                _superficieAtiva = value;
-
-                OnPropertyChanged();
-            }
-        }
-
-        // =========================
-        // PROPERTY CHANGED
-        // =========================
-
-        public event PropertyChangedEventHandler?
-            PropertyChanged;
-
-        protected virtual void OnPropertyChanged(
-            [CallerMemberName]
-            string? propertyName = null)
-        {
-            PropertyChanged?.Invoke(
-                this,
-                new PropertyChangedEventArgs(propertyName));
-        }
-    }
-}
-
-
-
 ====================================================================================================
 ARQUIVO: C:\Users\User\source\repos\lucasffxavier\Araci-front\ViewModels\ProjectSheetTemplateLineViewModel.cs
 ====================================================================================================
 
 using System;
+using System.ComponentModel;
+using System.Runtime.CompilerServices;
 using System.Windows.Media;
 using Araci.Core.Documents;
 
 namespace Araci.ViewModels
 {
-    public sealed class ProjectSheetTemplateLineViewModel
+    public sealed class ProjectSheetTemplateLineViewModel : INotifyPropertyChanged
     {
         private readonly ProjectSheetTemplateLine _linha;
+        private bool _isSelected;
 
         public ProjectSheetTemplateLineViewModel(ProjectSheetTemplateLine linha)
         {
@@ -10382,6 +9999,26 @@ namespace Araci.ViewModels
         public double StrokeThickness => _linha.StrokeThickness;
         public bool Visible => _linha.Visible;
 
+        public bool IsSelected
+        {
+            get => _isSelected;
+            set
+            {
+                if (_isSelected == value)
+                    return;
+
+                _isSelected = value;
+                OnPropertyChanged();
+                OnPropertyChanged(nameof(SelectionStrokeBrush));
+                OnPropertyChanged(nameof(SelectionStrokeThickness));
+            }
+        }
+
+        public Brush SelectionStrokeBrush => IsSelected ? Brushes.DodgerBlue : StrokeBrush;
+        public double SelectionStrokeThickness => IsSelected ? Math.Max(StrokeThickness + 3.0, 4.0) : StrokeThickness;
+
+        public event PropertyChangedEventHandler? PropertyChanged;
+
         private static Brush CriarBrush(string stroke)
         {
             try
@@ -10395,9 +10032,13 @@ namespace Araci.ViewModels
 
             return Brushes.Black;
         }
+
+        private void OnPropertyChanged([CallerMemberName] string? propertyName = null)
+        {
+            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
+        }
     }
 }
-
 
 
 ====================================================================================================
@@ -10409,6 +10050,7 @@ using System.Collections.ObjectModel;
 using System.ComponentModel;
 using System.Linq;
 using System.Runtime.CompilerServices;
+using System.Windows;
 using Araci.Core.Documents;
 
 namespace Araci.ViewModels
@@ -10420,6 +10062,7 @@ namespace Araci.ViewModels
         private readonly AraciDocument _document;
         private readonly ProjectSheetType _tipo;
         private ProjectSheetTemplateLineViewModel? _previewLine;
+        private Guid? _selectedLineId;
 
         public ProjectSheetTypeViewModel(AraciDocument document, ProjectSheetType tipo)
         {
@@ -10447,6 +10090,8 @@ namespace Araci.ViewModels
         public string Titulo => $"Tipo de Prancha - {Nome}";
         public string Descricao => $"{FormatoFolha} {OrientacaoFolha} - {LarguraFolha:0.#} x {AlturaFolha:0.#}";
         public ObservableCollection<ProjectSheetTemplateLineViewModel> Lines { get; }
+        public Guid? SelectedLineId => _selectedLineId;
+        public bool HasSelectedLine => _selectedLineId.HasValue;
 
         public ProjectSheetTemplateLineViewModel? PreviewLine
         {
@@ -10485,6 +10130,60 @@ namespace Araci.ViewModels
             PreviewLine = linha == null ? null : new ProjectSheetTemplateLineViewModel(linha);
         }
 
+        public bool SelectLineAt(Point position, double tolerance)
+        {
+            ProjectSheetTemplateLineViewModel? hit = Lines
+                .Reverse()
+                .FirstOrDefault(l => DistanciaAoSegmento(position, new Point(l.X1, l.Y1), new Point(l.X2, l.Y2)) <= tolerance);
+
+            if (hit == null)
+            {
+                ClearLineSelection();
+                return false;
+            }
+
+            SelectLine(hit.Id);
+            return true;
+        }
+
+        public bool SelectLine(Guid lineId)
+        {
+            if (!Lines.Any(l => l.Id == lineId))
+            {
+                ClearLineSelection();
+                return false;
+            }
+
+            _selectedLineId = lineId;
+            AtualizarSelecaoVisual();
+            OnPropertyChanged(nameof(SelectedLineId));
+            OnPropertyChanged(nameof(HasSelectedLine));
+            return true;
+        }
+
+        public void ClearLineSelection()
+        {
+            if (!_selectedLineId.HasValue)
+                return;
+
+            _selectedLineId = null;
+            AtualizarSelecaoVisual();
+            OnPropertyChanged(nameof(SelectedLineId));
+            OnPropertyChanged(nameof(HasSelectedLine));
+        }
+
+        public bool TryGetSelectedLineId(out Guid lineId)
+        {
+            if (_selectedLineId.HasValue && Lines.Any(l => l.Id == _selectedLineId.Value))
+            {
+                lineId = _selectedLineId.Value;
+                return true;
+            }
+
+            lineId = Guid.Empty;
+            return false;
+        }
+
         public event PropertyChangedEventHandler? PropertyChanged;
 
         private void OnItemProjetoRenomeado()
@@ -10504,10 +10203,48 @@ namespace Araci.ViewModels
 
         private void RefreshLines()
         {
+            Guid? selectedId = _selectedLineId;
             Lines.Clear();
 
             foreach (ProjectSheetTemplateLine linha in (_tipo.Linhas ?? new()).Where(l => l != null && l.Visible))
                 Lines.Add(new ProjectSheetTemplateLineViewModel(linha));
+
+            if (selectedId.HasValue && Lines.Any(l => l.Id == selectedId.Value))
+                _selectedLineId = selectedId;
+            else
+                _selectedLineId = null;
+
+            AtualizarSelecaoVisual();
+            OnPropertyChanged(nameof(SelectedLineId));
+            OnPropertyChanged(nameof(HasSelectedLine));
+        }
+
+        private void AtualizarSelecaoVisual()
+        {
+            foreach (ProjectSheetTemplateLineViewModel line in Lines)
+                line.IsSelected = _selectedLineId.HasValue && line.Id == _selectedLineId.Value;
+        }
+
+        private static double DistanciaAoSegmento(Point point, Point a, Point b)
+        {
+            double dx = b.X - a.X;
+            double dy = b.Y - a.Y;
+            double lengthSquared = dx * dx + dy * dy;
+
+            if (lengthSquared < 0.0001)
+                return Distancia(point, a);
+
+            double t = ((point.X - a.X) * dx + (point.Y - a.Y) * dy) / lengthSquared;
+            t = Math.Max(0, Math.Min(1, t));
+            var projection = new Point(a.X + t * dx, a.Y + t * dy);
+            return Distancia(point, projection);
+        }
+
+        private static double Distancia(Point a, Point b)
+        {
+            double dx = a.X - b.X;
+            double dy = a.Y - b.Y;
+            return Math.Sqrt(dx * dx + dy * dy);
         }
 
         private void OnPropertyChanged([CallerMemberName] string? propertyName = null)
@@ -10616,8 +10353,8 @@ ARQUIVO: C:\Users\User\source\repos\lucasffxavier\Araci-front\Views\ProjectSheet
                                               Y1="{Binding Y1}"
                                               X2="{Binding X2}"
                                               Y2="{Binding Y2}"
-                                              Stroke="{Binding StrokeBrush}"
-                                              StrokeThickness="{Binding StrokeThickness}"
+                                              Stroke="{Binding SelectionStrokeBrush}"
+                                              StrokeThickness="{Binding SelectionStrokeThickness}"
                                               StrokeStartLineCap="Square"
                                               StrokeEndLineCap="Square"/>
 									</DataTemplate>
@@ -10667,6 +10404,8 @@ namespace Araci.Views
 {
     public partial class ProjectSheetTypeView : UserControl
     {
+        private const double LineHitTolerance = 6.0;
+
         private EditorContext? _context;
 
         public ProjectSheetTypeView()
@@ -10688,6 +10427,13 @@ namespace Araci.Views
             Focus();
             Keyboard.Focus(this);
             Point position = e.GetPosition(TemplatePageBorder);
+
+            if (TentarSelecionarLinhaTemplate(position))
+            {
+                e.Handled = true;
+                return;
+            }
+
             ToolInputState inputState = CriarInputState(e, position, e.ChangedButton, e.ClickCount);
             _context.Tools.FerramentaAtual.OnMouseDown(null, position, inputState);
             TemplatePageBorder.CaptureMouse();
@@ -10723,8 +10469,49 @@ namespace Araci.Views
 
         private void OnPreviewKeyDown(object sender, KeyEventArgs e)
         {
-            if (_context?.Input.KeyDown(e.Key) == true)
+            if (_context == null)
+                return;
+
+            if (e.Key == Key.Delete && ExcluirLinhaSelecionada())
+            {
                 e.Handled = true;
+                return;
+            }
+
+            if (_context.Input.KeyDown(e.Key))
+                e.Handled = true;
+        }
+
+        private bool TentarSelecionarLinhaTemplate(Point position)
+        {
+            if (_context == null || _context.ProjectSheetTypeViewModelAtivo == null)
+                return false;
+
+            ITool ferramentaAtual = _context.Tools.FerramentaAtual;
+
+            if (!string.Equals(ferramentaAtual.Nome, "Selecionar", StringComparison.OrdinalIgnoreCase) || ferramentaAtual.IsBusy)
+                return false;
+
+            _context.ProjectSheetTypeViewModelAtivo.SelectLineAt(position, LineHitTolerance);
+            return true;
+        }
+
+        private bool ExcluirLinhaSelecionada()
+        {
+            if (_context == null || _context.ProjectSheetTypeViewModelAtivo == null)
+                return false;
+
+            ProjectSheetTypeViewModel viewModel = _context.ProjectSheetTypeViewModelAtivo;
+
+            if (!viewModel.TryGetSelectedLineId(out Guid lineId))
+                return false;
+
+            bool excluiu = _context.ExcluirLinhaDoTipoPrancha.Excluir(viewModel.Id, lineId);
+
+            if (excluiu)
+                viewModel.ClearLineSelection();
+
+            return excluiu;
         }
 
         private static ToolInputState CriarInputState(MouseEventArgs e, Point localPosition, MouseButton? button = null, int clickCount = 0)

@@ -137,6 +137,29 @@ namespace Araci.ViewModels
             return false;
         }
 
+        public bool SetLinePreviewOffset(Guid lineId, double deltaX, double deltaY)
+        {
+            ProjectSheetTemplateLineViewModel? line = Lines.FirstOrDefault(l => l.Id == lineId);
+
+            if (line == null)
+                return false;
+
+            line.SetPreviewOffset(deltaX, deltaY);
+            return true;
+        }
+
+        public void ClearLinePreviewOffset(Guid lineId)
+        {
+            ProjectSheetTemplateLineViewModel? line = Lines.FirstOrDefault(l => l.Id == lineId);
+            line?.ClearPreviewOffset();
+        }
+
+        public void ClearLinePreviewOffsets()
+        {
+            foreach (ProjectSheetTemplateLineViewModel line in Lines)
+                line.ClearPreviewOffset();
+        }
+
         public event PropertyChangedEventHandler? PropertyChanged;
 
         private void OnItemProjetoRenomeado()
