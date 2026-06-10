@@ -49,6 +49,17 @@ namespace Araci.Core.Commands
                 nomeNovo);
         }
 
+        public static RenameProjectItemCommand TipoPrancha(AraciDocument document, ProjectSheetType tipo, string nomeNovo)
+        {
+            ArgumentNullException.ThrowIfNull(document);
+            ArgumentNullException.ThrowIfNull(tipo);
+
+            return new RenameProjectItemCommand(
+                nome => document.RenomearTipoPrancha(tipo, nome),
+                tipo.Nome,
+                nomeNovo);
+        }
+
         public void Execute()
         {
             _renomear(_nomeNovo);

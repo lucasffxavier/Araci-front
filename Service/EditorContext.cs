@@ -111,6 +111,7 @@ namespace Araci.Services
             EditarPropriedadesVista = new EditarPropriedadesVistaUseCase(Document, Commands);
             EditarPropriedadesTabela = new EditarPropriedadesTabelaUseCase(Document, Commands);
             EditarPropriedadesPrancha = new EditarPropriedadesPranchaUseCase(Document, Commands);
+            EditarPropriedadesTipoPrancha = new EditarPropriedadesTipoPranchaUseCase(Document, Commands);
             ExportarTabela = new ExportarTabelaUseCase(Document, Dialogs, new ProjectTableDataBuilder(), new ProjectTableCsvExportService());
             InserirTabelaNaPrancha = new InserirTabelaNaPranchaUseCase(Document, Commands);
             MoverTabelaNaPrancha = new MoverTabelaNaPranchaUseCase(Document, Commands);
@@ -214,6 +215,7 @@ namespace Araci.Services
         public EditarPropriedadesVistaUseCase EditarPropriedadesVista { get; }
         public EditarPropriedadesTabelaUseCase EditarPropriedadesTabela { get; }
         public EditarPropriedadesPranchaUseCase EditarPropriedadesPrancha { get; }
+        public EditarPropriedadesTipoPranchaUseCase EditarPropriedadesTipoPrancha { get; }
         public ExportarTabelaUseCase ExportarTabela { get; }
         public InserirTabelaNaPranchaUseCase InserirTabelaNaPrancha { get; }
         public MoverTabelaNaPranchaUseCase MoverTabelaNaPrancha { get; }

@@ -52,5 +52,19 @@ namespace Araci.Applications.UseCases.Projeto
             _commands.Execute(DeleteProjectItemCommand.Prancha(_document, prancha));
             return true;
         }
+
+        public bool ExcluirTipoPrancha(Guid id)
+        {
+            if (_document.TiposPrancha.Count <= 1 || _document.TipoPranchaEstaEmUso(id))
+                return false;
+
+            ProjectSheetType? tipo = _document.TiposPrancha.FirstOrDefault(t => t.Id == id);
+
+            if (tipo == null)
+                return false;
+
+            _commands.Execute(DeleteProjectItemCommand.TipoPrancha(_document, tipo));
+            return true;
+        }
     }
 }

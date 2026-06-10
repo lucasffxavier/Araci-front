@@ -55,5 +55,18 @@ namespace Araci.Applications.UseCases.Projeto
             _commands.Execute(DuplicateProjectItemCommand.Prancha(_document, duplicata, indice));
             return true;
         }
+
+        public bool DuplicarTipoPrancha(Guid id)
+        {
+            ProjectSheetType? origem = _document.TiposPrancha.FirstOrDefault(t => t.Id == id);
+
+            if (origem == null)
+                return false;
+
+            ProjectSheetType duplicata = _document.CriarDuplicataTipoPrancha(origem);
+            int indice = _document.TiposPrancha.IndexOf(origem) + 1;
+            _commands.Execute(DuplicateProjectItemCommand.TipoPrancha(_document, duplicata, indice));
+            return true;
+        }
     }
 }

@@ -186,6 +186,7 @@ Araci-front
 │   │   ├── AraciDocument.cs
 │   │   ├── ProjectSheet.cs
 │   │   ├── ProjectSheetTableInstance.cs
+│   │   ├── ProjectSheetType.cs
 │   │   ├── ProjectTable.cs
 │   │   └── ProjectView.cs
 │   ├── Events
@@ -865,6 +866,80 @@ namespace Araci.Core.Commands
 
 
 ====================================================================================================
+ARQUIVO: C:\Users\User\source\repos\lucasffxavier\Araci-front\Applications\Commands\RenameProjectItemCommand.cs
+====================================================================================================
+
+using System;
+using Araci.Core.Documents;
+
+namespace Araci.Core.Commands
+{
+    public class RenameProjectItemCommand : IUndoableCommand
+    {
+        private readonly Action<string> _renomear;
+        private readonly string _nomeAnterior;
+        private readonly string _nomeNovo;
+
+        private RenameProjectItemCommand(Action<string> renomear, string nomeAnterior, string nomeNovo)
+        {
+            _renomear = renomear ?? throw new ArgumentNullException(nameof(renomear));
+            _nomeAnterior = nomeAnterior ?? string.Empty;
+            _nomeNovo = nomeNovo ?? string.Empty;
+        }
+
+        public static RenameProjectItemCommand Vista(AraciDocument document, ProjectView vista, string nomeNovo)
+        {
+            ArgumentNullException.ThrowIfNull(document);
+            ArgumentNullException.ThrowIfNull(vista);
+
+            return new RenameProjectItemCommand(
+                nome => document.RenomearVista(vista, nome),
+                vista.Nome,
+                nomeNovo);
+        }
+
+        public static RenameProjectItemCommand Tabela(AraciDocument document, ProjectTable tabela, string nomeNovo)
+        {
+            ArgumentNullException.ThrowIfNull(document);
+            ArgumentNullException.ThrowIfNull(tabela);
+
+            return new RenameProjectItemCommand(
+                nome => document.RenomearTabela(tabela, nome),
+                tabela.Nome,
+                nomeNovo);
+        }
+
+        public static RenameProjectItemCommand Prancha(AraciDocument document, ProjectSheet prancha, string nomeNovo)
+        {
+            ArgumentNullException.ThrowIfNull(document);
+            ArgumentNullException.ThrowIfNull(prancha);
+
+            return new RenameProjectItemCommand(
+                nome => document.RenomearPrancha(prancha, nome),
+                prancha.Nome,
+                nomeNovo);
+        }
+
+        public void Execute()
+        {
+            _renomear(_nomeNovo);
+        }
+
+        public void Undo()
+        {
+            _renomear(_nomeAnterior);
+        }
+
+        public void Redo()
+        {
+            Execute();
+        }
+    }
+}
+
+
+
+====================================================================================================
 ARQUIVO: C:\Users\User\source\repos\lucasffxavier\Araci-front\Applications\UseCases\Projeto\CriarItemProjetoUseCase.cs
 ====================================================================================================
 
@@ -905,6 +980,229 @@ namespace Araci.Applications.UseCases.Projeto
             ProjectSheet prancha = _document.CriarModeloNovaPrancha();
             _commands.Execute(AddProjectItemCommand.Prancha(_document, prancha));
             return prancha;
+        }
+    }
+}
+
+
+
+====================================================================================================
+ARQUIVO: C:\Users\User\source\repos\lucasffxavier\Araci-front\Applications\UseCases\Projeto\DuplicarItemProjetoUseCase.cs
+====================================================================================================
+
+using System;
+using System.Linq;
+using Araci.Applications.Abstractions;
+using Araci.Core.Commands;
+using Araci.Core.Documents;
+
+namespace Araci.Applications.UseCases.Projeto
+{
+    public class DuplicarItemProjetoUseCase
+    {
+        private readonly AraciDocument _document;
+        private readonly ICommandHistory _commands;
+
+        public DuplicarItemProjetoUseCase(AraciDocument document, ICommandHistory commands)
+        {
+            _document = document ?? throw new ArgumentNullException(nameof(document));
+            _commands = commands ?? throw new ArgumentNullException(nameof(commands));
+        }
+
+        public bool DuplicarVista(Guid id)
+        {
+            ProjectView? origem = _document.Vistas.FirstOrDefault(v => v.Id == id);
+
+            if (origem == null)
+                return false;
+
+            ProjectView duplicata = _document.CriarDuplicataVista(origem);
+            int indice = _document.Vistas.IndexOf(origem) + 1;
+            _commands.Execute(DuplicateProjectItemCommand.Vista(_document, duplicata, indice));
+            return true;
+        }
+
+        public bool DuplicarTabela(Guid id)
+        {
+            ProjectTable? origem = _document.Tabelas.FirstOrDefault(t => t.Id == id);
+
+            if (origem == null)
+                return false;
+
+            ProjectTable duplicata = _document.CriarDuplicataTabela(origem);
+            int indice = _document.Tabelas.IndexOf(origem) + 1;
+            _commands.Execute(DuplicateProjectItemCommand.Tabela(_document, duplicata, indice));
+            return true;
+        }
+
+        public bool DuplicarPrancha(Guid id)
+        {
+            ProjectSheet? origem = _document.Pranchas.FirstOrDefault(p => p.Id == id);
+
+            if (origem == null)
+                return false;
+
+            ProjectSheet duplicata = _document.CriarDuplicataPrancha(origem);
+            int indice = _document.Pranchas.IndexOf(origem) + 1;
+            _commands.Execute(DuplicateProjectItemCommand.Prancha(_document, duplicata, indice));
+            return true;
+        }
+    }
+}
+
+
+
+====================================================================================================
+ARQUIVO: C:\Users\User\source\repos\lucasffxavier\Araci-front\Applications\UseCases\Projeto\ExcluirItemProjetoUseCase.cs
+====================================================================================================
+
+using System;
+using System.Linq;
+using Araci.Applications.Abstractions;
+using Araci.Core.Commands;
+using Araci.Core.Documents;
+
+namespace Araci.Applications.UseCases.Projeto
+{
+    public class ExcluirItemProjetoUseCase
+    {
+        private readonly AraciDocument _document;
+        private readonly ICommandHistory _commands;
+
+        public ExcluirItemProjetoUseCase(AraciDocument document, ICommandHistory commands)
+        {
+            _document = document ?? throw new ArgumentNullException(nameof(document));
+            _commands = commands ?? throw new ArgumentNullException(nameof(commands));
+        }
+
+        public bool ExcluirVista(Guid id)
+        {
+            if (_document.Vistas.Count <= 1)
+                return false;
+
+            ProjectView? vista = _document.Vistas.FirstOrDefault(v => v.Id == id);
+
+            if (vista == null)
+                return false;
+
+            _commands.Execute(DeleteProjectItemCommand.Vista(_document, vista));
+            return true;
+        }
+
+        public bool ExcluirTabela(Guid id)
+        {
+            ProjectTable? tabela = _document.Tabelas.FirstOrDefault(t => t.Id == id);
+
+            if (tabela == null)
+                return false;
+
+            _commands.Execute(DeleteProjectItemCommand.Tabela(_document, tabela));
+            return true;
+        }
+
+        public bool ExcluirPrancha(Guid id)
+        {
+            ProjectSheet? prancha = _document.Pranchas.FirstOrDefault(p => p.Id == id);
+
+            if (prancha == null)
+                return false;
+
+            _commands.Execute(DeleteProjectItemCommand.Prancha(_document, prancha));
+            return true;
+        }
+    }
+}
+
+
+
+====================================================================================================
+ARQUIVO: C:\Users\User\source\repos\lucasffxavier\Araci-front\Applications\UseCases\Projeto\RenomearItemProjetoUseCase.cs
+====================================================================================================
+
+using System;
+using System.Linq;
+using Araci.Applications.Abstractions;
+using Araci.Core.Commands;
+using Araci.Core.Documents;
+
+namespace Araci.Applications.UseCases.Projeto
+{
+    public class RenomearItemProjetoUseCase
+    {
+        private readonly AraciDocument _document;
+        private readonly ICommandHistory _commands;
+
+        public RenomearItemProjetoUseCase(AraciDocument document, ICommandHistory commands)
+        {
+            _document = document ?? throw new ArgumentNullException(nameof(document));
+            _commands = commands ?? throw new ArgumentNullException(nameof(commands));
+        }
+
+        public bool RenomearVista(Guid id, string nome)
+        {
+            string normalizado = NormalizarNome(nome);
+
+            if (string.IsNullOrWhiteSpace(normalizado))
+                return false;
+
+            ProjectView? vista = _document.Vistas.FirstOrDefault(v => v.Id == id);
+
+            if (vista == null || NomeIgual(vista.Nome, normalizado))
+                return vista != null;
+
+            if (_document.Vistas.Any(v => v.Id != id && NomeIgual(v.Nome, normalizado)))
+                return false;
+
+            _commands.Execute(RenameProjectItemCommand.Vista(_document, vista, normalizado));
+            return true;
+        }
+
+        public bool RenomearTabela(Guid id, string nome)
+        {
+            string normalizado = NormalizarNome(nome);
+
+            if (string.IsNullOrWhiteSpace(normalizado))
+                return false;
+
+            ProjectTable? tabela = _document.Tabelas.FirstOrDefault(t => t.Id == id);
+
+            if (tabela == null || NomeIgual(tabela.Nome, normalizado))
+                return tabela != null;
+
+            if (_document.Tabelas.Any(t => t.Id != id && NomeIgual(t.Nome, normalizado)))
+                return false;
+
+            _commands.Execute(RenameProjectItemCommand.Tabela(_document, tabela, normalizado));
+            return true;
+        }
+
+        public bool RenomearPrancha(Guid id, string nome)
+        {
+            string normalizado = NormalizarNome(nome);
+
+            if (string.IsNullOrWhiteSpace(normalizado))
+                return false;
+
+            ProjectSheet? prancha = _document.Pranchas.FirstOrDefault(p => p.Id == id);
+
+            if (prancha == null || NomeIgual(prancha.Nome, normalizado))
+                return prancha != null;
+
+            if (_document.Pranchas.Any(p => p.Id != id && NomeIgual(p.Nome, normalizado)))
+                return false;
+
+            _commands.Execute(RenameProjectItemCommand.Prancha(_document, prancha, normalizado));
+            return true;
+        }
+
+        private static string NormalizarNome(string nome)
+        {
+            return string.IsNullOrWhiteSpace(nome) ? string.Empty : nome.Trim();
+        }
+
+        private static bool NomeIgual(string atual, string novo)
+        {
+            return string.Equals(NormalizarNome(atual), novo, StringComparison.OrdinalIgnoreCase);
         }
     }
 }
@@ -1012,12 +1310,20 @@ namespace Araci.TechnicalChecks
                 ("Tabela CSV use case mostra erro de escrita", TabelaCsvUseCaseMostraErroDeEscrita),
                 ("Prancha nova inicia sem instancias de tabela", PranchaNovaIniciaSemInstanciasTabela),
                 ("ProjectSheet possui defaults validos de folha", ProjectSheetPossuiDefaultsValidosFolha),
+                ("ProjectSheetType possui defaults validos", ProjectSheetTypePossuiDefaultsValidos),
+                ("AraciDocument novo possui tipo padrao de prancha", AraciDocumentNovoPossuiTipoPadraoPrancha),
+                ("CriarPrancha associa prancha ao tipo padrao", CriarPranchaAssociaPranchaAoTipoPadrao),
                 ("Prancha persiste instancia de tabela", PranchaPersisteInstanciaTabela),
                 ("Persistencia preserva propriedades da prancha", PersistenciaPreservaPropriedadesPrancha),
+                ("Persistencia preserva tipos de prancha", PersistenciaPreservaTiposPrancha),
+                ("Persistencia preserva associacao prancha tipo", PersistenciaPreservaAssociacaoPranchaTipo),
                 ("Prancha duplica instancias de tabela com copia profunda", PranchaDuplicaInstanciasTabelaComCopiaProfunda),
+                ("Duplicar prancha preserva associacao ao tipo", DuplicarPranchaPreservaAssociacaoTipo),
+                ("Operacoes de prancha nao alteram tipos indevidamente", OperacoesPranchaNaoAlteramTiposIndevidamente),
                 ("Excluir tabela limpa instancias em pranchas com undo redo", ExcluirTabelaLimpaInstanciasPranchaComUndoRedo),
                 ("Prancha carrega arquivo antigo sem instancias", PranchaCarregaArquivoAntigoSemInstancias),
                 ("Arquivo antigo sem propriedades de prancha usa defaults", ArquivoAntigoSemPropriedadesPranchaUsaDefaults),
+                ("Arquivo antigo sem tipos de prancha usa tipo padrao", ArquivoAntigoSemTiposPranchaUsaTipoPadrao),
                 ("Prancha ignora instancia orfa no load", PranchaIgnoraInstanciaOrfaNoLoad),
                 ("Editar propriedades prancha undo redo", EditarPropriedadesPranchaUndoRedo),
                 ("Inserir tabela na prancha cria instancia undo redo", InserirTabelaNaPranchaCriaInstanciaUndoRedo),
@@ -6582,6 +6888,46 @@ namespace Araci.TechnicalChecks
             AssertEqual(561, alturaA3Retrato, "A3 retrato altura");
         }
 
+        private static void ProjectSheetTypePossuiDefaultsValidos()
+        {
+            var tipo = new ProjectSheetType();
+
+            Assert(tipo.Id != Guid.Empty, "ProjectSheetType.Id padrao");
+            AssertEqual(ProjectSheetType.DefaultName, tipo.Nome, "ProjectSheetType.Nome padrao");
+            AssertEqual(ProjectSheetFormat.A1, tipo.FormatoFolha, "ProjectSheetType.FormatoFolha padrao");
+            AssertEqual(ProjectSheetOrientation.Paisagem, tipo.OrientacaoFolha, "ProjectSheetType.OrientacaoFolha padrao");
+            AssertEqual(ProjectSheet.DefaultWidth, tipo.LarguraFolha, "ProjectSheetType.LarguraFolha padrao");
+            AssertEqual(ProjectSheet.DefaultHeight, tipo.AlturaFolha, "ProjectSheetType.AlturaFolha padrao");
+
+            tipo.LarguraFolha = double.NaN;
+            tipo.AlturaFolha = double.NegativeInfinity;
+
+            AssertEqual(ProjectSheet.DefaultWidth, tipo.LarguraFolha, "ProjectSheetType.LarguraFolha invalida usa fallback");
+            AssertEqual(ProjectSheet.DefaultHeight, tipo.AlturaFolha, "ProjectSheetType.AlturaFolha invalida usa fallback");
+        }
+
+        private static void AraciDocumentNovoPossuiTipoPadraoPrancha()
+        {
+            var document = new AraciDocument();
+
+            AssertEqual(1, document.TiposPrancha.Count, "TiposPrancha.Count inicial");
+            Assert(document.TipoPranchaPadrao.Id != Guid.Empty, "TipoPranchaPadrao.Id");
+            AssertEqual(ProjectSheetType.DefaultName, document.TipoPranchaPadrao.Nome, "TipoPranchaPadrao.Nome");
+        }
+
+        private static void CriarPranchaAssociaPranchaAoTipoPadrao()
+        {
+            var document = new AraciDocument();
+            var commands = new Araci.Core.Commands.CommandManager();
+            var useCase = new CriarItemProjetoUseCase(document, commands);
+            Guid tipoPadraoId = document.TipoPranchaPadrao.Id;
+
+            ProjectSheet prancha = useCase.CriarPrancha();
+
+            AssertEqual(tipoPadraoId, prancha.SheetTypeId ?? Guid.Empty, "CriarPrancha SheetTypeId");
+            AssertEqual(1, document.TiposPrancha.Count, "CriarPrancha nao cria novo tipo");
+        }
+
         private static void PranchaPersisteInstanciaTabela()
         {
             var document = new AraciDocument();
@@ -6678,6 +7024,52 @@ namespace Araci.TechnicalChecks
             AssertEqual(3, reloaded.Tabelas.Single().RowCount, "Reload preserva RowCount");
         }
 
+        private static void PersistenciaPreservaTiposPrancha()
+        {
+            var serializer = CriarProjectSerializerTeste();
+            var document = new AraciDocument();
+            var tipo = new ProjectSheetType
+            {
+                Nome = "A3 Retrato - Obra",
+                FormatoFolha = ProjectSheetFormat.A3,
+                OrientacaoFolha = ProjectSheetOrientation.Retrato,
+                LarguraFolha = 397,
+                AlturaFolha = 561
+            };
+            document.SubstituirTiposPrancha(new[] { tipo });
+            EditorContext context = new();
+
+            ProjectFileDto dto = serializer.CreateFileDto(document, ProjectMetadataDto.CreateNew("Tipos prancha"), context.Settings.Units);
+            string json = serializer.Serialize(dto);
+            ProjectFileDto reloadedDto = serializer.Deserialize(json);
+            ProjectSheetType reloaded = serializer.CreateProjectSheetTypes(reloadedDto).Single(t => t.Id == tipo.Id);
+
+            AssertEqual(1, dto.SheetTypes.Count, "DTO SheetTypes.Count");
+            AssertEqual(tipo.Id, dto.SheetTypes[0].Id, "DTO SheetType.Id");
+            AssertEqual("A3 Retrato - Obra", reloaded.Nome, "Reload SheetType.Nome");
+            AssertEqual(ProjectSheetFormat.A3, reloaded.FormatoFolha, "Reload SheetType.FormatoFolha");
+            AssertEqual(ProjectSheetOrientation.Retrato, reloaded.OrientacaoFolha, "Reload SheetType.OrientacaoFolha");
+            AssertEqual(397, reloaded.LarguraFolha, "Reload SheetType.LarguraFolha");
+            AssertEqual(561, reloaded.AlturaFolha, "Reload SheetType.AlturaFolha");
+        }
+
+        private static void PersistenciaPreservaAssociacaoPranchaTipo()
+        {
+            var serializer = CriarProjectSerializerTeste();
+            var document = new AraciDocument();
+            ProjectSheetType tipo = document.TipoPranchaPadrao;
+            ProjectSheet prancha = document.CriarNovaPrancha();
+            EditorContext context = new();
+
+            ProjectFileDto dto = serializer.CreateFileDto(document, ProjectMetadataDto.CreateNew("Associacao prancha tipo"), context.Settings.Units);
+            string json = serializer.Serialize(dto);
+            ProjectFileDto reloadedDto = serializer.Deserialize(json);
+            ProjectSheet reloaded = serializer.CreateProjectSheets(reloadedDto, Array.Empty<Guid>()).Single(s => s.Id == prancha.Id);
+
+            AssertEqual(tipo.Id, dto.Sheets.Single(s => s.Id == prancha.Id).SheetTypeId ?? Guid.Empty, "DTO SheetTypeId");
+            AssertEqual(tipo.Id, reloaded.SheetTypeId ?? Guid.Empty, "Reload SheetTypeId");
+        }
+
         private static void PranchaDuplicaInstanciasTabelaComCopiaProfunda()
         {
             var document = new AraciDocument();
@@ -6711,6 +7103,45 @@ namespace Araci.TechnicalChecks
             AssertEqual(instancia.Height, copia.Height, "Duplicata instancia Height");
             AssertEqual(instancia.RowStartIndex, copia.RowStartIndex, "Duplicata instancia RowStartIndex");
             AssertEqual(instancia.RowCount, copia.RowCount, "Duplicata instancia RowCount");
+        }
+
+        private static void DuplicarPranchaPreservaAssociacaoTipo()
+        {
+            var document = new AraciDocument();
+            ProjectSheet origem = document.CriarNovaPrancha();
+            Guid tipoId = origem.SheetTypeId ?? Guid.Empty;
+            var commands = new Araci.Core.Commands.CommandManager();
+            var useCase = new DuplicarItemProjetoUseCase(document, commands);
+
+            bool duplicou = useCase.DuplicarPrancha(origem.Id);
+            ProjectSheet duplicata = document.Pranchas.Single(p => p.Id != origem.Id);
+
+            Assert(duplicou, "DuplicarPrancha deveria retornar true.");
+            AssertEqual(tipoId, duplicata.SheetTypeId ?? Guid.Empty, "Duplicata SheetTypeId");
+            AssertEqual(1, document.TiposPrancha.Count, "DuplicarPrancha nao duplica tipo");
+        }
+
+        private static void OperacoesPranchaNaoAlteramTiposIndevidamente()
+        {
+            var document = new AraciDocument();
+            var commands = new Araci.Core.Commands.CommandManager();
+            var criar = new CriarItemProjetoUseCase(document, commands);
+            var duplicar = new DuplicarItemProjetoUseCase(document, commands);
+            var excluir = new ExcluirItemProjetoUseCase(document, commands);
+            Guid tipoId = document.TipoPranchaPadrao.Id;
+
+            ProjectSheet prancha = criar.CriarPrancha();
+            AssertEqual(1, document.TiposPrancha.Count, "Tipos apos criar");
+
+            bool duplicou = duplicar.DuplicarPrancha(prancha.Id);
+            Assert(duplicou, "DuplicarPrancha deveria retornar true.");
+            AssertEqual(1, document.TiposPrancha.Count, "Tipos apos duplicar");
+
+            ProjectSheet duplicata = document.Pranchas.Single(p => p.Id != prancha.Id);
+            bool excluiu = excluir.ExcluirPrancha(duplicata.Id);
+            Assert(excluiu, "ExcluirPrancha deveria retornar true.");
+            AssertEqual(1, document.TiposPrancha.Count, "Tipos apos excluir");
+            AssertEqual(tipoId, document.TipoPranchaPadrao.Id, "Tipo padrao preservado");
         }
 
         private static void ExcluirTabelaLimpaInstanciasPranchaComUndoRedo()
@@ -6798,6 +7229,44 @@ namespace Araci.TechnicalChecks
             AssertEqual(ProjectSheetOrientation.Paisagem, prancha.OrientacaoFolha, "Prancha antiga OrientacaoFolha default");
             AssertEqual(ProjectSheet.DefaultWidth, prancha.LarguraFolha, "Prancha antiga LarguraFolha default");
             AssertEqual(ProjectSheet.DefaultHeight, prancha.AlturaFolha, "Prancha antiga AlturaFolha default");
+        }
+
+        private static void ArquivoAntigoSemTiposPranchaUsaTipoPadrao()
+        {
+            var serializer = CriarProjectSerializerTeste();
+            Guid sheetId = Guid.NewGuid();
+            string json = $$"""
+            {
+              "Version": 1,
+              "Sheets": [
+                {
+                  "Id": "{{sheetId}}",
+                  "Nome": "Prancha G19",
+                  "Numero": "A001",
+                  "FormatoFolha": "Personalizado",
+                  "OrientacaoFolha": "Retrato",
+                  "LarguraFolha": 640,
+                  "AlturaFolha": 900
+                }
+              ]
+            }
+            """;
+
+            ProjectFileDto dto = serializer.Deserialize(json);
+            IReadOnlyList<ProjectSheetType> tipos = serializer.CreateProjectSheetTypes(dto);
+            IReadOnlyList<ProjectSheet> pranchas = serializer.CreateProjectSheets(dto, Array.Empty<Guid>());
+            var document = new AraciDocument();
+            document.SubstituirTiposPrancha(tipos);
+            document.SubstituirPranchas(pranchas);
+            ProjectSheet prancha = document.Pranchas.Single();
+
+            AssertEqual(1, document.TiposPrancha.Count, "Arquivo antigo TiposPrancha.Count");
+            AssertEqual(document.TipoPranchaPadrao.Id, prancha.SheetTypeId ?? Guid.Empty, "Arquivo antigo SheetTypeId fallback");
+            AssertEqual("A001", prancha.Numero, "Arquivo G19 preserva Numero");
+            AssertEqual(ProjectSheetFormat.Personalizado, prancha.FormatoFolha, "Arquivo G19 preserva FormatoFolha");
+            AssertEqual(ProjectSheetOrientation.Retrato, prancha.OrientacaoFolha, "Arquivo G19 preserva OrientacaoFolha");
+            AssertEqual(640, prancha.LarguraFolha, "Arquivo G19 preserva LarguraFolha");
+            AssertEqual(900, prancha.AlturaFolha, "Arquivo G19 preserva AlturaFolha");
         }
 
         private static void PranchaIgnoraInstanciaOrfaNoLoad()
@@ -8860,7 +9329,9 @@ namespace Araci.Core.Documents
             Vistas = new ObservableCollection<ProjectView>();
             Tabelas = new ObservableCollection<ProjectTable>();
             Pranchas = new ObservableCollection<ProjectSheet>();
+            TiposPrancha = new ObservableCollection<ProjectSheetType>();
 
+            GarantirTipoPranchaPadrao();
             CriarVistaPadrao();
         }
 
@@ -8868,8 +9339,10 @@ namespace Araci.Core.Documents
         public ObservableCollection<ProjectView> Vistas { get; }
         public ObservableCollection<ProjectTable> Tabelas { get; }
         public ObservableCollection<ProjectSheet> Pranchas { get; }
+        public ObservableCollection<ProjectSheetType> TiposPrancha { get; }
         public Guid? VistaAtivaId { get; private set; }
         public ProjectView? VistaAtiva => Vistas.FirstOrDefault(v => v.Id == VistaAtivaId);
+        public ProjectSheetType TipoPranchaPadrao => GarantirTipoPranchaPadrao();
         public event System.Action? VistaAtivaAlterada;
         public event System.Action? ItemProjetoRenomeado;
         public event System.Action<ProjectView>? PropriedadesVistaAlteradas;
@@ -8937,10 +9410,13 @@ namespace Araci.Core.Documents
         public ProjectSheet CriarModeloNovaPrancha()
         {
             int indice = CriarIndiceUnico("Prancha", Pranchas.Select(p => p.Nome));
+            ProjectSheetType tipoPadrao = GarantirTipoPranchaPadrao();
+
             return new ProjectSheet
             {
                 Nome = $"Prancha {indice}",
-                Numero = $"A{indice:000}"
+                Numero = $"A{indice:000}",
+                SheetTypeId = tipoPadrao.Id
             };
         }
 
@@ -9007,6 +9483,7 @@ namespace Araci.Core.Documents
             {
                 Nome = CriarNomeUnico(origem?.Nome ?? "Prancha", Pranchas.Select(p => p.Nome)),
                 Numero = CriarNumeroPranchaUnico(),
+                SheetTypeId = ObterTipoPranchaIdValidoOuPadrao(origem?.SheetTypeId),
                 FormatoFolha = origem?.FormatoFolha ?? ProjectSheetFormat.A1,
                 OrientacaoFolha = origem?.OrientacaoFolha ?? ProjectSheetOrientation.Paisagem,
                 LarguraFolha = origem?.LarguraFolha ?? ProjectSheet.DefaultWidth,
@@ -9079,6 +9556,7 @@ namespace Araci.Core.Documents
             if (prancha == null || Pranchas.Any(p => p.Id == prancha.Id))
                 return;
 
+            GarantirAssociacaoTipoPrancha(prancha);
             Pranchas.Add(prancha);
         }
 
@@ -9096,6 +9574,7 @@ namespace Araci.Core.Documents
                 return;
 
             int indiceSeguro = indice < 0 || indice > Pranchas.Count ? Pranchas.Count : indice;
+            GarantirAssociacaoTipoPrancha(prancha);
             Pranchas.Insert(indiceSeguro, prancha);
         }
 
@@ -9175,12 +9654,33 @@ namespace Araci.Core.Documents
         public void SubstituirPranchas(IEnumerable<ProjectSheet> pranchas)
         {
             Pranchas.Clear();
+            GarantirTipoPranchaPadrao();
 
             foreach (ProjectSheet prancha in pranchas.Where(p => p != null && !string.IsNullOrWhiteSpace(p.Nome)))
             {
                 prancha.Tabelas ??= new List<ProjectSheetTableInstance>();
+                GarantirAssociacaoTipoPrancha(prancha);
                 Pranchas.Add(prancha);
             }
+        }
+
+        public void SubstituirTiposPrancha(IEnumerable<ProjectSheetType> tipos)
+        {
+            TiposPrancha.Clear();
+
+            foreach (ProjectSheetType tipo in (tipos ?? Enumerable.Empty<ProjectSheetType>()).Where(t => t != null && !string.IsNullOrWhiteSpace(t.Nome)))
+            {
+                if (tipo.Id == Guid.Empty)
+                    tipo.Id = Guid.NewGuid();
+
+                if (!TiposPrancha.Any(t => t.Id == tipo.Id))
+                    TiposPrancha.Add(tipo);
+            }
+
+            GarantirTipoPranchaPadrao();
+
+            foreach (ProjectSheet prancha in Pranchas)
+                GarantirAssociacaoTipoPrancha(prancha);
         }
 
         public void AdicionarElemento(Elemento elemento)
@@ -9216,7 +9716,34 @@ namespace Araci.Core.Documents
             Vistas.Clear();
             Tabelas.Clear();
             Pranchas.Clear();
+            TiposPrancha.Clear();
+            GarantirTipoPranchaPadrao();
             CriarVistaPadrao();
+        }
+
+        private ProjectSheetType GarantirTipoPranchaPadrao()
+        {
+            ProjectSheetType? existente = TiposPrancha.FirstOrDefault();
+
+            if (existente != null)
+                return existente;
+
+            ProjectSheetType tipo = ProjectSheetType.CriarPadrao();
+            TiposPrancha.Add(tipo);
+            return tipo;
+        }
+
+        private void GarantirAssociacaoTipoPrancha(ProjectSheet prancha)
+        {
+            prancha.SheetTypeId = ObterTipoPranchaIdValidoOuPadrao(prancha.SheetTypeId);
+        }
+
+        private Guid ObterTipoPranchaIdValidoOuPadrao(Guid? tipoId)
+        {
+            if (tipoId.HasValue && tipoId.Value != Guid.Empty && TiposPrancha.Any(t => t.Id == tipoId.Value))
+                return tipoId.Value;
+
+            return GarantirTipoPranchaPadrao().Id;
         }
 
         private void CriarVistaPadrao()
@@ -9338,6 +9865,7 @@ namespace Araci.Core.Documents
         public Guid Id { get; set; } = Guid.NewGuid();
         public string Nome { get; set; } = string.Empty;
         public string Numero { get; set; } = string.Empty;
+        public Guid? SheetTypeId { get; set; }
         public ProjectSheetFormat FormatoFolha { get; set; } = ProjectSheetFormat.A1;
         public ProjectSheetOrientation OrientacaoFolha { get; set; } = ProjectSheetOrientation.Paisagem;
 
@@ -9397,6 +9925,54 @@ namespace Araci.Core.Documents
 
 
 ====================================================================================================
+ARQUIVO: C:\Users\User\source\repos\lucasffxavier\Araci-front\Core\Documents\ProjectSheetType.cs
+====================================================================================================
+
+using System;
+
+namespace Araci.Core.Documents
+{
+    public class ProjectSheetType
+    {
+        public const string DefaultName = "A1 Paisagem - Padrao";
+
+        private double _larguraFolha = ProjectSheet.DefaultWidth;
+        private double _alturaFolha = ProjectSheet.DefaultHeight;
+
+        public Guid Id { get; set; } = Guid.NewGuid();
+        public string Nome { get; set; } = DefaultName;
+        public ProjectSheetFormat FormatoFolha { get; set; } = ProjectSheetFormat.A1;
+        public ProjectSheetOrientation OrientacaoFolha { get; set; } = ProjectSheetOrientation.Paisagem;
+
+        public double LarguraFolha
+        {
+            get => _larguraFolha;
+            set => _larguraFolha = NormalizarDimensao(value, ProjectSheet.DefaultWidth);
+        }
+
+        public double AlturaFolha
+        {
+            get => _alturaFolha;
+            set => _alturaFolha = NormalizarDimensao(value, ProjectSheet.DefaultHeight);
+        }
+
+        public static ProjectSheetType CriarPadrao()
+        {
+            return new ProjectSheetType();
+        }
+
+        private static double NormalizarDimensao(double valor, double fallback)
+        {
+            return double.IsNaN(valor) || double.IsInfinity(valor) || valor < ProjectSheet.MinDimension
+                ? fallback
+                : valor;
+        }
+    }
+}
+
+
+
+====================================================================================================
 ARQUIVO: C:\Users\User\source\repos\lucasffxavier\Araci-front\Infrastructure\Persistence\ProjectFileDto.cs
 ====================================================================================================
 
@@ -9420,8 +9996,19 @@ namespace Araci.Infrastructure.Persistence
         public Guid? ActiveViewId { get; set; }
         public List<ProjectViewDto> Views { get; set; } = new();
         public List<ProjectTableDto> Tables { get; set; } = new();
+        public List<ProjectSheetTypeDto> SheetTypes { get; set; } = new();
         public List<ProjectSheetDto> Sheets { get; set; } = new();
         public List<ElementDto> Elements { get; set; } = new();
+    }
+
+    public sealed class ProjectSheetTypeDto
+    {
+        public Guid Id { get; set; }
+        public string Nome { get; set; } = string.Empty;
+        public string FormatoFolha { get; set; } = string.Empty;
+        public string OrientacaoFolha { get; set; } = string.Empty;
+        public double? LarguraFolha { get; set; }
+        public double? AlturaFolha { get; set; }
     }
 
     public sealed class ProjectViewDto
@@ -9483,6 +10070,7 @@ namespace Araci.Infrastructure.Persistence
         public Guid Id { get; set; }
         public string Nome { get; set; } = string.Empty;
         public string Numero { get; set; } = string.Empty;
+        public Guid? SheetTypeId { get; set; }
         public string FormatoFolha { get; set; } = string.Empty;
         public string OrientacaoFolha { get; set; } = string.Empty;
         public double? LarguraFolha { get; set; }
@@ -9667,6 +10255,9 @@ namespace Araci.Infrastructure.Persistence
                 Tables = document.Tabelas
                     .Select(t => CriarProjectTableDto(t, document.Vistas.Select(v => v.Id)))
                     .ToList(),
+                SheetTypes = document.TiposPrancha
+                    .Select(CriarProjectSheetTypeDto)
+                    .ToList(),
                 Sheets = document.Pranchas
                     .Select(p => CriarProjectSheetDto(p, document.Tabelas.Select(t => t.Id)))
                     .ToList(),
@@ -9773,6 +10364,23 @@ namespace Araci.Infrastructure.Persistence
                 .Where(s => s != null)
                 .Cast<ProjectSheet>()
                 .ToList();
+        }
+
+        public IReadOnlyList<ProjectSheetType> CreateProjectSheetTypes(ProjectFileDto dto)
+        {
+            ArgumentNullException.ThrowIfNull(dto);
+
+            List<ProjectSheetType> tipos = (dto.SheetTypes ?? new List<ProjectSheetTypeDto>())
+                .Select(CriarProjectSheetType)
+                .Where(t => t != null)
+                .Cast<ProjectSheetType>()
+                .GroupBy(t => t.Id)
+                .Select(g => g.Last())
+                .ToList();
+
+            return tipos.Count > 0
+                ? tipos
+                : new List<ProjectSheetType> { ProjectSheetType.CriarPadrao() };
         }
 
         public Guid? GetActiveViewId(ProjectFileDto dto)
@@ -10020,6 +10628,7 @@ namespace Araci.Infrastructure.Persistence
                 Id = prancha.Id,
                 Nome = prancha.Nome,
                 Numero = prancha.Numero,
+                SheetTypeId = prancha.SheetTypeId,
                 FormatoFolha = prancha.FormatoFolha.ToString(),
                 OrientacaoFolha = prancha.OrientacaoFolha.ToString(),
                 LarguraFolha = prancha.LarguraFolha,
@@ -10038,6 +10647,19 @@ namespace Araci.Infrastructure.Persistence
                         RowCount = i.RowCount
                     })
                     .ToList()
+            };
+        }
+
+        private static ProjectSheetTypeDto CriarProjectSheetTypeDto(ProjectSheetType tipo)
+        {
+            return new ProjectSheetTypeDto
+            {
+                Id = tipo.Id,
+                Nome = tipo.Nome,
+                FormatoFolha = tipo.FormatoFolha.ToString(),
+                OrientacaoFolha = tipo.OrientacaoFolha.ToString(),
+                LarguraFolha = tipo.LarguraFolha,
+                AlturaFolha = tipo.AlturaFolha
             };
         }
 
@@ -10094,11 +10716,28 @@ namespace Araci.Infrastructure.Persistence
                 Id = dto.Id == Guid.Empty ? Guid.NewGuid() : dto.Id,
                 Nome = dto.Nome,
                 Numero = dto.Numero ?? string.Empty,
+                SheetTypeId = dto.SheetTypeId == Guid.Empty ? null : dto.SheetTypeId,
                 FormatoFolha = ParseEnum(dto.FormatoFolha, ProjectSheetFormat.A1),
                 OrientacaoFolha = ParseEnum(dto.OrientacaoFolha, ProjectSheetOrientation.Paisagem),
                 LarguraFolha = NormalizarDimensaoFolha(dto.LarguraFolha, ProjectSheet.DefaultWidth),
                 AlturaFolha = NormalizarDimensaoFolha(dto.AlturaFolha, ProjectSheet.DefaultHeight),
                 Tabelas = ParseProjectSheetTableInstances(dto.Tabelas, tabelasValidas)
+            };
+        }
+
+        private static ProjectSheetType? CriarProjectSheetType(ProjectSheetTypeDto dto)
+        {
+            if (string.IsNullOrWhiteSpace(dto.Nome))
+                return null;
+
+            return new ProjectSheetType
+            {
+                Id = dto.Id == Guid.Empty ? Guid.NewGuid() : dto.Id,
+                Nome = dto.Nome.Trim(),
+                FormatoFolha = ParseEnum(dto.FormatoFolha, ProjectSheetFormat.A1),
+                OrientacaoFolha = ParseEnum(dto.OrientacaoFolha, ProjectSheetOrientation.Paisagem),
+                LarguraFolha = NormalizarDimensaoFolha(dto.LarguraFolha, ProjectSheet.DefaultWidth),
+                AlturaFolha = NormalizarDimensaoFolha(dto.AlturaFolha, ProjectSheet.DefaultHeight)
             };
         }
 
@@ -10577,6 +11216,708 @@ namespace Araci.Infrastructure.Persistence
     }
 }
 
+
+
+====================================================================================================
+ARQUIVO: C:\Users\User\source\repos\lucasffxavier\Araci-front\Properties\PropertiesHostView.xaml
+====================================================================================================
+
+﻿<UserControl x:Class="Araci.Properties.PropertiesHostView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:viewModels="clr-namespace:Araci.ViewModels">
+    <UserControl.Resources>
+        <BooleanToVisibilityConverter x:Key="BooleanToVisibilityConverter"/>
+
+        <Style x:Key="LightComboBoxItemStyle" TargetType="{x:Type ComboBoxItem}">
+            <Setter Property="Foreground" Value="#FF000000"/>
+            <Setter Property="Background" Value="#FFFFFFFF"/>
+            <Setter Property="Padding" Value="4,2"/>
+            <Style.Triggers>
+                <Trigger Property="IsHighlighted" Value="True">
+                    <Setter Property="Background" Value="#FFE5F1FB"/>
+                    <Setter Property="Foreground" Value="#FF000000"/>
+                </Trigger>
+                <Trigger Property="IsSelected" Value="True">
+                    <Setter Property="Background" Value="#FFDCEBFA"/>
+                    <Setter Property="Foreground" Value="#FF000000"/>
+                </Trigger>
+            </Style.Triggers>
+        </Style>
+
+        <DataTemplate x:Key="BooleanComboBoxSelectedTemplate">
+            <TextBlock Text="{Binding DisplayName}"
+                       Foreground="#FF000000"
+                       VerticalAlignment="Center"
+                       TextTrimming="CharacterEllipsis"/>
+        </DataTemplate>
+
+        <DataTemplate x:Key="TypeComboBoxSelectedTemplate">
+            <TextBlock Text="{Binding NomeTipo}"
+                       Foreground="#FF000000"
+                       VerticalAlignment="Center"
+                       TextTrimming="CharacterEllipsis"/>
+        </DataTemplate>
+
+        <DataTemplate x:Key="DefaultPropertyEditorTemplate" DataType="{x:Type viewModels:PropertyDescriptorViewModel}">
+            <TextBox Text="{Binding Value, Mode=TwoWay, UpdateSourceTrigger=LostFocus}"
+                     IsReadOnly="{Binding IsReadOnly}"
+                     MinHeight="24"
+                     Padding="5,2"
+                     VerticalContentAlignment="Center"
+                     Background="#FFFFFFFF"
+                     Foreground="#FF000000"
+                     BorderBrush="#3A3A3A"
+                     BorderThickness="1"/>
+        </DataTemplate>
+
+        <DataTemplate x:Key="BooleanPropertyEditorTemplate" DataType="{x:Type viewModels:PropertyDescriptorViewModel}">
+            <ComboBox ItemsSource="{Binding BooleanOptions}"
+                      SelectedValue="{Binding BooleanValue, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                      SelectedValuePath="Value"
+                      ItemTemplate="{StaticResource BooleanComboBoxSelectedTemplate}"
+                      ItemContainerStyle="{StaticResource LightComboBoxItemStyle}"
+                      IsEnabled="{Binding IsEditable}"
+                      MinHeight="24"
+                      Padding="4,1"
+                      Background="#FFFFFFFF"
+                      Foreground="#FF000000"
+                      BorderBrush="#3A3A3A"
+                      BorderThickness="1"/>
+        </DataTemplate>
+
+        <DataTemplate x:Key="ColorPropertyEditorTemplate" DataType="{x:Type viewModels:PropertyDescriptorViewModel}">
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="24"/>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="28"/>
+                </Grid.ColumnDefinitions>
+                <Border Grid.Column="0"
+                        Width="18"
+                        Height="18"
+                        Margin="0,0,6,0"
+                        BorderBrush="#808080"
+                        BorderThickness="1"
+                        Background="{Binding ColorBrush}"
+                        VerticalAlignment="Center"/>
+                <TextBox Grid.Column="1"
+                         Text="{Binding Value, Mode=TwoWay, UpdateSourceTrigger=LostFocus}"
+                         IsReadOnly="{Binding IsReadOnly}"
+                         MinHeight="24"
+                         Padding="5,2"
+                         VerticalContentAlignment="Center"
+                         Background="#FFFFFFFF"
+                         Foreground="#FF000000"
+                         BorderBrush="#3A3A3A"
+                         BorderThickness="1"/>
+                <Button Grid.Column="2"
+                        Content="..."
+                        Command="{Binding EscolherCorCommand}"
+                        IsEnabled="{Binding IsEditable}"
+                        Margin="4,0,0,0"
+                        Padding="0"
+                        Background="#333333"
+                        Foreground="#F4F4F4"
+                        BorderBrush="#555555"/>
+            </Grid>
+        </DataTemplate>
+
+        <DataTemplate DataType="{x:Type viewModels:ProjectTablePropertiesViewModel}">
+            <Grid Margin="0">
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="*"/>
+                </Grid.RowDefinitions>
+
+                <TextBlock Grid.Row="0"
+                           Text="{Binding Titulo}"
+                           Foreground="#F4F4F4"
+                           FontWeight="SemiBold"
+                           Margin="10,10,10,8"/>
+
+                <ScrollViewer Grid.Row="1"
+                              VerticalScrollBarVisibility="Auto"
+                              HorizontalScrollBarVisibility="Disabled">
+                    <StackPanel Margin="10,0,10,10">
+                        <Button Content="Exportar CSV"
+                                Command="{Binding ExportarCsvCommand}"
+                                MinHeight="24"
+                                Margin="0,0,0,6"
+                                Padding="6,2"
+                                HorizontalContentAlignment="Center"
+                                Background="#333333"
+                                Foreground="#F4F4F4"
+                                BorderBrush="#555555"/>
+
+                        <Grid Margin="0,0,0,6">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="110"/>
+                                <ColumnDefinition Width="*"/>
+                            </Grid.ColumnDefinitions>
+                            <TextBlock Grid.Column="0"
+                                       Text="Nome"
+                                       Foreground="#DCDCDC"
+                                       VerticalAlignment="Center"
+                                       Margin="0,0,8,0"/>
+                            <TextBox Grid.Column="1"
+                                     Text="{Binding Nome, Mode=TwoWay, UpdateSourceTrigger=LostFocus}"
+                                     MinHeight="24"
+                                     Padding="5,2"
+                                     VerticalContentAlignment="Center"
+                                     Background="#FFFFFFFF"
+                                     Foreground="#FF000000"
+                                     BorderBrush="#3A3A3A"
+                                     BorderThickness="1"/>
+                        </Grid>
+
+                        <Grid Margin="0,0,0,6">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="110"/>
+                                <ColumnDefinition Width="*"/>
+                            </Grid.ColumnDefinitions>
+                            <TextBlock Grid.Column="0"
+                                       Text="Disciplina"
+                                       Foreground="#DCDCDC"
+                                       VerticalAlignment="Center"
+                                       Margin="0,0,8,0"/>
+                            <ComboBox Grid.Column="1"
+                                      ItemsSource="{Binding Disciplinas}"
+                                      SelectedItem="{Binding Disciplina, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                                      ItemContainerStyle="{StaticResource LightComboBoxItemStyle}"
+                                      MinHeight="24"
+                                      Background="#FFFFFFFF"
+                                      Foreground="#FF000000"
+                                      BorderBrush="#3A3A3A"/>
+                        </Grid>
+
+                        <Grid Margin="0,0,0,6">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="110"/>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="32"/>
+                            </Grid.ColumnDefinitions>
+                            <TextBlock Grid.Column="0"
+                                       Text="Elementos"
+                                       Foreground="#DCDCDC"
+                                       VerticalAlignment="Center"
+                                       TextTrimming="CharacterEllipsis"
+                                       Margin="0,0,8,0"/>
+                            <Button Grid.Column="2"
+                                    Content="..."
+                                    Command="{Binding ElementosTabelaCommand}"
+                                    Background="#333333"
+                                    Foreground="#F4F4F4"
+                                    BorderBrush="#555555"/>
+                        </Grid>
+
+                        <Grid Margin="0,0,0,6">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="110"/>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="32"/>
+                            </Grid.ColumnDefinitions>
+                            <TextBlock Grid.Column="0"
+                                       Text="Filtros"
+                                       Foreground="#DCDCDC"
+                                       VerticalAlignment="Center"
+                                       Margin="0,0,8,0"/>
+                            <Button Grid.Column="2"
+                                    Content="..."
+                                    Command="{Binding FiltrosCommand}"
+                                    Background="#333333"
+                                    Foreground="#F4F4F4"
+                                    BorderBrush="#555555"/>
+                        </Grid>
+
+                        <Grid Margin="0,0,0,6">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="110"/>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="32"/>
+                            </Grid.ColumnDefinitions>
+                            <TextBlock Grid.Column="0"
+                                       Text="Ordenação"
+                                       Foreground="#DCDCDC"
+                                       VerticalAlignment="Center"
+                                       Margin="0,0,8,0"/>
+                            <Button Grid.Column="2"
+                                    Content="..."
+                                    Command="{Binding OrdenacaoCommand}"
+                                    Background="#333333"
+                                    Foreground="#F4F4F4"
+                                    BorderBrush="#555555"/>
+                        </Grid>
+
+                        <Grid Margin="0,0,0,6">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="110"/>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="32"/>
+                            </Grid.ColumnDefinitions>
+                            <TextBlock Grid.Column="0"
+                                       Text="Exibição"
+                                       Foreground="#DCDCDC"
+                                       VerticalAlignment="Center"
+                                       Margin="0,0,8,0"/>
+                            <Button Grid.Column="2"
+                                    Content="..."
+                                    Command="{Binding ExibicaoCommand}"
+                                    Background="#333333"
+                                    Foreground="#F4F4F4"
+                                    BorderBrush="#555555"/>
+                        </Grid>
+                    </StackPanel>
+                </ScrollViewer>
+            </Grid>
+        </DataTemplate>
+
+        <DataTemplate DataType="{x:Type viewModels:ProjectViewPropertiesViewModel}">
+            <Grid Margin="0">
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="*"/>
+                </Grid.RowDefinitions>
+
+                <TextBlock Grid.Row="0"
+                           Text="{Binding Titulo}"
+                           Foreground="#F4F4F4"
+                           FontWeight="SemiBold"
+                           Margin="10,10,10,8"/>
+
+                <ScrollViewer Grid.Row="1"
+                              VerticalScrollBarVisibility="Auto"
+                              HorizontalScrollBarVisibility="Disabled">
+                    <StackPanel Margin="10,0,10,10">
+                        <Grid Margin="0,0,0,6">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="110"/>
+                                <ColumnDefinition Width="*"/>
+                            </Grid.ColumnDefinitions>
+                            <TextBlock Grid.Column="0"
+                                       Text="Nome"
+                                       Foreground="#DCDCDC"
+                                       VerticalAlignment="Center"
+                                       Margin="0,0,8,0"/>
+                            <TextBox Grid.Column="1"
+                                     Text="{Binding Nome, Mode=TwoWay, UpdateSourceTrigger=LostFocus}"
+                                     MinHeight="24"
+                                     Padding="5,2"
+                                     VerticalContentAlignment="Center"
+                                     Background="#FFFFFFFF"
+                                     Foreground="#FF000000"
+                                     BorderBrush="#3A3A3A"
+                                     BorderThickness="1"/>
+                        </Grid>
+
+                        <Grid Margin="0,0,0,6">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="110"/>
+                                <ColumnDefinition Width="*"/>
+                            </Grid.ColumnDefinitions>
+                            <TextBlock Grid.Column="0"
+                                       Text="Escala"
+                                       Foreground="#DCDCDC"
+                                       VerticalAlignment="Center"
+                                       Margin="0,0,8,0"/>
+                            <TextBox Grid.Column="1"
+                                     Text="{Binding Escala, Mode=TwoWay, UpdateSourceTrigger=LostFocus}"
+                                     MinHeight="24"
+                                     Padding="5,2"
+                                     VerticalContentAlignment="Center"
+                                     Background="#FFFFFFFF"
+                                     Foreground="#FF000000"
+                                     BorderBrush="#3A3A3A"
+                                     BorderThickness="1"/>
+                        </Grid>
+
+                        <Grid Margin="0,0,0,6">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="110"/>
+                                <ColumnDefinition Width="*"/>
+                            </Grid.ColumnDefinitions>
+                            <TextBlock Grid.Column="0"
+                                       Text="Disciplina"
+                                       Foreground="#DCDCDC"
+                                       VerticalAlignment="Center"
+                                       Margin="0,0,8,0"/>
+                            <ComboBox Grid.Column="1"
+                                      ItemsSource="{Binding Disciplinas}"
+                                      SelectedItem="{Binding Disciplina, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                                      ItemContainerStyle="{StaticResource LightComboBoxItemStyle}"
+                                      MinHeight="24"
+                                      Background="#FFFFFFFF"
+                                      Foreground="#FF000000"
+                                      BorderBrush="#3A3A3A"/>
+                        </Grid>
+
+                        <Grid Margin="0,0,0,6">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="110"/>
+                                <ColumnDefinition Width="*"/>
+                            </Grid.ColumnDefinitions>
+                            <TextBlock Grid.Column="0"
+                                       Text="Recortar vista"
+                                       Foreground="#DCDCDC"
+                                       VerticalAlignment="Center"
+                                       Margin="0,0,8,0"/>
+                            <CheckBox Grid.Column="1"
+                                      IsChecked="{Binding RecortarVista, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                                       Foreground="#DCDCDC"
+                                       VerticalAlignment="Center"
+                                      HorizontalAlignment="Left"/>
+                        </Grid>
+
+                        <Grid Margin="0,0,0,6">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="110"/>
+                                <ColumnDefinition Width="*"/>
+                            </Grid.ColumnDefinitions>
+                            <TextBlock Grid.Column="0"
+                                       Text="Região de recorte visível"
+                                       Foreground="#DCDCDC"
+                                       VerticalAlignment="Center"
+                                       TextTrimming="CharacterEllipsis"
+                                       Margin="0,0,8,0"/>
+                            <CheckBox Grid.Column="1"
+                                      IsChecked="{Binding RegiaoRecorteVisivel, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                                      Foreground="#DCDCDC"
+                                      VerticalAlignment="Center"
+                                      HorizontalAlignment="Left"/>
+                        </Grid>
+                    </StackPanel>
+                </ScrollViewer>
+            </Grid>
+        </DataTemplate>
+
+        <DataTemplate DataType="{x:Type viewModels:ProjectSheetPropertiesViewModel}">
+            <Grid Margin="0">
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="*"/>
+                </Grid.RowDefinitions>
+
+                <TextBlock Grid.Row="0"
+                           Text="{Binding Titulo}"
+                           Foreground="#F4F4F4"
+                           FontWeight="SemiBold"
+                           Margin="10,10,10,8"/>
+
+                <ScrollViewer Grid.Row="1"
+                              VerticalScrollBarVisibility="Auto"
+                              HorizontalScrollBarVisibility="Disabled">
+                    <StackPanel Margin="10,0,10,10">
+                        <Grid Margin="0,0,0,6">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="110"/>
+                                <ColumnDefinition Width="*"/>
+                            </Grid.ColumnDefinitions>
+                            <TextBlock Grid.Column="0"
+                                       Text="Numero"
+                                       Foreground="#DCDCDC"
+                                       VerticalAlignment="Center"
+                                       Margin="0,0,8,0"/>
+                            <TextBox Grid.Column="1"
+                                     Text="{Binding Numero, Mode=TwoWay, UpdateSourceTrigger=LostFocus}"
+                                     MinHeight="24"
+                                     Padding="5,2"
+                                     VerticalContentAlignment="Center"
+                                     Background="#FFFFFFFF"
+                                     Foreground="#FF000000"
+                                     BorderBrush="#3A3A3A"
+                                     BorderThickness="1"/>
+                        </Grid>
+
+                        <Grid Margin="0,0,0,6">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="110"/>
+                                <ColumnDefinition Width="*"/>
+                            </Grid.ColumnDefinitions>
+                            <TextBlock Grid.Column="0"
+                                       Text="Nome"
+                                       Foreground="#DCDCDC"
+                                       VerticalAlignment="Center"
+                                       Margin="0,0,8,0"/>
+                            <TextBox Grid.Column="1"
+                                     Text="{Binding Nome, Mode=TwoWay, UpdateSourceTrigger=LostFocus}"
+                                     MinHeight="24"
+                                     Padding="5,2"
+                                     VerticalContentAlignment="Center"
+                                     Background="#FFFFFFFF"
+                                     Foreground="#FF000000"
+                                     BorderBrush="#3A3A3A"
+                                     BorderThickness="1"/>
+                        </Grid>
+
+                        <Grid Margin="0,0,0,6">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="110"/>
+                                <ColumnDefinition Width="*"/>
+                            </Grid.ColumnDefinitions>
+                            <TextBlock Grid.Column="0"
+                                       Text="Formato"
+                                       Foreground="#DCDCDC"
+                                       VerticalAlignment="Center"
+                                       Margin="0,0,8,0"/>
+                            <ComboBox Grid.Column="1"
+                                      ItemsSource="{Binding Formatos}"
+                                      SelectedItem="{Binding FormatoFolha, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                                      ItemContainerStyle="{StaticResource LightComboBoxItemStyle}"
+                                      MinHeight="24"
+                                      Background="#FFFFFFFF"
+                                      Foreground="#FF000000"
+                                      BorderBrush="#3A3A3A"/>
+                        </Grid>
+
+                        <Grid Margin="0,0,0,6">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="110"/>
+                                <ColumnDefinition Width="*"/>
+                            </Grid.ColumnDefinitions>
+                            <TextBlock Grid.Column="0"
+                                       Text="Orientacao"
+                                       Foreground="#DCDCDC"
+                                       VerticalAlignment="Center"
+                                       Margin="0,0,8,0"/>
+                            <ComboBox Grid.Column="1"
+                                      ItemsSource="{Binding Orientacoes}"
+                                      SelectedItem="{Binding OrientacaoFolha, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                                      ItemContainerStyle="{StaticResource LightComboBoxItemStyle}"
+                                      MinHeight="24"
+                                      Background="#FFFFFFFF"
+                                      Foreground="#FF000000"
+                                      BorderBrush="#3A3A3A"/>
+                        </Grid>
+
+                        <Grid Margin="0,0,0,6">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="110"/>
+                                <ColumnDefinition Width="*"/>
+                            </Grid.ColumnDefinitions>
+                            <TextBlock Grid.Column="0"
+                                       Text="Largura"
+                                       Foreground="#DCDCDC"
+                                       VerticalAlignment="Center"
+                                       Margin="0,0,8,0"/>
+                            <TextBox Grid.Column="1"
+                                     Text="{Binding LarguraFolha, Mode=TwoWay, UpdateSourceTrigger=LostFocus}"
+                                     MinHeight="24"
+                                     Padding="5,2"
+                                     VerticalContentAlignment="Center"
+                                     Background="#FFFFFFFF"
+                                     Foreground="#FF000000"
+                                     BorderBrush="#3A3A3A"
+                                     BorderThickness="1"/>
+                        </Grid>
+
+                        <Grid Margin="0,0,0,6">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="110"/>
+                                <ColumnDefinition Width="*"/>
+                            </Grid.ColumnDefinitions>
+                            <TextBlock Grid.Column="0"
+                                       Text="Altura"
+                                       Foreground="#DCDCDC"
+                                       VerticalAlignment="Center"
+                                       Margin="0,0,8,0"/>
+                            <TextBox Grid.Column="1"
+                                     Text="{Binding AlturaFolha, Mode=TwoWay, UpdateSourceTrigger=LostFocus}"
+                                     MinHeight="24"
+                                     Padding="5,2"
+                                     VerticalContentAlignment="Center"
+                                     Background="#FFFFFFFF"
+                                     Foreground="#FF000000"
+                                     BorderBrush="#3A3A3A"
+                                     BorderThickness="1"/>
+                        </Grid>
+                    </StackPanel>
+                </ScrollViewer>
+            </Grid>
+        </DataTemplate>
+
+        <DataTemplate DataType="{x:Type viewModels:PropertiesViewModel}">
+            <Grid Margin="0">
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="*"/>
+                </Grid.RowDefinitions>
+
+                <TextBlock Grid.Row="0"
+                           Text="{Binding Titulo}"
+                           Foreground="#F4F4F4"
+                           FontWeight="SemiBold"
+                           Margin="10,10,10,4"/>
+
+                <Grid Grid.Row="1"
+                      Margin="10,4,10,8"
+                      Visibility="{Binding ExibirSeletorTipo, Converter={StaticResource BooleanToVisibilityConverter}}">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="110"/>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="32"/>
+                    </Grid.ColumnDefinitions>
+                    <TextBlock Grid.Column="0"
+                               Text="Tipo"
+                               Foreground="#DCDCDC"
+                               VerticalAlignment="Center"/>
+                    <ComboBox Grid.Column="1"
+                              ItemsSource="{Binding TiposDisponiveis}"
+                              SelectedItem="{Binding Tipo, Mode=TwoWay}"
+                              ItemTemplate="{StaticResource TypeComboBoxSelectedTemplate}"
+                              ItemContainerStyle="{StaticResource LightComboBoxItemStyle}"
+                              MinHeight="24"
+                              Background="#FFFFFFFF"
+                              Foreground="#FF000000"
+                              BorderBrush="#3A3A3A"/>
+                    <Button Grid.Column="2"
+                            Content="..."
+                            Command="{Binding AbrirPropriedadesTipoCommand}"
+                            IsEnabled="{Binding PodeAbrirPropriedadesTipo}"
+                            Margin="4,0,0,0"
+                            Background="#333333"
+                            Foreground="#F4F4F4"
+                            BorderBrush="#555555"/>
+                </Grid>
+
+                <ScrollViewer Grid.Row="2"
+                              VerticalScrollBarVisibility="Auto"
+                              HorizontalScrollBarVisibility="Disabled">
+                    <ItemsControl ItemsSource="{Binding Propriedades}"
+                                  Margin="10,0,10,10">
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate DataType="{x:Type viewModels:PropertyDescriptorViewModel}">
+                                <Grid Margin="0,0,0,6">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="110"/>
+                                        <ColumnDefinition Width="*"/>
+                                    </Grid.ColumnDefinitions>
+                                    <TextBlock Grid.Column="0"
+                                               Text="{Binding DisplayName}"
+                                               Foreground="#DCDCDC"
+                                               VerticalAlignment="Center"
+                                               TextTrimming="CharacterEllipsis"
+                                               Margin="0,0,8,0"/>
+                                    <ContentControl Grid.Column="1"
+                                                    Content="{Binding}">
+                                        <ContentControl.Style>
+                                            <Style TargetType="ContentControl">
+                                                <Setter Property="ContentTemplate" Value="{StaticResource DefaultPropertyEditorTemplate}"/>
+                                                <Style.Triggers>
+                                                    <DataTrigger Binding="{Binding IsBoolean}" Value="True">
+                                                        <Setter Property="ContentTemplate" Value="{StaticResource BooleanPropertyEditorTemplate}"/>
+                                                    </DataTrigger>
+                                                    <DataTrigger Binding="{Binding IsColor}" Value="True">
+                                                        <Setter Property="ContentTemplate" Value="{StaticResource ColorPropertyEditorTemplate}"/>
+                                                    </DataTrigger>
+                                                </Style.Triggers>
+                                            </Style>
+                                        </ContentControl.Style>
+                                    </ContentControl>
+                                </Grid>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                </ScrollViewer>
+            </Grid>
+        </DataTemplate>
+    </UserControl.Resources>
+
+    <Border Margin="8"
+            Background="#252526"
+            BorderBrush="#F4F4F4"
+            BorderThickness="1">
+        <Grid>
+            <Grid.RowDefinitions>
+                <RowDefinition Height="38"/>
+                <RowDefinition Height="*"/>
+            </Grid.RowDefinitions>
+            <Border Grid.Row="0"
+                    Background="#1E1E1E"
+                    BorderBrush="#3A3A3A"
+                    BorderThickness="0,0,0,1">
+                <Grid>
+                    <TextBlock Text="Propriedades"
+                               Foreground="#F4F4F4"
+                               FontWeight="SemiBold"
+                               VerticalAlignment="Center"
+                               Margin="12,0,42,0"/>
+                    <Button Content="×"
+                            Width="28"
+                            Height="28"
+                            HorizontalAlignment="Right"
+                            VerticalAlignment="Center"
+                            Margin="0,0,6,0"
+                            FontSize="18"
+                            FontWeight="SemiBold"
+                            Foreground="#F4F4F4"
+                            Background="Transparent"
+                            BorderBrush="Transparent"
+                            Click="OnCloseClick"/>
+                </Grid>
+            </Border>
+            <ContentControl Grid.Row="1"
+                            Content="{Binding Editor.ElementoSelecionado}"
+                            HorizontalContentAlignment="Stretch"
+                            VerticalContentAlignment="Stretch"/>
+        </Grid>
+    </Border>
+</UserControl>
+
+
+
+====================================================================================================
+ARQUIVO: C:\Users\User\source\repos\lucasffxavier\Araci-front\Properties\PropertiesHostView.xaml.cs
+====================================================================================================
+
+﻿using System.Windows;
+using System.Windows.Controls;
+using System.Windows.Data;
+using System.Windows.Input;
+
+namespace Araci.Properties
+{
+    public partial class PropertiesHostView : UserControl
+    {
+        public static readonly RoutedEvent CloseRequestedEvent = EventManager.RegisterRoutedEvent(
+            nameof(CloseRequested),
+            RoutingStrategy.Bubble,
+            typeof(RoutedEventHandler),
+            typeof(PropertiesHostView));
+
+        public event RoutedEventHandler CloseRequested
+        {
+            add => AddHandler(CloseRequestedEvent, value);
+            remove => RemoveHandler(CloseRequestedEvent, value);
+        }
+
+        public PropertiesHostView()
+        {
+            InitializeComponent();
+            AddHandler(Keyboard.PreviewKeyDownEvent, new KeyEventHandler(OnPreviewKeyDown), true);
+        }
+
+        private void OnCloseClick(object sender, RoutedEventArgs e)
+        {
+            RaiseEvent(new RoutedEventArgs(CloseRequestedEvent));
+        }
+
+        private void OnPreviewKeyDown(object sender, KeyEventArgs e)
+        {
+            if (e.Key != Key.Enter)
+                return;
+
+            if (Keyboard.FocusedElement is not TextBox textBox)
+                return;
+
+            BindingExpression? binding = textBox.GetBindingExpression(TextBox.TextProperty);
+            binding?.UpdateSource();
+            FocusManager.SetFocusedElement(FocusManager.GetFocusScope(textBox), null);
+            Keyboard.ClearFocus();
+            e.Handled = true;
+        }
+    }
+}
 
 
 ====================================================================================================
@@ -11631,440 +12972,766 @@ namespace Araci.ViewModels
 
 
 ====================================================================================================
-ARQUIVO: C:\Users\User\source\repos\lucasffxavier\Araci-front\ViewModels\ProjectSheetViewModel.cs
+ARQUIVO: C:\Users\User\source\repos\lucasffxavier\Araci-front\ViewModels\PropertiesViewModel.cs
 ====================================================================================================
 
 using System;
+using System.Collections;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.ComponentModel;
+using System.Globalization;
 using System.Linq;
+using System.Reflection;
 using System.Runtime.CompilerServices;
-using Araci.Applications.Projects.Tables;
-using Araci.Applications.UseCases.Projeto;
-using Araci.Core.Documents;
+using System.Windows;
+using System.Windows.Input;
+using System.Windows.Media;
+using Araci.Applications.UseCases.Editar;
+using Araci.Models.Tipos;
+using Araci.Properties;
+using Araci.Services;
+using Araci.Services.Settings;
 
 namespace Araci.ViewModels
 {
-    public sealed class ProjectSheetViewModel : INotifyPropertyChanged
+    public class PropertiesViewModel : INotifyPropertyChanged
     {
-        private const double WorkspaceMargin = 1600.0;
-        private const double MinZoomScale = 0.25;
-        private const double MaxZoomScale = 4.0;
-        private const double ZoomStep = 0.10;
+        private readonly IReadOnlyList<ElementoViewModel> _selecionados;
+        private readonly EditarPropriedadesUseCase? _editarPropriedades;
+        private readonly EditorSettings _settings;
+        private object? _elementoSelecionado;
+        private SimpleCommand? _abrirPropriedadesTipoCommand;
 
-        private readonly AraciDocument _document;
-        private readonly ProjectSheet _sheet;
-        private readonly MoverTabelaNaPranchaUseCase? _moverTabelaNaPrancha;
-        private readonly RedimensionarTabelaNaPranchaUseCase? _redimensionarTabelaNaPrancha;
-        private readonly RemoverTabelaDaPranchaUseCase? _removerTabelaDaPrancha;
-        private readonly DividirTabelaNaPranchaUseCase? _dividirTabelaNaPrancha;
-        private readonly ProjectTableDataBuilder _tableDataBuilder = new();
-        private string _titulo = string.Empty;
-        private string _emptyMessage = string.Empty;
-        private Guid? _selectedInstanceId;
-        private double _workspaceWidth = MoverTabelaNaPranchaUseCase.LarguraPadraoPrancha + WorkspaceMargin * 2;
-        private double _workspaceHeight = MoverTabelaNaPranchaUseCase.AlturaPadraoPrancha + WorkspaceMargin * 2;
-        private double _zoomScale = 1.0;
-
-        public ProjectSheetViewModel(
-            AraciDocument document,
-            ProjectSheet sheet,
-            MoverTabelaNaPranchaUseCase? moverTabelaNaPrancha = null,
-            RedimensionarTabelaNaPranchaUseCase? redimensionarTabelaNaPrancha = null,
-            RemoverTabelaDaPranchaUseCase? removerTabelaDaPrancha = null,
-            DividirTabelaNaPranchaUseCase? dividirTabelaNaPrancha = null)
+        public PropertiesViewModel()
         {
-            _document = document ?? throw new ArgumentNullException(nameof(document));
-            _sheet = sheet ?? throw new ArgumentNullException(nameof(sheet));
-            _moverTabelaNaPrancha = moverTabelaNaPrancha;
-            _redimensionarTabelaNaPrancha = redimensionarTabelaNaPrancha;
-            _removerTabelaDaPrancha = removerTabelaDaPrancha;
-            _dividirTabelaNaPrancha = dividirTabelaNaPrancha;
-            TableInstances = new ObservableCollection<ProjectSheetTableInstanceViewModel>();
-            _document.PropriedadesPranchaAlteradas += OnPropriedadesPranchaAlteradas;
-            Refresh();
+            _selecionados = Array.Empty<ElementoViewModel>();
+            _settings = new EditorSettings();
         }
 
-        public Guid SheetId => _sheet.Id;
-        public ObservableCollection<ProjectSheetTableInstanceViewModel> TableInstances { get; }
-        public bool HasInstances => TableInstances.Count > 0;
-        public bool HasEmptyMessage => !string.IsNullOrWhiteSpace(EmptyMessage);
-        public Guid? SelectedInstanceId => _selectedInstanceId;
-        public bool HasSelectedInstance => _selectedInstanceId.HasValue;
-        public double SheetWidth => _sheet.LarguraFolha;
-        public double SheetHeight => _sheet.AlturaFolha;
-        public double SheetOriginOffsetX => WorkspaceMargin;
-        public double SheetOriginOffsetY => WorkspaceMargin;
-        public double MinimumWorkspaceWidth => SheetWidth + WorkspaceMargin * 2;
-        public double MinimumWorkspaceHeight => SheetHeight + WorkspaceMargin * 2;
-
-        public double WorkspaceWidth
+        public PropertiesViewModel(IEnumerable<ElementoViewModel> selecionados, EditarPropriedadesUseCase? editarPropriedades = null, EditorSettings? settings = null)
         {
-            get => _workspaceWidth;
-            private set
-            {
-                double normalized = Math.Max(MinimumWorkspaceWidth, NormalizeWorkspaceDimension(value, MinimumWorkspaceWidth));
+            _selecionados = selecionados?.Where(e => e != null).ToList() ?? new List<ElementoViewModel>();
+            _editarPropriedades = editarPropriedades;
+            _settings = settings ?? new EditorSettings();
+            QuantidadeSelecionada = _selecionados.Count;
+            Titulo = CriarTitulo(_selecionados);
+            Propriedades = new ObservableCollection<PropertyDescriptorViewModel>(CriarDescritores(_selecionados, _editarPropriedades, _settings));
+            AssinarAlteracoesDosElementosSelecionados();
+        }
 
-                if (Math.Abs(_workspaceWidth - normalized) < 0.000001)
+        public object? ElementoSelecionado
+        {
+            get => _elementoSelecionado;
+            set
+            {
+                if (_elementoSelecionado == value)
                     return;
 
-                _workspaceWidth = normalized;
+                _elementoSelecionado = value;
                 OnPropertyChanged();
             }
         }
 
-        public double WorkspaceHeight
-        {
-            get => _workspaceHeight;
-            private set
-            {
-                double normalized = Math.Max(MinimumWorkspaceHeight, NormalizeWorkspaceDimension(value, MinimumWorkspaceHeight));
+        public int QuantidadeSelecionada { get; }
+        public string Titulo { get; } = "Propriedades";
+        public ObservableCollection<PropertyDescriptorViewModel> Propriedades { get; } = new();
+        public bool MesmoTipo => _selecionados.Count > 0 && _selecionados.All(e => e.GetType() == _selecionados[0].GetType());
+        public bool ExibirSeletorTipo => MesmoTipo;
+        public IEnumerable TiposDisponiveis => MesmoTipo ? _selecionados[0].TiposDisponiveis : Array.Empty<object>();
+        public bool PodeAbrirPropriedadesTipo => MesmoTipo && Tipo != null;
 
-                if (Math.Abs(_workspaceHeight - normalized) < 0.000001)
+        public TipoElemento? Tipo
+        {
+            get
+            {
+                if (!MesmoTipo || _selecionados.Count == 0)
+                    return null;
+
+                var primeiro = _selecionados[0].Tipo;
+                return _selecionados.All(e => ReferenceEquals(e.Tipo, primeiro)) ? primeiro : null;
+            }
+            set
+            {
+                if (!MesmoTipo || value == null)
                     return;
 
-                _workspaceHeight = normalized;
-                OnPropertyChanged();
-            }
-        }
-
-        public double ZoomScale
-        {
-            get => _zoomScale;
-            private set
-            {
-                double normalized = NormalizeZoom(value);
-
-                if (Math.Abs(_zoomScale - normalized) < 0.000001)
+                if (_editarPropriedades == null)
                     return;
 
-                _zoomScale = normalized;
-                OnPropertyChanged();
-                OnPropertyChanged(nameof(ZoomPercentText));
-            }
-        }
-
-        public string ZoomPercentText => $"{Math.Round(ZoomScale * 100):0}%";
-
-        public string Titulo
-        {
-            get => _titulo;
-            private set
-            {
-                if (_titulo == value)
+                if (!_editarPropriedades.Executar(_selecionados, nameof(ElementoViewModel.Tipo), value))
                     return;
 
-                _titulo = value;
-                OnPropertyChanged();
+                AtualizarSeletorTipo();
             }
         }
 
-        public string EmptyMessage
+        public ICommand AbrirPropriedadesTipoCommand => _abrirPropriedadesTipoCommand ??= new SimpleCommand(AbrirPropriedadesTipo, () => PodeAbrirPropriedadesTipo);
+
+        private void AbrirPropriedadesTipo()
         {
-            get => _emptyMessage;
-            private set
+            if (!PodeAbrirPropriedadesTipo)
+                return;
+
+            _selecionados[0].AbrirPropriedadesTipoCommand.Execute(null);
+            AtualizarSeletorTipo();
+        }
+
+        private void AssinarAlteracoesDosElementosSelecionados()
+        {
+            foreach (ElementoViewModel elemento in _selecionados)
+                elemento.PropertyChanged += OnElementoSelecionadoPropertyChanged;
+        }
+
+        private void OnElementoSelecionadoPropertyChanged(object? sender, PropertyChangedEventArgs e)
+        {
+            if (string.IsNullOrEmpty(e.PropertyName) || e.PropertyName == nameof(ElementoViewModel.Tipo) || e.PropertyName == nameof(ElementoViewModel.TipoViewModel))
+                AtualizarSeletorTipo();
+        }
+
+        private void AtualizarSeletorTipo()
+        {
+            OnPropertyChanged(nameof(TiposDisponiveis));
+            OnPropertyChanged(nameof(Tipo));
+            OnPropertyChanged(nameof(PodeAbrirPropriedadesTipo));
+            _abrirPropriedadesTipoCommand?.RaiseCanExecuteChanged();
+        }
+
+        private static string CriarTitulo(IReadOnlyList<ElementoViewModel> itens)
+        {
+            if (itens.Count == 0)
+                return "Nenhum elemento selecionado";
+
+            if (itens.All(i => i.GetType() == itens[0].GetType()))
+                return CriarTituloMesmoTipo(itens[0], itens.Count);
+
+            return $"{itens.Count} elementos selecionados";
+        }
+
+        private static string CriarTituloMesmoTipo(ElementoViewModel item, int quantidade)
+        {
+            string tipo = ObterNomeTipoAmigavel(item, quantidade > 1);
+            string selecionado = ObterParticipioSelecionado(item, quantidade > 1);
+
+            return $"{quantidade} {tipo} {selecionado}";
+        }
+
+        private static IEnumerable<PropertyDescriptorViewModel> CriarDescritores(IReadOnlyList<ElementoViewModel> itens, EditarPropriedadesUseCase? editarPropriedades, EditorSettings settings)
+        {
+            if (itens.Count == 0)
+                yield break;
+
+            bool mesmoTipo = itens.All(i => i.GetType() == itens[0].GetType());
+
+            foreach (var descriptor in InstancePropertyCatalog.GetCommonFor(itens))
             {
-                if (_emptyMessage == value)
-                    return;
+                var props = itens.Select(i => ObterPropriedade(i, descriptor.PropertyName)).ToList();
 
-                _emptyMessage = value;
-                OnPropertyChanged();
-                OnPropertyChanged(nameof(HasEmptyMessage));
+                if (props.Any(p => p == null))
+                    continue;
+
+                Type tipoValor = props[0]!.PropertyType;
+                bool editavelMesmoTipo = mesmoTipo && descriptor.IsEditable;
+                bool editavelTiposDiferentes = !mesmoTipo && InstancePropertyCatalog.CanEditAcrossMixedTypes(itens, descriptor.PropertyName);
+                bool editavel = (editavelMesmoTipo || editavelTiposDiferentes) && props.All(p => p != null && p.CanWrite && EhTipoEditavel(p.PropertyType)) && TiposCompativeis(props);
+                var valores = itens.Select(i => ObterValor(i, descriptor.PropertyName)).ToList();
+                object? primeiro = valores[0];
+                bool varia = valores.Skip(1).Any(v => !ValoresIguais(primeiro, v));
+
+                yield return new PropertyDescriptorViewModel(itens, descriptor, tipoValor, varia, editavel, editarPropriedades, settings);
             }
         }
 
-        public void Refresh()
+        private static bool TiposCompativeis(IReadOnlyList<PropertyInfo?> props)
         {
-            Guid? selectedBeforeRefresh = _selectedInstanceId;
-            Titulo = string.IsNullOrWhiteSpace(_sheet.Numero)
-                ? _sheet.Nome
-                : $"{_sheet.Numero} - {_sheet.Nome}";
+            if (props.Count == 0 || props[0] == null)
+                return false;
 
-            TableInstances.Clear();
-            NormalizeInstances();
-            RecalculateWorkspaceFromDocument();
+            Type primeiro = Nullable.GetUnderlyingType(props[0]!.PropertyType) ?? props[0]!.PropertyType;
 
-            foreach (ProjectSheetTableInstance instance in _sheet.Tabelas.Where(i => i != null))
+            foreach (var prop in props.Skip(1))
             {
-                ProjectTable? table = _document.Tabelas.FirstOrDefault(t => t.Id == instance.TableId);
-                ProjectTableDataResult? tableData = table == null
-                    ? null
-                    : _tableDataBuilder.Build(_document, table);
+                if (prop == null)
+                    return false;
 
-                var instanceViewModel = new ProjectSheetTableInstanceViewModel(
-                    instance,
-                    table?.Nome ?? "Tabela nao encontrada",
-                    tableData)
-                {
-                    IsSelected = selectedBeforeRefresh == instance.Id
-                };
-                instanceViewModel.SetSheetOriginOffset(SheetOriginOffsetX, SheetOriginOffsetY);
-                TableInstances.Add(instanceViewModel);
+                Type atual = Nullable.GetUnderlyingType(prop.PropertyType) ?? prop.PropertyType;
+
+                if (atual != primeiro)
+                    return false;
             }
 
-            if (selectedBeforeRefresh.HasValue && !TableInstances.Any(i => i.Id == selectedBeforeRefresh.Value))
-                _selectedInstanceId = null;
-
-            EmptyMessage = HasInstances ? string.Empty : "Nenhuma tabela inserida na prancha";
-            OnPropertyChanged(nameof(HasInstances));
-            OnSelectionChanged();
-        }
-
-        public void SelecionarInstancia(Guid instanceId)
-        {
-            bool encontrou = false;
-
-            foreach (ProjectSheetTableInstanceViewModel instance in TableInstances)
-            {
-                bool selecionada = instance.Id == instanceId;
-                instance.IsSelected = selecionada;
-                encontrou |= selecionada;
-            }
-
-            _selectedInstanceId = encontrou ? instanceId : null;
-            OnSelectionChanged();
-        }
-
-        public void LimparSelecao()
-        {
-            foreach (ProjectSheetTableInstanceViewModel instance in TableInstances)
-                instance.IsSelected = false;
-
-            _selectedInstanceId = null;
-            OnSelectionChanged();
-        }
-
-        public void SetPreviewPosition(ProjectSheetTableInstanceViewModel instance, double x, double y)
-        {
-            ArgumentNullException.ThrowIfNull(instance);
-
-            instance.SetPreviewPosition(
-                MoverTabelaNaPranchaUseCase.NormalizePosition(x),
-                MoverTabelaNaPranchaUseCase.NormalizePosition(y));
-        }
-
-        public void SetPreviewSize(ProjectSheetTableInstanceViewModel instance, double width, double height)
-        {
-            ArgumentNullException.ThrowIfNull(instance);
-
-            instance.SetPreviewSize(
-                RedimensionarTabelaNaPranchaUseCase.NormalizeDimension(width, ProjectSheetTableInstance.MinWidth),
-                RedimensionarTabelaNaPranchaUseCase.NormalizeDimension(height, ProjectSheetTableInstance.MinHeight));
-        }
-
-        public bool MoverInstancia(Guid instanceId, double novoX, double novoY)
-        {
-            ProjectSheetTableInstanceViewModel? instanceViewModel = TableInstances.FirstOrDefault(i => i.Id == instanceId);
-
-            if (instanceViewModel == null)
-                return false;
-
-            bool moved = _moverTabelaNaPrancha?.Mover(
-                SheetId,
-                instanceId,
-                novoX,
-                novoY,
-                SheetWidth,
-                SheetHeight,
-                Refresh) == true;
-
-            if (moved)
-                SelecionarInstancia(instanceId);
-            else
-                RestoreWorkspaceFromDocument();
-
-            return moved;
-        }
-
-        public bool RedimensionarInstancia(Guid instanceId, double novaLargura, double novaAltura)
-        {
-            ProjectSheetTableInstanceViewModel? instanceViewModel = TableInstances.FirstOrDefault(i => i.Id == instanceId);
-
-            if (instanceViewModel == null)
-                return false;
-
-            bool resized = _redimensionarTabelaNaPrancha?.Redimensionar(
-                SheetId,
-                instanceId,
-                novaLargura,
-                novaAltura,
-                SheetWidth,
-                SheetHeight,
-                Refresh) == true;
-
-            if (resized)
-                SelecionarInstancia(instanceId);
-            else
-                RestoreWorkspaceFromDocument();
-
-            return resized;
-        }
-
-        public bool RemoverInstanciaSelecionada()
-        {
-            if (!_selectedInstanceId.HasValue)
-                return false;
-
-            Guid instanceId = _selectedInstanceId.Value;
-            bool removed = _removerTabelaDaPrancha?.Remover(SheetId, instanceId, Refresh) == true;
-
-            if (removed)
-            {
-                _selectedInstanceId = null;
-                Refresh();
-            }
-
-            return removed;
-        }
-
-        public bool DividirInstanciaTabela(Guid instanceId)
-        {
-            if (!TableInstances.Any(i => i.Id == instanceId && i.CanSplit))
-                return false;
-
-            ProjectSheetTableInstance? novaInstancia = _dividirTabelaNaPrancha?.Dividir(SheetId, instanceId, Refresh);
-
-            if (novaInstancia == null)
-                return false;
-
-            SelecionarInstancia(novaInstancia.Id);
-            RestoreWorkspaceFromDocument();
             return true;
         }
 
-        public void ZoomIn()
+        private static PropertyInfo? ObterPropriedade(ElementoViewModel item, string nomePropriedade)
         {
-            ZoomScale += ZoomStep;
+            var prop = item.GetType().GetProperty(nomePropriedade, BindingFlags.Instance | BindingFlags.Public);
+            return prop == null || prop.GetIndexParameters().Length > 0 ? null : prop;
         }
 
-        public void ZoomOut()
+        internal static object? ObterValor(ElementoViewModel item, string nomePropriedade)
         {
-            ZoomScale -= ZoomStep;
+            return ObterPropriedade(item, nomePropriedade)?.GetValue(item);
         }
 
-        public void ResetZoom()
+        internal static bool ValoresIguais(object? a, object? b)
         {
-            ZoomScale = 1.0;
+            if (a == null && b == null)
+                return true;
+
+            if (a == null || b == null)
+                return false;
+
+            if (a is double da && b is double db)
+                return Math.Abs(da - db) < 0.000001;
+
+            if (a is float fa && b is float fb)
+                return Math.Abs(fa - fb) < 0.000001f;
+
+            return Equals(a, b);
         }
 
-        public void RestoreWorkspaceFromDocument()
+        internal static string FormatarValor(object? valor)
         {
-            RecalculateWorkspaceFromDocument();
-            UpdateInstanceOffsets();
+            return UnitFormatter.Format(valor, UnitKind.None);
         }
 
-        private void NormalizeInstances()
+        internal static string FormatarValor(object? valor, InstancePropertyDescriptor descriptor)
         {
-            foreach (ProjectSheetTableInstance instance in _sheet.Tabelas.Where(i => i != null))
-                NormalizeInstance(instance);
+            return UnitFormatter.Format(valor, descriptor.Unit);
         }
 
-        private void RecalculateWorkspaceFromDocument()
+        internal static string FormatarValor(object? valor, UnitKind baseUnit, UnitKind displayUnit)
         {
-            RecalculateWorkspace(_sheet.Tabelas.Where(i => i != null).Select(i => new WorkspaceBoundsItem(i.X, i.Y, i.Width, i.Height)));
+            return UnitFormatter.Format(valor, baseUnit, displayUnit);
         }
 
-        private void RecalculateWorkspace(IEnumerable<WorkspaceBoundsItem> items)
+        internal static bool TentarConverterValor(string valor, Type tipoDestino, out object? convertido)
         {
-            double maxX = SheetWidth;
-            double maxY = SheetHeight;
+            return TentarConverterValor(valor, tipoDestino, UnitKind.None, out convertido);
+        }
 
-            foreach (WorkspaceBoundsItem item in items)
+        internal static bool TentarConverterValor(string valor, Type tipoDestino, InstancePropertyDescriptor descriptor, out object? convertido)
+        {
+            return TentarConverterValor(valor, tipoDestino, descriptor.Unit, out convertido);
+        }
+
+        internal static bool TentarConverterValor(string valor, Type tipoDestino, UnitKind baseUnit, UnitKind displayUnit, out object? convertido)
+        {
+            return TentarConverterValorConvertendo(valor, tipoDestino, displayUnit, baseUnit, out convertido);
+        }
+
+        internal static bool TentarConverterValor(string valor, Type tipoDestino, UnitKind unit, out object? convertido)
+        {
+            return TentarConverterValorConvertendo(valor, tipoDestino, unit, unit, out convertido);
+        }
+
+        private static bool TentarConverterValorConvertendo(string valor, Type tipoDestino, UnitKind displayUnit, UnitKind baseUnit, out object? convertido)
+        {
+            convertido = null;
+            Type tipo = Nullable.GetUnderlyingType(tipoDestino) ?? tipoDestino;
+            string valorSemUnidade = UnitFormatter.StripUnit(valor, displayUnit);
+
+            try
             {
-                double x = MoverTabelaNaPranchaUseCase.NormalizePosition(item.X);
-                double y = MoverTabelaNaPranchaUseCase.NormalizePosition(item.Y);
-                double width = RedimensionarTabelaNaPranchaUseCase.NormalizeDimension(item.Width, ProjectSheetTableInstance.MinWidth);
-                double height = RedimensionarTabelaNaPranchaUseCase.NormalizeDimension(item.Height, ProjectSheetTableInstance.MinHeight);
+                if (tipo == typeof(string))
+                {
+                    convertido = valorSemUnidade;
+                    return true;
+                }
 
-                maxX = Math.Max(maxX, x + width);
-                maxY = Math.Max(maxY, y + height);
+                if (tipo == typeof(int))
+                {
+                    if (!int.TryParse(valorSemUnidade, NumberStyles.Integer, CultureInfo.CurrentCulture, out int i))
+                        return false;
+
+                    convertido = i;
+                    return true;
+                }
+
+                if (tipo == typeof(double))
+                {
+                    if (!double.TryParse(valorSemUnidade, NumberStyles.Float | NumberStyles.AllowThousands, CultureInfo.CurrentCulture, out double d))
+                        return false;
+
+                    convertido = UnitFormatter.FromDisplay(d, displayUnit, baseUnit);
+                    return true;
+                }
+
+                if (tipo == typeof(float))
+                {
+                    if (!float.TryParse(valorSemUnidade, NumberStyles.Float | NumberStyles.AllowThousands, CultureInfo.CurrentCulture, out float f))
+                        return false;
+
+                    convertido = (float)UnitFormatter.FromDisplay(f, displayUnit, baseUnit);
+                    return true;
+                }
+
+                if (tipo == typeof(decimal))
+                {
+                    if (!decimal.TryParse(valorSemUnidade, NumberStyles.Float | NumberStyles.AllowThousands, CultureInfo.CurrentCulture, out decimal m))
+                        return false;
+
+                    convertido = (decimal)UnitFormatter.FromDisplay((double)m, displayUnit, baseUnit);
+                    return true;
+                }
+
+                if (tipo == typeof(bool))
+                {
+                    if (TentarConverterBooleano(valorSemUnidade, out bool b))
+                    {
+                        convertido = b;
+                        return true;
+                    }
+
+                    return false;
+                }
+
+                if (tipo.IsEnum)
+                {
+                    convertido = Enum.Parse(tipo, valorSemUnidade, true);
+                    return true;
+                }
+
+                convertido = Convert.ChangeType(valorSemUnidade, tipo, CultureInfo.CurrentCulture);
+                return true;
+            }
+            catch
+            {
+                convertido = null;
+                return false;
+            }
+        }
+
+        private static bool TentarConverterBooleano(string valor, out bool convertido)
+        {
+            convertido = false;
+
+            if (bool.TryParse(valor, out bool b))
+            {
+                convertido = b;
+                return true;
             }
 
-            WorkspaceWidth = SheetOriginOffsetX + maxX + WorkspaceMargin;
-            WorkspaceHeight = SheetOriginOffsetY + maxY + WorkspaceMargin;
-            UpdateInstanceOffsets();
+            string normalizado = (valor ?? string.Empty).Trim().ToLowerInvariant();
+
+            if (normalizado is "sim" or "s" or "yes" or "y" or "1")
+            {
+                convertido = true;
+                return true;
+            }
+
+            if (normalizado is "não" or "nao" or "n" or "no" or "0")
+            {
+                convertido = false;
+                return true;
+            }
+
+            return false;
         }
 
-        private void UpdateInstanceOffsets()
+        private static bool EhTipoEditavel(Type tipo)
         {
-            foreach (ProjectSheetTableInstanceViewModel instance in TableInstances)
-                instance.SetSheetOriginOffset(SheetOriginOffsetX, SheetOriginOffsetY);
+            Type t = Nullable.GetUnderlyingType(tipo) ?? tipo;
+            return t == typeof(string) || t == typeof(int) || t == typeof(double) || t == typeof(float) || t == typeof(decimal) || t == typeof(bool) || t.IsEnum;
         }
 
-        private static void NormalizeInstance(ProjectSheetTableInstance instance)
+        private static string ObterNomeTipoAmigavel(ElementoViewModel vm, bool plural)
         {
-            instance.X = MoverTabelaNaPranchaUseCase.NormalizePosition(instance.X);
-            instance.Y = MoverTabelaNaPranchaUseCase.NormalizePosition(instance.Y);
-            instance.Width = RedimensionarTabelaNaPranchaUseCase.NormalizeDimension(instance.Width, ProjectSheetTableInstance.MinWidth);
-            instance.Height = RedimensionarTabelaNaPranchaUseCase.NormalizeDimension(instance.Height, ProjectSheetTableInstance.MinHeight);
-            instance.RowStartIndex = instance.RowStartIndex;
-            instance.RowCount = instance.RowCount;
+            if (vm is LinhaAnotativaViewModel)
+                return plural ? "Linhas" : "Linha";
+
+            if (vm is TextoAnotativoViewModel)
+                return plural ? "Textos" : "Texto";
+
+            if (vm is RetanguloAnotativoViewModel)
+                return plural ? "Retângulos" : "Retângulo";
+
+            if (vm is CirculoAnotativoViewModel)
+                return plural ? "Círculos" : "Círculo";
+
+            return vm.GetType().Name.Replace("ViewModel", string.Empty);
         }
 
-        private static double NormalizeWorkspaceDimension(double value, double fallback)
+        private static string ObterParticipioSelecionado(ElementoViewModel vm, bool plural)
         {
-            return double.IsNaN(value) || double.IsInfinity(value) || value <= 0
-                ? fallback
-                : value;
-        }
+            if (vm is LinhaAnotativaViewModel)
+                return plural ? "selecionadas" : "selecionada";
 
-        private static double NormalizeZoom(double value)
-        {
-            if (double.IsNaN(value) || double.IsInfinity(value))
-                return 1.0;
-
-            if (value < MinZoomScale)
-                return MinZoomScale;
-
-            if (value > MaxZoomScale)
-                return MaxZoomScale;
-
-            return value;
+            return plural ? "selecionados" : "selecionado";
         }
 
         public event PropertyChangedEventHandler? PropertyChanged;
 
-        private void OnSelectionChanged()
+        protected virtual void OnPropertyChanged([CallerMemberName] string? nome = null)
         {
-            OnPropertyChanged(nameof(SelectedInstanceId));
-            OnPropertyChanged(nameof(HasSelectedInstance));
+            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nome));
         }
 
-        private void OnPropriedadesPranchaAlteradas(ProjectSheet prancha)
+        private sealed class SimpleCommand : ICommand
         {
-            if (prancha.Id != SheetId)
-                return;
+            private readonly Action _execute;
+            private readonly Func<bool>? _canExecute;
 
-            OnPropertyChanged(nameof(SheetWidth));
-            OnPropertyChanged(nameof(SheetHeight));
-            OnPropertyChanged(nameof(MinimumWorkspaceWidth));
-            OnPropertyChanged(nameof(MinimumWorkspaceHeight));
-            Refresh();
-        }
-
-        private void OnPropertyChanged([CallerMemberName] string? propertyName = null)
-        {
-            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
-        }
-
-        private readonly struct WorkspaceBoundsItem
-        {
-            public WorkspaceBoundsItem(double x, double y, double width, double height)
+            public SimpleCommand(Action execute, Func<bool>? canExecute = null)
             {
-                X = x;
-                Y = y;
-                Width = width;
-                Height = height;
+                _execute = execute ?? throw new ArgumentNullException(nameof(execute));
+                _canExecute = canExecute;
             }
 
-            public double X { get; }
-            public double Y { get; }
-            public double Width { get; }
-            public double Height { get; }
+            public bool CanExecute(object? parameter)
+            {
+                return _canExecute?.Invoke() ?? true;
+            }
+
+            public void Execute(object? parameter)
+            {
+                if (CanExecute(parameter))
+                    _execute();
+            }
+
+            public event EventHandler? CanExecuteChanged;
+
+            public void RaiseCanExecuteChanged()
+            {
+                CanExecuteChanged?.Invoke(this, EventArgs.Empty);
+            }
+        }
+    }
+
+    public class PropertyDescriptorViewModel : INotifyPropertyChanged
+    {
+        private readonly IReadOnlyList<ElementoViewModel> _elementos;
+        private readonly InstancePropertyDescriptor _descriptor;
+        private readonly Type _tipoValor;
+        private readonly EditarPropriedadesUseCase? _editarPropriedades;
+        private ICommand? _escolherCorCommand;
+        private string _valor;
+        private bool _varia;
+        private bool _temErro;
+        private string _mensagemErro = string.Empty;
+        private static readonly IReadOnlyList<BooleanPropertyOption> _booleanOptions = new[]
+        {
+            new BooleanPropertyOption(true, "Sim"),
+            new BooleanPropertyOption(false, "Não")
+        };
+
+        public PropertyDescriptorViewModel(IReadOnlyList<ElementoViewModel> elementos, InstancePropertyDescriptor descriptor, Type tipoValor, bool varia, bool isEditable, EditarPropriedadesUseCase? editarPropriedades = null)
+            : this(elementos, descriptor, tipoValor, varia, isEditable, editarPropriedades, null)
+        {
+        }
+
+        public PropertyDescriptorViewModel(IReadOnlyList<ElementoViewModel> elementos, InstancePropertyDescriptor descriptor, Type tipoValor, bool varia, bool isEditable, EditarPropriedadesUseCase? editarPropriedades, EditorSettings? settings)
+        {
+            _elementos = elementos;
+            _descriptor = descriptor;
+            _tipoValor = tipoValor;
+            _editarPropriedades = editarPropriedades;
+            Nome = descriptor.DisplayName;
+            DisplayName = descriptor.DisplayName;
+            PropertyName = descriptor.PropertyName;
+            BaseUnit = descriptor.Unit;
+            DisplayUnit = ResolveDisplayUnit(BaseUnit, settings);
+            Unit = DisplayUnit;
+            UnitSymbol = UnitFormatter.GetSymbol(DisplayUnit);
+            IsEditable = isEditable;
+            IsReadOnly = !isEditable;
+            IsColor = descriptor.IsColor;
+            _varia = varia;
+            _valor = varia ? "<varia>" : FormatarValorLocal(ObterValorAtual());
+            AssinarAlteracoesDosElementos();
+        }
+
+        public string Nome { get; }
+        public string DisplayName { get; }
+        public string PropertyName { get; }
+        public Type ValueType => _tipoValor;
+        public UnitKind BaseUnit { get; }
+        public UnitKind DisplayUnit { get; }
+        public UnitKind Unit { get; }
+        public string UnitSymbol { get; }
+        public bool HasUnit => DisplayUnit != UnitKind.None;
+        public bool IsEditable { get; }
+        public bool IsReadOnly { get; }
+        public bool IsColor { get; }
+        public bool IsBoolean => (Nullable.GetUnderlyingType(_tipoValor) ?? _tipoValor) == typeof(bool);
+        public IReadOnlyList<BooleanPropertyOption> BooleanOptions => _booleanOptions;
+        public bool? BooleanValue
+        {
+            get
+            {
+                if (_varia)
+                    return null;
+
+                object? atual = ObterValorAtual();
+                return atual is bool b ? b : null;
+            }
+            set
+            {
+                if (!IsEditable || value == null)
+                    return;
+
+                AplicarValor(value.Value ? "true" : "false");
+            }
+        }
+        public bool IsMixed => _varia;
+        public bool Varia => _varia;
+        public Brush ColorBrush => CriarColorBrush(_valor);
+        public ICommand? EscolherCorCommand => IsColor
+            ? _escolherCorCommand ??= new ColorCommand(EscolherCor, () => IsEditable)
+            : null;
+
+        public string Valor
+        {
+            get => _valor;
+            set => AplicarValor(value);
+        }
+
+        public string Value
+        {
+            get => _valor;
+            set => AplicarValor(value);
+        }
+
+        public bool TemErro
+        {
+            get => _temErro;
+            private set
+            {
+                if (_temErro == value)
+                    return;
+
+                _temErro = value;
+                OnPropertyChanged();
+            }
+        }
+
+        public string MensagemErro
+        {
+            get => _mensagemErro;
+            private set
+            {
+                if (_mensagemErro == value)
+                    return;
+
+                _mensagemErro = value;
+                OnPropertyChanged();
+            }
+        }
+
+        private void AplicarValor(string novoValor)
+        {
+            if (!IsEditable)
+                return;
+
+            if (string.Equals(novoValor, "<varia>", StringComparison.OrdinalIgnoreCase))
+                return;
+
+            if (IsColor)
+            {
+                if (!ColorPickerWindow.TryNormalizeHexColor(novoValor, out string corNormalizada))
+                {
+                    AtualizarValorInvalido(novoValor);
+                    return;
+                }
+
+                novoValor = corNormalizada;
+            }
+
+            if (string.Equals(novoValor, _valor, StringComparison.Ordinal))
+                return;
+
+            if (!PropertiesViewModel.TentarConverterValor(novoValor, _tipoValor, BaseUnit, DisplayUnit, out object? convertido))
+            {
+                AtualizarValorInvalido(novoValor);
+                return;
+            }
+
+            bool aplicado = _editarPropriedades?.Executar(_elementos, _descriptor.PropertyName, convertido) ?? false;
+
+            if (aplicado)
+                AtualizarValorDoModelo();
+            else
+                AtualizarValorLocal(convertido);
+        }
+
+        private void AtualizarValorInvalido(string valor)
+        {
+            TemErro = true;
+            MensagemErro = "Valor inválido";
+            _valor = valor;
+            OnPropertyChanged(nameof(Valor));
+            OnPropertyChanged(nameof(Value));
+            OnPropertyChanged(nameof(ColorBrush));
+            OnPropertyChanged(nameof(BooleanValue));
+        }
+
+        private void AtualizarValorLocal(object? convertido)
+        {
+            _varia = false;
+            _valor = FormatarValorLocal(convertido);
+            AtualizarEstadoValido();
+        }
+
+        private void AtualizarValorDoModelo()
+        {
+            if (_elementos.Count == 0)
+                return;
+
+            var valores = _elementos.Select(e => PropertiesViewModel.ObterValor(e, _descriptor.PropertyName)).ToList();
+            object? primeiro = valores[0];
+            bool varia = valores.Skip(1).Any(v => !PropertiesViewModel.ValoresIguais(primeiro, v));
+            string valorAtualizado = varia ? "<varia>" : FormatarValorLocal(primeiro);
+
+            if (_varia == varia && string.Equals(_valor, valorAtualizado, StringComparison.Ordinal))
+            {
+                AtualizarEstadoValido();
+                return;
+            }
+
+            _varia = varia;
+            _valor = valorAtualizado;
+            AtualizarEstadoValido();
+        }
+
+        private string FormatarValorLocal(object? convertido)
+        {
+            if (IsColor && convertido is string cor && ColorPickerWindow.TryNormalizeHexColor(cor, out string corNormalizada))
+                return corNormalizada;
+
+            if (IsBoolean && convertido is bool b)
+                return b ? "Sim" : "Não";
+
+            return PropertiesViewModel.FormatarValor(convertido, BaseUnit, DisplayUnit);
+        }
+
+        private static UnitKind ResolveDisplayUnit(UnitKind baseUnit, EditorSettings? settings)
+        {
+            if (baseUnit == UnitKind.None)
+                return UnitKind.None;
+
+            UnitQuantityKind quantity = UnitFormatter.GetQuantity(baseUnit);
+            return settings?.Units.Resolve(quantity) ?? baseUnit;
+        }
+
+        private void AtualizarEstadoValido()
+        {
+            TemErro = false;
+            MensagemErro = string.Empty;
+            OnPropertyChanged(nameof(Valor));
+            OnPropertyChanged(nameof(Value));
+            OnPropertyChanged(nameof(ColorBrush));
+            OnPropertyChanged(nameof(BooleanValue));
+            OnPropertyChanged(nameof(IsMixed));
+            OnPropertyChanged(nameof(Varia));
+        }
+
+        private void EscolherCor()
+        {
+            var window = new ColorPickerWindow(_valor)
+            {
+                Owner = Application.Current?.MainWindow
+            };
+
+            if (window.ShowDialog() == true)
+                Valor = window.SelectedColorHex;
+        }
+
+        private void AssinarAlteracoesDosElementos()
+        {
+            foreach (ElementoViewModel elemento in _elementos)
+                elemento.PropertyChanged += OnElementoPropertyChanged;
+        }
+
+        private void OnElementoPropertyChanged(object? sender, PropertyChangedEventArgs e)
+        {
+            if (!string.IsNullOrEmpty(e.PropertyName) && e.PropertyName != _descriptor.PropertyName)
+                return;
+
+            AtualizarValorDoModelo();
+        }
+
+        private static Brush CriarColorBrush(string value)
+        {
+            try
+            {
+                if (ColorPickerWindow.TryNormalizeColor(value, out string normalized) &&
+                    ColorConverter.ConvertFromString(normalized) is Color color)
+                {
+                    return new SolidColorBrush(color);
+                }
+            }
+            catch (FormatException)
+            {
+            }
+
+            return Brushes.Black;
+        }
+
+        private object? ObterValorAtual()
+        {
+            if (_elementos.Count == 0)
+                return null;
+
+            return PropertiesViewModel.ObterValor(_elementos[0], _descriptor.PropertyName);
+        }
+
+        private sealed class ColorCommand : ICommand
+        {
+            private readonly Action _execute;
+            private readonly Func<bool>? _canExecute;
+
+            public ColorCommand(Action execute, Func<bool>? canExecute = null)
+            {
+                _execute = execute ?? throw new ArgumentNullException(nameof(execute));
+                _canExecute = canExecute;
+            }
+
+            public bool CanExecute(object? parameter)
+            {
+                return _canExecute?.Invoke() ?? true;
+            }
+
+            public void Execute(object? parameter)
+            {
+                if (CanExecute(parameter))
+                    _execute();
+            }
+
+            public event EventHandler? CanExecuteChanged
+            {
+                add { }
+                remove { }
+            }
+        }
+
+        public event PropertyChangedEventHandler? PropertyChanged;
+
+        protected virtual void OnPropertyChanged([CallerMemberName] string? nome = null)
+        {
+            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nome));
+        }
+    }
+
+    public sealed class BooleanPropertyOption
+    {
+        public BooleanPropertyOption(bool value, string displayName)
+        {
+            Value = value;
+            DisplayName = displayName;
+        }
+
+        public bool Value { get; }
+        public string DisplayName { get; }
+    }
+
+    public class PropertyRowViewModel : PropertyDescriptorViewModel
+    {
+        public PropertyRowViewModel(string nome, string valor, bool varia)
+            : base(Array.Empty<ElementoViewModel>(), new InstancePropertyDescriptor(typeof(ElementoViewModel), string.Empty, nome, 0, false), typeof(string), varia, false)
+        {
         }
     }
 }
-
 
 

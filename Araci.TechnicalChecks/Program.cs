@@ -102,6 +102,24 @@ namespace Araci.TechnicalChecks
                 ("Persistencia preserva propriedades da prancha", PersistenciaPreservaPropriedadesPrancha),
                 ("Persistencia preserva tipos de prancha", PersistenciaPreservaTiposPrancha),
                 ("Persistencia preserva associacao prancha tipo", PersistenciaPreservaAssociacaoPranchaTipo),
+                ("Criar tipo de prancha adiciona item com defaults", CriarTipoPranchaAdicionaItemComDefaults),
+                ("Criar tipo de prancha undo redo", CriarTipoPranchaUndoRedo),
+                ("Duplicar tipo de prancha copia propriedades", DuplicarTipoPranchaCopiaPropriedades),
+                ("Duplicar tipo de prancha undo redo", DuplicarTipoPranchaUndoRedo),
+                ("Renomear tipo de prancha altera nome", RenomearTipoPranchaAlteraNome),
+                ("Renomear tipo de prancha bloqueia nome vazio", RenomearTipoPranchaBloqueiaNomeVazio),
+                ("Renomear tipo de prancha bloqueia duplicado case insensitive", RenomearTipoPranchaBloqueiaDuplicadoCaseInsensitive),
+                ("Excluir tipo de prancha remove tipo nao usado", ExcluirTipoPranchaRemoveTipoNaoUsado),
+                ("Excluir tipo de prancha undo redo", ExcluirTipoPranchaUndoRedo),
+                ("Excluir ultimo tipo de prancha bloqueado", ExcluirUltimoTipoPranchaBloqueado),
+                ("Excluir tipo de prancha em uso bloqueado", ExcluirTipoPranchaEmUsoBloqueado),
+                ("Excluir tipo em uso nao altera SheetTypeId", ExcluirTipoEmUsoNaoAlteraSheetTypeId),
+                ("Project Browser lista tipos de prancha", ProjectBrowserListaTiposPrancha),
+                ("Project Browser seleciona tipo sem abrir item visual", ProjectBrowserSelecionaTipoSemAbrirItemVisual),
+                ("Selecao tipo exibe ProjectSheetTypePropertiesViewModel", SelecaoTipoExibeProjectSheetTypePropertiesViewModel),
+                ("Propriedades tipo prancha editaveis undo redo", PropriedadesTipoPranchaEditaveisUndoRedo),
+                ("Persistencia salva reabre tipos criados e editados", PersistenciaSalvaReabreTiposCriadosEditados),
+                ("Operacoes tipo prancha nao alteram tabelas ou pranchas", OperacoesTipoPranchaNaoAlteramTabelasOuPranchas),
                 ("Prancha duplica instancias de tabela com copia profunda", PranchaDuplicaInstanciasTabelaComCopiaProfunda),
                 ("Duplicar prancha preserva associacao ao tipo", DuplicarPranchaPreservaAssociacaoTipo),
                 ("Operacoes de prancha nao alteram tipos indevidamente", OperacoesPranchaNaoAlteramTiposIndevidamente),
@@ -5853,6 +5871,337 @@ namespace Araci.TechnicalChecks
 
             AssertEqual(tipo.Id, dto.Sheets.Single(s => s.Id == prancha.Id).SheetTypeId ?? Guid.Empty, "DTO SheetTypeId");
             AssertEqual(tipo.Id, reloaded.SheetTypeId ?? Guid.Empty, "Reload SheetTypeId");
+        }
+
+        private static void CriarTipoPranchaAdicionaItemComDefaults()
+        {
+            var document = new AraciDocument();
+            var commands = new Araci.Core.Commands.CommandManager();
+            var useCase = new CriarItemProjetoUseCase(document, commands);
+
+            ProjectSheetType tipo = useCase.CriarTipoPrancha();
+
+            AssertEqual(2, document.TiposPrancha.Count, "TiposPrancha.Count apos criar");
+            Assert(document.TiposPrancha.Contains(tipo), "Tipo criado deveria estar no documento.");
+            Assert(tipo.Id != Guid.Empty, "Tipo criado Id");
+            AssertEqual(ProjectSheetFormat.A1, tipo.FormatoFolha, "Tipo criado FormatoFolha");
+            AssertEqual(ProjectSheetOrientation.Paisagem, tipo.OrientacaoFolha, "Tipo criado OrientacaoFolha");
+            AssertEqual(ProjectSheet.DefaultWidth, tipo.LarguraFolha, "Tipo criado LarguraFolha");
+            AssertEqual(ProjectSheet.DefaultHeight, tipo.AlturaFolha, "Tipo criado AlturaFolha");
+        }
+
+        private static void CriarTipoPranchaUndoRedo()
+        {
+            var document = new AraciDocument();
+            var commands = new Araci.Core.Commands.CommandManager();
+            var useCase = new CriarItemProjetoUseCase(document, commands);
+
+            ProjectSheetType tipo = useCase.CriarTipoPrancha();
+            commands.Undo();
+
+            Assert(!document.TiposPrancha.Any(t => t.Id == tipo.Id), "Undo deveria remover tipo criado.");
+
+            commands.Redo();
+
+            Assert(document.TiposPrancha.Any(t => t.Id == tipo.Id), "Redo deveria restaurar tipo criado.");
+        }
+
+        private static void DuplicarTipoPranchaCopiaPropriedades()
+        {
+            var document = new AraciDocument();
+            ProjectSheetType origem = document.TipoPranchaPadrao;
+            origem.Nome = "A3 Obra";
+            origem.FormatoFolha = ProjectSheetFormat.A3;
+            origem.OrientacaoFolha = ProjectSheetOrientation.Retrato;
+            origem.LarguraFolha = 397;
+            origem.AlturaFolha = 561;
+            var commands = new Araci.Core.Commands.CommandManager();
+            var useCase = new DuplicarItemProjetoUseCase(document, commands);
+
+            bool duplicou = useCase.DuplicarTipoPrancha(origem.Id);
+            ProjectSheetType duplicata = document.TiposPrancha.Single(t => t.Id != origem.Id);
+
+            Assert(duplicou, "DuplicarTipoPrancha deveria retornar true.");
+            Assert(duplicata.Id != origem.Id, "Duplicata deveria ter novo Id.");
+            AssertEqual(ProjectSheetFormat.A3, duplicata.FormatoFolha, "Duplicata FormatoFolha");
+            AssertEqual(ProjectSheetOrientation.Retrato, duplicata.OrientacaoFolha, "Duplicata OrientacaoFolha");
+            AssertEqual(397, duplicata.LarguraFolha, "Duplicata LarguraFolha");
+            AssertEqual(561, duplicata.AlturaFolha, "Duplicata AlturaFolha");
+            Assert(!document.Pranchas.Any(p => p.SheetTypeId == duplicata.Id), "Duplicar tipo nao deveria reassociar pranchas.");
+        }
+
+        private static void DuplicarTipoPranchaUndoRedo()
+        {
+            var document = new AraciDocument();
+            Guid origemId = document.TipoPranchaPadrao.Id;
+            var commands = new Araci.Core.Commands.CommandManager();
+            var useCase = new DuplicarItemProjetoUseCase(document, commands);
+
+            bool duplicou = useCase.DuplicarTipoPrancha(origemId);
+            ProjectSheetType duplicata = document.TiposPrancha.Single(t => t.Id != origemId);
+            commands.Undo();
+
+            Assert(duplicou, "DuplicarTipoPrancha deveria retornar true.");
+            Assert(!document.TiposPrancha.Any(t => t.Id == duplicata.Id), "Undo deveria remover duplicata.");
+
+            commands.Redo();
+
+            Assert(document.TiposPrancha.Any(t => t.Id == duplicata.Id), "Redo deveria restaurar duplicata.");
+        }
+
+        private static void RenomearTipoPranchaAlteraNome()
+        {
+            var document = new AraciDocument();
+            var commands = new Araci.Core.Commands.CommandManager();
+            var useCase = new RenomearItemProjetoUseCase(document, commands);
+            ProjectSheetType tipo = document.TipoPranchaPadrao;
+
+            bool renomeou = useCase.RenomearTipoPrancha(tipo.Id, "  Template obra  ");
+
+            Assert(renomeou, "RenomearTipoPrancha deveria retornar true.");
+            AssertEqual("Template obra", tipo.Nome, "Tipo renomeado");
+            commands.Undo();
+            AssertEqual(ProjectSheetType.DefaultName, tipo.Nome, "Undo renomear tipo");
+        }
+
+        private static void RenomearTipoPranchaBloqueiaNomeVazio()
+        {
+            var document = new AraciDocument();
+            var commands = new Araci.Core.Commands.CommandManager();
+            var useCase = new RenomearItemProjetoUseCase(document, commands);
+            ProjectSheetType tipo = document.TipoPranchaPadrao;
+
+            bool renomeou = useCase.RenomearTipoPrancha(tipo.Id, "   ");
+
+            Assert(!renomeou, "Nome vazio deveria ser bloqueado.");
+            AssertEqual(ProjectSheetType.DefaultName, tipo.Nome, "Nome deveria permanecer inalterado.");
+            Assert(!commands.CanUndo, "Nome vazio nao deveria criar comando.");
+        }
+
+        private static void RenomearTipoPranchaBloqueiaDuplicadoCaseInsensitive()
+        {
+            var document = new AraciDocument();
+            ProjectSheetType tipo = document.CriarNovoTipoPrancha();
+            tipo.Nome = "Tipo Obra";
+            var commands = new Araci.Core.Commands.CommandManager();
+            var useCase = new RenomearItemProjetoUseCase(document, commands);
+
+            bool renomeou = useCase.RenomearTipoPrancha(tipo.Id, ProjectSheetType.DefaultName.ToUpperInvariant());
+
+            Assert(!renomeou, "Nome duplicado case-insensitive deveria ser bloqueado.");
+            AssertEqual("Tipo Obra", tipo.Nome, "Nome duplicado nao deveria alterar tipo.");
+            Assert(!commands.CanUndo, "Nome duplicado nao deveria criar comando.");
+        }
+
+        private static void ExcluirTipoPranchaRemoveTipoNaoUsado()
+        {
+            var document = new AraciDocument();
+            ProjectSheetType tipo = document.CriarNovoTipoPrancha();
+            var commands = new Araci.Core.Commands.CommandManager();
+            var useCase = new ExcluirItemProjetoUseCase(document, commands);
+
+            bool excluiu = useCase.ExcluirTipoPrancha(tipo.Id);
+
+            Assert(excluiu, "ExcluirTipoPrancha deveria retornar true.");
+            Assert(!document.TiposPrancha.Any(t => t.Id == tipo.Id), "Tipo nao usado deveria ser removido.");
+        }
+
+        private static void ExcluirTipoPranchaUndoRedo()
+        {
+            var document = new AraciDocument();
+            ProjectSheetType tipo = document.CriarNovoTipoPrancha();
+            var commands = new Araci.Core.Commands.CommandManager();
+            var useCase = new ExcluirItemProjetoUseCase(document, commands);
+
+            bool excluiu = useCase.ExcluirTipoPrancha(tipo.Id);
+            commands.Undo();
+
+            Assert(excluiu, "ExcluirTipoPrancha deveria retornar true.");
+            Assert(document.TiposPrancha.Any(t => t.Id == tipo.Id), "Undo deveria restaurar tipo excluido.");
+
+            commands.Redo();
+
+            Assert(!document.TiposPrancha.Any(t => t.Id == tipo.Id), "Redo deveria excluir tipo novamente.");
+        }
+
+        private static void ExcluirUltimoTipoPranchaBloqueado()
+        {
+            var document = new AraciDocument();
+            var commands = new Araci.Core.Commands.CommandManager();
+            var useCase = new ExcluirItemProjetoUseCase(document, commands);
+            Guid tipoId = document.TipoPranchaPadrao.Id;
+
+            bool excluiu = useCase.ExcluirTipoPrancha(tipoId);
+
+            Assert(!excluiu, "Excluir ultimo tipo deveria ser bloqueado.");
+            AssertEqual(1, document.TiposPrancha.Count, "Ultimo tipo deveria permanecer.");
+            AssertEqual(tipoId, document.TipoPranchaPadrao.Id, "Tipo padrao deveria permanecer.");
+        }
+
+        private static void ExcluirTipoPranchaEmUsoBloqueado()
+        {
+            var document = new AraciDocument();
+            ProjectSheet prancha = document.CriarNovaPrancha();
+            var commands = new Araci.Core.Commands.CommandManager();
+            var useCase = new ExcluirItemProjetoUseCase(document, commands);
+
+            bool excluiu = useCase.ExcluirTipoPrancha(prancha.SheetTypeId ?? Guid.Empty);
+
+            Assert(!excluiu, "Excluir tipo em uso deveria ser bloqueado.");
+            AssertEqual(1, document.TiposPrancha.Count, "Tipo em uso deveria permanecer.");
+        }
+
+        private static void ExcluirTipoEmUsoNaoAlteraSheetTypeId()
+        {
+            var document = new AraciDocument();
+            ProjectSheet prancha = document.CriarNovaPrancha();
+            Guid? sheetTypeId = prancha.SheetTypeId;
+            var commands = new Araci.Core.Commands.CommandManager();
+            var useCase = new ExcluirItemProjetoUseCase(document, commands);
+
+            bool excluiu = useCase.ExcluirTipoPrancha(sheetTypeId ?? Guid.Empty);
+
+            Assert(!excluiu, "Excluir tipo em uso deveria retornar false.");
+            AssertEqual(sheetTypeId, prancha.SheetTypeId, "SheetTypeId nao deveria mudar.");
+        }
+
+        private static void ProjectBrowserListaTiposPrancha()
+        {
+            var document = new AraciDocument();
+            ProjectSheetType tipo = document.CriarNovoTipoPrancha();
+            var browser = new ProjectBrowserViewModel(document);
+
+            ProjectBrowserSectionViewModel secao = browser.Secoes.Single(s => s.Titulo == "Tipos de Prancha");
+
+            Assert(secao.Itens.Any(i => i.Id == document.TipoPranchaPadrao.Id), "Browser deveria listar tipo padrao.");
+            Assert(secao.Itens.Any(i => i.Id == tipo.Id), "Browser deveria listar tipo criado.");
+        }
+
+        private static void ProjectBrowserSelecionaTipoSemAbrirItemVisual()
+        {
+            var document = new AraciDocument();
+            bool abriuVista = false;
+            bool abriuTabela = false;
+            bool abriuPrancha = false;
+            bool abriuTipo = false;
+            var browser = new ProjectBrowserViewModel(
+                document,
+                _ => abriuVista = true,
+                abrirTabela: _ => abriuTabela = true,
+                abrirPrancha: _ => abriuPrancha = true,
+                abrirPropriedadesTipoPrancha: _ => abriuTipo = true);
+            ProjectBrowserItemViewModel item = browser.Secoes.Single(s => s.Titulo == "Tipos de Prancha").Itens.First();
+
+            item.SelecionarCommand.Execute(null);
+
+            Assert(!abriuVista, "Selecionar tipo nao deveria abrir vista.");
+            Assert(!abriuTabela, "Selecionar tipo nao deveria abrir tabela.");
+            Assert(!abriuPrancha, "Selecionar tipo nao deveria abrir prancha.");
+            Assert(abriuTipo, "Selecionar tipo deveria abrir propriedades do tipo.");
+            Assert(item.IsSelected, "Tipo selecionado deveria ficar marcado.");
+        }
+
+        private static void SelecaoTipoExibeProjectSheetTypePropertiesViewModel()
+        {
+            var context = new EditorContext();
+            ProjectSheetType tipo = context.Document.TipoPranchaPadrao;
+            object? selecionado = null;
+            var browser = new ProjectBrowserViewModel(
+                context.Document,
+                context.DefinirVistaAtiva,
+                context.RenomearItemProjeto,
+                context.ExcluirItemProjeto,
+                context.DuplicarItemProjeto,
+                abrirPropriedadesTipoPrancha: id =>
+                {
+                    ProjectSheetType? atual = context.Document.TiposPrancha.FirstOrDefault(t => t.Id == id);
+                    selecionado = atual == null
+                        ? null
+                        : new ProjectSheetTypePropertiesViewModel(context.Document, atual, context.RenomearItemProjeto, context.EditarPropriedadesTipoPrancha);
+                });
+
+            ProjectBrowserItemViewModel item = browser.Secoes.Single(s => s.Titulo == "Tipos de Prancha").Itens.Single(i => i.Id == tipo.Id);
+            item.SelecionarCommand.Execute(null);
+
+            Assert(selecionado is ProjectSheetTypePropertiesViewModel, "Selecao de tipo deveria criar ProjectSheetTypePropertiesViewModel.");
+        }
+
+        private static void PropriedadesTipoPranchaEditaveisUndoRedo()
+        {
+            var document = new AraciDocument();
+            var commands = new Araci.Core.Commands.CommandManager();
+            var renomear = new RenomearItemProjetoUseCase(document, commands);
+            var editar = new EditarPropriedadesTipoPranchaUseCase(document, commands);
+            ProjectSheetType tipo = document.TipoPranchaPadrao;
+            var viewModel = new ProjectSheetTypePropertiesViewModel(document, tipo, renomear, editar);
+
+            viewModel.Nome = "Tipo revisado";
+            viewModel.FormatoFolha = ProjectSheetFormat.A3;
+            viewModel.LarguraFolha = 640;
+
+            AssertEqual("Tipo revisado", tipo.Nome, "Tipo Nome editado");
+            AssertEqual(ProjectSheetFormat.Personalizado, tipo.FormatoFolha, "Tipo Formato apos largura manual");
+            AssertEqual(640, tipo.LarguraFolha, "Tipo Largura editada");
+
+            commands.Undo();
+            AssertEqual(561, tipo.LarguraFolha, "Undo largura volta ao A3");
+
+            commands.Undo();
+            AssertEqual(ProjectSheetFormat.A1, tipo.FormatoFolha, "Undo formato volta ao A1");
+
+            commands.Undo();
+            AssertEqual(ProjectSheetType.DefaultName, tipo.Nome, "Undo nome tipo");
+
+            commands.Redo();
+            AssertEqual("Tipo revisado", tipo.Nome, "Redo nome tipo");
+        }
+
+        private static void PersistenciaSalvaReabreTiposCriadosEditados()
+        {
+            var serializer = CriarProjectSerializerTeste();
+            var document = new AraciDocument();
+            ProjectSheetType tipo = document.CriarNovoTipoPrancha();
+            tipo.Nome = "Template executivo";
+            tipo.FormatoFolha = ProjectSheetFormat.A2;
+            tipo.OrientacaoFolha = ProjectSheetOrientation.Retrato;
+            tipo.LarguraFolha = 561;
+            tipo.AlturaFolha = 794;
+            EditorContext context = new();
+
+            ProjectFileDto dto = serializer.CreateFileDto(document, ProjectMetadataDto.CreateNew("G21 tipos"), context.Settings.Units);
+            ProjectFileDto reloadedDto = serializer.Deserialize(serializer.Serialize(dto));
+            ProjectSheetType reloaded = serializer.CreateProjectSheetTypes(reloadedDto).Single(t => t.Id == tipo.Id);
+
+            AssertEqual("Template executivo", reloaded.Nome, "Reload tipo Nome");
+            AssertEqual(ProjectSheetFormat.A2, reloaded.FormatoFolha, "Reload tipo FormatoFolha");
+            AssertEqual(ProjectSheetOrientation.Retrato, reloaded.OrientacaoFolha, "Reload tipo OrientacaoFolha");
+            AssertEqual(561, reloaded.LarguraFolha, "Reload tipo LarguraFolha");
+            AssertEqual(794, reloaded.AlturaFolha, "Reload tipo AlturaFolha");
+        }
+
+        private static void OperacoesTipoPranchaNaoAlteramTabelasOuPranchas()
+        {
+            var document = new AraciDocument();
+            ProjectTable tabela = document.CriarNovaTabela();
+            ProjectSheet prancha = document.CriarNovaPrancha();
+            Guid pranchaId = prancha.Id;
+            Guid? sheetTypeId = prancha.SheetTypeId;
+            var commands = new Araci.Core.Commands.CommandManager();
+            var criar = new CriarItemProjetoUseCase(document, commands);
+            var duplicar = new DuplicarItemProjetoUseCase(document, commands);
+            var renomear = new RenomearItemProjetoUseCase(document, commands);
+            var editar = new EditarPropriedadesTipoPranchaUseCase(document, commands);
+
+            ProjectSheetType tipo = criar.CriarTipoPrancha();
+            duplicar.DuplicarTipoPrancha(tipo.Id);
+            renomear.RenomearTipoPrancha(tipo.Id, "Administrativo");
+            editar.AlterarAltura(tipo.Id, 600);
+
+            AssertEqual(1, document.Tabelas.Count, "Tabelas.Count apos operacoes de tipo");
+            AssertEqual(tabela.Id, document.Tabelas[0].Id, "Tabela preservada");
+            AssertEqual(1, document.Pranchas.Count, "Pranchas.Count apos operacoes de tipo");
+            AssertEqual(pranchaId, document.Pranchas[0].Id, "Prancha preservada");
+            AssertEqual(sheetTypeId, document.Pranchas[0].SheetTypeId, "SheetTypeId da prancha preservado");
         }
 
         private static void PranchaDuplicaInstanciasTabelaComCopiaProfunda()

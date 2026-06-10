@@ -32,6 +32,7 @@ namespace Araci.Core.Documents
         public event System.Action<ProjectView>? PropriedadesVistaAlteradas;
         public event System.Action<ProjectTable>? PropriedadesTabelaAlteradas;
         public event System.Action<ProjectSheet>? PropriedadesPranchaAlteradas;
+        public event System.Action<ProjectSheetType>? PropriedadesTipoPranchaAlteradas;
 
         public IEnumerable<Elemento> ObterElementosDaVistaAtiva()
         {
@@ -81,6 +82,13 @@ namespace Araci.Core.Documents
             return prancha;
         }
 
+        public ProjectSheetType CriarNovoTipoPrancha()
+        {
+            ProjectSheetType tipo = CriarModeloNovoTipoPrancha();
+            AdicionarTipoPrancha(tipo);
+            return tipo;
+        }
+
         public ProjectView CriarModeloNovaVista()
         {
             return new ProjectView { Nome = CriarNomeUnico("Vista", Vistas.Select(v => v.Nome)) };
@@ -101,6 +109,14 @@ namespace Araci.Core.Documents
                 Nome = $"Prancha {indice}",
                 Numero = $"A{indice:000}",
                 SheetTypeId = tipoPadrao.Id
+            };
+        }
+
+        public ProjectSheetType CriarModeloNovoTipoPrancha()
+        {
+            return new ProjectSheetType
+            {
+                Nome = CriarNomeUnicoIgnoreCase("Tipo de prancha", TiposPrancha.Select(t => t.Nome))
             };
         }
 
@@ -176,6 +192,18 @@ namespace Araci.Core.Documents
                     .Where(i => i != null)
                     .Select(i => i.CriarCopia(gerarNovoId: true))
                     .ToList() ?? new List<ProjectSheetTableInstance>()
+            };
+        }
+
+        public ProjectSheetType CriarDuplicataTipoPrancha(ProjectSheetType origem)
+        {
+            return new ProjectSheetType
+            {
+                Nome = CriarNomeUnicoIgnoreCase(origem?.Nome ?? "Tipo de prancha", TiposPrancha.Select(t => t.Nome)),
+                FormatoFolha = origem?.FormatoFolha ?? ProjectSheetFormat.A1,
+                OrientacaoFolha = origem?.OrientacaoFolha ?? ProjectSheetOrientation.Paisagem,
+                LarguraFolha = origem?.LarguraFolha ?? ProjectSheet.DefaultWidth,
+                AlturaFolha = origem?.AlturaFolha ?? ProjectSheet.DefaultHeight
             };
         }
 
@@ -262,6 +290,40 @@ namespace Araci.Core.Documents
             Pranchas.Insert(indiceSeguro, prancha);
         }
 
+        public void AdicionarTipoPrancha(ProjectSheetType tipo)
+        {
+            if (tipo == null || TiposPrancha.Any(t => t.Id == tipo.Id))
+                return;
+
+            if (tipo.Id == Guid.Empty)
+                tipo.Id = Guid.NewGuid();
+
+            TiposPrancha.Add(tipo);
+        }
+
+        public void RemoverTipoPrancha(ProjectSheetType tipo)
+        {
+            if (tipo == null || !TiposPrancha.Contains(tipo))
+                return;
+
+            if (TiposPrancha.Count <= 1 || TipoPranchaEstaEmUso(tipo.Id))
+                return;
+
+            TiposPrancha.Remove(tipo);
+        }
+
+        public void RestaurarTipoPrancha(ProjectSheetType tipo, int indice)
+        {
+            if (tipo == null || TiposPrancha.Any(t => t.Id == tipo.Id))
+                return;
+
+            if (tipo.Id == Guid.Empty)
+                tipo.Id = Guid.NewGuid();
+
+            int indiceSeguro = indice < 0 || indice > TiposPrancha.Count ? TiposPrancha.Count : indice;
+            TiposPrancha.Insert(indiceSeguro, tipo);
+        }
+
         public void RenomearVista(ProjectView vista, string nome)
         {
             if (vista == null || !Vistas.Contains(vista))
@@ -312,6 +374,30 @@ namespace Araci.Core.Documents
 
             PropriedadesPranchaAlteradas?.Invoke(prancha);
             ItemProjetoRenomeado?.Invoke();
+        }
+
+        public void RenomearTipoPrancha(ProjectSheetType tipo, string nome)
+        {
+            if (tipo == null || !TiposPrancha.Contains(tipo))
+                return;
+
+            tipo.Nome = nome;
+            ItemProjetoRenomeado?.Invoke();
+            PropriedadesTipoPranchaAlteradas?.Invoke(tipo);
+        }
+
+        public void AtualizarPropriedadesTipoPrancha(ProjectSheetType tipo)
+        {
+            if (tipo == null || !TiposPrancha.Contains(tipo))
+                return;
+
+            PropriedadesTipoPranchaAlteradas?.Invoke(tipo);
+            ItemProjetoRenomeado?.Invoke();
+        }
+
+        public bool TipoPranchaEstaEmUso(Guid tipoId)
+        {
+            return tipoId != Guid.Empty && Pranchas.Any(p => p.SheetTypeId == tipoId);
         }
 
         public void SubstituirVistas(IEnumerable<ProjectView> vistas)
@@ -486,6 +572,21 @@ namespace Araci.Core.Documents
         private static string CriarNomeUnico(string prefixo, IEnumerable<string> nomesExistentes)
         {
             return $"{prefixo} {CriarIndiceUnico(prefixo, nomesExistentes)}";
+        }
+
+        private static string CriarNomeUnicoIgnoreCase(string prefixo, IEnumerable<string> nomesExistentes)
+        {
+            var existentes = nomesExistentes.ToHashSet(StringComparer.OrdinalIgnoreCase);
+
+            if (!existentes.Contains(prefixo))
+                return prefixo;
+
+            int indice = 2;
+
+            while (existentes.Contains($"{prefixo} {indice}"))
+                indice++;
+
+            return $"{prefixo} {indice}";
         }
 
         private static int CriarIndiceUnico(string prefixo, IEnumerable<string> nomesExistentes)

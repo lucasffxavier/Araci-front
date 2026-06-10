@@ -74,6 +74,25 @@ namespace Araci.Applications.UseCases.Projeto
             return true;
         }
 
+        public bool RenomearTipoPrancha(Guid id, string nome)
+        {
+            string normalizado = NormalizarNome(nome);
+
+            if (string.IsNullOrWhiteSpace(normalizado))
+                return false;
+
+            ProjectSheetType? tipo = _document.TiposPrancha.FirstOrDefault(t => t.Id == id);
+
+            if (tipo == null || NomeIgual(tipo.Nome, normalizado))
+                return tipo != null;
+
+            if (_document.TiposPrancha.Any(t => t.Id != id && NomeIgual(t.Nome, normalizado)))
+                return false;
+
+            _commands.Execute(RenameProjectItemCommand.TipoPrancha(_document, tipo, normalizado));
+            return true;
+        }
+
         private static string NormalizarNome(string nome)
         {
             return string.IsNullOrWhiteSpace(nome) ? string.Empty : nome.Trim();

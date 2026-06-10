@@ -44,6 +44,16 @@ namespace Araci.Core.Commands
                 () => document.RemoverPrancha(duplicata));
         }
 
+        public static DuplicateProjectItemCommand TipoPrancha(AraciDocument document, ProjectSheetType duplicata, int indice)
+        {
+            ArgumentNullException.ThrowIfNull(document);
+            ArgumentNullException.ThrowIfNull(duplicata);
+
+            return new DuplicateProjectItemCommand(
+                () => document.RestaurarTipoPrancha(duplicata, indice),
+                () => document.RemoverTipoPrancha(duplicata));
+        }
+
         public void Execute()
         {
             _adicionar();

@@ -87,6 +87,18 @@ namespace Araci.Core.Commands
                 () => document.RestaurarPrancha(prancha, indice));
         }
 
+        public static DeleteProjectItemCommand TipoPrancha(AraciDocument document, ProjectSheetType tipo)
+        {
+            ArgumentNullException.ThrowIfNull(document);
+            ArgumentNullException.ThrowIfNull(tipo);
+
+            int indice = document.TiposPrancha.IndexOf(tipo);
+
+            return new DeleteProjectItemCommand(
+                () => document.RemoverTipoPrancha(tipo),
+                () => document.RestaurarTipoPrancha(tipo, indice));
+        }
+
         public void Execute()
         {
             _remover();

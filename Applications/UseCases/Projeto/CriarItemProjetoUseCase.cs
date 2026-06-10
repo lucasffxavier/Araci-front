@@ -36,5 +36,12 @@ namespace Araci.Applications.UseCases.Projeto
             _commands.Execute(AddProjectItemCommand.Prancha(_document, prancha));
             return prancha;
         }
+
+        public ProjectSheetType CriarTipoPrancha()
+        {
+            ProjectSheetType tipo = _document.CriarModeloNovoTipoPrancha();
+            _commands.Execute(AddProjectItemCommand.TipoPrancha(_document, tipo));
+            return tipo;
+        }
     }
 }

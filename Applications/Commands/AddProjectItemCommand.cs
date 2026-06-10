@@ -44,6 +44,16 @@ namespace Araci.Core.Commands
                 () => document.RemoverPrancha(prancha));
         }
 
+        public static AddProjectItemCommand TipoPrancha(AraciDocument document, ProjectSheetType tipo)
+        {
+            ArgumentNullException.ThrowIfNull(document);
+            ArgumentNullException.ThrowIfNull(tipo);
+
+            return new AddProjectItemCommand(
+                () => document.AdicionarTipoPrancha(tipo),
+                () => document.RemoverTipoPrancha(tipo));
+        }
+
         public void Execute()
         {
             _adicionar();

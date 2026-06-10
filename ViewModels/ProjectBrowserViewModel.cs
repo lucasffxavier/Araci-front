@@ -16,6 +16,7 @@ namespace Araci.ViewModels
     {
         private readonly AraciDocument _document;
         private readonly Action<Guid> _definirVistaAtiva;
+        private readonly CriarItemProjetoUseCase? _criarItemProjeto;
         private readonly RenomearItemProjetoUseCase? _renomearItemProjeto;
         private readonly ExcluirItemProjetoUseCase? _excluirItemProjeto;
         private readonly DuplicarItemProjetoUseCase? _duplicarItemProjeto;
@@ -24,6 +25,7 @@ namespace Araci.ViewModels
         private readonly Action<Guid>? _abrirPropriedadesVista;
         private readonly Action<Guid>? _abrirPropriedadesTabela;
         private readonly Action<Guid>? _abrirPropriedadesPrancha;
+        private readonly Action<Guid>? _abrirPropriedadesTipoPrancha;
         private Guid? _selectedItemId;
         private string? _selectedItemKind;
 
@@ -37,10 +39,13 @@ namespace Araci.ViewModels
             Action<Guid>? abrirPrancha = null,
             Action<Guid>? abrirPropriedadesVista = null,
             Action<Guid>? abrirPropriedadesTabela = null,
-            Action<Guid>? abrirPropriedadesPrancha = null)
+            Action<Guid>? abrirPropriedadesPrancha = null,
+            CriarItemProjetoUseCase? criarItemProjeto = null,
+            Action<Guid>? abrirPropriedadesTipoPrancha = null)
         {
             _document = document;
             _definirVistaAtiva = definirVistaAtiva ?? _document.DefinirVistaAtiva;
+            _criarItemProjeto = criarItemProjeto;
             _renomearItemProjeto = renomearItemProjeto;
             _excluirItemProjeto = excluirItemProjeto;
             _duplicarItemProjeto = duplicarItemProjeto;
@@ -49,11 +54,13 @@ namespace Araci.ViewModels
             _abrirPropriedadesVista = abrirPropriedadesVista;
             _abrirPropriedadesTabela = abrirPropriedadesTabela;
             _abrirPropriedadesPrancha = abrirPropriedadesPrancha;
+            _abrirPropriedadesTipoPrancha = abrirPropriedadesTipoPrancha;
             Secoes = new ObservableCollection<ProjectBrowserSectionViewModel>
             {
                 new("Vistas"),
                 new("Tabelas"),
-                new("Pranchas")
+                new("Pranchas"),
+                new("Tipos de Prancha", CriarTipoPrancha, _criarItemProjeto != null)
             };
 
             AtualizarSecoes();
@@ -61,6 +68,7 @@ namespace Araci.ViewModels
             _document.Vistas.CollectionChanged += OnDocumentCollectionChanged;
             _document.Tabelas.CollectionChanged += OnDocumentCollectionChanged;
             _document.Pranchas.CollectionChanged += OnDocumentCollectionChanged;
+            _document.TiposPrancha.CollectionChanged += OnDocumentCollectionChanged;
             _document.VistaAtivaAlterada += OnVistaAtivaAlterada;
             _document.ItemProjetoRenomeado += OnItemProjetoRenomeado;
             ExcluirSelecionadoCommand = new RelayCommand(ExecutarExcluirSelecionado);
@@ -93,6 +101,7 @@ namespace Araci.ViewModels
             AtualizarItens(Secoes[0], _document.Vistas.Select(v => CriarItem(v.Id, "Vista", v.Nome)));
             AtualizarItens(Secoes[1], CriarItensTabela());
             AtualizarItens(Secoes[2], CriarItensPrancha());
+            AtualizarItens(Secoes[3], CriarItensTipoPrancha());
         }
 
         private IEnumerable<ProjectBrowserItemViewModel> CriarItensTabela()
@@ -117,6 +126,12 @@ namespace Araci.ViewModels
 
             foreach (ProjectSheet prancha in _document.Pranchas)
                 yield return CriarItem(prancha.Id, "Prancha", FormatarPrancha(prancha), prancha.Nome);
+        }
+
+        private IEnumerable<ProjectBrowserItemViewModel> CriarItensTipoPrancha()
+        {
+            foreach (ProjectSheetType tipo in _document.TiposPrancha)
+                yield return CriarItem(tipo.Id, "TipoPrancha", tipo.Nome);
         }
 
         private ProjectBrowserItemViewModel CriarItem(Guid id, string tipo, string nome, string? nomeEdicao = null)
@@ -163,6 +178,10 @@ namespace Araci.ViewModels
                 _abrirPrancha?.Invoke(item.Id);
                 _abrirPropriedadesPrancha?.Invoke(item.Id);
             }
+            else if (item.Tipo == "TipoPrancha")
+            {
+                _abrirPropriedadesTipoPrancha?.Invoke(item.Id);
+            }
 
             foreach (ProjectBrowserSectionViewModel secao in Secoes)
             {
@@ -198,6 +217,9 @@ namespace Araci.ViewModels
                 case "Prancha":
                     return _renomearItemProjeto.RenomearPrancha(item.Id, novoNome);
 
+                case "TipoPrancha":
+                    return _renomearItemProjeto.RenomearTipoPrancha(item.Id, novoNome);
+
                 default:
                     return false;
             }
@@ -213,6 +235,7 @@ namespace Araci.ViewModels
                 "Vista" => _excluirItemProjeto.ExcluirVista(item.Id),
                 "Tabela" => _excluirItemProjeto.ExcluirTabela(item.Id),
                 "Prancha" => _excluirItemProjeto.ExcluirPrancha(item.Id),
+                "TipoPrancha" => _excluirItemProjeto.ExcluirTipoPrancha(item.Id),
                 _ => false
             };
         }
@@ -227,6 +250,7 @@ namespace Araci.ViewModels
                 "Vista" => _duplicarItemProjeto.DuplicarVista(item.Id),
                 "Tabela" => _duplicarItemProjeto.DuplicarTabela(item.Id),
                 "Prancha" => _duplicarItemProjeto.DuplicarPrancha(item.Id),
+                "TipoPrancha" => _duplicarItemProjeto.DuplicarTipoPrancha(item.Id),
                 _ => false
             };
         }
@@ -237,6 +261,23 @@ namespace Araci.ViewModels
                 _abrirPropriedadesVista?.Invoke(item.Id);
             else if (item.Tipo == "Tabela")
                 _abrirPropriedadesTabela?.Invoke(item.Id);
+            else if (item.Tipo == "Prancha")
+                _abrirPropriedadesPrancha?.Invoke(item.Id);
+            else if (item.Tipo == "TipoPrancha")
+                _abrirPropriedadesTipoPrancha?.Invoke(item.Id);
+        }
+
+        private void CriarTipoPrancha()
+        {
+            ProjectSheetType? tipo = _criarItemProjeto?.CriarTipoPrancha();
+
+            if (tipo == null)
+                return;
+
+            _selectedItemId = tipo.Id;
+            _selectedItemKind = "TipoPrancha";
+            AtualizarSecoes();
+            _abrirPropriedadesTipoPrancha?.Invoke(tipo.Id);
         }
 
         public bool ExcluirSelecionado()
@@ -266,14 +307,27 @@ namespace Araci.ViewModels
 
     public sealed class ProjectBrowserSectionViewModel
     {
+        private readonly Action? _criar;
+        private readonly bool _podeCriar;
+        private RelayCommand? _criarCommand;
+
         public ProjectBrowserSectionViewModel(string titulo)
+            : this(titulo, null, false)
+        {
+        }
+
+        public ProjectBrowserSectionViewModel(string titulo, Action? criar, bool podeCriar)
         {
             Titulo = titulo;
+            _criar = criar;
+            _podeCriar = podeCriar;
             Itens = new ObservableCollection<ProjectBrowserItemViewModel>();
         }
 
         public string Titulo { get; }
         public ObservableCollection<ProjectBrowserItemViewModel> Itens { get; }
+        public bool PodeCriar => _podeCriar;
+        public ICommand CriarCommand => _criarCommand ??= new RelayCommand(() => _criar?.Invoke(), () => PodeCriar);
     }
 
     public sealed class ProjectBrowserItemViewModel : INotifyPropertyChanged
@@ -319,7 +373,7 @@ namespace Araci.ViewModels
             CancelarEdicaoCommand = new RelayCommand(CancelarEdicao);
             ExcluirCommand = new RelayCommand(Excluir, () => IsSelectable && _excluir != null);
             DuplicarCommand = new RelayCommand(Duplicar, () => IsSelectable && _duplicar != null);
-            PropriedadesCommand = new RelayCommand(AbrirPropriedades, () => IsSelectable && (Tipo == "Vista" || Tipo == "Tabela") && _abrirPropriedades != null);
+            PropriedadesCommand = new RelayCommand(AbrirPropriedades, () => IsSelectable && _abrirPropriedades != null);
         }
 
         public Guid Id { get; }
