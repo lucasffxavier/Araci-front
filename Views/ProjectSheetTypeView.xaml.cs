@@ -3,6 +3,7 @@ using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
 using System.Windows.Threading;
+using Araci.Core.Documents;
 using Araci.Applications.Editar.Base;
 using Araci.Services;
 using Araci.ViewModels;
@@ -313,6 +314,7 @@ namespace Araci.Views
             if (alterou)
                 viewModel.SelectLine(lineId);
 
+            AtualizarPainelPropriedadesLinhaSelecionada();
             AtualizarHandlesOverlay();
             return true;
         }
@@ -359,17 +361,22 @@ namespace Araci.Views
             if (!selecionou)
             {
                 LimparEstadoArrasteLinhaTemplate();
+                AtualizarPainelPropriedadesLinhaSelecionada();
                 AtualizarHandlesOverlay();
                 return true;
             }
 
             if (!viewModel.TryGetSelectedLineId(out Guid lineId))
+            {
+                AtualizarPainelPropriedadesLinhaSelecionada();
                 return true;
+            }
 
             _linhaTemplateEmArrasteId = lineId;
             _linhaTemplateDragStart = position;
             _linhaTemplateArrastando = false;
             TemplatePageBorder.CaptureMouse();
+            AtualizarPainelPropriedadesLinhaSelecionada();
             AtualizarHandlesOverlay();
             return true;
         }
@@ -456,6 +463,7 @@ namespace Araci.Views
             if (excluiu)
                 viewModel.ClearLineSelection();
 
+            AtualizarPainelPropriedadesLinhaSelecionada();
             AtualizarHandlesOverlay();
             return excluiu;
         }
@@ -489,6 +497,34 @@ namespace Araci.Views
         private void AtualizarHandlesOverlay()
         {
             ObterViewModelAtivo();
+        }
+
+        private void AtualizarPainelPropriedadesLinhaSelecionada()
+        {
+            if (_context == null)
+                return;
+
+            ProjectSheetTypeViewModel? viewModel = ObterViewModelAtivo();
+
+            if (viewModel == null)
+                return;
+
+            if (viewModel.TryGetSelectedLineId(out Guid lineId) &&
+                viewModel.TryGetLine(lineId, out ProjectSheetTemplateLine? linha) &&
+                linha != null)
+            {
+                _context.Editor.ElementoSelecionado = new ProjectSheetTemplateLinePropertiesViewModel(
+                    viewModel.Tipo,
+                    linha,
+                    _context.MoverLinhaDoTipoPrancha);
+                return;
+            }
+
+            _context.Editor.ElementoSelecionado = new ProjectSheetTypePropertiesViewModel(
+                _context.Document,
+                viewModel.Tipo,
+                _context.RenomearItemProjeto,
+                _context.EditarPropriedadesTipoPrancha);
         }
 
         private void CenterSheetInViewportDeferred()

@@ -144,6 +144,12 @@ namespace Araci.ViewModels
             return false;
         }
 
+        public bool TryGetLine(Guid lineId, out ProjectSheetTemplateLine? linha)
+        {
+            linha = _tipo.Linhas.FirstOrDefault(l => l.Id == lineId);
+            return linha != null;
+        }
+
         public bool TryGetLineCoordinates(Guid lineId, out double x1, out double y1, out double x2, out double y2)
         {
             ProjectSheetTemplateLineViewModel? line = Lines.FirstOrDefault(l => l.Id == lineId);
