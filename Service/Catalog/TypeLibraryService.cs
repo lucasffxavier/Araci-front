@@ -68,10 +68,10 @@ namespace Araci.Services.Catalog
 
         private void InicializarLinhasAnotativas()
         {
-            TiposLinhasAnotativas.Add(CriarTipoLinha("Linha contínua", "Contínuo", "#FF000000", 1.0));
-            TiposLinhasAnotativas.Add(CriarTipoLinha("Linha tracejada", "Tracejado", "#FF000000", 1.0));
-            TiposLinhasAnotativas.Add(CriarTipoLinha("Linha traço ponto", "Traço ponto", "#FF000000", 1.0));
-            TiposLinhasAnotativas.Add(CriarTipoLinha("Linha traço dois pontos", "Traço dois pontos", "#FF000000", 1.0));
+            TiposLinhasAnotativas.Add(CriarTipoLinha("Linha contínua", "Contínuo"));
+            TiposLinhasAnotativas.Add(CriarTipoLinha("Linha tracejada", "Tracejado"));
+            TiposLinhasAnotativas.Add(CriarTipoLinha("Linha traço ponto", "Traço ponto"));
+            TiposLinhasAnotativas.Add(CriarTipoLinha("Linha traço dois pontos", "Traço dois pontos"));
         }
 
         private void InicializarTextosAnotativos()
@@ -81,16 +81,14 @@ namespace Araci.Services.Catalog
             TiposTextosAnotativos.Add(CriarTipoTexto("Texto título", "#FF000000", "Arial", 20, "Centro"));
         }
 
-        private static TipoLinhaAnotativa CriarTipoLinha(string nome, string estilo, string cor, double espessura)
+        private static TipoLinhaAnotativa CriarTipoLinha(string nome, string estilo)
         {
             return new TipoLinhaAnotativa
             {
                 NomeTipo = nome,
                 Familia = "Anotações",
                 Categoria = "Linhas",
-                EstiloLinha = estilo,
-                CorLinha = cor,
-                EspessuraLinha = espessura
+                EstiloLinha = estilo
             };
         }
 

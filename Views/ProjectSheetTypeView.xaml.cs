@@ -517,7 +517,8 @@ namespace Araci.Views
                     viewModel.Tipo,
                     linha,
                     _context.MoverLinhaDoTipoPrancha,
-                    _context.Types);
+                    _context.Types,
+                    _context.TypePropertiesDialogs);
                 return;
             }
 

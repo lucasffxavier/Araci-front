@@ -7,8 +7,6 @@ namespace Araci.Models.Tipos
     public class TipoLinhaAnotativa : TipoElemento, INotifyPropertyChanged
     {
         public const string PARAM_ESTILO_LINHA = "EstiloLinha";
-        public const string PARAM_COR_LINHA = "CorLinha";
-        public const string PARAM_ESPESSURA_LINHA = "EspessuraLinha";
 
         public TipoLinhaAnotativa()
         {
@@ -17,8 +15,6 @@ namespace Araci.Models.Tipos
             Categoria = "Linhas";
 
             DefinirParametro(new Parameter<string>(PARAM_ESTILO_LINHA, "Contínuo"));
-            DefinirParametro(new Parameter<string>(PARAM_COR_LINHA, "#FF000000"));
-            DefinirParametro(new Parameter<double>(PARAM_ESPESSURA_LINHA, 1.0));
         }
 
         public string EstiloLinha
@@ -32,36 +28,6 @@ namespace Araci.Models.Tipos
                     return;
 
                 Definir(PARAM_ESTILO_LINHA, normalizado);
-                OnPropertyChanged();
-            }
-        }
-
-        public string CorLinha
-        {
-            get => Obter<string>(PARAM_COR_LINHA);
-            set
-            {
-                string normalizada = NormalizarCor(value);
-
-                if (string.Equals(Obter<string>(PARAM_COR_LINHA), normalizada, StringComparison.OrdinalIgnoreCase))
-                    return;
-
-                Definir(PARAM_COR_LINHA, normalizada);
-                OnPropertyChanged();
-            }
-        }
-
-        public double EspessuraLinha
-        {
-            get => Obter<double>(PARAM_ESPESSURA_LINHA);
-            set
-            {
-                double normalizada = NormalizarEspessura(value);
-
-                if (Math.Abs(Obter<double>(PARAM_ESPESSURA_LINHA) - normalizada) < 0.000001)
-                    return;
-
-                Definir(PARAM_ESPESSURA_LINHA, normalizada);
                 OnPropertyChanged();
             }
         }

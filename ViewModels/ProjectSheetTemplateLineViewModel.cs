@@ -54,8 +54,8 @@ namespace Araci.ViewModels
         public double ModelX2 => _linha.X2;
         public double ModelY2 => _linha.Y2;
         public TipoLinhaAnotativa? TipoLinha => _tipoLinha;
-        public string CorLinha => TipoLinha?.CorLinha ?? _linha.Stroke;
-        public double StrokeThickness => TipoLinha?.EspessuraLinha ?? _linha.StrokeThickness;
+        public string CorLinha => _linha.Stroke;
+        public double StrokeThickness => _linha.StrokeThickness;
         public string EstiloLinha => TipoLinha?.EstiloLinha ?? "Contínuo";
         public Brush StrokeBrush => CriarBrush(CorLinha);
         public DoubleCollection? StrokeDashArray => CriarStrokeDashArray(EstiloLinha);
@@ -199,8 +199,6 @@ namespace Araci.ViewModels
         private void OnTipoLinhaPropertyChanged(object? sender, PropertyChangedEventArgs e)
         {
             if (string.IsNullOrEmpty(e.PropertyName) ||
-                e.PropertyName == nameof(TipoLinhaAnotativa.CorLinha) ||
-                e.PropertyName == nameof(TipoLinhaAnotativa.EspessuraLinha) ||
                 e.PropertyName == nameof(TipoLinhaAnotativa.EstiloLinha))
             {
                 NotificarEstilo();

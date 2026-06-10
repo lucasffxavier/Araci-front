@@ -146,19 +146,10 @@ namespace Araci.ViewModels
 
         public string CorLinha
         {
-            get => TipoLinha?.CorLinha ?? Linha.CorLinha;
+            get => Linha.CorLinha;
             set
             {
                 string normalizada = TipoLinhaAnotativa.NormalizarCor(value);
-
-                if (TipoLinha != null)
-                {
-                    if (string.Equals(TipoLinha.CorLinha, normalizada, StringComparison.OrdinalIgnoreCase))
-                        return;
-
-                    TipoLinha.CorLinha = normalizada;
-                    return;
-                }
 
                 if (Linha.CorLinha == normalizada)
                     return;
@@ -172,19 +163,10 @@ namespace Araci.ViewModels
 
         public double EspessuraLinha
         {
-            get => TipoLinha?.EspessuraLinha ?? Linha.EspessuraLinha;
+            get => Linha.EspessuraLinha;
             set
             {
                 double normalizada = TipoLinhaAnotativa.NormalizarEspessura(value);
-
-                if (TipoLinha != null)
-                {
-                    if (Math.Abs(TipoLinha.EspessuraLinha - normalizada) < 0.0001)
-                        return;
-
-                    TipoLinha.EspessuraLinha = normalizada;
-                    return;
-                }
 
                 if (Math.Abs(Linha.EspessuraLinha - normalizada) < 0.0001)
                     return;
@@ -288,8 +270,6 @@ namespace Araci.ViewModels
         private void OnTipoLinhaPropertyChanged(object? sender, PropertyChangedEventArgs e)
         {
             if (string.IsNullOrEmpty(e.PropertyName) ||
-                e.PropertyName == nameof(TipoLinhaAnotativa.CorLinha) ||
-                e.PropertyName == nameof(TipoLinhaAnotativa.EspessuraLinha) ||
                 e.PropertyName == nameof(TipoLinhaAnotativa.EstiloLinha))
             {
                 NotificarEstiloTipoLinha();
@@ -298,8 +278,6 @@ namespace Araci.ViewModels
 
         private void NotificarEstiloTipoLinha()
         {
-            OnPropertyChanged(nameof(CorLinha));
-            OnPropertyChanged(nameof(EspessuraLinha));
             OnPropertyChanged(nameof(EstiloLinha));
             OnPropertyChanged(nameof(StrokeDashArray));
             OnPropertyChanged(nameof(RenderData));

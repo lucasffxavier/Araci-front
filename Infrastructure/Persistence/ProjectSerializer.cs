@@ -294,10 +294,10 @@ namespace Araci.Infrastructure.Persistence
 
         private static IEnumerable<LineAnnotationTypeDto> CreateDefaultLineAnnotationTypeDtos()
         {
-            yield return new LineAnnotationTypeDto { NomeTipo = "Linha contínua", Familia = "Anotações", Categoria = "Linhas", EstiloLinha = "Contínuo", CorLinha = "#FF000000", EspessuraLinha = 1.0 };
-            yield return new LineAnnotationTypeDto { NomeTipo = "Linha tracejada", Familia = "Anotações", Categoria = "Linhas", EstiloLinha = "Tracejado", CorLinha = "#FF000000", EspessuraLinha = 1.0 };
-            yield return new LineAnnotationTypeDto { NomeTipo = "Linha traço ponto", Familia = "Anotações", Categoria = "Linhas", EstiloLinha = "Traço ponto", CorLinha = "#FF000000", EspessuraLinha = 1.0 };
-            yield return new LineAnnotationTypeDto { NomeTipo = "Linha traço dois pontos", Familia = "Anotações", Categoria = "Linhas", EstiloLinha = "Traço dois pontos", CorLinha = "#FF000000", EspessuraLinha = 1.0 };
+            yield return new LineAnnotationTypeDto { NomeTipo = "Linha contínua", Familia = "Anotações", Categoria = "Linhas", EstiloLinha = "Contínuo" };
+            yield return new LineAnnotationTypeDto { NomeTipo = "Linha tracejada", Familia = "Anotações", Categoria = "Linhas", EstiloLinha = "Tracejado" };
+            yield return new LineAnnotationTypeDto { NomeTipo = "Linha traço ponto", Familia = "Anotações", Categoria = "Linhas", EstiloLinha = "Traço ponto" };
+            yield return new LineAnnotationTypeDto { NomeTipo = "Linha traço dois pontos", Familia = "Anotações", Categoria = "Linhas", EstiloLinha = "Traço dois pontos" };
         }
 
         private static LineAnnotationTypeDto CriarLineAnnotationTypeDto(TipoLinhaAnotativa tipo)
@@ -307,9 +307,7 @@ namespace Araci.Infrastructure.Persistence
                 NomeTipo = tipo.NomeTipo,
                 Familia = tipo.Familia,
                 Categoria = tipo.Categoria,
-                EstiloLinha = tipo.EstiloLinha,
-                CorLinha = tipo.CorLinha,
-                EspessuraLinha = tipo.EspessuraLinha
+                EstiloLinha = tipo.EstiloLinha
             };
         }
 
@@ -320,9 +318,7 @@ namespace Araci.Infrastructure.Persistence
                 NomeTipo = string.IsNullOrWhiteSpace(dto.NomeTipo) ? "Linha contínua" : dto.NomeTipo.Trim(),
                 Familia = string.IsNullOrWhiteSpace(dto.Familia) ? "Anotações" : dto.Familia.Trim(),
                 Categoria = string.IsNullOrWhiteSpace(dto.Categoria) ? "Linhas" : dto.Categoria.Trim(),
-                EstiloLinha = dto.EstiloLinha,
-                CorLinha = dto.CorLinha,
-                EspessuraLinha = dto.EspessuraLinha
+                EstiloLinha = dto.EstiloLinha
             };
         }
 
@@ -543,6 +539,7 @@ namespace Araci.Infrastructure.Persistence
             return new ProjectSheetTemplateLineDto
             {
                 Id = linha.Id,
+                Nome = linha.Nome,
                 X1 = linha.X1,
                 Y1 = linha.Y1,
                 X2 = linha.X2,
@@ -661,6 +658,7 @@ namespace Araci.Infrastructure.Persistence
             var linha = new ProjectSheetTemplateLine
             {
                 Id = dto.Id == Guid.Empty ? Guid.NewGuid() : dto.Id,
+                Nome = NormalizarNomeLinhaTemplate(dto.Nome),
                 X1 = NormalizarCoordenada(dto.X1),
                 Y1 = NormalizarCoordenada(dto.Y1),
                 X2 = NormalizarCoordenada(dto.X2),
@@ -895,6 +893,11 @@ namespace Araci.Infrastructure.Persistence
         private static PointDto CriarPointDto(Point point)
         {
             return new PointDto { X = point.X, Y = point.Y };
+        }
+
+        private static string NormalizarNomeLinhaTemplate(string? valor)
+        {
+            return string.IsNullOrWhiteSpace(valor) ? string.Empty : valor.Trim();
         }
 
         private static double NormalizarRotacao(double valor)

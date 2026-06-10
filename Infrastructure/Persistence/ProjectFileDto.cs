@@ -37,6 +37,7 @@ namespace Araci.Infrastructure.Persistence
     public sealed class ProjectSheetTemplateLineDto
     {
         public Guid Id { get; set; }
+        public string Nome { get; set; } = string.Empty;
         public double X1 { get; set; }
         public double Y1 { get; set; }
         public double X2 { get; set; }
@@ -158,8 +159,6 @@ namespace Araci.Infrastructure.Persistence
         public string Familia { get; set; } = string.Empty;
         public string Categoria { get; set; } = string.Empty;
         public string EstiloLinha { get; set; } = "Contínuo";
-        public string CorLinha { get; set; } = "#FF000000";
-        public double EspessuraLinha { get; set; } = 1.0;
     }
 
     public sealed class TextAnnotationTypeDto

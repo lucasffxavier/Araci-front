@@ -1,9 +1,7 @@
 using System;
 using System.Collections.Generic;
-using System.Windows.Input;
-using System.Windows.Media;
+using Araci.Core.Commands;
 using Araci.Models.Tipos;
-using Araci.Properties;
 
 namespace Araci.ViewModels
 {
@@ -14,9 +12,6 @@ namespace Araci.ViewModels
         private readonly string _familiaOriginal;
         private readonly string _categoriaOriginal;
         private readonly string _estiloLinhaOriginal;
-        private readonly string _corLinhaOriginal;
-        private readonly double _espessuraLinhaOriginal;
-        private SimpleCommand? _escolherCorCommand;
 
         public TipoLinhaAnotativaViewModel(TipoLinhaAnotativa tipo)
             : this(tipo, null)
@@ -31,15 +26,11 @@ namespace Araci.ViewModels
             _familiaOriginal = tipo.Familia;
             _categoriaOriginal = tipo.Categoria;
             _estiloLinhaOriginal = tipo.EstiloLinha;
-            _corLinhaOriginal = tipo.CorLinha;
-            _espessuraLinhaOriginal = tipo.EspessuraLinha;
         }
 
         protected TipoLinhaAnotativa TipoLinha => (TipoLinhaAnotativa)_tipo;
 
         public IReadOnlyList<string> EstilosLinhaDisponiveis { get; } = new[] { "Contínuo", "Tracejado", "Traço ponto", "Traço dois pontos" };
-
-        public ICommand EscolherCorCommand => _escolherCorCommand ??= new SimpleCommand(EscolherCor);
 
         public string EstiloLinha
         {
@@ -54,37 +45,50 @@ namespace Araci.ViewModels
             }
         }
 
-        public string CorLinha
+        public IUndoableCommand? CreateCommitCommand(Action? tipoAlterado)
         {
-            get => TipoLinha.CorLinha;
-            set
+            var composite = new CompositeCommand();
+
+            if (!string.Equals(_nomeOriginal, TipoLinha.NomeTipo, StringComparison.Ordinal))
             {
-                string normalizada = TipoLinhaAnotativa.NormalizarCor(value);
-
-                if (string.Equals(TipoLinha.CorLinha, normalizada, StringComparison.OrdinalIgnoreCase))
-                    return;
-
-                TipoLinha.CorLinha = normalizada;
-                OnPropertyChanged();
-                OnPropertyChanged(nameof(CorLinhaBrush));
+                composite.Add(new UpdateLineAnnotationTypePropertyCommand<string>(
+                    TipoLinha,
+                    (t, value) => t.NomeTipo = value,
+                    _nomeOriginal,
+                    TipoLinha.NomeTipo));
             }
-        }
 
-        public Brush CorLinhaBrush => CriarBrush(CorLinha);
-
-        public double EspessuraLinha
-        {
-            get => TipoLinha.EspessuraLinha;
-            set
+            if (!string.Equals(_familiaOriginal, TipoLinha.Familia, StringComparison.Ordinal))
             {
-                double normalizada = TipoLinhaAnotativa.NormalizarEspessura(value);
-
-                if (Math.Abs(TipoLinha.EspessuraLinha - normalizada) < 0.000001)
-                    return;
-
-                TipoLinha.EspessuraLinha = normalizada;
-                OnPropertyChanged();
+                composite.Add(new UpdateLineAnnotationTypePropertyCommand<string>(
+                    TipoLinha,
+                    (t, value) => t.Familia = value,
+                    _familiaOriginal,
+                    TipoLinha.Familia));
             }
+
+            if (!string.Equals(_categoriaOriginal, TipoLinha.Categoria, StringComparison.Ordinal))
+            {
+                composite.Add(new UpdateLineAnnotationTypePropertyCommand<string>(
+                    TipoLinha,
+                    (t, value) => t.Categoria = value,
+                    _categoriaOriginal,
+                    TipoLinha.Categoria));
+            }
+
+            if (!string.Equals(_estiloLinhaOriginal, TipoLinha.EstiloLinha, StringComparison.Ordinal))
+            {
+                composite.Add(new UpdateLineAnnotationTypePropertyCommand<string>(
+                    TipoLinha,
+                    (t, value) => t.EstiloLinha = value,
+                    _estiloLinhaOriginal,
+                    TipoLinha.EstiloLinha));
+            }
+
+            if (composite.IsEmpty)
+                return null;
+
+            return new CommitTipoLinhaAnotativaCommand(composite, tipoAlterado);
         }
 
         public override void CommitChanges()
@@ -98,20 +102,7 @@ namespace Araci.ViewModels
             TipoLinha.Familia = _familiaOriginal;
             TipoLinha.Categoria = _categoriaOriginal;
             TipoLinha.EstiloLinha = _estiloLinhaOriginal;
-            TipoLinha.CorLinha = _corLinhaOriginal;
-            TipoLinha.EspessuraLinha = _espessuraLinhaOriginal;
             NotificarTudo();
-        }
-
-        private void EscolherCor()
-        {
-            var window = new ColorPickerWindow(CorLinha)
-            {
-                Owner = System.Windows.Application.Current?.MainWindow
-            };
-
-            if (window.ShowDialog() == true)
-                CorLinha = window.SelectedColorHex;
         }
 
         private void NotificarTudo()
@@ -120,51 +111,35 @@ namespace Araci.ViewModels
             OnPropertyChanged(nameof(Familia));
             OnPropertyChanged(nameof(Categoria));
             OnPropertyChanged(nameof(EstiloLinha));
-            OnPropertyChanged(nameof(CorLinha));
-            OnPropertyChanged(nameof(CorLinhaBrush));
-            OnPropertyChanged(nameof(EspessuraLinha));
         }
 
-        private static Brush CriarBrush(string cor)
+        private sealed class CommitTipoLinhaAnotativaCommand : IUndoableCommand
         {
-            try
-            {
-                if (ColorConverter.ConvertFromString(cor) is Color color)
-                    return new SolidColorBrush(color);
-            }
-            catch (FormatException)
-            {
-            }
+            private readonly IUndoableCommand _inner;
+            private readonly Action? _afterChanged;
 
-            return Brushes.Black;
-        }
-
-        private sealed class SimpleCommand : ICommand
-        {
-            private readonly Action _execute;
-            private readonly Func<bool>? _canExecute;
-
-            public SimpleCommand(Action execute, Func<bool>? canExecute = null)
+            public CommitTipoLinhaAnotativaCommand(IUndoableCommand inner, Action? afterChanged)
             {
-                _execute = execute ?? throw new ArgumentNullException(nameof(execute));
-                _canExecute = canExecute;
+                _inner = inner ?? throw new ArgumentNullException(nameof(inner));
+                _afterChanged = afterChanged;
             }
 
-            public bool CanExecute(object? parameter)
+            public void Execute()
             {
-                return _canExecute?.Invoke() ?? true;
+                _inner.Execute();
+                _afterChanged?.Invoke();
             }
 
-            public void Execute(object? parameter)
+            public void Undo()
             {
-                if (CanExecute(parameter))
-                    _execute();
+                _inner.Undo();
+                _afterChanged?.Invoke();
             }
 
-            public event EventHandler? CanExecuteChanged
+            public void Redo()
             {
-                add { }
-                remove { }
+                _inner.Redo();
+                _afterChanged?.Invoke();
             }
         }
     }

@@ -1,12 +1,18 @@
 using System;
 using System.Collections.Generic;
 using System.ComponentModel;
+using System.Globalization;
 using System.Linq;
 using System.Runtime.CompilerServices;
+using System.Windows;
+using System.Windows.Input;
+using System.Windows.Media;
 using Araci.Applications.UseCases.Projeto;
 using Araci.Core.Documents;
 using Araci.Models.Tipos;
+using Araci.Properties;
 using Araci.Services.Catalog;
+using Araci.Services.UI;
 
 namespace Araci.ViewModels
 {
@@ -16,17 +22,22 @@ namespace Araci.ViewModels
         private readonly ProjectSheetTemplateLine _linha;
         private readonly MoverLinhaDoTipoPranchaUseCase _editarLinha;
         private readonly TypeLibraryService _types;
+        private readonly TypePropertiesDialogService _typePropertiesDialogs;
+        private SimpleCommand? _abrirPropriedadesTipoCommand;
+        private SimpleCommand? _escolherCorCommand;
 
         public ProjectSheetTemplateLinePropertiesViewModel(
             ProjectSheetType tipo,
             ProjectSheetTemplateLine linha,
             MoverLinhaDoTipoPranchaUseCase editarLinha,
-            TypeLibraryService types)
+            TypeLibraryService types,
+            TypePropertiesDialogService typePropertiesDialogs)
         {
             _tipo = tipo ?? throw new ArgumentNullException(nameof(tipo));
             _linha = linha ?? throw new ArgumentNullException(nameof(linha));
             _editarLinha = editarLinha ?? throw new ArgumentNullException(nameof(editarLinha));
             _types = types ?? throw new ArgumentNullException(nameof(types));
+            _typePropertiesDialogs = typePropertiesDialogs ?? throw new ArgumentNullException(nameof(typePropertiesDialogs));
 
             foreach (TipoLinhaAnotativa tipoLinha in _types.TiposLinhasAnotativas)
                 tipoLinha.PropertyChanged += OnTipoLinhaPropertyChanged;
@@ -35,7 +46,10 @@ namespace Araci.ViewModels
         public Guid Id => _linha.Id;
         public string Titulo => "Linha do Tipo de Prancha";
         public IReadOnlyList<TipoLinhaAnotativa> TiposDisponiveis => _types.TiposLinhasAnotativas;
-        public IReadOnlyList<string> EstilosLinhaDisponiveis { get; } = new[] { "Contínuo", "Tracejado", "Traço ponto", "Traço dois pontos" };
+        public ICommand AbrirPropriedadesTipoCommand => _abrirPropriedadesTipoCommand ??= new SimpleCommand(AbrirPropriedadesTipo, () => PodeAbrirPropriedadesTipo);
+        public ICommand EscolherCorCommand => _escolherCorCommand ??= new SimpleCommand(EscolherCor);
+
+        public bool PodeAbrirPropriedadesTipo => TipoLinha != null;
 
         public TipoLinhaAnotativa? TipoLinha
         {
@@ -50,89 +64,46 @@ namespace Araci.ViewModels
             }
         }
 
-        public double X1
+        public string Nome
         {
-            get => _linha.X1;
+            get => NomeAtual();
             set
             {
-                if (_editarLinha.AlterarCoordenadas(_tipo.Id, _linha.Id, value, _linha.Y1, _linha.X2, _linha.Y2))
-                    OnCoordinatePropertiesChanged();
+                if (_editarLinha.AlterarNome(_tipo.Id, _linha.Id, value))
+                    OnPropertyChanged();
             }
         }
 
-        public double Y1
+        public double Comprimento
         {
-            get => _linha.Y1;
-            set
+            get
             {
-                if (_editarLinha.AlterarCoordenadas(_tipo.Id, _linha.Id, _linha.X1, value, _linha.X2, _linha.Y2))
-                    OnCoordinatePropertiesChanged();
+                double dx = _linha.X2 - _linha.X1;
+                double dy = _linha.Y2 - _linha.Y1;
+                return Math.Sqrt(dx * dx + dy * dy);
             }
         }
 
-        public double X2
-        {
-            get => _linha.X2;
-            set
-            {
-                if (_editarLinha.AlterarCoordenadas(_tipo.Id, _linha.Id, _linha.X1, _linha.Y1, value, _linha.Y2))
-                    OnCoordinatePropertiesChanged();
-            }
-        }
-
-        public double Y2
-        {
-            get => _linha.Y2;
-            set
-            {
-                if (_editarLinha.AlterarCoordenadas(_tipo.Id, _linha.Id, _linha.X1, _linha.Y1, _linha.X2, value))
-                    OnCoordinatePropertiesChanged();
-            }
-        }
+        public string ComprimentoTexto => Comprimento.ToString("0.##", CultureInfo.CurrentCulture);
 
         public string CorLinha
         {
-            get => TipoLinha?.CorLinha ?? _linha.Stroke;
+            get => _linha.Stroke;
             set
             {
-                TipoLinhaAnotativa? tipoLinha = TipoLinha;
-
-                bool alterou = tipoLinha != null
-                    ? _editarLinha.AlterarCorTipo(tipoLinha, value)
-                    : _editarLinha.AlterarStroke(_tipo.Id, _linha.Id, value);
-
-                if (alterou)
+                if (_editarLinha.AlterarStroke(_tipo.Id, _linha.Id, value))
                     OnStylePropertiesChanged();
             }
         }
+
+        public Brush CorLinhaBrush => CriarBrush(CorLinha);
 
         public double EspessuraLinha
         {
-            get => TipoLinha?.EspessuraLinha ?? _linha.StrokeThickness;
+            get => _linha.StrokeThickness;
             set
             {
-                TipoLinhaAnotativa? tipoLinha = TipoLinha;
-
-                bool alterou = tipoLinha != null
-                    ? _editarLinha.AlterarEspessuraTipo(tipoLinha, value)
-                    : _editarLinha.AlterarEspessura(_tipo.Id, _linha.Id, value);
-
-                if (alterou)
-                    OnStylePropertiesChanged();
-            }
-        }
-
-        public string EstiloLinha
-        {
-            get => TipoLinha?.EstiloLinha ?? "Contínuo";
-            set
-            {
-                TipoLinhaAnotativa? tipoLinha = TipoLinha;
-
-                if (tipoLinha == null)
-                    return;
-
-                if (_editarLinha.AlterarEstiloTipo(tipoLinha, value))
+                if (_editarLinha.AlterarEspessura(_tipo.Id, _linha.Id, value))
                     OnStylePropertiesChanged();
             }
         }
@@ -143,10 +114,37 @@ namespace Araci.ViewModels
 
         public void Refresh()
         {
-            OnCoordinatePropertiesChanged();
             OnPropertyChanged(nameof(TipoLinha));
+            OnPropertyChanged(nameof(PodeAbrirPropriedadesTipo));
+            OnPropertyChanged(nameof(Nome));
+            OnPropertyChanged(nameof(Comprimento));
+            OnPropertyChanged(nameof(ComprimentoTexto));
             OnStylePropertiesChanged();
             OnPropertyChanged(nameof(AindaExiste));
+            _abrirPropriedadesTipoCommand?.RaiseCanExecuteChanged();
+        }
+
+        private void AbrirPropriedadesTipo()
+        {
+            TipoLinhaAnotativa? tipoLinha = TipoLinha;
+
+            if (tipoLinha == null)
+                return;
+
+            _typePropertiesDialogs.Show(new TipoLinhaAnotativaViewModel(tipoLinha, Refresh));
+            _editarLinha.AlterarTipoGrafico(_tipo.Id, _linha.Id, tipoLinha);
+            Refresh();
+        }
+
+        private void EscolherCor()
+        {
+            var window = new ColorPickerWindow(CorLinha)
+            {
+                Owner = Application.Current?.MainWindow
+            };
+
+            if (window.ShowDialog() == true)
+                CorLinha = window.SelectedColorHex;
         }
 
         private TipoLinhaAnotativa? ResolverTipoLinha()
@@ -165,6 +163,18 @@ namespace Araci.ViewModels
             return _types.TipoLinhaAnotativaPadrao;
         }
 
+        private string NomeAtual()
+        {
+            if (!string.IsNullOrWhiteSpace(_linha.Nome))
+                return _linha.Nome;
+
+            int indice = _tipo.Linhas.FindIndex(l => l.Id == _linha.Id);
+
+            return indice >= 0
+                ? $"LINHA-{indice + 1:000}"
+                : "LINHA";
+        }
+
         private void OnTipoLinhaPropertyChanged(object? sender, PropertyChangedEventArgs e)
         {
             TipoLinhaAnotativa? tipoLinha = TipoLinha;
@@ -173,32 +183,67 @@ namespace Araci.ViewModels
                 return;
 
             if (string.IsNullOrEmpty(e.PropertyName) ||
-                e.PropertyName == nameof(TipoLinhaAnotativa.CorLinha) ||
-                e.PropertyName == nameof(TipoLinhaAnotativa.EspessuraLinha) ||
-                e.PropertyName == nameof(TipoLinhaAnotativa.EstiloLinha))
+                e.PropertyName == nameof(TipoLinhaAnotativa.EstiloLinha) ||
+                e.PropertyName == nameof(TipoLinhaAnotativa.NomeTipo))
             {
-                OnStylePropertiesChanged();
+                Refresh();
             }
-        }
-
-        private void OnCoordinatePropertiesChanged()
-        {
-            OnPropertyChanged(nameof(X1));
-            OnPropertyChanged(nameof(Y1));
-            OnPropertyChanged(nameof(X2));
-            OnPropertyChanged(nameof(Y2));
         }
 
         private void OnStylePropertiesChanged()
         {
             OnPropertyChanged(nameof(CorLinha));
+            OnPropertyChanged(nameof(CorLinhaBrush));
             OnPropertyChanged(nameof(EspessuraLinha));
-            OnPropertyChanged(nameof(EstiloLinha));
+        }
+
+        private static Brush CriarBrush(string stroke)
+        {
+            try
+            {
+                if (ColorConverter.ConvertFromString(string.IsNullOrWhiteSpace(stroke) ? "#FF000000" : stroke) is Color color)
+                    return new SolidColorBrush(color);
+            }
+            catch (FormatException)
+            {
+            }
+
+            return Brushes.Black;
         }
 
         private void OnPropertyChanged([CallerMemberName] string? propertyName = null)
         {
             PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
+        }
+
+        private sealed class SimpleCommand : ICommand
+        {
+            private readonly Action _execute;
+            private readonly Func<bool>? _canExecute;
+
+            public SimpleCommand(Action execute, Func<bool>? canExecute = null)
+            {
+                _execute = execute ?? throw new ArgumentNullException(nameof(execute));
+                _canExecute = canExecute;
+            }
+
+            public bool CanExecute(object? parameter)
+            {
+                return _canExecute?.Invoke() ?? true;
+            }
+
+            public void Execute(object? parameter)
+            {
+                if (CanExecute(parameter))
+                    _execute();
+            }
+
+            public void RaiseCanExecuteChanged()
+            {
+                CanExecuteChanged?.Invoke(this, EventArgs.Empty);
+            }
+
+            public event EventHandler? CanExecuteChanged;
         }
     }
 }

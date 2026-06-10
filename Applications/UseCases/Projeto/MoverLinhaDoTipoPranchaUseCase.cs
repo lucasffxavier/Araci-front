@@ -46,6 +46,27 @@ namespace Araci.Applications.UseCases.Projeto
             return AlterarCoordenadas(tipo, linha, x1, y1, x2, y2);
         }
 
+        public bool AlterarNome(Guid tipoId, Guid linhaId, string nome)
+        {
+            string nomeNormalizado = NormalizarNome(nome);
+
+            if (!TryGetLinha(tipoId, linhaId, out ProjectSheetType tipo, out ProjectSheetTemplateLine linha))
+                return false;
+
+            if (string.Equals(linha.Nome, nomeNormalizado, StringComparison.Ordinal))
+                return false;
+
+            _commands.Execute(new UpdateProjectSheetTypeLinePropertyCommand<string>(
+                _document,
+                tipo,
+                linha.Id,
+                (l, value) => l.Nome = value,
+                linha.Nome,
+                nomeNormalizado));
+
+            return true;
+        }
+
         public bool AlterarTipoGrafico(Guid tipoId, Guid linhaId, TipoLinhaAnotativa tipoLinha)
         {
             if (tipoLinha == null)
@@ -114,44 +135,6 @@ namespace Araci.Applications.UseCases.Projeto
                 (l, value) => l.StrokeThickness = value,
                 linha.StrokeThickness,
                 strokeThickness));
-
-            return true;
-        }
-
-        public bool AlterarCorTipo(TipoLinhaAnotativa tipoLinha, string cor)
-        {
-            if (tipoLinha == null)
-                return false;
-
-            string corNormalizada = TipoLinhaAnotativa.NormalizarCor(cor);
-
-            if (string.Equals(tipoLinha.CorLinha, corNormalizada, StringComparison.OrdinalIgnoreCase))
-                return false;
-
-            _commands.Execute(new UpdateLineAnnotationTypePropertyCommand<string>(
-                tipoLinha,
-                (t, value) => t.CorLinha = value,
-                tipoLinha.CorLinha,
-                corNormalizada));
-
-            return true;
-        }
-
-        public bool AlterarEspessuraTipo(TipoLinhaAnotativa tipoLinha, double espessura)
-        {
-            if (tipoLinha == null)
-                return false;
-
-            double espessuraNormalizada = TipoLinhaAnotativa.NormalizarEspessura(espessura);
-
-            if (Math.Abs(tipoLinha.EspessuraLinha - espessuraNormalizada) < 0.000001)
-                return false;
-
-            _commands.Execute(new UpdateLineAnnotationTypePropertyCommand<double>(
-                tipoLinha,
-                (t, value) => t.EspessuraLinha = value,
-                tipoLinha.EspessuraLinha,
-                espessuraNormalizada));
 
             return true;
         }
@@ -236,6 +219,11 @@ namespace Araci.Applications.UseCases.Projeto
         {
             normalizedStroke = TipoLinhaAnotativa.NormalizarCor(stroke);
             return !string.IsNullOrWhiteSpace(normalizedStroke);
+        }
+
+        private static string NormalizarNome(string nome)
+        {
+            return string.IsNullOrWhiteSpace(nome) ? string.Empty : nome.Trim();
         }
 
         private static bool ValorFinito(double value)

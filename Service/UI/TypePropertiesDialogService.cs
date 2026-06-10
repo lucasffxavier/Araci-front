@@ -55,6 +55,18 @@ namespace Araci.Services.UI
                 }
             }
 
+            if (viewModel is TipoLinhaAnotativaViewModel linhaViewModel && _commands != null)
+            {
+                var command = linhaViewModel.CreateCommitCommand(_afterTypeLibraryChanged);
+
+                if (command != null)
+                {
+                    _commands.Execute(command);
+                    linhaViewModel.CommitChanges();
+                    return;
+                }
+            }
+
             viewModel.CommitChanges();
         }
     }

@@ -5,6 +5,7 @@ namespace Araci.Core.Documents
     public class ProjectSheetTemplateLine
     {
         public Guid Id { get; set; } = Guid.NewGuid();
+        public string Nome { get; set; } = string.Empty;
         public double X1 { get; set; }
         public double Y1 { get; set; }
         public double X2 { get; set; }
@@ -40,6 +41,7 @@ namespace Araci.Core.Documents
             return new ProjectSheetTemplateLine
             {
                 Id = gerarNovoId ? Guid.NewGuid() : Id,
+                Nome = Nome,
                 X1 = X1,
                 Y1 = Y1,
                 X2 = X2,
