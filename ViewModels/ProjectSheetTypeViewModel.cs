@@ -20,6 +20,7 @@ namespace Araci.ViewModels
         private readonly ProjectSheetType _tipo;
         private readonly TypeLibraryService _types;
         private ProjectSheetTemplateLineViewModel? _previewLine;
+        private ProjectSheetTemplateRectangleViewModel? _previewRectangle;
         private Guid? _selectedLineId;
         private Guid? _selectedRectangleId;
 
@@ -83,7 +84,22 @@ namespace Araci.ViewModels
             }
         }
 
+        public ProjectSheetTemplateRectangleViewModel? PreviewRectangle
+        {
+            get => _previewRectangle;
+            private set
+            {
+                if (ReferenceEquals(_previewRectangle, value))
+                    return;
+
+                _previewRectangle = value;
+                OnPropertyChanged();
+                OnPropertyChanged(nameof(HasPreviewRectangle));
+            }
+        }
+
         public bool HasPreviewLine => PreviewLine != null;
+        public bool HasPreviewRectangle => PreviewRectangle != null;
 
         public void Refresh()
         {
@@ -106,6 +122,11 @@ namespace Araci.ViewModels
         public void SetPreviewLine(ProjectSheetTemplateLine? linha)
         {
             PreviewLine = linha == null ? null : new ProjectSheetTemplateLineViewModel(linha, _types);
+        }
+
+        public void SetPreviewRectangle(ProjectSheetTemplateRectangle? retangulo)
+        {
+            PreviewRectangle = retangulo == null ? null : new ProjectSheetTemplateRectangleViewModel(retangulo, _types);
         }
 
         public bool TryHitLineAt(Point position, double tolerance, out Guid lineId)
