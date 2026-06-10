@@ -3,12 +3,14 @@ using System.Linq;
 using Araci.Applications.Abstractions;
 using Araci.Core.Commands;
 using Araci.Core.Documents;
+using Araci.Models.Tipos;
 
 namespace Araci.Applications.UseCases.Projeto
 {
     public sealed class MoverRetanguloDoTipoPranchaUseCase
     {
         private const double MinDeltaSquared = 0.0001;
+        private const double MinStrokeThickness = 0.1;
 
         private readonly AraciDocument _document;
         private readonly ICommandHistory _commands;
@@ -36,6 +38,115 @@ namespace Araci.Applications.UseCases.Projeto
                 return false;
 
             return AlterarPosicao(tipo, retangulo, x, y);
+        }
+
+        public bool AlterarNome(Guid tipoId, Guid retanguloId, string nome)
+        {
+            string nomeNormalizado = NormalizarNome(nome);
+
+            if (!TryGetRetangulo(tipoId, retanguloId, out ProjectSheetType tipo, out ProjectSheetTemplateRectangle retangulo))
+                return false;
+
+            if (string.Equals(retangulo.Nome, nomeNormalizado, StringComparison.Ordinal))
+                return false;
+
+            _commands.Execute(new UpdateProjectSheetTypeRectanglePropertyCommand<string>(
+                _document,
+                tipo,
+                retangulo.Id,
+                (r, value) => r.Nome = value,
+                retangulo.Nome,
+                nomeNormalizado));
+
+            return true;
+        }
+
+        public bool AlterarLargura(Guid tipoId, Guid retanguloId, double largura)
+        {
+            if (!DimensaoValida(largura))
+                return false;
+
+            if (!TryGetRetangulo(tipoId, retanguloId, out ProjectSheetType tipo, out ProjectSheetTemplateRectangle retangulo))
+                return false;
+
+            if (Math.Abs(retangulo.Largura - largura) < 0.000001)
+                return false;
+
+            _commands.Execute(new UpdateProjectSheetTypeRectanglePropertyCommand<double>(
+                _document,
+                tipo,
+                retangulo.Id,
+                (r, value) => r.Largura = value,
+                retangulo.Largura,
+                largura));
+
+            return true;
+        }
+
+        public bool AlterarAltura(Guid tipoId, Guid retanguloId, double altura)
+        {
+            if (!DimensaoValida(altura))
+                return false;
+
+            if (!TryGetRetangulo(tipoId, retanguloId, out ProjectSheetType tipo, out ProjectSheetTemplateRectangle retangulo))
+                return false;
+
+            if (Math.Abs(retangulo.Altura - altura) < 0.000001)
+                return false;
+
+            _commands.Execute(new UpdateProjectSheetTypeRectanglePropertyCommand<double>(
+                _document,
+                tipo,
+                retangulo.Id,
+                (r, value) => r.Altura = value,
+                retangulo.Altura,
+                altura));
+
+            return true;
+        }
+
+        public bool AlterarStroke(Guid tipoId, Guid retanguloId, string stroke)
+        {
+            if (!TryNormalizeStroke(stroke, out string normalizedStroke))
+                return false;
+
+            if (!TryGetRetangulo(tipoId, retanguloId, out ProjectSheetType tipo, out ProjectSheetTemplateRectangle retangulo))
+                return false;
+
+            if (string.Equals(retangulo.Stroke, normalizedStroke, StringComparison.OrdinalIgnoreCase))
+                return false;
+
+            _commands.Execute(new UpdateProjectSheetTypeRectanglePropertyCommand<string>(
+                _document,
+                tipo,
+                retangulo.Id,
+                (r, value) => r.Stroke = value,
+                retangulo.Stroke,
+                normalizedStroke));
+
+            return true;
+        }
+
+        public bool AlterarEspessura(Guid tipoId, Guid retanguloId, double strokeThickness)
+        {
+            if (!StrokeThicknessValida(strokeThickness))
+                return false;
+
+            if (!TryGetRetangulo(tipoId, retanguloId, out ProjectSheetType tipo, out ProjectSheetTemplateRectangle retangulo))
+                return false;
+
+            if (Math.Abs(retangulo.StrokeThickness - strokeThickness) < 0.000001)
+                return false;
+
+            _commands.Execute(new UpdateProjectSheetTypeRectanglePropertyCommand<double>(
+                _document,
+                tipo,
+                retangulo.Id,
+                (r, value) => r.StrokeThickness = value,
+                retangulo.StrokeThickness,
+                strokeThickness));
+
+            return true;
         }
 
         private bool AlterarPosicao(ProjectSheetType tipo, ProjectSheetTemplateRectangle retangulo, double x, double y)
@@ -76,6 +187,27 @@ namespace Araci.Applications.UseCases.Projeto
                 return false;
 
             return deltaX * deltaX + deltaY * deltaY >= MinDeltaSquared;
+        }
+
+        private static bool DimensaoValida(double value)
+        {
+            return ValorFinito(value) && value >= ProjectSheetTemplateRectangle.MinDimension;
+        }
+
+        private static bool StrokeThicknessValida(double strokeThickness)
+        {
+            return ValorFinito(strokeThickness) && strokeThickness >= MinStrokeThickness;
+        }
+
+        private static bool TryNormalizeStroke(string stroke, out string normalizedStroke)
+        {
+            normalizedStroke = TipoLinhaAnotativa.NormalizarCor(stroke);
+            return !string.IsNullOrWhiteSpace(normalizedStroke);
+        }
+
+        private static string NormalizarNome(string nome)
+        {
+            return string.IsNullOrWhiteSpace(nome) ? string.Empty : nome.Trim();
         }
 
         private static bool ValorFinito(double value)

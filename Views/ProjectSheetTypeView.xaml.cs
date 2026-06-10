@@ -666,6 +666,17 @@ namespace Araci.Views
                 return;
             }
 
+            if (viewModel.TryGetSelectedRectangleId(out Guid rectangleId) &&
+                viewModel.TryGetRectangle(rectangleId, out ProjectSheetTemplateRectangle? retangulo) &&
+                retangulo != null)
+            {
+                _context.Editor.ElementoSelecionado = new ProjectSheetTemplateRectanglePropertiesViewModel(
+                    viewModel.Tipo,
+                    retangulo,
+                    _context.MoverRetanguloDoTipoPrancha);
+                return;
+            }
+
             _context.Editor.ElementoSelecionado = new ProjectSheetTypePropertiesViewModel(
                 _context.Document,
                 viewModel.Tipo,
