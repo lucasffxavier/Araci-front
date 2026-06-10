@@ -112,6 +112,7 @@ namespace Araci.Services
             EditarPropriedadesTabela = new EditarPropriedadesTabelaUseCase(Document, Commands);
             EditarPropriedadesPrancha = new EditarPropriedadesPranchaUseCase(Document, Commands);
             EditarPropriedadesTipoPrancha = new EditarPropriedadesTipoPranchaUseCase(Document, Commands);
+            InserirLinhaNoTipoPrancha = new InserirLinhaNoTipoPranchaUseCase(Document, Commands);
             ExportarTabela = new ExportarTabelaUseCase(Document, Dialogs, new ProjectTableDataBuilder(), new ProjectTableCsvExportService());
             InserirTabelaNaPrancha = new InserirTabelaNaPranchaUseCase(Document, Commands);
             MoverTabelaNaPrancha = new MoverTabelaNaPranchaUseCase(Document, Commands);
@@ -146,7 +147,9 @@ namespace Araci.Services
                 CriarInserirElementoGenericoTool,
                 CriarInserirLinhaAnotativaTool,
                 CriarInserirRetanguloAnotativoTool,
-                CriarInserirCirculoAnotativoTool);
+                CriarInserirCirculoAnotativoTool,
+                CriarInserirLinhaTipoPranchaTool,
+                () => Editor.SuperficieAtiva == EditorSurfaceKind.ProjectSheetType);
 
             Input = EditingComposition.CreateInput(Tools, Commands, SafeDelete, Selection, Elements, Hover, Clipboard.CopiarSelecionados, Clipboard.Colar);
             AlterarUnidadesProjeto = new AlterarUnidadesProjetoUseCase(Settings, RefreshProperties);
@@ -190,6 +193,7 @@ namespace Araci.Services
         }
 
         public EditorState Editor { get; } = new EditorState();
+        public ProjectSheetTypeViewModel? ProjectSheetTypeViewModelAtivo { get; set; }
         public EditorSettings Settings { get; } = new EditorSettings();
         public MoveHudService MoveHud { get; }
         public AlignmentGuideService AlignmentGuides { get; }
@@ -216,6 +220,7 @@ namespace Araci.Services
         public EditarPropriedadesTabelaUseCase EditarPropriedadesTabela { get; }
         public EditarPropriedadesPranchaUseCase EditarPropriedadesPrancha { get; }
         public EditarPropriedadesTipoPranchaUseCase EditarPropriedadesTipoPrancha { get; }
+        public InserirLinhaNoTipoPranchaUseCase InserirLinhaNoTipoPrancha { get; }
         public ExportarTabelaUseCase ExportarTabela { get; }
         public InserirTabelaNaPranchaUseCase InserirTabelaNaPrancha { get; }
         public MoverTabelaNaPranchaUseCase MoverTabelaNaPrancha { get; }
@@ -365,6 +370,11 @@ namespace Araci.Services
         private InserirLinhaAnotativaTool CriarInserirLinhaAnotativaTool()
         {
             return new InserirLinhaAnotativaTool(Commands, Document, Names, ElementoFactory, Scene, SceneQueries, LinhaEndpointEdit, () => Tools.VoltarParaSelecao());
+        }
+
+        private InserirLinhaTipoPranchaTool CriarInserirLinhaTipoPranchaTool()
+        {
+            return new InserirLinhaTipoPranchaTool(() => ProjectSheetTypeViewModelAtivo, InserirLinhaNoTipoPrancha, () => Tools.VoltarParaSelecao());
         }
 
         private InserirRetanguloAnotativoTool CriarInserirRetanguloAnotativoTool()

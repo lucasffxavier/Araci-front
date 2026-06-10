@@ -35,7 +35,9 @@ namespace Araci
             _context.Document.Tabelas.CollectionChanged += OnTabelasCollectionChanged;
             _context.Document.Pranchas.CollectionChanged += OnPranchasCollectionChanged;
             Viewport.Inicializar(_context);
+            ProjectSheetTypeViewer.Inicializar(_context);
             InicializarRibbon();
+            LimparDataContextsAreaCentral();
             AtualizarVisibilidadeNavegadorProjeto();
         }
 
@@ -43,6 +45,13 @@ namespace Araci
         {
             DataContext = _context;
             ArquivoMenu.DataContext = _context;
+        }
+
+        private void LimparDataContextsAreaCentral()
+        {
+            ProjectTableGrid.DataContext = null;
+            ProjectSheetViewer.DataContext = null;
+            ProjectSheetTypeViewer.DataContext = null;
         }
 
         public void ToggleArquivoMenu(UIElement referencia)
@@ -62,6 +71,18 @@ namespace Araci
         {
             Viewport.Focus();
             System.Windows.Input.Keyboard.Focus(Viewport);
+        }
+
+        public void FocarSuperficieAtiva()
+        {
+            if (_context.Editor.SuperficieAtiva == EditorSurfaceKind.ProjectSheetType)
+            {
+                ProjectSheetTypeViewer.Focus();
+                System.Windows.Input.Keyboard.Focus(ProjectSheetTypeViewer);
+                return;
+            }
+
+            FocarViewport();
         }
 
         public void MostrarPropriedades()
@@ -146,6 +167,8 @@ namespace Araci
                 return;
 
             _projectSheetTypeViewModel = new ProjectSheetTypeViewModel(_context.Document, tipo);
+            _context.ProjectSheetTypeViewModelAtivo = _projectSheetTypeViewModel;
+            _context.Editor.SuperficieAtiva = EditorSurfaceKind.ProjectSheetType;
 
             ProjectSheetTypeViewer.DataContext = _projectSheetTypeViewModel;
             ProjectSheetTypeViewer.Visibility = Visibility.Visible;
@@ -156,6 +179,7 @@ namespace Araci
             ProjectSheetViewer.DataContext = null;
             _projectSheetViewModel = null;
             Viewport.Visibility = Visibility.Collapsed;
+            FocarSuperficieAtiva();
         }
 
         public void MostrarTabela(System.Guid tabelaId)
@@ -178,6 +202,8 @@ namespace Araci
             ProjectSheetTypeViewer.Visibility = Visibility.Collapsed;
             ProjectSheetTypeViewer.DataContext = null;
             _projectSheetTypeViewModel = null;
+            _context.ProjectSheetTypeViewModelAtivo = null;
+            _context.Editor.SuperficieAtiva = EditorSurfaceKind.ProjectTable;
             Viewport.Visibility = Visibility.Collapsed;
         }
 
@@ -198,6 +224,8 @@ namespace Araci
             ProjectSheetTypeViewer.Visibility = Visibility.Collapsed;
             ProjectSheetTypeViewer.DataContext = null;
             _projectSheetTypeViewModel = null;
+            _context.ProjectSheetTypeViewModelAtivo = null;
+            _context.Editor.SuperficieAtiva = EditorSurfaceKind.ProjectSheet;
             Viewport.Visibility = Visibility.Collapsed;
         }
 
@@ -287,7 +315,6 @@ namespace Araci
             FocarViewport();
         }
 
-
         private void OnWindowPreviewKeyDown(object sender, KeyEventArgs e)
         {
             if (e.Handled)
@@ -331,6 +358,7 @@ namespace Araci
         private void OnItemProjetoRenomeado()
         {
             _projectSheetViewModel?.Refresh();
+            _projectSheetTypeViewModel?.Refresh();
         }
 
         private void OnTabelasCollectionChanged(object? sender, NotifyCollectionChangedEventArgs e)
@@ -394,6 +422,8 @@ namespace Araci
             ProjectSheetTypeViewer.Visibility = Visibility.Collapsed;
             ProjectSheetTypeViewer.DataContext = null;
             _projectSheetTypeViewModel = null;
+            _context.ProjectSheetTypeViewModelAtivo = null;
+            _context.Editor.SuperficieAtiva = EditorSurfaceKind.Diagram;
             Viewport.Visibility = Visibility.Visible;
             FocarViewport();
         }

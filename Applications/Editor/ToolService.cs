@@ -15,6 +15,8 @@ namespace Araci.Applications.Editor
         private readonly Func<ITool> _criarInserirCaboTool;
         private readonly Func<ElementDefinition, ITool> _criarInserirElementoTool;
         private readonly Func<ITool> _criarInserirLinhaAnotativaTool;
+        private readonly Func<ITool>? _criarInserirLinhaTipoPranchaTool;
+        private readonly Func<bool>? _isTipoPranchaAtivo;
         private readonly Func<ITool> _criarInserirRetanguloAnotativoTool;
         private readonly Func<ITool> _criarInserirCirculoAnotativoTool;
         private ITool _ferramentaAtual;
@@ -29,7 +31,9 @@ namespace Araci.Applications.Editor
             Func<ElementDefinition, ITool> criarInserirElementoTool,
             Func<ITool> criarInserirLinhaAnotativaTool,
             Func<ITool> criarInserirRetanguloAnotativoTool,
-            Func<ITool> criarInserirCirculoAnotativoTool)
+            Func<ITool> criarInserirCirculoAnotativoTool,
+            Func<ITool>? criarInserirLinhaTipoPranchaTool = null,
+            Func<bool>? isTipoPranchaAtivo = null)
         {
             _elements = elements ?? throw new ArgumentNullException(nameof(elements));
             _criarSelecionarTool = criarSelecionarTool ?? throw new ArgumentNullException(nameof(criarSelecionarTool));
@@ -39,6 +43,8 @@ namespace Araci.Applications.Editor
             _criarInserirCaboTool = criarInserirCaboTool ?? throw new ArgumentNullException(nameof(criarInserirCaboTool));
             _criarInserirElementoTool = criarInserirElementoTool ?? throw new ArgumentNullException(nameof(criarInserirElementoTool));
             _criarInserirLinhaAnotativaTool = criarInserirLinhaAnotativaTool ?? throw new ArgumentNullException(nameof(criarInserirLinhaAnotativaTool));
+            _criarInserirLinhaTipoPranchaTool = criarInserirLinhaTipoPranchaTool;
+            _isTipoPranchaAtivo = isTipoPranchaAtivo;
             _criarInserirRetanguloAnotativoTool = criarInserirRetanguloAnotativoTool ?? throw new ArgumentNullException(nameof(criarInserirRetanguloAnotativoTool));
             _criarInserirCirculoAnotativoTool = criarInserirCirculoAnotativoTool ?? throw new ArgumentNullException(nameof(criarInserirCirculoAnotativoTool));
             _ferramentaAtual = _criarSelecionarTool();
@@ -90,7 +96,9 @@ namespace Araci.Applications.Editor
 
         public void AtivarInserirLinhaAnotativa()
         {
-            FerramentaAtual = _criarInserirLinhaAnotativaTool();
+            FerramentaAtual = _isTipoPranchaAtivo?.Invoke() == true && _criarInserirLinhaTipoPranchaTool != null
+                ? _criarInserirLinhaTipoPranchaTool()
+                : _criarInserirLinhaAnotativaTool();
         }
 
         public void AtivarInserirRetanguloAnotativo()

@@ -3,6 +3,14 @@ using System.Runtime.CompilerServices;
 
 namespace Araci.ViewModels
 {
+    public enum EditorSurfaceKind
+    {
+        Diagram,
+        ProjectTable,
+        ProjectSheet,
+        ProjectSheetType
+    }
+
     public class EditorState
         : INotifyPropertyChanged
     {
@@ -15,6 +23,9 @@ namespace Araci.ViewModels
 
         private bool
             _navegadorProjetoVisivel;
+
+        private EditorSurfaceKind
+            _superficieAtiva = EditorSurfaceKind.Diagram;
 
         public object?
             ElementoSelecionado
@@ -43,6 +54,22 @@ namespace Araci.ViewModels
                     return;
 
                 _navegadorProjetoVisivel = value;
+
+                OnPropertyChanged();
+            }
+        }
+
+        public EditorSurfaceKind
+            SuperficieAtiva
+        {
+            get => _superficieAtiva;
+
+            set
+            {
+                if (_superficieAtiva == value)
+                    return;
+
+                _superficieAtiva = value;
 
                 OnPropertyChanged();
             }

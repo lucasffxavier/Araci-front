@@ -134,7 +134,7 @@ namespace Araci.Ribbon.Tabs
         private void LinhaButton_Click(object sender, RoutedEventArgs e)
         {
             Context?.Tools.AtivarInserirLinhaAnotativa();
-            FocarViewport();
+            FocarSuperficieAtiva();
         }
 
         private void RetanguloButton_Click(object sender, RoutedEventArgs e)
@@ -159,6 +159,12 @@ namespace Araci.Ribbon.Tabs
         {
             if (Window.GetWindow(this) is MainWindow window)
                 window.FocarViewport();
+        }
+
+        private void FocarSuperficieAtiva()
+        {
+            if (Window.GetWindow(this) is MainWindow window)
+                window.FocarSuperficieAtiva();
         }
     }
 }

@@ -31,6 +31,19 @@ namespace Araci.Infrastructure.Persistence
         public string OrientacaoFolha { get; set; } = string.Empty;
         public double? LarguraFolha { get; set; }
         public double? AlturaFolha { get; set; }
+        public List<ProjectSheetTemplateLineDto> Linhas { get; set; } = new();
+    }
+
+    public sealed class ProjectSheetTemplateLineDto
+    {
+        public Guid Id { get; set; }
+        public double X1 { get; set; }
+        public double Y1 { get; set; }
+        public double X2 { get; set; }
+        public double Y2 { get; set; }
+        public string Stroke { get; set; } = "#FF000000";
+        public double StrokeThickness { get; set; } = 1.0;
+        public bool Visible { get; set; } = true;
     }
 
     public sealed class ProjectViewDto

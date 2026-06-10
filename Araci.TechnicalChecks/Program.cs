@@ -119,6 +119,19 @@ namespace Araci.TechnicalChecks
                 ("ProjectSheetTypeViewModel atualiza apos propriedades do tipo", ProjectSheetTypeViewModelAtualizaAposPropriedadesTipo),
                 ("ProjectSheetTypeView possui superficie de template", ProjectSheetTypeViewPossuiSuperficieTemplate),
                 ("ProjectSheetTypeView mantem bindings dimensoes do tipo", ProjectSheetTypeViewMantemBindingsDimensoesTipo),
+                ("ProjectSheetType novo inicia sem linhas de template", ProjectSheetTypeNovoIniciaSemLinhasTemplate),
+                ("Inserir linha no tipo adiciona linha", InserirLinhaTipoAdicionaLinha),
+                ("Inserir linha no tipo ignora comprimento zero", InserirLinhaTipoIgnoraComprimentoZero),
+                ("Inserir linha no tipo undo redo preserva Id", InserirLinhaTipoUndoRedoPreservaId),
+                ("Persistencia preserva linha de template", PersistenciaPreservaLinhaTemplate),
+                ("Arquivo antigo sem linhas de template abre vazio", ArquivoAntigoSemLinhasTemplateAbreVazio),
+                ("Linha de template nao entra em Elementos", LinhaTemplateNaoEntraEmElementos),
+                ("Operacoes linha template nao alteram tabelas pranchas", OperacoesLinhaTemplateNaoAlteramTabelasPranchas),
+                ("ProjectSheetTypeViewModel expoe linhas do tipo", ProjectSheetTypeViewModelExpoeLinhasTipo),
+                ("ProjectSheetTypeView renderiza bindings de linhas", ProjectSheetTypeViewRenderizaBindingsLinhas),
+                ("ToolService linha em contexto tipo ativa ferramenta template", ToolServiceLinhaContextoTipoAtivaFerramentaTemplate),
+                ("Ferramenta linha template insere linha por dois cliques", FerramentaLinhaTemplateInsereLinhaPorDoisCliques),
+                ("ToolService linha em contexto diagrama preserva ferramenta anotativa", ToolServiceLinhaContextoDiagramaPreservaFerramentaAnotativa),
                 ("Project Browser seleciona tipo abre visualizacao de tipo", ProjectBrowserSelecionaTipoAbreVisualizacaoTipo),
                 ("Project Browser seleciona tipo nao altera vista ativa", ProjectBrowserSelecionaTipoNaoAlteraVistaAtiva),
                 ("Project Browser seleciona tipo nao altera tabelas ou pranchas", ProjectBrowserSelecionaTipoNaoAlteraTabelasOuPranchas),
@@ -6143,6 +6156,221 @@ namespace Araci.TechnicalChecks
             AssertContains(xaml, "Width=\"{Binding WorkspaceWidth}\"", "ProjectSheetTypeView WorkspaceWidth binding");
             AssertContains(xaml, "Height=\"{Binding WorkspaceHeight}\"", "ProjectSheetTypeView WorkspaceHeight binding");
             Assert(!xaml.Contains("TableInstances", StringComparison.OrdinalIgnoreCase), "ProjectSheetTypeView nao deveria renderizar tabelas.");
+        }
+
+        private static void ProjectSheetTypeNovoIniciaSemLinhasTemplate()
+        {
+            var tipo = new ProjectSheetType();
+
+            Assert(tipo.Linhas != null, "ProjectSheetType.Linhas nao deveria ser null.");
+            AssertEqual(0, tipo.Linhas!.Count, "ProjectSheetType.Linhas.Count inicial");
+        }
+
+        private static void InserirLinhaTipoAdicionaLinha()
+        {
+            var document = new AraciDocument();
+            var commands = new Araci.Core.Commands.CommandManager();
+            var useCase = new InserirLinhaNoTipoPranchaUseCase(document, commands);
+            ProjectSheetType tipo = document.TipoPranchaPadrao;
+
+            ProjectSheetTemplateLine? linha = useCase.Inserir(tipo.Id, 10, 20, 80, 20);
+
+            Assert(linha != null, "Linha deveria ser criada.");
+            AssertEqual(1, tipo.Linhas.Count, "Linhas.Count apos inserir");
+            AssertEqual(10, tipo.Linhas[0].X1, "Linha X1");
+            AssertEqual(20, tipo.Linhas[0].Y1, "Linha Y1");
+            AssertEqual(80, tipo.Linhas[0].X2, "Linha X2");
+            AssertEqual(20, tipo.Linhas[0].Y2, "Linha Y2");
+        }
+
+        private static void InserirLinhaTipoIgnoraComprimentoZero()
+        {
+            var document = new AraciDocument();
+            var commands = new Araci.Core.Commands.CommandManager();
+            var useCase = new InserirLinhaNoTipoPranchaUseCase(document, commands);
+            ProjectSheetType tipo = document.TipoPranchaPadrao;
+
+            ProjectSheetTemplateLine? linha = useCase.Inserir(tipo.Id, 10, 10, 10, 10);
+
+            Assert(linha == null, "Linha de comprimento zero nao deveria ser criada.");
+            AssertEqual(0, tipo.Linhas.Count, "Linhas.Count apos comprimento zero");
+            Assert(!commands.CanUndo, "Comprimento zero nao deveria criar comando.");
+        }
+
+        private static void InserirLinhaTipoUndoRedoPreservaId()
+        {
+            var document = new AraciDocument();
+            var commands = new Araci.Core.Commands.CommandManager();
+            var useCase = new InserirLinhaNoTipoPranchaUseCase(document, commands);
+            ProjectSheetType tipo = document.TipoPranchaPadrao;
+
+            ProjectSheetTemplateLine linha = useCase.Inserir(tipo.Id, 1, 2, 30, 40)!;
+            Guid linhaId = linha.Id;
+
+            commands.Undo();
+            AssertEqual(0, tipo.Linhas.Count, "Undo deveria remover linha.");
+
+            commands.Redo();
+            AssertEqual(1, tipo.Linhas.Count, "Redo deveria restaurar linha.");
+            AssertEqual(linhaId, tipo.Linhas[0].Id, "Redo deveria preservar Id da linha.");
+        }
+
+        private static void PersistenciaPreservaLinhaTemplate()
+        {
+            var serializer = CriarProjectSerializerTeste();
+            var document = new AraciDocument();
+            ProjectSheetType tipo = document.TipoPranchaPadrao;
+            var linha = new ProjectSheetTemplateLine
+            {
+                X1 = 12,
+                Y1 = 24,
+                X2 = 120,
+                Y2 = 48,
+                Stroke = "#FFFF0000",
+                StrokeThickness = 2.5,
+                Visible = true
+            };
+            tipo.Linhas.Add(linha);
+            EditorContext context = new();
+
+            ProjectFileDto dto = serializer.CreateFileDto(document, ProjectMetadataDto.CreateNew("Linha template"), context.Settings.Units);
+            ProjectFileDto reloadedDto = serializer.Deserialize(serializer.Serialize(dto));
+            ProjectSheetType reloaded = serializer.CreateProjectSheetTypes(reloadedDto).Single(t => t.Id == tipo.Id);
+            ProjectSheetTemplateLine reloadedLine = reloaded.Linhas.Single();
+
+            AssertEqual(linha.Id, reloadedLine.Id, "Reload linha Id");
+            AssertEqual(12, reloadedLine.X1, "Reload linha X1");
+            AssertEqual(24, reloadedLine.Y1, "Reload linha Y1");
+            AssertEqual(120, reloadedLine.X2, "Reload linha X2");
+            AssertEqual(48, reloadedLine.Y2, "Reload linha Y2");
+            AssertEqual("#FFFF0000", reloadedLine.Stroke, "Reload linha Stroke");
+            AssertEqual(2.5, reloadedLine.StrokeThickness, "Reload linha StrokeThickness");
+            Assert(reloadedLine.Visible, "Reload linha Visible");
+        }
+
+        private static void ArquivoAntigoSemLinhasTemplateAbreVazio()
+        {
+            var serializer = CriarProjectSerializerTeste();
+            Guid tipoId = Guid.NewGuid();
+            string json = $$"""
+            {
+              "Version": 1,
+              "SheetTypes": [
+                {
+                  "Id": "{{tipoId}}",
+                  "Nome": "Tipo antigo",
+                  "FormatoFolha": "A1",
+                  "OrientacaoFolha": "Paisagem",
+                  "LarguraFolha": 1122,
+                  "AlturaFolha": 794
+                }
+              ]
+            }
+            """;
+
+            ProjectFileDto dto = serializer.Deserialize(json);
+            ProjectSheetType tipo = serializer.CreateProjectSheetTypes(dto).Single();
+
+            AssertEqual(tipoId, tipo.Id, "Tipo antigo Id");
+            Assert(tipo.Linhas != null, "Linhas antigas nao deveria ser null.");
+            AssertEqual(0, tipo.Linhas!.Count, "Arquivo antigo Linhas.Count");
+        }
+
+        private static void LinhaTemplateNaoEntraEmElementos()
+        {
+            var document = new AraciDocument();
+            var commands = new Araci.Core.Commands.CommandManager();
+            var useCase = new InserirLinhaNoTipoPranchaUseCase(document, commands);
+
+            useCase.Inserir(document.TipoPranchaPadrao.Id, 0, 0, 100, 0);
+
+            AssertEqual(0, document.Elementos.Count, "Linha de template nao deveria entrar em Elementos.");
+        }
+
+        private static void OperacoesLinhaTemplateNaoAlteramTabelasPranchas()
+        {
+            var document = new AraciDocument();
+            ProjectTable tabela = document.CriarNovaTabela();
+            ProjectSheet prancha = document.CriarNovaPrancha();
+            Guid? sheetTypeId = prancha.SheetTypeId;
+            var commands = new Araci.Core.Commands.CommandManager();
+            var useCase = new InserirLinhaNoTipoPranchaUseCase(document, commands);
+
+            useCase.Inserir(document.TipoPranchaPadrao.Id, 5, 6, 70, 80);
+
+            AssertEqual(1, document.Tabelas.Count, "Tabelas.Count apos linha template");
+            AssertEqual(tabela.Id, document.Tabelas[0].Id, "Tabela preservada apos linha template");
+            AssertEqual(1, document.Pranchas.Count, "Pranchas.Count apos linha template");
+            AssertEqual(prancha.Id, document.Pranchas[0].Id, "Prancha preservada apos linha template");
+            AssertEqual(sheetTypeId, document.Pranchas[0].SheetTypeId, "SheetTypeId preservado apos linha template");
+        }
+
+        private static void ProjectSheetTypeViewModelExpoeLinhasTipo()
+        {
+            var document = new AraciDocument();
+            ProjectSheetType tipo = document.TipoPranchaPadrao;
+            tipo.Linhas.Add(new ProjectSheetTemplateLine { X1 = 1, Y1 = 2, X2 = 3, Y2 = 4 });
+
+            var viewModel = new ProjectSheetTypeViewModel(document, tipo);
+
+            AssertEqual(1, viewModel.Lines.Count, "ViewModel Lines.Count");
+            AssertEqual(1, viewModel.Lines[0].X1, "ViewModel linha X1");
+            AssertEqual(4, viewModel.Lines[0].Y2, "ViewModel linha Y2");
+        }
+
+        private static void ProjectSheetTypeViewRenderizaBindingsLinhas()
+        {
+            string xaml = File.ReadAllText(FindProjectFile("Views/ProjectSheetTypeView.xaml"));
+
+            AssertContains(xaml, "ItemsSource=\"{Binding Lines}\"", "ProjectSheetTypeView Lines binding");
+            AssertContains(xaml, "X1=\"{Binding X1}\"", "ProjectSheetTypeView Line X1 binding");
+            AssertContains(xaml, "Y1=\"{Binding Y1}\"", "ProjectSheetTypeView Line Y1 binding");
+            AssertContains(xaml, "X2=\"{Binding X2}\"", "ProjectSheetTypeView Line X2 binding");
+            AssertContains(xaml, "Y2=\"{Binding Y2}\"", "ProjectSheetTypeView Line Y2 binding");
+            AssertContains(xaml, "PreviewLine", "ProjectSheetTypeView PreviewLine binding");
+        }
+
+        private static void ToolServiceLinhaContextoTipoAtivaFerramentaTemplate()
+        {
+            var context = new EditorContext();
+            ProjectSheetType tipo = context.Document.TipoPranchaPadrao;
+            context.ProjectSheetTypeViewModelAtivo = new ProjectSheetTypeViewModel(context.Document, tipo);
+            context.Editor.SuperficieAtiva = EditorSurfaceKind.ProjectSheetType;
+
+            context.Tools.AtivarInserirLinhaAnotativa();
+
+            Assert(context.Tools.FerramentaAtual is Araci.Applications.Anotar.InserirLinha.InserirLinhaTipoPranchaTool, "Contexto de tipo deveria ativar InserirLinhaTipoPranchaTool.");
+        }
+
+        private static void FerramentaLinhaTemplateInsereLinhaPorDoisCliques()
+        {
+            var context = new EditorContext();
+            ProjectSheetType tipo = context.Document.TipoPranchaPadrao;
+            context.ProjectSheetTypeViewModelAtivo = new ProjectSheetTypeViewModel(context.Document, tipo);
+            context.Editor.SuperficieAtiva = EditorSurfaceKind.ProjectSheetType;
+            context.Tools.AtivarInserirLinhaAnotativa();
+            ToolInputState input = new(ModifierKeys.None, MouseButton.Left, 1, new Point(0, 0), new Point(0, 0));
+
+            context.Tools.FerramentaAtual.OnMouseDown(null, new Point(10, 20), input);
+            context.Tools.FerramentaAtual.OnMouseMove(new Point(80, 20), input);
+            context.Tools.FerramentaAtual.OnMouseDown(null, new Point(80, 20), input);
+
+            ProjectSheetTemplateLine linha = tipo.Linhas.Single();
+            AssertEqual(10, linha.X1, "Ferramenta template linha X1");
+            AssertEqual(20, linha.Y1, "Ferramenta template linha Y1");
+            AssertEqual(80, linha.X2, "Ferramenta template linha X2");
+            AssertEqual(20, linha.Y2, "Ferramenta template linha Y2");
+            AssertEqual(0, context.Document.Elementos.Count, "Ferramenta template nao deveria criar Elemento.");
+        }
+
+        private static void ToolServiceLinhaContextoDiagramaPreservaFerramentaAnotativa()
+        {
+            var context = new EditorContext();
+            context.Editor.SuperficieAtiva = EditorSurfaceKind.Diagram;
+
+            context.Tools.AtivarInserirLinhaAnotativa();
+
+            Assert(context.Tools.FerramentaAtual is Araci.Applications.Anotar.InserirLinha.InserirLinhaAnotativaTool, "Contexto de diagrama deveria preservar InserirLinhaAnotativaTool.");
         }
 
         private static void ProjectBrowserSelecionaTipoAbreVisualizacaoTipo()

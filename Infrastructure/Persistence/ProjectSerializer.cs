@@ -476,7 +476,26 @@ namespace Araci.Infrastructure.Persistence
                 FormatoFolha = tipo.FormatoFolha.ToString(),
                 OrientacaoFolha = tipo.OrientacaoFolha.ToString(),
                 LarguraFolha = tipo.LarguraFolha,
-                AlturaFolha = tipo.AlturaFolha
+                AlturaFolha = tipo.AlturaFolha,
+                Linhas = (tipo.Linhas ?? new List<ProjectSheetTemplateLine>())
+                    .Where(l => l != null)
+                    .Select(CriarProjectSheetTemplateLineDto)
+                    .ToList()
+            };
+        }
+
+        private static ProjectSheetTemplateLineDto CriarProjectSheetTemplateLineDto(ProjectSheetTemplateLine linha)
+        {
+            return new ProjectSheetTemplateLineDto
+            {
+                Id = linha.Id,
+                X1 = linha.X1,
+                Y1 = linha.Y1,
+                X2 = linha.X2,
+                Y2 = linha.Y2,
+                Stroke = string.IsNullOrWhiteSpace(linha.Stroke) ? "#FF000000" : linha.Stroke,
+                StrokeThickness = NormalizarEspessuraLinha(linha.StrokeThickness),
+                Visible = linha.Visible
             };
         }
 
@@ -554,8 +573,30 @@ namespace Araci.Infrastructure.Persistence
                 FormatoFolha = ParseEnum(dto.FormatoFolha, ProjectSheetFormat.A1),
                 OrientacaoFolha = ParseEnum(dto.OrientacaoFolha, ProjectSheetOrientation.Paisagem),
                 LarguraFolha = NormalizarDimensaoFolha(dto.LarguraFolha, ProjectSheet.DefaultWidth),
-                AlturaFolha = NormalizarDimensaoFolha(dto.AlturaFolha, ProjectSheet.DefaultHeight)
+                AlturaFolha = NormalizarDimensaoFolha(dto.AlturaFolha, ProjectSheet.DefaultHeight),
+                Linhas = ParseProjectSheetTemplateLines(dto.Linhas)
             };
+        }
+
+        private static List<ProjectSheetTemplateLine> ParseProjectSheetTemplateLines(IEnumerable<ProjectSheetTemplateLineDto>? valores)
+        {
+            if (valores == null)
+                return new List<ProjectSheetTemplateLine>();
+
+            return valores
+                .Where(v => v != null)
+                .Select(v => new ProjectSheetTemplateLine
+                {
+                    Id = v.Id == Guid.Empty ? Guid.NewGuid() : v.Id,
+                    X1 = NormalizarCoordenada(v.X1),
+                    Y1 = NormalizarCoordenada(v.Y1),
+                    X2 = NormalizarCoordenada(v.X2),
+                    Y2 = NormalizarCoordenada(v.Y2),
+                    Stroke = string.IsNullOrWhiteSpace(v.Stroke) ? "#FF000000" : v.Stroke,
+                    StrokeThickness = NormalizarEspessuraLinha(v.StrokeThickness),
+                    Visible = v.Visible
+                })
+                .ToList();
         }
 
         private Elemento? CriarElemento(ElementDto dto)
@@ -806,6 +847,13 @@ namespace Araci.Infrastructure.Persistence
                 return fallback;
 
             return valor.Value;
+        }
+
+        private static double NormalizarEspessuraLinha(double valor)
+        {
+            return double.IsNaN(valor) || double.IsInfinity(valor) || valor <= 0
+                ? 1.0
+                : valor;
         }
 
         private static string NormalizarTextoVista(string? valor, string fallback)

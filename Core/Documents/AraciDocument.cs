@@ -203,7 +203,11 @@ namespace Araci.Core.Documents
                 FormatoFolha = origem?.FormatoFolha ?? ProjectSheetFormat.A1,
                 OrientacaoFolha = origem?.OrientacaoFolha ?? ProjectSheetOrientation.Paisagem,
                 LarguraFolha = origem?.LarguraFolha ?? ProjectSheet.DefaultWidth,
-                AlturaFolha = origem?.AlturaFolha ?? ProjectSheet.DefaultHeight
+                AlturaFolha = origem?.AlturaFolha ?? ProjectSheet.DefaultHeight,
+                Linhas = origem?.Linhas
+                    .Where(l => l != null)
+                    .Select(l => l.CriarCopia(gerarNovoId: true))
+                    .ToList() ?? new List<ProjectSheetTemplateLine>()
             };
         }
 

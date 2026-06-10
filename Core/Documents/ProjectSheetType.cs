@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 
 namespace Araci.Core.Documents
 {
@@ -13,6 +14,7 @@ namespace Araci.Core.Documents
         public string Nome { get; set; } = DefaultName;
         public ProjectSheetFormat FormatoFolha { get; set; } = ProjectSheetFormat.A1;
         public ProjectSheetOrientation OrientacaoFolha { get; set; } = ProjectSheetOrientation.Paisagem;
+        public List<ProjectSheetTemplateLine> Linhas { get; set; } = new();
 
         public double LarguraFolha
         {
