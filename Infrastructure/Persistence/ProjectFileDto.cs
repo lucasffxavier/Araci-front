@@ -18,8 +18,19 @@ namespace Araci.Infrastructure.Persistence
         public Guid? ActiveViewId { get; set; }
         public List<ProjectViewDto> Views { get; set; } = new();
         public List<ProjectTableDto> Tables { get; set; } = new();
+        public List<ProjectSheetTypeDto> SheetTypes { get; set; } = new();
         public List<ProjectSheetDto> Sheets { get; set; } = new();
         public List<ElementDto> Elements { get; set; } = new();
+    }
+
+    public sealed class ProjectSheetTypeDto
+    {
+        public Guid Id { get; set; }
+        public string Nome { get; set; } = string.Empty;
+        public string FormatoFolha { get; set; } = string.Empty;
+        public string OrientacaoFolha { get; set; } = string.Empty;
+        public double? LarguraFolha { get; set; }
+        public double? AlturaFolha { get; set; }
     }
 
     public sealed class ProjectViewDto
@@ -81,6 +92,7 @@ namespace Araci.Infrastructure.Persistence
         public Guid Id { get; set; }
         public string Nome { get; set; } = string.Empty;
         public string Numero { get; set; } = string.Empty;
+        public Guid? SheetTypeId { get; set; }
         public string FormatoFolha { get; set; } = string.Empty;
         public string OrientacaoFolha { get; set; } = string.Empty;
         public double? LarguraFolha { get; set; }

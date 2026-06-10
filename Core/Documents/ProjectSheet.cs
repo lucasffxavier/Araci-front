@@ -31,6 +31,7 @@ namespace Araci.Core.Documents
         public Guid Id { get; set; } = Guid.NewGuid();
         public string Nome { get; set; } = string.Empty;
         public string Numero { get; set; } = string.Empty;
+        public Guid? SheetTypeId { get; set; }
         public ProjectSheetFormat FormatoFolha { get; set; } = ProjectSheetFormat.A1;
         public ProjectSheetOrientation OrientacaoFolha { get; set; } = ProjectSheetOrientation.Paisagem;
 

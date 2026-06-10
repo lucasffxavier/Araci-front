@@ -95,12 +95,20 @@ namespace Araci.TechnicalChecks
                 ("Tabela CSV use case mostra erro de escrita", TabelaCsvUseCaseMostraErroDeEscrita),
                 ("Prancha nova inicia sem instancias de tabela", PranchaNovaIniciaSemInstanciasTabela),
                 ("ProjectSheet possui defaults validos de folha", ProjectSheetPossuiDefaultsValidosFolha),
+                ("ProjectSheetType possui defaults validos", ProjectSheetTypePossuiDefaultsValidos),
+                ("AraciDocument novo possui tipo padrao de prancha", AraciDocumentNovoPossuiTipoPadraoPrancha),
+                ("CriarPrancha associa prancha ao tipo padrao", CriarPranchaAssociaPranchaAoTipoPadrao),
                 ("Prancha persiste instancia de tabela", PranchaPersisteInstanciaTabela),
                 ("Persistencia preserva propriedades da prancha", PersistenciaPreservaPropriedadesPrancha),
+                ("Persistencia preserva tipos de prancha", PersistenciaPreservaTiposPrancha),
+                ("Persistencia preserva associacao prancha tipo", PersistenciaPreservaAssociacaoPranchaTipo),
                 ("Prancha duplica instancias de tabela com copia profunda", PranchaDuplicaInstanciasTabelaComCopiaProfunda),
+                ("Duplicar prancha preserva associacao ao tipo", DuplicarPranchaPreservaAssociacaoTipo),
+                ("Operacoes de prancha nao alteram tipos indevidamente", OperacoesPranchaNaoAlteramTiposIndevidamente),
                 ("Excluir tabela limpa instancias em pranchas com undo redo", ExcluirTabelaLimpaInstanciasPranchaComUndoRedo),
                 ("Prancha carrega arquivo antigo sem instancias", PranchaCarregaArquivoAntigoSemInstancias),
                 ("Arquivo antigo sem propriedades de prancha usa defaults", ArquivoAntigoSemPropriedadesPranchaUsaDefaults),
+                ("Arquivo antigo sem tipos de prancha usa tipo padrao", ArquivoAntigoSemTiposPranchaUsaTipoPadrao),
                 ("Prancha ignora instancia orfa no load", PranchaIgnoraInstanciaOrfaNoLoad),
                 ("Editar propriedades prancha undo redo", EditarPropriedadesPranchaUndoRedo),
                 ("Inserir tabela na prancha cria instancia undo redo", InserirTabelaNaPranchaCriaInstanciaUndoRedo),
@@ -5665,6 +5673,46 @@ namespace Araci.TechnicalChecks
             AssertEqual(561, alturaA3Retrato, "A3 retrato altura");
         }
 
+        private static void ProjectSheetTypePossuiDefaultsValidos()
+        {
+            var tipo = new ProjectSheetType();
+
+            Assert(tipo.Id != Guid.Empty, "ProjectSheetType.Id padrao");
+            AssertEqual(ProjectSheetType.DefaultName, tipo.Nome, "ProjectSheetType.Nome padrao");
+            AssertEqual(ProjectSheetFormat.A1, tipo.FormatoFolha, "ProjectSheetType.FormatoFolha padrao");
+            AssertEqual(ProjectSheetOrientation.Paisagem, tipo.OrientacaoFolha, "ProjectSheetType.OrientacaoFolha padrao");
+            AssertEqual(ProjectSheet.DefaultWidth, tipo.LarguraFolha, "ProjectSheetType.LarguraFolha padrao");
+            AssertEqual(ProjectSheet.DefaultHeight, tipo.AlturaFolha, "ProjectSheetType.AlturaFolha padrao");
+
+            tipo.LarguraFolha = double.NaN;
+            tipo.AlturaFolha = double.NegativeInfinity;
+
+            AssertEqual(ProjectSheet.DefaultWidth, tipo.LarguraFolha, "ProjectSheetType.LarguraFolha invalida usa fallback");
+            AssertEqual(ProjectSheet.DefaultHeight, tipo.AlturaFolha, "ProjectSheetType.AlturaFolha invalida usa fallback");
+        }
+
+        private static void AraciDocumentNovoPossuiTipoPadraoPrancha()
+        {
+            var document = new AraciDocument();
+
+            AssertEqual(1, document.TiposPrancha.Count, "TiposPrancha.Count inicial");
+            Assert(document.TipoPranchaPadrao.Id != Guid.Empty, "TipoPranchaPadrao.Id");
+            AssertEqual(ProjectSheetType.DefaultName, document.TipoPranchaPadrao.Nome, "TipoPranchaPadrao.Nome");
+        }
+
+        private static void CriarPranchaAssociaPranchaAoTipoPadrao()
+        {
+            var document = new AraciDocument();
+            var commands = new Araci.Core.Commands.CommandManager();
+            var useCase = new CriarItemProjetoUseCase(document, commands);
+            Guid tipoPadraoId = document.TipoPranchaPadrao.Id;
+
+            ProjectSheet prancha = useCase.CriarPrancha();
+
+            AssertEqual(tipoPadraoId, prancha.SheetTypeId ?? Guid.Empty, "CriarPrancha SheetTypeId");
+            AssertEqual(1, document.TiposPrancha.Count, "CriarPrancha nao cria novo tipo");
+        }
+
         private static void PranchaPersisteInstanciaTabela()
         {
             var document = new AraciDocument();
@@ -5761,6 +5809,52 @@ namespace Araci.TechnicalChecks
             AssertEqual(3, reloaded.Tabelas.Single().RowCount, "Reload preserva RowCount");
         }
 
+        private static void PersistenciaPreservaTiposPrancha()
+        {
+            var serializer = CriarProjectSerializerTeste();
+            var document = new AraciDocument();
+            var tipo = new ProjectSheetType
+            {
+                Nome = "A3 Retrato - Obra",
+                FormatoFolha = ProjectSheetFormat.A3,
+                OrientacaoFolha = ProjectSheetOrientation.Retrato,
+                LarguraFolha = 397,
+                AlturaFolha = 561
+            };
+            document.SubstituirTiposPrancha(new[] { tipo });
+            EditorContext context = new();
+
+            ProjectFileDto dto = serializer.CreateFileDto(document, ProjectMetadataDto.CreateNew("Tipos prancha"), context.Settings.Units);
+            string json = serializer.Serialize(dto);
+            ProjectFileDto reloadedDto = serializer.Deserialize(json);
+            ProjectSheetType reloaded = serializer.CreateProjectSheetTypes(reloadedDto).Single(t => t.Id == tipo.Id);
+
+            AssertEqual(1, dto.SheetTypes.Count, "DTO SheetTypes.Count");
+            AssertEqual(tipo.Id, dto.SheetTypes[0].Id, "DTO SheetType.Id");
+            AssertEqual("A3 Retrato - Obra", reloaded.Nome, "Reload SheetType.Nome");
+            AssertEqual(ProjectSheetFormat.A3, reloaded.FormatoFolha, "Reload SheetType.FormatoFolha");
+            AssertEqual(ProjectSheetOrientation.Retrato, reloaded.OrientacaoFolha, "Reload SheetType.OrientacaoFolha");
+            AssertEqual(397, reloaded.LarguraFolha, "Reload SheetType.LarguraFolha");
+            AssertEqual(561, reloaded.AlturaFolha, "Reload SheetType.AlturaFolha");
+        }
+
+        private static void PersistenciaPreservaAssociacaoPranchaTipo()
+        {
+            var serializer = CriarProjectSerializerTeste();
+            var document = new AraciDocument();
+            ProjectSheetType tipo = document.TipoPranchaPadrao;
+            ProjectSheet prancha = document.CriarNovaPrancha();
+            EditorContext context = new();
+
+            ProjectFileDto dto = serializer.CreateFileDto(document, ProjectMetadataDto.CreateNew("Associacao prancha tipo"), context.Settings.Units);
+            string json = serializer.Serialize(dto);
+            ProjectFileDto reloadedDto = serializer.Deserialize(json);
+            ProjectSheet reloaded = serializer.CreateProjectSheets(reloadedDto, Array.Empty<Guid>()).Single(s => s.Id == prancha.Id);
+
+            AssertEqual(tipo.Id, dto.Sheets.Single(s => s.Id == prancha.Id).SheetTypeId ?? Guid.Empty, "DTO SheetTypeId");
+            AssertEqual(tipo.Id, reloaded.SheetTypeId ?? Guid.Empty, "Reload SheetTypeId");
+        }
+
         private static void PranchaDuplicaInstanciasTabelaComCopiaProfunda()
         {
             var document = new AraciDocument();
@@ -5794,6 +5888,45 @@ namespace Araci.TechnicalChecks
             AssertEqual(instancia.Height, copia.Height, "Duplicata instancia Height");
             AssertEqual(instancia.RowStartIndex, copia.RowStartIndex, "Duplicata instancia RowStartIndex");
             AssertEqual(instancia.RowCount, copia.RowCount, "Duplicata instancia RowCount");
+        }
+
+        private static void DuplicarPranchaPreservaAssociacaoTipo()
+        {
+            var document = new AraciDocument();
+            ProjectSheet origem = document.CriarNovaPrancha();
+            Guid tipoId = origem.SheetTypeId ?? Guid.Empty;
+            var commands = new Araci.Core.Commands.CommandManager();
+            var useCase = new DuplicarItemProjetoUseCase(document, commands);
+
+            bool duplicou = useCase.DuplicarPrancha(origem.Id);
+            ProjectSheet duplicata = document.Pranchas.Single(p => p.Id != origem.Id);
+
+            Assert(duplicou, "DuplicarPrancha deveria retornar true.");
+            AssertEqual(tipoId, duplicata.SheetTypeId ?? Guid.Empty, "Duplicata SheetTypeId");
+            AssertEqual(1, document.TiposPrancha.Count, "DuplicarPrancha nao duplica tipo");
+        }
+
+        private static void OperacoesPranchaNaoAlteramTiposIndevidamente()
+        {
+            var document = new AraciDocument();
+            var commands = new Araci.Core.Commands.CommandManager();
+            var criar = new CriarItemProjetoUseCase(document, commands);
+            var duplicar = new DuplicarItemProjetoUseCase(document, commands);
+            var excluir = new ExcluirItemProjetoUseCase(document, commands);
+            Guid tipoId = document.TipoPranchaPadrao.Id;
+
+            ProjectSheet prancha = criar.CriarPrancha();
+            AssertEqual(1, document.TiposPrancha.Count, "Tipos apos criar");
+
+            bool duplicou = duplicar.DuplicarPrancha(prancha.Id);
+            Assert(duplicou, "DuplicarPrancha deveria retornar true.");
+            AssertEqual(1, document.TiposPrancha.Count, "Tipos apos duplicar");
+
+            ProjectSheet duplicata = document.Pranchas.Single(p => p.Id != prancha.Id);
+            bool excluiu = excluir.ExcluirPrancha(duplicata.Id);
+            Assert(excluiu, "ExcluirPrancha deveria retornar true.");
+            AssertEqual(1, document.TiposPrancha.Count, "Tipos apos excluir");
+            AssertEqual(tipoId, document.TipoPranchaPadrao.Id, "Tipo padrao preservado");
         }
 
         private static void ExcluirTabelaLimpaInstanciasPranchaComUndoRedo()
@@ -5881,6 +6014,44 @@ namespace Araci.TechnicalChecks
             AssertEqual(ProjectSheetOrientation.Paisagem, prancha.OrientacaoFolha, "Prancha antiga OrientacaoFolha default");
             AssertEqual(ProjectSheet.DefaultWidth, prancha.LarguraFolha, "Prancha antiga LarguraFolha default");
             AssertEqual(ProjectSheet.DefaultHeight, prancha.AlturaFolha, "Prancha antiga AlturaFolha default");
+        }
+
+        private static void ArquivoAntigoSemTiposPranchaUsaTipoPadrao()
+        {
+            var serializer = CriarProjectSerializerTeste();
+            Guid sheetId = Guid.NewGuid();
+            string json = $$"""
+            {
+              "Version": 1,
+              "Sheets": [
+                {
+                  "Id": "{{sheetId}}",
+                  "Nome": "Prancha G19",
+                  "Numero": "A001",
+                  "FormatoFolha": "Personalizado",
+                  "OrientacaoFolha": "Retrato",
+                  "LarguraFolha": 640,
+                  "AlturaFolha": 900
+                }
+              ]
+            }
+            """;
+
+            ProjectFileDto dto = serializer.Deserialize(json);
+            IReadOnlyList<ProjectSheetType> tipos = serializer.CreateProjectSheetTypes(dto);
+            IReadOnlyList<ProjectSheet> pranchas = serializer.CreateProjectSheets(dto, Array.Empty<Guid>());
+            var document = new AraciDocument();
+            document.SubstituirTiposPrancha(tipos);
+            document.SubstituirPranchas(pranchas);
+            ProjectSheet prancha = document.Pranchas.Single();
+
+            AssertEqual(1, document.TiposPrancha.Count, "Arquivo antigo TiposPrancha.Count");
+            AssertEqual(document.TipoPranchaPadrao.Id, prancha.SheetTypeId ?? Guid.Empty, "Arquivo antigo SheetTypeId fallback");
+            AssertEqual("A001", prancha.Numero, "Arquivo G19 preserva Numero");
+            AssertEqual(ProjectSheetFormat.Personalizado, prancha.FormatoFolha, "Arquivo G19 preserva FormatoFolha");
+            AssertEqual(ProjectSheetOrientation.Retrato, prancha.OrientacaoFolha, "Arquivo G19 preserva OrientacaoFolha");
+            AssertEqual(640, prancha.LarguraFolha, "Arquivo G19 preserva LarguraFolha");
+            AssertEqual(900, prancha.AlturaFolha, "Arquivo G19 preserva AlturaFolha");
         }
 
         private static void PranchaIgnoraInstanciaOrfaNoLoad()

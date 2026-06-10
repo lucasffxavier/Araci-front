@@ -72,6 +72,9 @@ namespace Araci.Infrastructure.Persistence
                 Tables = document.Tabelas
                     .Select(t => CriarProjectTableDto(t, document.Vistas.Select(v => v.Id)))
                     .ToList(),
+                SheetTypes = document.TiposPrancha
+                    .Select(CriarProjectSheetTypeDto)
+                    .ToList(),
                 Sheets = document.Pranchas
                     .Select(p => CriarProjectSheetDto(p, document.Tabelas.Select(t => t.Id)))
                     .ToList(),
@@ -178,6 +181,23 @@ namespace Araci.Infrastructure.Persistence
                 .Where(s => s != null)
                 .Cast<ProjectSheet>()
                 .ToList();
+        }
+
+        public IReadOnlyList<ProjectSheetType> CreateProjectSheetTypes(ProjectFileDto dto)
+        {
+            ArgumentNullException.ThrowIfNull(dto);
+
+            List<ProjectSheetType> tipos = (dto.SheetTypes ?? new List<ProjectSheetTypeDto>())
+                .Select(CriarProjectSheetType)
+                .Where(t => t != null)
+                .Cast<ProjectSheetType>()
+                .GroupBy(t => t.Id)
+                .Select(g => g.Last())
+                .ToList();
+
+            return tipos.Count > 0
+                ? tipos
+                : new List<ProjectSheetType> { ProjectSheetType.CriarPadrao() };
         }
 
         public Guid? GetActiveViewId(ProjectFileDto dto)
@@ -425,6 +445,7 @@ namespace Araci.Infrastructure.Persistence
                 Id = prancha.Id,
                 Nome = prancha.Nome,
                 Numero = prancha.Numero,
+                SheetTypeId = prancha.SheetTypeId,
                 FormatoFolha = prancha.FormatoFolha.ToString(),
                 OrientacaoFolha = prancha.OrientacaoFolha.ToString(),
                 LarguraFolha = prancha.LarguraFolha,
@@ -443,6 +464,19 @@ namespace Araci.Infrastructure.Persistence
                         RowCount = i.RowCount
                     })
                     .ToList()
+            };
+        }
+
+        private static ProjectSheetTypeDto CriarProjectSheetTypeDto(ProjectSheetType tipo)
+        {
+            return new ProjectSheetTypeDto
+            {
+                Id = tipo.Id,
+                Nome = tipo.Nome,
+                FormatoFolha = tipo.FormatoFolha.ToString(),
+                OrientacaoFolha = tipo.OrientacaoFolha.ToString(),
+                LarguraFolha = tipo.LarguraFolha,
+                AlturaFolha = tipo.AlturaFolha
             };
         }
 
@@ -499,11 +533,28 @@ namespace Araci.Infrastructure.Persistence
                 Id = dto.Id == Guid.Empty ? Guid.NewGuid() : dto.Id,
                 Nome = dto.Nome,
                 Numero = dto.Numero ?? string.Empty,
+                SheetTypeId = dto.SheetTypeId == Guid.Empty ? null : dto.SheetTypeId,
                 FormatoFolha = ParseEnum(dto.FormatoFolha, ProjectSheetFormat.A1),
                 OrientacaoFolha = ParseEnum(dto.OrientacaoFolha, ProjectSheetOrientation.Paisagem),
                 LarguraFolha = NormalizarDimensaoFolha(dto.LarguraFolha, ProjectSheet.DefaultWidth),
                 AlturaFolha = NormalizarDimensaoFolha(dto.AlturaFolha, ProjectSheet.DefaultHeight),
                 Tabelas = ParseProjectSheetTableInstances(dto.Tabelas, tabelasValidas)
+            };
+        }
+
+        private static ProjectSheetType? CriarProjectSheetType(ProjectSheetTypeDto dto)
+        {
+            if (string.IsNullOrWhiteSpace(dto.Nome))
+                return null;
+
+            return new ProjectSheetType
+            {
+                Id = dto.Id == Guid.Empty ? Guid.NewGuid() : dto.Id,
+                Nome = dto.Nome.Trim(),
+                FormatoFolha = ParseEnum(dto.FormatoFolha, ProjectSheetFormat.A1),
+                OrientacaoFolha = ParseEnum(dto.OrientacaoFolha, ProjectSheetOrientation.Paisagem),
+                LarguraFolha = NormalizarDimensaoFolha(dto.LarguraFolha, ProjectSheet.DefaultWidth),
+                AlturaFolha = NormalizarDimensaoFolha(dto.AlturaFolha, ProjectSheet.DefaultHeight)
             };
         }
 

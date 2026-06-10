@@ -112,6 +112,7 @@ namespace Araci.Applications.Projects
                 _serializer.ApplyTypeLibraries(dto.TypeLibraries);
                 var vistas = _serializer.CreateProjectViews(dto);
                 var tabelas = _serializer.CreateProjectTables(dto);
+                var tiposPrancha = _serializer.CreateProjectSheetTypes(dto);
                 var pranchas = _serializer.CreateProjectSheets(dto, tabelas.Select(t => t.Id));
                 Guid? vistaAtivaId = _serializer.GetActiveViewId(dto);
                 var elementos = _serializer.CreateElements(dto);
@@ -120,6 +121,7 @@ namespace Araci.Applications.Projects
                 _document.SubstituirVistas(vistas);
                 _document.DefinirVistaAtiva(vistaAtivaId);
                 _document.SubstituirTabelas(tabelas);
+                _document.SubstituirTiposPrancha(tiposPrancha);
                 _document.SubstituirPranchas(pranchas);
 
                 foreach (Elemento elemento in elementos)
