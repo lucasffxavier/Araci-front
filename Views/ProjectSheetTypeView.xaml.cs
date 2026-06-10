@@ -2,6 +2,7 @@ using System;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
+using System.Windows.Threading;
 using Araci.Applications.Editar.Base;
 using Araci.Services;
 using Araci.ViewModels;
@@ -13,6 +14,9 @@ namespace Araci.Views
         private const double LineHitTolerance = 6.0;
         private const double EndpointHitTolerance = 8.0;
         private const double DragThresholdSquared = 9.0;
+        private const double LayoutTolerance = 1.0;
+        private const int CenterSheetMaxAttempts = 10;
+        private const int CenterSheetSettlingAttempts = 2;
 
         private EditorContext? _context;
         private Guid? _linhaTemplateEmArrasteId;
@@ -28,11 +32,14 @@ namespace Araci.Views
         private double _linhaTemplateEndpointOriginalY1;
         private double _linhaTemplateEndpointOriginalX2;
         private double _linhaTemplateEndpointOriginalY2;
+        private int _centerSheetRequestVersion;
 
         public ProjectSheetTypeView()
         {
             InitializeComponent();
             DataContext = null;
+            Loaded += ProjectSheetTypeView_Loaded;
+            SizeChanged += ProjectSheetTypeView_SizeChanged;
             DataContextChanged += OnDataContextChanged;
         }
 
@@ -41,7 +48,20 @@ namespace Araci.Views
             _context = context ?? throw new ArgumentNullException(nameof(context));
 
             if (DataContext is ProjectSheetTypeViewModel viewModel)
+            {
                 _context.ProjectSheetTypeViewModelAtivo = viewModel;
+                CenterSheetInViewportDeferred();
+            }
+        }
+
+        private void ProjectSheetTypeView_Loaded(object sender, RoutedEventArgs e)
+        {
+            CenterSheetInViewportDeferred();
+        }
+
+        private void ProjectSheetTypeView_SizeChanged(object sender, SizeChangedEventArgs e)
+        {
+            CenterSheetInViewportDeferred();
         }
 
         private void TemplatePageBorder_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
@@ -459,6 +479,8 @@ namespace Araci.Views
             {
                 if (_context != null)
                     _context.ProjectSheetTypeViewModelAtivo = viewModel;
+
+                CenterSheetInViewportDeferred();
             }
 
             AtualizarHandlesOverlay();
@@ -469,6 +491,130 @@ namespace Araci.Views
             ObterViewModelAtivo();
         }
 
+        private void CenterSheetInViewportDeferred()
+        {
+            int version = ++_centerSheetRequestVersion;
+            QueueCenterSheetInViewport(version, 0, DispatcherPriority.Loaded);
+        }
+
+        private void QueueCenterSheetInViewport(int version, int attempt, DispatcherPriority priority)
+        {
+            Dispatcher.BeginInvoke(
+                priority,
+                new Action(() =>
+                {
+                    if (version != _centerSheetRequestVersion)
+                        return;
+
+                    bool centered = CenterSheetInViewport(updateLayout: true);
+
+                    if (version != _centerSheetRequestVersion)
+                        return;
+
+                    if (!centered && attempt < CenterSheetMaxAttempts)
+                    {
+                        QueueCenterSheetInViewport(version, attempt + 1, DispatcherPriority.ContextIdle);
+                        return;
+                    }
+
+                    if (centered && attempt < CenterSheetSettlingAttempts)
+                        QueueCenterSheetInViewport(version, attempt + 1, DispatcherPriority.Render);
+                }));
+        }
+
+        private bool CenterSheetInViewport(bool updateLayout = false)
+        {
+            ProjectSheetTypeViewModel? viewModel = ObterViewModelAtivo();
+
+            if (!IsLoaded || viewModel == null)
+                return false;
+
+            if (updateLayout)
+            {
+                SheetTypeSurface.UpdateLayout();
+                TemplatePageBorder.UpdateLayout();
+                SheetTypeScrollViewer.UpdateLayout();
+            }
+
+            double viewportWidth = ResolveViewportDimension(SheetTypeScrollViewer.ViewportWidth, SheetTypeScrollViewer.ActualWidth);
+            double viewportHeight = ResolveViewportDimension(SheetTypeScrollViewer.ViewportHeight, SheetTypeScrollViewer.ActualHeight);
+
+            if (viewportWidth <= 0 || viewportHeight <= 0)
+                return false;
+
+            double extentWidth = ResolveExtentDimension(SheetTypeScrollViewer.ExtentWidth, SheetTypeSurface.ActualWidth, viewModel.WorkspaceWidth);
+            double extentHeight = ResolveExtentDimension(SheetTypeScrollViewer.ExtentHeight, SheetTypeSurface.ActualHeight, viewModel.WorkspaceHeight);
+            double expectedScrollableWidth = Math.Max(0.0, extentWidth - viewportWidth);
+            double expectedScrollableHeight = Math.Max(0.0, extentHeight - viewportHeight);
+
+            if (!ScrollableDimensionReady(SheetTypeScrollViewer.ScrollableWidth, expectedScrollableWidth) ||
+                !ScrollableDimensionReady(SheetTypeScrollViewer.ScrollableHeight, expectedScrollableHeight))
+                return false;
+
+            double sheetCenterX = viewModel.SheetOriginOffsetX + viewModel.SheetWidth / 2.0;
+            double sheetCenterY = viewModel.SheetOriginOffsetY + viewModel.SheetHeight / 2.0;
+            double targetHorizontal = sheetCenterX - viewportWidth / 2.0;
+            double targetVertical = sheetCenterY - viewportHeight / 2.0;
+            double maximumHorizontal = Math.Max(SheetTypeScrollViewer.ScrollableWidth, expectedScrollableWidth);
+            double maximumVertical = Math.Max(SheetTypeScrollViewer.ScrollableHeight, expectedScrollableHeight);
+            double normalizedHorizontal = NormalizeScrollOffset(targetHorizontal, maximumHorizontal);
+            double normalizedVertical = NormalizeScrollOffset(targetVertical, maximumVertical);
+
+            SheetTypeScrollViewer.ScrollToHorizontalOffset(normalizedHorizontal);
+            SheetTypeScrollViewer.ScrollToVerticalOffset(normalizedVertical);
+            SheetTypeScrollViewer.UpdateLayout();
+            return true;
+        }
+
+        private static double ResolveViewportDimension(double viewport, double actual)
+        {
+            bool viewportValido = ValorPositivo(viewport);
+            bool actualValido = ValorPositivo(actual);
+
+            if (!viewportValido)
+                return actualValido ? actual : 0.0;
+
+            if (actualValido && viewport > actual + LayoutTolerance)
+                return actual;
+
+            return viewport;
+        }
+
+        private static double ResolveExtentDimension(double extent, double actual, double fallback)
+        {
+            double resolved = 0.0;
+
+            if (ValorPositivo(fallback))
+                resolved = Math.Max(resolved, fallback);
+
+            if (ValorPositivo(actual))
+                resolved = Math.Max(resolved, actual);
+
+            if (ValorPositivo(extent))
+                resolved = Math.Max(resolved, extent);
+
+            return resolved;
+        }
+
+        private static bool ScrollableDimensionReady(double scrollable, double expectedScrollable)
+        {
+            if (expectedScrollable <= LayoutTolerance)
+                return true;
+
+            return ValorFinito(scrollable) && scrollable + LayoutTolerance >= expectedScrollable;
+        }
+
+        private static double NormalizeScrollOffset(double value, double maximum)
+        {
+            if (double.IsNaN(value) || double.IsInfinity(value) || value < 0)
+                return 0;
+
+            if (double.IsNaN(maximum) || double.IsInfinity(maximum) || maximum < 0)
+                return value;
+
+            return Math.Min(value, maximum);
+        }
+
         private Point ObterPontoLocalFolha(MouseEventArgs e)
         {
             return e.GetPosition(TemplatePageContent);
@@ -477,6 +623,11 @@ namespace Araci.Views
         private static bool PontoValido(Point point)
         {
             return ValorFinito(point.X) && ValorFinito(point.Y);
+        }
+
+        private static bool ValorPositivo(double value)
+        {
+            return ValorFinito(value) && value > 0;
         }
 
         private static bool ValorFinito(double value)

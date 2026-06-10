@@ -119,6 +119,7 @@ namespace Araci.TechnicalChecks
                 ("ProjectSheetTypeViewModel atualiza apos propriedades do tipo", ProjectSheetTypeViewModelAtualizaAposPropriedadesTipo),
                 ("ProjectSheetTypeView possui superficie de template", ProjectSheetTypeViewPossuiSuperficieTemplate),
                 ("ProjectSheetTypeView mantem bindings dimensoes do tipo", ProjectSheetTypeViewMantemBindingsDimensoesTipo),
+                ("ProjectSheetTypeView centraliza folha real", ProjectSheetTypeViewCentralizaFolhaReal),
                 ("ProjectSheetType novo inicia sem linhas de template", ProjectSheetTypeNovoIniciaSemLinhasTemplate),
                 ("Inserir linha no tipo adiciona linha", InserirLinhaTipoAdicionaLinha),
                 ("Inserir linha no tipo ignora comprimento zero", InserirLinhaTipoIgnoraComprimentoZero),
@@ -6169,6 +6170,32 @@ namespace Araci.TechnicalChecks
             AssertContains(xaml, "Width=\"{Binding WorkspaceWidth}\"", "ProjectSheetTypeView WorkspaceWidth binding");
             AssertContains(xaml, "Height=\"{Binding WorkspaceHeight}\"", "ProjectSheetTypeView WorkspaceHeight binding");
             Assert(!xaml.Contains("TableInstances", StringComparison.OrdinalIgnoreCase), "ProjectSheetTypeView nao deveria renderizar tabelas.");
+        }
+
+        private static void ProjectSheetTypeViewCentralizaFolhaReal()
+        {
+            RunSta(() =>
+            {
+                var view = new ProjectSheetTypeView();
+                var scrollViewer = view.FindName("SheetTypeScrollViewer") as ScrollViewer;
+                var templatePageBorder = view.FindName("TemplatePageBorder") as Border;
+
+                Assert(scrollViewer != null, "ProjectSheetTypeView deveria possuir SheetTypeScrollViewer para centralizar a folha real.");
+                Assert(templatePageBorder != null, "ProjectSheetTypeView deveria possuir TemplatePageBorder para calcular o centro real da folha.");
+            });
+
+            string xaml = File.ReadAllText(FindProjectFile("Views/ProjectSheetTypeView.xaml"));
+            string code = File.ReadAllText(FindProjectFile("Views/ProjectSheetTypeView.xaml.cs"));
+
+            AssertContains(xaml, "x:Name=\"SheetTypeScrollViewer\"", "ProjectSheetTypeView ScrollViewer nomeado");
+            AssertContains(code, "CenterSheetInViewportDeferred", "ProjectSheetTypeView deve centralizar de forma diferida apos layout.");
+            AssertContains(code, "CenterSheetInViewport", "ProjectSheetTypeView deve possuir rotina explicita de centralizacao.");
+            AssertContains(code, "TemplatePageBorder", "ProjectSheetTypeView centralizacao deve usar a folha real.");
+            AssertContains(code, "SheetTypeScrollViewer.ScrollToHorizontalOffset", "ProjectSheetTypeView deve ajustar scroll horizontal.");
+            AssertContains(code, "SheetTypeScrollViewer.ScrollToVerticalOffset", "ProjectSheetTypeView deve ajustar scroll vertical.");
+            AssertContains(code, "sheetBounds.Left + sheetBounds.Width / 2.0 - viewportWidth / 2.0", "ProjectSheetTypeView horizontal deve centralizar pelo centro da folha.");
+            AssertContains(code, "sheetBounds.Top + sheetBounds.Height / 2.0 - viewportHeight / 2.0", "ProjectSheetTypeView vertical deve centralizar pelo centro da folha.");
+            AssertContains(code, "NormalizeScrollOffset", "ProjectSheetTypeView centralizacao deve normalizar offsets de scroll.");
         }
 
         private static void ProjectSheetTypeNovoIniciaSemLinhasTemplate()
