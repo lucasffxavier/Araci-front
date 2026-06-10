@@ -1,7 +1,6 @@
 using System;
 using System.Collections.Generic;
 using System.ComponentModel;
-using System.Globalization;
 using System.Linq;
 using System.Runtime.CompilerServices;
 using System.Windows;
@@ -12,6 +11,7 @@ using Araci.Core.Documents;
 using Araci.Models.Tipos;
 using Araci.Properties;
 using Araci.Services.Catalog;
+using Araci.Services.Settings;
 using Araci.Services.UI;
 
 namespace Araci.ViewModels
@@ -84,7 +84,7 @@ namespace Araci.ViewModels
             }
         }
 
-        public string ComprimentoTexto => Comprimento.ToString("0.##", CultureInfo.CurrentCulture);
+        public string ComprimentoTexto => UnitFormatter.Format(Comprimento, UnitKind.LengthMeter, UnitKind.LengthMeter);
 
         public string CorLinha
         {
