@@ -138,11 +138,23 @@ namespace Araci.ViewModels
 
         public bool Contains(Point position, double tolerance)
         {
-            double margem = Math.Max(0.0, tolerance);
-            return position.X >= X - margem &&
-                position.X <= X + Largura + margem &&
-                position.Y >= Y - margem &&
-                position.Y <= Y + Altura + margem;
+            Rect bounds = new Rect(X, Y, Math.Max(0.0, Largura), Math.Max(0.0, Altura));
+
+            if (!bounds.Contains(position))
+                return false;
+
+            Point topLeft = new(bounds.Left, bounds.Top);
+            Point topRight = new(bounds.Right, bounds.Top);
+            Point bottomRight = new(bounds.Right, bounds.Bottom);
+            Point bottomLeft = new(bounds.Left, bounds.Bottom);
+
+            double menor = double.MaxValue;
+            menor = Math.Min(menor, DistanciaPontoSegmento(position, topLeft, topRight));
+            menor = Math.Min(menor, DistanciaPontoSegmento(position, topRight, bottomRight));
+            menor = Math.Min(menor, DistanciaPontoSegmento(position, bottomRight, bottomLeft));
+            menor = Math.Min(menor, DistanciaPontoSegmento(position, bottomLeft, topLeft));
+
+            return menor <= Math.Max(0.0, tolerance);
         }
 
         public event PropertyChangedEventHandler? PropertyChanged;
@@ -244,6 +256,28 @@ namespace Araci.ViewModels
                 .Replace("Í", "i")
                 .ToLowerInvariant()
                 .Trim();
+        }
+
+        private static double DistanciaPontoSegmento(Point p, Point a, Point b)
+        {
+            double dx = b.X - a.X;
+            double dy = b.Y - a.Y;
+            double lengthSquared = dx * dx + dy * dy;
+
+            if (lengthSquared <= double.Epsilon)
+                return Distancia(p, a);
+
+            double t = ((p.X - a.X) * dx + (p.Y - a.Y) * dy) / lengthSquared;
+            t = Math.Max(0, Math.Min(1, t));
+            var projection = new Point(a.X + t * dx, a.Y + t * dy);
+            return Distancia(p, projection);
+        }
+
+        private static double Distancia(Point a, Point b)
+        {
+            double dx = a.X - b.X;
+            double dy = a.Y - b.Y;
+            return Math.Sqrt(dx * dx + dy * dy);
         }
 
         private void OnPropertyChanged([CallerMemberName] string? propertyName = null)
