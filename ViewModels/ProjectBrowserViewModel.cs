@@ -26,6 +26,7 @@ namespace Araci.ViewModels
         private readonly Action<Guid>? _abrirPropriedadesTabela;
         private readonly Action<Guid>? _abrirPropriedadesPrancha;
         private readonly Action<Guid>? _abrirPropriedadesTipoPrancha;
+        private readonly Action<Guid>? _abrirTipoPrancha;
         private Guid? _selectedItemId;
         private string? _selectedItemKind;
 
@@ -41,7 +42,8 @@ namespace Araci.ViewModels
             Action<Guid>? abrirPropriedadesTabela = null,
             Action<Guid>? abrirPropriedadesPrancha = null,
             CriarItemProjetoUseCase? criarItemProjeto = null,
-            Action<Guid>? abrirPropriedadesTipoPrancha = null)
+            Action<Guid>? abrirPropriedadesTipoPrancha = null,
+            Action<Guid>? abrirTipoPrancha = null)
         {
             _document = document;
             _definirVistaAtiva = definirVistaAtiva ?? _document.DefinirVistaAtiva;
@@ -55,6 +57,7 @@ namespace Araci.ViewModels
             _abrirPropriedadesTabela = abrirPropriedadesTabela;
             _abrirPropriedadesPrancha = abrirPropriedadesPrancha;
             _abrirPropriedadesTipoPrancha = abrirPropriedadesTipoPrancha;
+            _abrirTipoPrancha = abrirTipoPrancha;
             Secoes = new ObservableCollection<ProjectBrowserSectionViewModel>
             {
                 new("Vistas"),
@@ -180,6 +183,7 @@ namespace Araci.ViewModels
             }
             else if (item.Tipo == "TipoPrancha")
             {
+                _abrirTipoPrancha?.Invoke(item.Id);
                 _abrirPropriedadesTipoPrancha?.Invoke(item.Id);
             }
 
@@ -277,6 +281,7 @@ namespace Araci.ViewModels
             _selectedItemId = tipo.Id;
             _selectedItemKind = "TipoPrancha";
             AtualizarSecoes();
+            _abrirTipoPrancha?.Invoke(tipo.Id);
             _abrirPropriedadesTipoPrancha?.Invoke(tipo.Id);
         }
 

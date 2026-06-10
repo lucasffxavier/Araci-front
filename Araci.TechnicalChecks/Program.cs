@@ -115,7 +115,13 @@ namespace Araci.TechnicalChecks
                 ("Excluir tipo de prancha em uso bloqueado", ExcluirTipoPranchaEmUsoBloqueado),
                 ("Excluir tipo em uso nao altera SheetTypeId", ExcluirTipoEmUsoNaoAlteraSheetTypeId),
                 ("Project Browser lista tipos de prancha", ProjectBrowserListaTiposPrancha),
-                ("Project Browser seleciona tipo sem abrir item visual", ProjectBrowserSelecionaTipoSemAbrirItemVisual),
+                ("ProjectSheetTypeViewModel usa dimensoes do tipo", ProjectSheetTypeViewModelUsaDimensoesTipo),
+                ("ProjectSheetTypeViewModel atualiza apos propriedades do tipo", ProjectSheetTypeViewModelAtualizaAposPropriedadesTipo),
+                ("ProjectSheetTypeView possui superficie de template", ProjectSheetTypeViewPossuiSuperficieTemplate),
+                ("ProjectSheetTypeView mantem bindings dimensoes do tipo", ProjectSheetTypeViewMantemBindingsDimensoesTipo),
+                ("Project Browser seleciona tipo abre visualizacao de tipo", ProjectBrowserSelecionaTipoAbreVisualizacaoTipo),
+                ("Project Browser seleciona tipo nao altera vista ativa", ProjectBrowserSelecionaTipoNaoAlteraVistaAtiva),
+                ("Project Browser seleciona tipo nao altera tabelas ou pranchas", ProjectBrowserSelecionaTipoNaoAlteraTabelasOuPranchas),
                 ("Selecao tipo exibe ProjectSheetTypePropertiesViewModel", SelecaoTipoExibeProjectSheetTypePropertiesViewModel),
                 ("Propriedades tipo prancha editaveis undo redo", PropriedadesTipoPranchaEditaveisUndoRedo),
                 ("Persistencia salva reabre tipos criados e editados", PersistenciaSalvaReabreTiposCriadosEditados),
@@ -6077,19 +6083,83 @@ namespace Araci.TechnicalChecks
             Assert(secao.Itens.Any(i => i.Id == tipo.Id), "Browser deveria listar tipo criado.");
         }
 
-        private static void ProjectBrowserSelecionaTipoSemAbrirItemVisual()
+        private static void ProjectSheetTypeViewModelUsaDimensoesTipo()
+        {
+            var document = new AraciDocument();
+            ProjectSheetType tipo = document.TipoPranchaPadrao;
+            tipo.Nome = "A2 Template";
+            tipo.FormatoFolha = ProjectSheetFormat.A2;
+            tipo.OrientacaoFolha = ProjectSheetOrientation.Retrato;
+            tipo.LarguraFolha = 561;
+            tipo.AlturaFolha = 794;
+
+            var viewModel = new ProjectSheetTypeViewModel(document, tipo);
+
+            AssertEqual(tipo.Id, viewModel.Id, "ProjectSheetTypeViewModel.Id");
+            AssertEqual("A2 Template", viewModel.Nome, "ProjectSheetTypeViewModel.Nome");
+            AssertEqual(ProjectSheetFormat.A2, viewModel.FormatoFolha, "ProjectSheetTypeViewModel.FormatoFolha");
+            AssertEqual(ProjectSheetOrientation.Retrato, viewModel.OrientacaoFolha, "ProjectSheetTypeViewModel.OrientacaoFolha");
+            AssertEqual(561, viewModel.SheetWidth, "ProjectSheetTypeViewModel.SheetWidth");
+            AssertEqual(794, viewModel.SheetHeight, "ProjectSheetTypeViewModel.SheetHeight");
+            Assert(viewModel.WorkspaceWidth > viewModel.SheetWidth, "WorkspaceWidth deveria incluir margem.");
+            Assert(viewModel.WorkspaceHeight > viewModel.SheetHeight, "WorkspaceHeight deveria incluir margem.");
+        }
+
+        private static void ProjectSheetTypeViewModelAtualizaAposPropriedadesTipo()
+        {
+            var document = new AraciDocument();
+            ProjectSheetType tipo = document.TipoPranchaPadrao;
+            var viewModel = new ProjectSheetTypeViewModel(document, tipo);
+            var commands = new Araci.Core.Commands.CommandManager();
+            var editar = new EditarPropriedadesTipoPranchaUseCase(document, commands);
+
+            bool alterou = editar.AlterarFormato(tipo.Id, ProjectSheetFormat.A3);
+
+            Assert(alterou, "AlterarFormato deveria retornar true.");
+            AssertEqual(ProjectSheetFormat.A3, viewModel.FormatoFolha, "ViewModel FormatoFolha apos alterar tipo");
+            AssertEqual(561, viewModel.SheetWidth, "ViewModel SheetWidth apos alterar tipo");
+            AssertEqual(397, viewModel.SheetHeight, "ViewModel SheetHeight apos alterar tipo");
+        }
+
+        private static void ProjectSheetTypeViewPossuiSuperficieTemplate()
+        {
+            RunSta(() =>
+            {
+                var view = new ProjectSheetTypeView();
+                var surface = view.FindName("SheetTypeSurface") as Canvas;
+                var page = view.FindName("TemplatePageBorder") as Border;
+
+                Assert(surface != null, "ProjectSheetTypeView deveria possuir SheetTypeSurface.");
+                Assert(page != null, "ProjectSheetTypeView deveria possuir TemplatePageBorder.");
+            });
+        }
+
+        private static void ProjectSheetTypeViewMantemBindingsDimensoesTipo()
+        {
+            string xaml = File.ReadAllText(FindProjectFile("Views/ProjectSheetTypeView.xaml"));
+
+            AssertContains(xaml, "Width=\"{Binding SheetWidth}\"", "ProjectSheetTypeView SheetWidth binding");
+            AssertContains(xaml, "Height=\"{Binding SheetHeight}\"", "ProjectSheetTypeView SheetHeight binding");
+            AssertContains(xaml, "Width=\"{Binding WorkspaceWidth}\"", "ProjectSheetTypeView WorkspaceWidth binding");
+            AssertContains(xaml, "Height=\"{Binding WorkspaceHeight}\"", "ProjectSheetTypeView WorkspaceHeight binding");
+            Assert(!xaml.Contains("TableInstances", StringComparison.OrdinalIgnoreCase), "ProjectSheetTypeView nao deveria renderizar tabelas.");
+        }
+
+        private static void ProjectBrowserSelecionaTipoAbreVisualizacaoTipo()
         {
             var document = new AraciDocument();
             bool abriuVista = false;
             bool abriuTabela = false;
             bool abriuPrancha = false;
-            bool abriuTipo = false;
+            bool abriuPropriedadesTipo = false;
+            bool abriuVisualizacaoTipo = false;
             var browser = new ProjectBrowserViewModel(
                 document,
                 _ => abriuVista = true,
                 abrirTabela: _ => abriuTabela = true,
                 abrirPrancha: _ => abriuPrancha = true,
-                abrirPropriedadesTipoPrancha: _ => abriuTipo = true);
+                abrirPropriedadesTipoPrancha: _ => abriuPropriedadesTipo = true,
+                abrirTipoPrancha: _ => abriuVisualizacaoTipo = true);
             ProjectBrowserItemViewModel item = browser.Secoes.Single(s => s.Titulo == "Tipos de Prancha").Itens.First();
 
             item.SelecionarCommand.Execute(null);
@@ -6097,8 +6167,44 @@ namespace Araci.TechnicalChecks
             Assert(!abriuVista, "Selecionar tipo nao deveria abrir vista.");
             Assert(!abriuTabela, "Selecionar tipo nao deveria abrir tabela.");
             Assert(!abriuPrancha, "Selecionar tipo nao deveria abrir prancha.");
-            Assert(abriuTipo, "Selecionar tipo deveria abrir propriedades do tipo.");
+            Assert(abriuVisualizacaoTipo, "Selecionar tipo deveria abrir visualizacao central do tipo.");
+            Assert(abriuPropriedadesTipo, "Selecionar tipo deveria abrir propriedades do tipo.");
             Assert(item.IsSelected, "Tipo selecionado deveria ficar marcado.");
+        }
+
+        private static void ProjectBrowserSelecionaTipoNaoAlteraVistaAtiva()
+        {
+            var document = new AraciDocument();
+            Guid? vistaAtivaAntes = document.VistaAtivaId;
+            var browser = new ProjectBrowserViewModel(
+                document,
+                document.DefinirVistaAtiva,
+                abrirTipoPrancha: _ => { });
+            ProjectBrowserItemViewModel item = browser.Secoes.Single(s => s.Titulo == "Tipos de Prancha").Itens.First();
+
+            item.SelecionarCommand.Execute(null);
+
+            AssertEqual(vistaAtivaAntes, document.VistaAtivaId, "Selecionar tipo nao deveria alterar VistaAtivaId");
+        }
+
+        private static void ProjectBrowserSelecionaTipoNaoAlteraTabelasOuPranchas()
+        {
+            var document = new AraciDocument();
+            ProjectTable tabela = document.CriarNovaTabela();
+            ProjectSheet prancha = document.CriarNovaPrancha();
+            Guid? sheetTypeId = prancha.SheetTypeId;
+            var browser = new ProjectBrowserViewModel(
+                document,
+                abrirTipoPrancha: _ => { });
+            ProjectBrowserItemViewModel item = browser.Secoes.Single(s => s.Titulo == "Tipos de Prancha").Itens.First();
+
+            item.SelecionarCommand.Execute(null);
+
+            AssertEqual(1, document.Tabelas.Count, "Selecionar tipo nao deveria alterar Tabelas.Count");
+            AssertEqual(tabela.Id, document.Tabelas[0].Id, "Tabela preservada ao selecionar tipo");
+            AssertEqual(1, document.Pranchas.Count, "Selecionar tipo nao deveria alterar Pranchas.Count");
+            AssertEqual(prancha.Id, document.Pranchas[0].Id, "Prancha preservada ao selecionar tipo");
+            AssertEqual(sheetTypeId, document.Pranchas[0].SheetTypeId, "SheetTypeId preservado ao selecionar tipo");
         }
 
         private static void SelecaoTipoExibeProjectSheetTypePropertiesViewModel()

@@ -21,13 +21,14 @@ namespace Araci
         private readonly GridLength _propertiesColumnWidth = new(320);
         private ProjectTableDataViewModel? _projectTableDataViewModel;
         private ProjectSheetViewModel? _projectSheetViewModel;
+        private ProjectSheetTypeViewModel? _projectSheetTypeViewModel;
 
         public MainWindow()
         {
             InitializeComponent();
             _context = new EditorContext();
             UnitValueConverter.CurrentUnits = _context.Settings.Units;
-            ProjectBrowser.DataContext = new ProjectBrowserViewModel(_context.Document, _context.DefinirVistaAtiva, _context.RenomearItemProjeto, _context.ExcluirItemProjeto, _context.DuplicarItemProjeto, MostrarTabela, MostrarPrancha, MostrarPropriedadesVista, MostrarPropriedadesTabela, MostrarPropriedadesPrancha, _context.CriarItemProjeto, MostrarPropriedadesTipoPrancha);
+            ProjectBrowser.DataContext = new ProjectBrowserViewModel(_context.Document, _context.DefinirVistaAtiva, _context.RenomearItemProjeto, _context.ExcluirItemProjeto, _context.DuplicarItemProjeto, MostrarTabela, MostrarPrancha, MostrarPropriedadesVista, MostrarPropriedadesTabela, MostrarPropriedadesPrancha, _context.CriarItemProjeto, MostrarPropriedadesTipoPrancha, MostrarTipoPrancha);
             _context.Editor.PropertyChanged += OnEditorStatePropertyChanged;
             _context.Document.PropriedadesTabelaAlteradas += OnPropriedadesTabelaAlteradas;
             _context.Document.ItemProjetoRenomeado += OnItemProjetoRenomeado;
@@ -137,6 +138,26 @@ namespace Araci
             MostrarPropriedades();
         }
 
+        public void MostrarTipoPrancha(System.Guid tipoId)
+        {
+            ProjectSheetType? tipo = _context.Document.TiposPrancha.FirstOrDefault(t => t.Id == tipoId);
+
+            if (tipo == null)
+                return;
+
+            _projectSheetTypeViewModel = new ProjectSheetTypeViewModel(_context.Document, tipo);
+
+            ProjectSheetTypeViewer.DataContext = _projectSheetTypeViewModel;
+            ProjectSheetTypeViewer.Visibility = Visibility.Visible;
+            ProjectTableGrid.Visibility = Visibility.Collapsed;
+            ProjectTableGrid.DataContext = null;
+            _projectTableDataViewModel = null;
+            ProjectSheetViewer.Visibility = Visibility.Collapsed;
+            ProjectSheetViewer.DataContext = null;
+            _projectSheetViewModel = null;
+            Viewport.Visibility = Visibility.Collapsed;
+        }
+
         public void MostrarTabela(System.Guid tabelaId)
         {
             ProjectTable? tabela = _context.Document.Tabelas.FirstOrDefault(t => t.Id == tabelaId);
@@ -154,6 +175,9 @@ namespace Araci
             ProjectSheetViewer.Visibility = Visibility.Collapsed;
             ProjectSheetViewer.DataContext = null;
             _projectSheetViewModel = null;
+            ProjectSheetTypeViewer.Visibility = Visibility.Collapsed;
+            ProjectSheetTypeViewer.DataContext = null;
+            _projectSheetTypeViewModel = null;
             Viewport.Visibility = Visibility.Collapsed;
         }
 
@@ -171,6 +195,9 @@ namespace Araci
             ProjectTableGrid.Visibility = Visibility.Collapsed;
             ProjectTableGrid.DataContext = null;
             _projectTableDataViewModel = null;
+            ProjectSheetTypeViewer.Visibility = Visibility.Collapsed;
+            ProjectSheetTypeViewer.DataContext = null;
+            _projectSheetTypeViewModel = null;
             Viewport.Visibility = Visibility.Collapsed;
         }
 
@@ -364,6 +391,9 @@ namespace Araci
             ProjectSheetViewer.Visibility = Visibility.Collapsed;
             ProjectSheetViewer.DataContext = null;
             _projectSheetViewModel = null;
+            ProjectSheetTypeViewer.Visibility = Visibility.Collapsed;
+            ProjectSheetTypeViewer.DataContext = null;
+            _projectSheetTypeViewModel = null;
             Viewport.Visibility = Visibility.Visible;
             FocarViewport();
         }
