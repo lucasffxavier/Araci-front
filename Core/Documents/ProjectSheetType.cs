@@ -16,6 +16,7 @@ namespace Araci.Core.Documents
         public ProjectSheetOrientation OrientacaoFolha { get; set; } = ProjectSheetOrientation.Paisagem;
         public List<ProjectSheetTemplateLine> Linhas { get; set; } = new();
         public List<ProjectSheetTemplateRectangle> Retangulos { get; set; } = new();
+        public List<ProjectSheetTemplateCircle> Circulos { get; set; } = new();
 
         public double LarguraFolha
         {

@@ -534,6 +534,10 @@ namespace Araci.Infrastructure.Persistence
                 Retangulos = (tipo.Retangulos ?? new List<ProjectSheetTemplateRectangle>())
                     .Where(r => r != null)
                     .Select(CriarProjectSheetTemplateRectangleDto)
+                    .ToList(),
+                Circulos = (tipo.Circulos ?? new List<ProjectSheetTemplateCircle>())
+                    .Where(c => c != null)
+                    .Select(CriarProjectSheetTemplateCircleDto)
                     .ToList()
             };
         }
@@ -592,6 +596,34 @@ namespace Araci.Infrastructure.Persistence
                     NomeTipo = retangulo.TipoLinhaNome,
                     Familia = retangulo.TipoLinhaFamilia,
                     Categoria = retangulo.TipoLinhaCategoria
+                }
+                : null;
+        }
+
+        private static ProjectSheetTemplateCircleDto CriarProjectSheetTemplateCircleDto(ProjectSheetTemplateCircle circulo)
+        {
+            return new ProjectSheetTemplateCircleDto
+            {
+                Id = circulo.Id,
+                Nome = circulo.Nome,
+                X = circulo.X,
+                Y = circulo.Y,
+                Raio = circulo.Raio,
+                Type = CriarProjectSheetTemplateCircleTypeRef(circulo),
+                Stroke = string.IsNullOrWhiteSpace(circulo.Stroke) ? "#FF000000" : circulo.Stroke,
+                StrokeThickness = NormalizarEspessuraLinha(circulo.StrokeThickness),
+                Visible = circulo.Visible
+            };
+        }
+
+        private static TypeRefDto? CriarProjectSheetTemplateCircleTypeRef(ProjectSheetTemplateCircle circulo)
+        {
+            return circulo.PossuiTipoLinha
+                ? new TypeRefDto
+                {
+                    NomeTipo = circulo.TipoLinhaNome,
+                    Familia = circulo.TipoLinhaFamilia,
+                    Categoria = circulo.TipoLinhaCategoria
                 }
                 : null;
         }
@@ -672,7 +704,8 @@ namespace Araci.Infrastructure.Persistence
                 LarguraFolha = NormalizarDimensaoFolha(dto.LarguraFolha, ProjectSheet.DefaultWidth),
                 AlturaFolha = NormalizarDimensaoFolha(dto.AlturaFolha, ProjectSheet.DefaultHeight),
                 Linhas = ParseProjectSheetTemplateLines(dto.Linhas),
-                Retangulos = ParseProjectSheetTemplateRectangles(dto.Retangulos)
+                Retangulos = ParseProjectSheetTemplateRectangles(dto.Retangulos),
+                Circulos = ParseProjectSheetTemplateCircles(dto.Circulos)
             };
         }
 
@@ -758,6 +791,47 @@ namespace Araci.Infrastructure.Persistence
                 retangulo.DefinirTipoLinha(null, null, null);
 
             return retangulo;
+        }
+
+        private static List<ProjectSheetTemplateCircle> ParseProjectSheetTemplateCircles(IEnumerable<ProjectSheetTemplateCircleDto>? valores)
+        {
+            if (valores == null)
+                return new List<ProjectSheetTemplateCircle>();
+
+            return valores
+                .Where(v => v != null)
+                .Select(CriarProjectSheetTemplateCircle)
+                .ToList();
+        }
+
+        private static ProjectSheetTemplateCircle CriarProjectSheetTemplateCircle(ProjectSheetTemplateCircleDto dto)
+        {
+            var circulo = new ProjectSheetTemplateCircle
+            {
+                Id = dto.Id == Guid.Empty ? Guid.NewGuid() : dto.Id,
+                Nome = NormalizarNomeTemplate(dto.Nome),
+                X = NormalizarCoordenada(dto.X),
+                Y = NormalizarCoordenada(dto.Y),
+                Raio = NormalizarRaioTemplate(dto.Raio, ProjectSheetTemplateCircle.DefaultRadius),
+                Stroke = string.IsNullOrWhiteSpace(dto.Stroke) ? "#FF000000" : dto.Stroke,
+                StrokeThickness = NormalizarEspessuraLinha(dto.StrokeThickness),
+                Visible = dto.Visible
+            };
+
+            if (dto.Type != null && !string.IsNullOrWhiteSpace(dto.Type.NomeTipo))
+            {
+                circulo.DefinirTipoLinha(dto.Type.NomeTipo, dto.Type.Familia, dto.Type.Categoria);
+                return circulo;
+            }
+
+            bool possuiEstiloLegadoCustomizado =
+                !string.Equals(circulo.Stroke, "#FF000000", StringComparison.OrdinalIgnoreCase) ||
+                Math.Abs(circulo.StrokeThickness - 1.0) > 0.000001;
+
+            if (possuiEstiloLegadoCustomizado)
+                circulo.DefinirTipoLinha(null, null, null);
+
+            return circulo;
         }
 
         private Elemento? CriarElemento(ElementDto dto)
@@ -1030,6 +1104,13 @@ namespace Araci.Infrastructure.Persistence
         private static double NormalizarDimensaoTemplate(double valor, double fallback)
         {
             return double.IsNaN(valor) || double.IsInfinity(valor) || valor < ProjectSheetTemplateRectangle.MinDimension
+                ? fallback
+                : valor;
+        }
+
+        private static double NormalizarRaioTemplate(double valor, double fallback)
+        {
+            return double.IsNaN(valor) || double.IsInfinity(valor) || valor < ProjectSheetTemplateCircle.MinRadius
                 ? fallback
                 : valor;
         }
