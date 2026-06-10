@@ -10,25 +10,19 @@ namespace Araci.Views
 {
     public partial class ProjectSheetTypeView : UserControl
     {
-        private enum LinhaTemplateInteractionMode
-        {
-            None,
-            Line,
-            Endpoint
-        }
-
         private const double LineHitTolerance = 6.0;
         private const double EndpointHitTolerance = 8.0;
         private const double DragThresholdSquared = 9.0;
 
         private EditorContext? _context;
-        private LinhaTemplateInteractionMode _linhaTemplateInteractionMode;
         private Guid? _linhaTemplateEmArrasteId;
         private Point _linhaTemplateDragStart;
         private bool _linhaTemplateArrastando;
         private Guid? _linhaTemplateEndpointEmArrasteId;
         private ProjectSheetTemplateLineEndpoint _linhaTemplateEndpointEmArraste;
         private Point _linhaTemplateEndpointDragStart;
+        private Point _linhaTemplateEndpointLastPosition;
+        private bool _linhaTemplateEndpointLastPositionValid;
         private bool _linhaTemplateEndpointArrastando;
         private double _linhaTemplateEndpointOriginalX1;
         private double _linhaTemplateEndpointOriginalY1;
@@ -57,7 +51,7 @@ namespace Araci.Views
 
             Focus();
             Keyboard.Focus(this);
-            Point position = e.GetPosition(TemplatePageBorder);
+            Point position = ObterPontoLocalFolha(e);
 
             if (TentarIniciarEdicaoExtremidadeLinhaTemplate(position))
             {
@@ -83,7 +77,7 @@ namespace Araci.Views
             if (_context == null)
                 return;
 
-            Point position = e.GetPosition(TemplatePageBorder);
+            Point position = ObterPontoLocalFolha(e);
 
             if (AtualizarEdicaoExtremidadeLinhaTemplate(position, e))
             {
@@ -105,9 +99,9 @@ namespace Araci.Views
             if (_context == null)
                 return;
 
-            Point position = e.GetPosition(TemplatePageBorder);
+            Point position = ObterPontoLocalFolha(e);
 
-            if (FinalizarEdicaoExtremidadeLinhaTemplate(position))
+            if (FinalizarEdicaoExtremidadeLinhaTemplate())
             {
                 if (TemplatePageBorder.IsMouseCaptured)
                     TemplatePageBorder.ReleaseMouseCapture();
@@ -205,8 +199,9 @@ namespace Araci.Views
             _linhaTemplateEndpointEmArrasteId = lineId;
             _linhaTemplateEndpointEmArraste = endpoint;
             _linhaTemplateEndpointDragStart = position;
+            _linhaTemplateEndpointLastPosition = position;
+            _linhaTemplateEndpointLastPositionValid = PontoValido(position);
             _linhaTemplateEndpointArrastando = false;
-            _linhaTemplateInteractionMode = LinhaTemplateInteractionMode.Endpoint;
             _linhaTemplateEmArrasteId = null;
             _linhaTemplateArrastando = false;
             TemplatePageBorder.CaptureMouse();
@@ -229,7 +224,8 @@ namespace Araci.Views
             if (!_linhaTemplateEndpointArrastando && delta.LengthSquared < DragThresholdSquared)
                 return true;
 
-            _linhaTemplateEndpointArrastando = true;
+            if (!PontoValido(position))
+                return true;
 
             double previewX1 = _linhaTemplateEndpointEmArraste == ProjectSheetTemplateLineEndpoint.Start
                 ? position.X
@@ -244,18 +240,24 @@ namespace Araci.Views
                 ? position.Y
                 : _linhaTemplateEndpointOriginalY2;
 
-            viewModel.SetLinePreviewCoordinates(
+            bool previewAplicado = viewModel.SetLinePreviewCoordinates(
                 _linhaTemplateEndpointEmArrasteId.Value,
                 previewX1,
                 previewY1,
                 previewX2,
                 previewY2);
 
+            if (!previewAplicado)
+                return true;
+
+            _linhaTemplateEndpointArrastando = true;
+            _linhaTemplateEndpointLastPosition = position;
+            _linhaTemplateEndpointLastPositionValid = true;
             AtualizarHandlesOverlay();
             return true;
         }
 
-        private bool FinalizarEdicaoExtremidadeLinhaTemplate(Point position)
+        private bool FinalizarEdicaoExtremidadeLinhaTemplate()
         {
             ProjectSheetTypeViewModel? viewModel = ObterViewModelAtivo();
 
@@ -265,23 +267,32 @@ namespace Araci.Views
             Guid lineId = _linhaTemplateEndpointEmArrasteId.Value;
             bool arrastou = _linhaTemplateEndpointArrastando;
             ProjectSheetTemplateLineEndpoint endpoint = _linhaTemplateEndpointEmArraste;
+            Point finalPosition = _linhaTemplateEndpointLastPosition;
+            bool finalPositionValid = _linhaTemplateEndpointLastPositionValid && PontoValido(finalPosition);
+            double originalX1 = _linhaTemplateEndpointOriginalX1;
+            double originalY1 = _linhaTemplateEndpointOriginalY1;
+            double originalX2 = _linhaTemplateEndpointOriginalX2;
+            double originalY2 = _linhaTemplateEndpointOriginalY2;
 
             viewModel.ClearLinePreviewCoordinates(lineId);
             LimparEstadoEdicaoExtremidadeLinhaTemplate();
 
-            if (!arrastou)
+            if (!arrastou || !finalPositionValid)
             {
                 AtualizarHandlesOverlay();
                 return true;
             }
 
-            double newX1 = endpoint == ProjectSheetTemplateLineEndpoint.Start ? position.X : _linhaTemplateEndpointOriginalX1;
-            double newY1 = endpoint == ProjectSheetTemplateLineEndpoint.Start ? position.Y : _linhaTemplateEndpointOriginalY1;
-            double newX2 = endpoint == ProjectSheetTemplateLineEndpoint.End ? position.X : _linhaTemplateEndpointOriginalX2;
-            double newY2 = endpoint == ProjectSheetTemplateLineEndpoint.End ? position.Y : _linhaTemplateEndpointOriginalY2;
+            double newX1 = endpoint == ProjectSheetTemplateLineEndpoint.Start ? finalPosition.X : originalX1;
+            double newY1 = endpoint == ProjectSheetTemplateLineEndpoint.Start ? finalPosition.Y : originalY1;
+            double newX2 = endpoint == ProjectSheetTemplateLineEndpoint.End ? finalPosition.X : originalX2;
+            double newY2 = endpoint == ProjectSheetTemplateLineEndpoint.End ? finalPosition.Y : originalY2;
 
-            _context.MoverLinhaDoTipoPrancha.AlterarCoordenadas(viewModel.Id, lineId, newX1, newY1, newX2, newY2);
-            viewModel.SelectLine(lineId);
+            bool alterou = _context.MoverLinhaDoTipoPrancha.AlterarCoordenadas(viewModel.Id, lineId, newX1, newY1, newX2, newY2);
+
+            if (alterou)
+                viewModel.SelectLine(lineId);
+
             AtualizarHandlesOverlay();
             return true;
         }
@@ -301,11 +312,13 @@ namespace Araci.Views
         {
             _linhaTemplateEndpointEmArrasteId = null;
             _linhaTemplateEndpointArrastando = false;
+            _linhaTemplateEndpointDragStart = default;
+            _linhaTemplateEndpointLastPosition = default;
+            _linhaTemplateEndpointLastPositionValid = false;
             _linhaTemplateEndpointOriginalX1 = 0.0;
             _linhaTemplateEndpointOriginalY1 = 0.0;
             _linhaTemplateEndpointOriginalX2 = 0.0;
             _linhaTemplateEndpointOriginalY2 = 0.0;
-            _linhaTemplateInteractionMode = LinhaTemplateInteractionMode.None;
         }
 
         private bool TentarIniciarInteracaoLinhaTemplate(Point position)
@@ -336,7 +349,6 @@ namespace Araci.Views
             _linhaTemplateEmArrasteId = lineId;
             _linhaTemplateDragStart = position;
             _linhaTemplateArrastando = false;
-            _linhaTemplateInteractionMode = LinhaTemplateInteractionMode.Line;
             TemplatePageBorder.CaptureMouse();
             AtualizarHandlesOverlay();
             return true;
@@ -407,7 +419,6 @@ namespace Araci.Views
         {
             _linhaTemplateEmArrasteId = null;
             _linhaTemplateArrastando = false;
-            _linhaTemplateInteractionMode = LinhaTemplateInteractionMode.None;
         }
 
         private bool ExcluirLinhaSelecionada()
@@ -456,6 +467,21 @@ namespace Araci.Views
         private void AtualizarHandlesOverlay()
         {
             ObterViewModelAtivo();
+        }
+
+        private Point ObterPontoLocalFolha(MouseEventArgs e)
+        {
+            return e.GetPosition(TemplatePageContent);
+        }
+
+        private static bool PontoValido(Point point)
+        {
+            return ValorFinito(point.X) && ValorFinito(point.Y);
+        }
+
+        private static bool ValorFinito(double value)
+        {
+            return !double.IsNaN(value) && !double.IsInfinity(value);
         }
 
         private static ToolInputState CriarInputState(MouseEventArgs e, Point localPosition, MouseButton? button = null, int clickCount = 0)

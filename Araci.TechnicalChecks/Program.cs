@@ -6645,7 +6645,20 @@ namespace Araci.TechnicalChecks
             AssertContains(code, "TryHitSelectedLineEndpoint", "ProjectSheetTypeView deve detectar endpoint selecionado");
             AssertContains(code, "SetLinePreviewCoordinates", "ProjectSheetTypeView deve aplicar preview de endpoint");
             AssertContains(code, "AlterarCoordenadas", "ProjectSheetTypeView deve confirmar edicao de endpoint por use case");
-            AssertContains(code, "LinhaTemplateInteractionMode.Endpoint", "ProjectSheetTypeView deve possuir modo de endpoint");
+            AssertContains(code, "_linhaTemplateEndpointEmArrasteId", "ProjectSheetTypeView deve manter estado de endpoint em edicao");
+            AssertContains(code, "_linhaTemplateEndpointLastPosition", "ProjectSheetTypeView deve manter ultima posicao valida de endpoint.");
+            AssertContains(code, "_linhaTemplateEndpointLastPositionValid", "ProjectSheetTypeView deve validar a ultima posicao de endpoint.");
+            AssertContains(code, "FinalizarEdicaoExtremidadeLinhaTemplate()", "Commit de endpoint nao deve depender exclusivamente do MouseUp.");
+            AssertContains(code, "Point finalPosition = _linhaTemplateEndpointLastPosition", "Commit de endpoint deve usar ultima posicao valida.");
+            AssertContains(code, "ObterPontoLocalFolha", "ProjectSheetTypeView deve converter mouse para coordenadas locais da folha.");
+            AssertContains(code, "TemplatePageContent", "Coordenadas de endpoint devem usar o mesmo sistema local do overlay.");
+            Assert(!code.Contains("FinalizarEdicaoExtremidadeLinhaTemplate(position)", StringComparison.Ordinal), "Commit de endpoint nao deve usar diretamente a posicao do MouseUp.");
+            Assert(!code.Contains(".X1 =", StringComparison.Ordinal), "ProjectSheetTypeView nao deve alterar X1 do dominio diretamente.");
+            Assert(!code.Contains(".Y1 =", StringComparison.Ordinal), "ProjectSheetTypeView nao deve alterar Y1 do dominio diretamente.");
+            Assert(!code.Contains(".X2 =", StringComparison.Ordinal), "ProjectSheetTypeView nao deve alterar X2 do dominio diretamente.");
+            Assert(!code.Contains(".Y2 =", StringComparison.Ordinal), "ProjectSheetTypeView nao deve alterar Y2 do dominio diretamente.");
+            Assert(!code.Contains("LinhaTemplateInteractionMode", StringComparison.Ordinal), "ProjectSheetTypeView nao deve manter modo de interacao morto sem leitura.");
+            Assert(!code.Contains("_linhaTemplateInteractionMode", StringComparison.Ordinal), "ProjectSheetTypeView nao deve manter campo de modo morto sem leitura.");
         }
 
         private static void EditorContextExpoeMoverLinhaDoTipoPrancha()
