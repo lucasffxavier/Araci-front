@@ -60,6 +60,7 @@ Araci-front
 │   │   ├── DuplicateProjectItemCommand.cs
 │   │   ├── IUndoableCommand.cs
 │   │   ├── MoveProjectSheetTableInstanceCommand.cs
+│   │   ├── MoveProjectSheetTypeLineCommand.cs
 │   │   ├── RemoveProjectSheetTableInstanceCommand.cs
 │   │   ├── RemoveProjectSheetTypeLineCommand.cs
 │   │   ├── RenameProjectItemCommand.cs
@@ -158,6 +159,7 @@ Araci-front
 │           ├── ExportarTabelaUseCase.cs
 │           ├── InserirLinhaNoTipoPranchaUseCase.cs
 │           ├── InserirTabelaNaPranchaUseCase.cs
+│           ├── MoverLinhaDoTipoPranchaUseCase.cs
 │           ├── MoverTabelaNaPranchaUseCase.cs
 │           ├── NovoProjetoUseCase.cs
 │           ├── RedimensionarTabelaNaPranchaUseCase.cs
@@ -557,23 +559,6 @@ Araci-front
 
 
 ====================================================================================================
-ARQUIVO: C:\Users\User\source\repos\lucasffxavier\Araci-front\Applications\Commands\IUndoableCommand.cs
-====================================================================================================
-
-﻿namespace Araci.Core.Commands
-{
-    public interface IUndoableCommand
-    {
-        void Execute();
-
-        void Undo();
-
-        void Redo();
-    }
-}
-
-
-====================================================================================================
 ARQUIVO: C:\Users\User\source\repos\lucasffxavier\Araci-front\Araci.TechnicalChecks\Program.cs
 ====================================================================================================
 
@@ -715,6 +700,14 @@ namespace Araci.TechnicalChecks
                 ("Excluir linha template undo redo", ExcluirLinhaTemplateUndoRedo),
                 ("ProjectSheetTypeView usa destaque de selecao de linha", ProjectSheetTypeViewUsaDestaqueSelecaoLinha),
                 ("EditorContext expoe excluir linha do tipo prancha", EditorContextExpoeExcluirLinhaDoTipoPrancha),
+                ("Mover linha template undo redo", MoverLinhaTemplateUndoRedo),
+                ("ProjectSheetTypeViewModel aplica preview de movimento de linha", ProjectSheetTypeViewModelAplicaPreviewMovimentoLinha),
+                ("ProjectSheetTypeView possui interacao de arraste de linha", ProjectSheetTypeViewPossuiInteracaoArrasteLinha),
+                ("Mover extremidade linha template undo redo", MoverExtremidadeLinhaTemplateUndoRedo),
+                ("ProjectSheetTypeViewModel aplica preview de extremidade de linha", ProjectSheetTypeViewModelAplicaPreviewExtremidadeLinha),
+                ("ProjectSheetTypeView renderiza handles de extremidade de linha", ProjectSheetTypeViewRenderizaHandlesExtremidadeLinha),
+                ("ProjectSheetTypeView possui interacao de extremidade de linha", ProjectSheetTypeViewPossuiInteracaoExtremidadeLinha),
+                ("EditorContext expoe mover linha do tipo prancha", EditorContextExpoeMoverLinhaDoTipoPrancha),
                 ("ToolService linha em contexto diagrama preserva ferramenta anotativa", ToolServiceLinhaContextoDiagramaPreservaFerramentaAnotativa),
                 ("Project Browser seleciona tipo abre visualizacao de tipo", ProjectBrowserSelecionaTipoAbreVisualizacaoTipo),
                 ("Project Browser seleciona tipo nao altera vista ativa", ProjectBrowserSelecionaTipoNaoAlteraVistaAtiva),
@@ -7032,6 +7025,177 @@ namespace Araci.TechnicalChecks
             Assert(context.ExcluirLinhaDoTipoPrancha != null, "EditorContext deveria expor ExcluirLinhaDoTipoPranchaUseCase.");
         }
 
+        private static void MoverLinhaTemplateUndoRedo()
+        {
+            var document = new AraciDocument();
+            var commands = new Araci.Core.Commands.CommandManager();
+            var inserir = new InserirLinhaNoTipoPranchaUseCase(document, commands);
+            var mover = new MoverLinhaDoTipoPranchaUseCase(document, commands);
+            ProjectSheetType tipo = document.TipoPranchaPadrao;
+            ProjectSheetTemplateLine linha = inserir.Inserir(tipo.Id, 10, 20, 80, 25)!;
+
+            bool moveu = mover.Mover(tipo.Id, linha.Id, 15, -5);
+
+            Assert(moveu, "Mover linha deveria retornar true.");
+            AssertEqual(25, linha.X1, "Linha.X1 apos move");
+            AssertEqual(15, linha.Y1, "Linha.Y1 apos move");
+            AssertEqual(95, linha.X2, "Linha.X2 apos move");
+            AssertEqual(20, linha.Y2, "Linha.Y2 apos move");
+
+            commands.Undo();
+
+            AssertEqual(10, linha.X1, "Linha.X1 apos undo");
+            AssertEqual(20, linha.Y1, "Linha.Y1 apos undo");
+            AssertEqual(80, linha.X2, "Linha.X2 apos undo");
+            AssertEqual(25, linha.Y2, "Linha.Y2 apos undo");
+
+            commands.Redo();
+
+            AssertEqual(25, linha.X1, "Linha.X1 apos redo");
+            AssertEqual(15, linha.Y1, "Linha.Y1 apos redo");
+            AssertEqual(95, linha.X2, "Linha.X2 apos redo");
+            AssertEqual(20, linha.Y2, "Linha.Y2 apos redo");
+        }
+
+        private static void ProjectSheetTypeViewModelAplicaPreviewMovimentoLinha()
+        {
+            var document = new AraciDocument();
+            ProjectSheetType tipo = document.TipoPranchaPadrao;
+            ProjectSheetTemplateLine linha = new()
+            {
+                X1 = 10,
+                Y1 = 20,
+                X2 = 80,
+                Y2 = 25
+            };
+            tipo.Linhas.Add(linha);
+            var viewModel = new ProjectSheetTypeViewModel(document, tipo);
+
+            bool aplicado = viewModel.SetLinePreviewOffset(linha.Id, 15, -5);
+
+            Assert(aplicado, "Preview de movimento deveria ser aplicado.");
+            AssertEqual(25, viewModel.Lines[0].X1, "Preview X1");
+            AssertEqual(15, viewModel.Lines[0].Y1, "Preview Y1");
+            AssertEqual(95, viewModel.Lines[0].X2, "Preview X2");
+            AssertEqual(20, viewModel.Lines[0].Y2, "Preview Y2");
+            AssertEqual(10, linha.X1, "Preview nao deve alterar modelo X1");
+            AssertEqual(20, linha.Y1, "Preview nao deve alterar modelo Y1");
+
+            viewModel.ClearLinePreviewOffset(linha.Id);
+
+            AssertEqual(10, viewModel.Lines[0].X1, "Preview limpo X1");
+            AssertEqual(20, viewModel.Lines[0].Y1, "Preview limpo Y1");
+            AssertEqual(80, viewModel.Lines[0].X2, "Preview limpo X2");
+            AssertEqual(25, viewModel.Lines[0].Y2, "Preview limpo Y2");
+        }
+
+        private static void ProjectSheetTypeViewPossuiInteracaoArrasteLinha()
+        {
+            string code = File.ReadAllText(FindProjectFile("Views/ProjectSheetTypeView.xaml.cs"));
+
+            AssertContains(code, "TentarIniciarInteracaoLinhaTemplate", "ProjectSheetTypeView iniciar arraste linha");
+            AssertContains(code, "AtualizarArrasteLinhaTemplate", "ProjectSheetTypeView atualizar arraste linha");
+            AssertContains(code, "FinalizarArrasteLinhaTemplate", "ProjectSheetTypeView finalizar arraste linha");
+            AssertContains(code, "MoverLinhaDoTipoPrancha", "ProjectSheetTypeView deve chamar use case de movimento");
+        }
+
+        private static void MoverExtremidadeLinhaTemplateUndoRedo()
+        {
+            var document = new AraciDocument();
+            var commands = new Araci.Core.Commands.CommandManager();
+            var inserir = new InserirLinhaNoTipoPranchaUseCase(document, commands);
+            var mover = new MoverLinhaDoTipoPranchaUseCase(document, commands);
+            ProjectSheetType tipo = document.TipoPranchaPadrao;
+            ProjectSheetTemplateLine linha = inserir.Inserir(tipo.Id, 10, 20, 80, 25)!;
+
+            bool alterou = mover.AlterarCoordenadas(tipo.Id, linha.Id, 30, 40, 80, 25);
+
+            Assert(alterou, "Alterar extremidade deveria retornar true.");
+            AssertEqual(30, linha.X1, "Linha.X1 apos editar extremidade");
+            AssertEqual(40, linha.Y1, "Linha.Y1 apos editar extremidade");
+            AssertEqual(80, linha.X2, "Linha.X2 preservado apos editar extremidade");
+            AssertEqual(25, linha.Y2, "Linha.Y2 preservado apos editar extremidade");
+
+            commands.Undo();
+
+            AssertEqual(10, linha.X1, "Linha.X1 apos undo extremidade");
+            AssertEqual(20, linha.Y1, "Linha.Y1 apos undo extremidade");
+            AssertEqual(80, linha.X2, "Linha.X2 apos undo extremidade");
+            AssertEqual(25, linha.Y2, "Linha.Y2 apos undo extremidade");
+
+            commands.Redo();
+
+            AssertEqual(30, linha.X1, "Linha.X1 apos redo extremidade");
+            AssertEqual(40, linha.Y1, "Linha.Y1 apos redo extremidade");
+            AssertEqual(80, linha.X2, "Linha.X2 apos redo extremidade");
+            AssertEqual(25, linha.Y2, "Linha.Y2 apos redo extremidade");
+        }
+
+        private static void ProjectSheetTypeViewModelAplicaPreviewExtremidadeLinha()
+        {
+            var document = new AraciDocument();
+            ProjectSheetType tipo = document.TipoPranchaPadrao;
+            ProjectSheetTemplateLine linha = new()
+            {
+                X1 = 10,
+                Y1 = 20,
+                X2 = 80,
+                Y2 = 25
+            };
+            tipo.Linhas.Add(linha);
+            var viewModel = new ProjectSheetTypeViewModel(document, tipo);
+
+            viewModel.SelectLine(linha.Id);
+            bool hitouEndpoint = viewModel.TryHitSelectedLineEndpoint(new Point(10, 20), 9, out Guid linhaId, out ProjectSheetTemplateLineEndpoint endpoint);
+            bool aplicado = viewModel.SetLinePreviewCoordinates(linha.Id, 30, 40, 80, 25);
+
+            Assert(hitouEndpoint, "Hit-test deveria encontrar endpoint selecionado.");
+            AssertEqual(linha.Id, linhaId, "Endpoint lineId");
+            AssertEqual(ProjectSheetTemplateLineEndpoint.Start, endpoint, "Endpoint inicial");
+            Assert(aplicado, "Preview de extremidade deveria ser aplicado.");
+            AssertEqual(30, viewModel.Lines[0].X1, "Preview extremidade X1");
+            AssertEqual(40, viewModel.Lines[0].Y1, "Preview extremidade Y1");
+            AssertEqual(80, viewModel.Lines[0].X2, "Preview extremidade X2");
+            AssertEqual(25, viewModel.Lines[0].Y2, "Preview extremidade Y2");
+            AssertEqual(10, linha.X1, "Preview extremidade nao deve alterar modelo X1");
+            AssertEqual(20, linha.Y1, "Preview extremidade nao deve alterar modelo Y1");
+
+            viewModel.ClearLinePreviewCoordinates(linha.Id);
+
+            AssertEqual(10, viewModel.Lines[0].X1, "Preview extremidade limpo X1");
+            AssertEqual(20, viewModel.Lines[0].Y1, "Preview extremidade limpo Y1");
+            AssertEqual(80, viewModel.Lines[0].X2, "Preview extremidade limpo X2");
+            AssertEqual(25, viewModel.Lines[0].Y2, "Preview extremidade limpo Y2");
+        }
+
+        private static void ProjectSheetTypeViewRenderizaHandlesExtremidadeLinha()
+        {
+            string xaml = File.ReadAllText(FindProjectFile("Views/ProjectSheetTypeView.xaml"));
+
+            AssertContains(xaml, "EndpointHandlesVisible", "ProjectSheetTypeView handles visibilidade");
+            AssertContains(xaml, "StartHandleLeft", "ProjectSheetTypeView handle inicial left");
+            AssertContains(xaml, "StartHandleTop", "ProjectSheetTypeView handle inicial top");
+            AssertContains(xaml, "EndHandleLeft", "ProjectSheetTypeView handle final left");
+            AssertContains(xaml, "EndHandleTop", "ProjectSheetTypeView handle final top");
+        }
+
+        private static void ProjectSheetTypeViewPossuiInteracaoExtremidadeLinha()
+        {
+            string code = File.ReadAllText(FindProjectFile("Views/ProjectSheetTypeView.xaml.cs"));
+
+            AssertContains(code, "TryHitSelectedLineEndpoint", "ProjectSheetTypeView deve detectar endpoint selecionado");
+            AssertContains(code, "SetLinePreviewCoordinates", "ProjectSheetTypeView deve aplicar preview de endpoint");
+            AssertContains(code, "AlterarCoordenadas", "ProjectSheetTypeView deve confirmar edicao de endpoint por use case");
+            AssertContains(code, "LinhaTemplateInteractionMode.Endpoint", "ProjectSheetTypeView deve possuir modo de endpoint");
+        }
+
+        private static void EditorContextExpoeMoverLinhaDoTipoPrancha()
+        {
+            var context = new EditorContext();
+
+            Assert(context.MoverLinhaDoTipoPrancha != null, "EditorContext deveria expor MoverLinhaDoTipoPranchaUseCase.");
+        }
+
         private static void ToolServiceLinhaContextoDiagramaPreservaFerramentaAnotativa()
         {
             var context = new EditorContext();
@@ -9447,91 +9611,440 @@ namespace Araci.TechnicalChecks
 
 
 ====================================================================================================
-ARQUIVO: C:\Users\User\source\repos\lucasffxavier\Araci-front\Core\Documents\ProjectSheetTemplateLine.cs
+ARQUIVO: C:\Users\User\source\repos\lucasffxavier\Araci-front\MainWindow.xaml.cs
 ====================================================================================================
 
-using System;
-
-namespace Araci.Core.Documents
-{
-    public class ProjectSheetTemplateLine
-    {
-        public Guid Id { get; set; } = Guid.NewGuid();
-        public double X1 { get; set; }
-        public double Y1 { get; set; }
-        public double X2 { get; set; }
-        public double Y2 { get; set; }
-        public string Stroke { get; set; } = "#FF000000";
-        public double StrokeThickness { get; set; } = 1.0;
-        public bool Visible { get; set; } = true;
-
-        public ProjectSheetTemplateLine CriarCopia(bool gerarNovoId)
-        {
-            return new ProjectSheetTemplateLine
-            {
-                Id = gerarNovoId ? Guid.NewGuid() : Id,
-                X1 = X1,
-                Y1 = Y1,
-                X2 = X2,
-                Y2 = Y2,
-                Stroke = Stroke,
-                StrokeThickness = StrokeThickness,
-                Visible = Visible
-            };
-        }
-    }
-}
-
-
-
-====================================================================================================
-ARQUIVO: C:\Users\User\source\repos\lucasffxavier\Araci-front\Core\Documents\ProjectSheetType.cs
-====================================================================================================
-
-using System;
+using Araci.Services;
+using Araci.Properties;
+using Araci.ViewModels;
+using Araci.Applications.Abstractions;
+using Araci.Applications.Projects.Tables;
+using Araci.Core.Documents;
 using System.Collections.Generic;
+using System.ComponentModel;
+using System.Linq;
+using System.Collections.Specialized;
+using System.Windows;
+using System.Windows.Controls.Primitives;
+using System.Windows.Input;
 
-namespace Araci.Core.Documents
+namespace Araci
 {
-    public class ProjectSheetType
+    public partial class MainWindow : Window
     {
-        public const string DefaultName = "A1 Paisagem - Padrao";
+        private readonly EditorContext _context;
+        private readonly GridLength _projectBrowserColumnWidth = new(260);
+        private readonly GridLength _propertiesColumnWidth = new(320);
+        private ProjectTableDataViewModel? _projectTableDataViewModel;
+        private ProjectSheetViewModel? _projectSheetViewModel;
+        private ProjectSheetTypeViewModel? _projectSheetTypeViewModel;
 
-        private double _larguraFolha = ProjectSheet.DefaultWidth;
-        private double _alturaFolha = ProjectSheet.DefaultHeight;
-
-        public Guid Id { get; set; } = Guid.NewGuid();
-        public string Nome { get; set; } = DefaultName;
-        public ProjectSheetFormat FormatoFolha { get; set; } = ProjectSheetFormat.A1;
-        public ProjectSheetOrientation OrientacaoFolha { get; set; } = ProjectSheetOrientation.Paisagem;
-        public List<ProjectSheetTemplateLine> Linhas { get; set; } = new();
-
-        public double LarguraFolha
+        public MainWindow()
         {
-            get => _larguraFolha;
-            set => _larguraFolha = NormalizarDimensao(value, ProjectSheet.DefaultWidth);
+            InitializeComponent();
+            _context = new EditorContext();
+            UnitValueConverter.CurrentUnits = _context.Settings.Units;
+            ProjectBrowser.DataContext = new ProjectBrowserViewModel(_context.Document, _context.DefinirVistaAtiva, _context.RenomearItemProjeto, _context.ExcluirItemProjeto, _context.DuplicarItemProjeto, MostrarTabela, MostrarPrancha, MostrarPropriedadesVista, MostrarPropriedadesTabela, MostrarPropriedadesPrancha, _context.CriarItemProjeto, MostrarPropriedadesTipoPrancha, MostrarTipoPrancha);
+            _context.Editor.PropertyChanged += OnEditorStatePropertyChanged;
+            _context.Document.PropriedadesTabelaAlteradas += OnPropriedadesTabelaAlteradas;
+            _context.Document.ItemProjetoRenomeado += OnItemProjetoRenomeado;
+            _context.Document.Tabelas.CollectionChanged += OnTabelasCollectionChanged;
+            _context.Document.Pranchas.CollectionChanged += OnPranchasCollectionChanged;
+            Viewport.Inicializar(_context);
+            ProjectSheetTypeViewer.Inicializar(_context);
+            InicializarRibbon();
+            LimparDataContextsAreaCentral();
+            AtualizarVisibilidadeNavegadorProjeto();
         }
 
-        public double AlturaFolha
+        private void InicializarRibbon()
         {
-            get => _alturaFolha;
-            set => _alturaFolha = NormalizarDimensao(value, ProjectSheet.DefaultHeight);
+            DataContext = _context;
+            ArquivoMenu.DataContext = _context;
         }
 
-        public static ProjectSheetType CriarPadrao()
+        private void LimparDataContextsAreaCentral()
         {
-            return new ProjectSheetType();
+            ProjectTableGrid.DataContext = null;
+            ProjectSheetViewer.DataContext = null;
+            ProjectSheetTypeViewer.DataContext = null;
         }
 
-        private static double NormalizarDimensao(double valor, double fallback)
+        public void ToggleArquivoMenu(UIElement referencia)
         {
-            return double.IsNaN(valor) || double.IsInfinity(valor) || valor < ProjectSheet.MinDimension
-                ? fallback
-                : valor;
+            if (ArquivoPopup.IsOpen)
+            {
+                ArquivoPopup.IsOpen = false;
+                return;
+            }
+
+            ArquivoPopup.PlacementTarget = referencia;
+            ArquivoPopup.Placement = PlacementMode.Bottom;
+            ArquivoPopup.IsOpen = true;
+        }
+
+        public void FocarViewport()
+        {
+            Viewport.Focus();
+            System.Windows.Input.Keyboard.Focus(Viewport);
+        }
+
+        public void FocarSuperficieAtiva()
+        {
+            if (_context.Editor.SuperficieAtiva == EditorSurfaceKind.ProjectSheetType)
+            {
+                ProjectSheetTypeViewer.Focus();
+                System.Windows.Input.Keyboard.Focus(ProjectSheetTypeViewer);
+                return;
+            }
+
+            FocarViewport();
+        }
+
+        public void MostrarPropriedades()
+        {
+            PropertiesColumn.Width = _propertiesColumnWidth;
+            PropertiesHost.Visibility = Visibility.Visible;
+        }
+
+        public void MostrarPropriedadesVista(System.Guid vistaId)
+        {
+            ProjectView? vista = _context.Document.Vistas.FirstOrDefault(v => v.Id == vistaId);
+
+            if (vista == null)
+                return;
+
+            MostrarViewport();
+
+            _context.Editor.ElementoSelecionado = new ProjectViewPropertiesViewModel(
+                _context.Document,
+                vista,
+                _context.RenomearItemProjeto,
+                _context.EditarPropriedadesVista);
+
+            MostrarPropriedades();
+        }
+
+        public void MostrarPropriedadesTabela(System.Guid tabelaId)
+        {
+            ProjectTable? tabela = _context.Document.Tabelas.FirstOrDefault(t => t.Id == tabelaId);
+
+            if (tabela == null)
+                return;
+
+            _context.Editor.ElementoSelecionado = new ProjectTablePropertiesViewModel(
+                _context.Document,
+                tabela,
+                _context.RenomearItemProjeto,
+                _context.EditarPropriedadesTabela,
+                _context.ExportarTabela,
+                _context.Dialogs);
+
+            MostrarPropriedades();
+        }
+
+        public void MostrarPropriedadesPrancha(System.Guid pranchaId)
+        {
+            ProjectSheet? prancha = _context.Document.Pranchas.FirstOrDefault(p => p.Id == pranchaId);
+
+            if (prancha == null)
+                return;
+
+            _context.Editor.ElementoSelecionado = new ProjectSheetPropertiesViewModel(
+                _context.Document,
+                prancha,
+                _context.RenomearItemProjeto,
+                _context.EditarPropriedadesPrancha);
+
+            MostrarPropriedades();
+        }
+
+        public void MostrarPropriedadesTipoPrancha(System.Guid tipoId)
+        {
+            ProjectSheetType? tipo = _context.Document.TiposPrancha.FirstOrDefault(t => t.Id == tipoId);
+
+            if (tipo == null)
+                return;
+
+            _context.Editor.ElementoSelecionado = new ProjectSheetTypePropertiesViewModel(
+                _context.Document,
+                tipo,
+                _context.RenomearItemProjeto,
+                _context.EditarPropriedadesTipoPrancha);
+
+            MostrarPropriedades();
+        }
+
+        public void MostrarTipoPrancha(System.Guid tipoId)
+        {
+            ProjectSheetType? tipo = _context.Document.TiposPrancha.FirstOrDefault(t => t.Id == tipoId);
+
+            if (tipo == null)
+                return;
+
+            _projectSheetTypeViewModel = new ProjectSheetTypeViewModel(_context.Document, tipo);
+            _context.ProjectSheetTypeViewModelAtivo = _projectSheetTypeViewModel;
+            _context.Editor.SuperficieAtiva = EditorSurfaceKind.ProjectSheetType;
+
+            ProjectSheetTypeViewer.DataContext = _projectSheetTypeViewModel;
+            ProjectSheetTypeViewer.Visibility = Visibility.Visible;
+            ProjectTableGrid.Visibility = Visibility.Collapsed;
+            ProjectTableGrid.DataContext = null;
+            _projectTableDataViewModel = null;
+            ProjectSheetViewer.Visibility = Visibility.Collapsed;
+            ProjectSheetViewer.DataContext = null;
+            _projectSheetViewModel = null;
+            Viewport.Visibility = Visibility.Collapsed;
+            FocarSuperficieAtiva();
+        }
+
+        public void MostrarTabela(System.Guid tabelaId)
+        {
+            ProjectTable? tabela = _context.Document.Tabelas.FirstOrDefault(t => t.Id == tabelaId);
+
+            if (tabela == null)
+                return;
+
+            _projectTableDataViewModel = new ProjectTableDataViewModel(
+                _context.Document,
+                tabela,
+                new ProjectTableDataBuilder());
+
+            ProjectTableGrid.DataContext = _projectTableDataViewModel;
+            ProjectTableGrid.Visibility = Visibility.Visible;
+            ProjectSheetViewer.Visibility = Visibility.Collapsed;
+            ProjectSheetViewer.DataContext = null;
+            _projectSheetViewModel = null;
+            ProjectSheetTypeViewer.Visibility = Visibility.Collapsed;
+            ProjectSheetTypeViewer.DataContext = null;
+            _projectSheetTypeViewModel = null;
+            _context.ProjectSheetTypeViewModelAtivo = null;
+            _context.Editor.SuperficieAtiva = EditorSurfaceKind.ProjectTable;
+            Viewport.Visibility = Visibility.Collapsed;
+        }
+
+        public void MostrarPrancha(System.Guid pranchaId)
+        {
+            ProjectSheet? prancha = _context.Document.Pranchas.FirstOrDefault(p => p.Id == pranchaId);
+
+            if (prancha == null)
+                return;
+
+            _projectSheetViewModel = new ProjectSheetViewModel(_context.Document, prancha, _context.MoverTabelaNaPrancha, _context.RedimensionarTabelaNaPrancha, _context.RemoverTabelaDaPrancha, _context.DividirTabelaNaPrancha);
+
+            ProjectSheetViewer.DataContext = _projectSheetViewModel;
+            ProjectSheetViewer.Visibility = Visibility.Visible;
+            ProjectTableGrid.Visibility = Visibility.Collapsed;
+            ProjectTableGrid.DataContext = null;
+            _projectTableDataViewModel = null;
+            ProjectSheetTypeViewer.Visibility = Visibility.Collapsed;
+            ProjectSheetTypeViewer.DataContext = null;
+            _projectSheetTypeViewModel = null;
+            _context.ProjectSheetTypeViewModelAtivo = null;
+            _context.Editor.SuperficieAtiva = EditorSurfaceKind.ProjectSheet;
+            Viewport.Visibility = Visibility.Collapsed;
+        }
+
+        public void AlternarNavegadorProjeto()
+        {
+            _context.Editor.NavegadorProjetoVisivel = !_context.Editor.NavegadorProjetoVisivel;
+        }
+
+        public void CriarNovaVistaProjeto()
+        {
+            _context.CriarItemProjeto.CriarVista();
+            MostrarNavegadorProjeto();
+        }
+
+        public void CriarNovaTabelaProjeto()
+        {
+            _context.CriarItemProjeto.CriarTabela();
+            MostrarNavegadorProjeto();
+        }
+
+        public void CriarNovaPranchaProjeto()
+        {
+            _context.CriarItemProjeto.CriarPrancha();
+            MostrarNavegadorProjeto();
+        }
+
+        public void ExportarTabelaAtualCsv()
+        {
+            ProjectTable? tabela = _projectTableDataViewModel == null
+                ? null
+                : _context.Document.Tabelas.FirstOrDefault(t => t.Id == _projectTableDataViewModel.TableId);
+
+            _context.ExportarTabela.Executar(tabela);
+        }
+
+        public void InserirTabelaNaPrancha()
+        {
+            if (_context.Document.Pranchas.Count == 0)
+            {
+                _context.Dialogs.ShowWarning("Inserir tabela na prancha", "Crie uma prancha antes de inserir uma tabela.");
+                return;
+            }
+
+            if (_context.Document.Tabelas.Count == 0)
+            {
+                _context.Dialogs.ShowWarning("Inserir tabela na prancha", "Crie uma tabela antes de inseri-la em uma prancha.");
+                return;
+            }
+
+            List<ProjectItemDialogOption> pranchas = _context.Document.Pranchas
+                .Select(p => new ProjectItemDialogOption(p.Id, string.IsNullOrWhiteSpace(p.Numero) ? p.Nome : $"{p.Numero} - {p.Nome}"))
+                .ToList();
+            List<ProjectItemDialogOption> tabelas = _context.Document.Tabelas
+                .Select(t => new ProjectItemDialogOption(t.Id, t.Nome))
+                .ToList();
+
+            InserirTabelaPranchaDialogResult? result = _context.Dialogs.ShowInserirTabelaPranchaDialog(pranchas, tabelas);
+
+            if (result == null || result.TableIds.Count == 0)
+                return;
+
+            IReadOnlyList<ProjectSheetTableInstance> instances = _context.InserirTabelaNaPrancha.InserirMultiplas(result.SheetId, result.TableIds, AtualizarPranchaAtual);
+
+            if (instances.Count == 0)
+            {
+                _context.Dialogs.ShowWarning("Inserir tabela na prancha", "Nao foi possivel inserir as tabelas na prancha selecionada.");
+                return;
+            }
+
+            if (_projectSheetViewModel?.SheetId == result.SheetId)
+                _projectSheetViewModel.Refresh();
+
+            _context.Dialogs.ShowInfo("Inserir tabela na prancha", instances.Count == 1 ? "Tabela inserida na prancha." : "Tabelas inseridas na prancha.");
+        }
+
+        public void MostrarConfiguracaoUnidades()
+        {
+            var viewModel = new UnitsSettingsViewModel(_context.Settings.Units);
+            var window = new UnitsWindow(viewModel)
+            {
+                Owner = this
+            };
+
+            if (window.ShowDialog() == true)
+                _context.AlterarUnidadesProjeto.Executar(viewModel.ToUnitDisplaySettings());
+
+            FocarViewport();
+        }
+
+        private void OnWindowPreviewKeyDown(object sender, KeyEventArgs e)
+        {
+            if (e.Handled)
+                return;
+
+            if (!Keyboard.Modifiers.HasFlag(ModifierKeys.Control))
+                return;
+
+            if (e.Key != Key.Z && e.Key != Key.Y)
+                return;
+
+            if (Keyboard.FocusedElement is TextBoxBase)
+                return;
+
+            if (_context.Input.KeyDown(e.Key))
+                e.Handled = true;
+        }
+
+        private void OnPropertiesCloseRequested(object sender, RoutedEventArgs e)
+        {
+            PropertiesColumn.Width = new GridLength(0);
+            PropertiesHost.Visibility = Visibility.Collapsed;
+            FocarViewport();
+        }
+
+        private void OnProjectBrowserCloseRequested(object sender, RoutedEventArgs e)
+        {
+            _context.Editor.NavegadorProjetoVisivel = false;
+            FocarViewport();
+        }
+
+        private void OnPropriedadesTabelaAlteradas(ProjectTable tabela)
+        {
+            if (_projectTableDataViewModel?.TableId == tabela.Id)
+                _projectTableDataViewModel.Refresh();
+
+            if (_projectSheetViewModel != null)
+                _projectSheetViewModel.Refresh();
+        }
+
+        private void OnItemProjetoRenomeado()
+        {
+            _projectSheetViewModel?.Refresh();
+            _projectSheetTypeViewModel?.Refresh();
+        }
+
+        private void OnTabelasCollectionChanged(object? sender, NotifyCollectionChangedEventArgs e)
+        {
+            if (_projectTableDataViewModel == null ||
+                _context.Document.Tabelas.Any(t => t.Id == _projectTableDataViewModel.TableId))
+            {
+                _projectSheetViewModel?.Refresh();
+                return;
+            }
+
+            MostrarViewport();
+        }
+
+        private void OnPranchasCollectionChanged(object? sender, NotifyCollectionChangedEventArgs e)
+        {
+            if (_projectSheetViewModel == null ||
+                _context.Document.Pranchas.Any(p => p.Id == _projectSheetViewModel.SheetId))
+                return;
+
+            MostrarViewport();
+        }
+
+        private void OnEditorStatePropertyChanged(object? sender, PropertyChangedEventArgs e)
+        {
+            if (string.IsNullOrEmpty(e.PropertyName) || e.PropertyName == nameof(EditorState.NavegadorProjetoVisivel))
+                AtualizarVisibilidadeNavegadorProjeto();
+        }
+
+        private void AtualizarPranchaAtual()
+        {
+            _projectSheetViewModel?.Refresh();
+        }
+
+        private void AtualizarVisibilidadeNavegadorProjeto()
+        {
+            if (_context.Editor.NavegadorProjetoVisivel)
+            {
+                ProjectBrowserColumn.Width = _projectBrowserColumnWidth;
+                ProjectBrowser.Visibility = Visibility.Visible;
+                return;
+            }
+
+            ProjectBrowserColumn.Width = new GridLength(0);
+            ProjectBrowser.Visibility = Visibility.Collapsed;
+        }
+
+        private void MostrarNavegadorProjeto()
+        {
+            _context.Editor.NavegadorProjetoVisivel = true;
+        }
+
+        private void MostrarViewport()
+        {
+            ProjectTableGrid.Visibility = Visibility.Collapsed;
+            ProjectTableGrid.DataContext = null;
+            _projectTableDataViewModel = null;
+            ProjectSheetViewer.Visibility = Visibility.Collapsed;
+            ProjectSheetViewer.DataContext = null;
+            _projectSheetViewModel = null;
+            ProjectSheetTypeViewer.Visibility = Visibility.Collapsed;
+            ProjectSheetTypeViewer.DataContext = null;
+            _projectSheetTypeViewModel = null;
+            _context.ProjectSheetTypeViewModelAtivo = null;
+            _context.Editor.SuperficieAtiva = EditorSurfaceKind.Diagram;
+            Viewport.Visibility = Visibility.Visible;
+            FocarViewport();
         }
     }
 }
-
 
 
 ====================================================================================================
@@ -9654,6 +10167,7 @@ namespace Araci.Services
             EditarPropriedadesTipoPrancha = new EditarPropriedadesTipoPranchaUseCase(Document, Commands);
             InserirLinhaNoTipoPrancha = new InserirLinhaNoTipoPranchaUseCase(Document, Commands);
             ExcluirLinhaDoTipoPrancha = new ExcluirLinhaDoTipoPranchaUseCase(Document, Commands);
+            MoverLinhaDoTipoPrancha = new MoverLinhaDoTipoPranchaUseCase(Document, Commands);
             ExportarTabela = new ExportarTabelaUseCase(Document, Dialogs, new ProjectTableDataBuilder(), new ProjectTableCsvExportService());
             InserirTabelaNaPrancha = new InserirTabelaNaPranchaUseCase(Document, Commands);
             MoverTabelaNaPrancha = new MoverTabelaNaPranchaUseCase(Document, Commands);
@@ -9763,6 +10277,7 @@ namespace Araci.Services
         public EditarPropriedadesTipoPranchaUseCase EditarPropriedadesTipoPrancha { get; }
         public InserirLinhaNoTipoPranchaUseCase InserirLinhaNoTipoPrancha { get; }
         public ExcluirLinhaDoTipoPranchaUseCase ExcluirLinhaDoTipoPrancha { get; }
+        public MoverLinhaDoTipoPranchaUseCase MoverLinhaDoTipoPrancha { get; }
         public ExportarTabelaUseCase ExportarTabela { get; }
         public InserirTabelaNaPranchaUseCase InserirTabelaNaPrancha { get; }
         public MoverTabelaNaPranchaUseCase MoverTabelaNaPrancha { get; }
@@ -9975,15 +10490,31 @@ ARQUIVO: C:\Users\User\source\repos\lucasffxavier\Araci-front\ViewModels\Project
 using System;
 using System.ComponentModel;
 using System.Runtime.CompilerServices;
+using System.Windows;
 using System.Windows.Media;
 using Araci.Core.Documents;
 
 namespace Araci.ViewModels
 {
+    public enum ProjectSheetTemplateLineEndpoint
+    {
+        Start,
+        End
+    }
+
     public sealed class ProjectSheetTemplateLineViewModel : INotifyPropertyChanged
     {
+        private const double EndpointHandleSizeValue = 10.0;
+
         private readonly ProjectSheetTemplateLine _linha;
         private bool _isSelected;
+        private double _previewOffsetX;
+        private double _previewOffsetY;
+        private bool _hasEndpointPreview;
+        private double _previewX1;
+        private double _previewY1;
+        private double _previewX2;
+        private double _previewY2;
 
         public ProjectSheetTemplateLineViewModel(ProjectSheetTemplateLine linha)
         {
@@ -9991,13 +10522,26 @@ namespace Araci.ViewModels
         }
 
         public Guid Id => _linha.Id;
-        public double X1 => _linha.X1;
-        public double Y1 => _linha.Y1;
-        public double X2 => _linha.X2;
-        public double Y2 => _linha.Y2;
+        public double X1 => _hasEndpointPreview ? _previewX1 : _linha.X1 + _previewOffsetX;
+        public double Y1 => _hasEndpointPreview ? _previewY1 : _linha.Y1 + _previewOffsetY;
+        public double X2 => _hasEndpointPreview ? _previewX2 : _linha.X2 + _previewOffsetX;
+        public double Y2 => _hasEndpointPreview ? _previewY2 : _linha.Y2 + _previewOffsetY;
+        public double ModelX1 => _linha.X1;
+        public double ModelY1 => _linha.Y1;
+        public double ModelX2 => _linha.X2;
+        public double ModelY2 => _linha.Y2;
         public Brush StrokeBrush => CriarBrush(_linha.Stroke);
         public double StrokeThickness => _linha.StrokeThickness;
         public bool Visible => _linha.Visible;
+        public bool HasPreviewOffset => Math.Abs(_previewOffsetX) > 0.0001 || Math.Abs(_previewOffsetY) > 0.0001;
+        public bool HasEndpointPreview => _hasEndpointPreview;
+        public double EndpointHandleSize => EndpointHandleSizeValue;
+        public double StartHandleLeft => X1 - EndpointHandleSizeValue / 2.0;
+        public double StartHandleTop => Y1 - EndpointHandleSizeValue / 2.0;
+        public double EndHandleLeft => X2 - EndpointHandleSizeValue / 2.0;
+        public double EndHandleTop => Y2 - EndpointHandleSizeValue / 2.0;
+        public bool EndpointHandlesVisible => IsSelected;
+        public Visibility EndpointHandlesVisibility => EndpointHandlesVisible ? Visibility.Visible : Visibility.Collapsed;
 
         public bool IsSelected
         {
@@ -10011,13 +10555,109 @@ namespace Araci.ViewModels
                 OnPropertyChanged();
                 OnPropertyChanged(nameof(SelectionStrokeBrush));
                 OnPropertyChanged(nameof(SelectionStrokeThickness));
+                OnPropertyChanged(nameof(EndpointHandlesVisible));
+                OnPropertyChanged(nameof(EndpointHandlesVisibility));
             }
         }
 
         public Brush SelectionStrokeBrush => IsSelected ? Brushes.DodgerBlue : StrokeBrush;
         public double SelectionStrokeThickness => IsSelected ? Math.Max(StrokeThickness + 3.0, 4.0) : StrokeThickness;
 
+        public void SetPreviewOffset(double deltaX, double deltaY)
+        {
+            if (_hasEndpointPreview)
+                ClearEndpointPreview();
+
+            if (Math.Abs(_previewOffsetX - deltaX) < 0.0001 && Math.Abs(_previewOffsetY - deltaY) < 0.0001)
+                return;
+
+            _previewOffsetX = deltaX;
+            _previewOffsetY = deltaY;
+            NotificarCoordenadas();
+            OnPropertyChanged(nameof(HasPreviewOffset));
+        }
+
+        public void ClearPreviewOffset()
+        {
+            if (!HasPreviewOffset)
+                return;
+
+            _previewOffsetX = 0.0;
+            _previewOffsetY = 0.0;
+            NotificarCoordenadas();
+            OnPropertyChanged(nameof(HasPreviewOffset));
+        }
+
+        public void SetEndpointPreview(ProjectSheetTemplateLineEndpoint endpoint, double x, double y)
+        {
+            if (!_hasEndpointPreview)
+            {
+                _previewX1 = _linha.X1;
+                _previewY1 = _linha.Y1;
+                _previewX2 = _linha.X2;
+                _previewY2 = _linha.Y2;
+            }
+
+            if (endpoint == ProjectSheetTemplateLineEndpoint.Start)
+            {
+                _previewX1 = x;
+                _previewY1 = y;
+            }
+            else
+            {
+                _previewX2 = x;
+                _previewY2 = y;
+            }
+
+            _hasEndpointPreview = true;
+            _previewOffsetX = 0.0;
+            _previewOffsetY = 0.0;
+            NotificarCoordenadas();
+            OnPropertyChanged(nameof(HasPreviewOffset));
+            OnPropertyChanged(nameof(HasEndpointPreview));
+        }
+
+        public void SetPreviewCoordinates(double x1, double y1, double x2, double y2)
+        {
+            _previewX1 = x1;
+            _previewY1 = y1;
+            _previewX2 = x2;
+            _previewY2 = y2;
+            _hasEndpointPreview = true;
+            _previewOffsetX = 0.0;
+            _previewOffsetY = 0.0;
+            NotificarCoordenadas();
+            OnPropertyChanged(nameof(HasPreviewOffset));
+            OnPropertyChanged(nameof(HasEndpointPreview));
+        }
+
+        public void ClearEndpointPreview()
+        {
+            if (!_hasEndpointPreview)
+                return;
+
+            _hasEndpointPreview = false;
+            _previewX1 = 0.0;
+            _previewY1 = 0.0;
+            _previewX2 = 0.0;
+            _previewY2 = 0.0;
+            NotificarCoordenadas();
+            OnPropertyChanged(nameof(HasEndpointPreview));
+        }
+
         public event PropertyChangedEventHandler? PropertyChanged;
+
+        private void NotificarCoordenadas()
+        {
+            OnPropertyChanged(nameof(X1));
+            OnPropertyChanged(nameof(Y1));
+            OnPropertyChanged(nameof(X2));
+            OnPropertyChanged(nameof(Y2));
+            OnPropertyChanged(nameof(StartHandleLeft));
+            OnPropertyChanged(nameof(StartHandleTop));
+            OnPropertyChanged(nameof(EndHandleLeft));
+            OnPropertyChanged(nameof(EndHandleTop));
+        }
 
         private static Brush CriarBrush(string stroke)
         {
@@ -10051,6 +10691,7 @@ using System.ComponentModel;
 using System.Linq;
 using System.Runtime.CompilerServices;
 using System.Windows;
+using System.Windows.Media;
 using Araci.Core.Documents;
 
 namespace Araci.ViewModels
@@ -10058,6 +10699,7 @@ namespace Araci.ViewModels
     public sealed class ProjectSheetTypeViewModel : INotifyPropertyChanged
     {
         private const double WorkspaceMargin = 360.0;
+        private const double EndpointHandleSize = 12.0;
 
         private readonly AraciDocument _document;
         private readonly ProjectSheetType _tipo;
@@ -10069,6 +10711,7 @@ namespace Araci.ViewModels
             _document = document ?? throw new ArgumentNullException(nameof(document));
             _tipo = tipo ?? throw new ArgumentNullException(nameof(tipo));
             Lines = new ObservableCollection<ProjectSheetTemplateLineViewModel>();
+            EndpointHandles = new ObservableCollection<ProjectSheetTemplateLineEndpointHandleViewModel>();
             _document.PropriedadesTipoPranchaAlteradas += OnPropriedadesTipoPranchaAlteradas;
             _document.ItemProjetoRenomeado += OnItemProjetoRenomeado;
             Refresh();
@@ -10090,8 +10733,10 @@ namespace Araci.ViewModels
         public string Titulo => $"Tipo de Prancha - {Nome}";
         public string Descricao => $"{FormatoFolha} {OrientacaoFolha} - {LarguraFolha:0.#} x {AlturaFolha:0.#}";
         public ObservableCollection<ProjectSheetTemplateLineViewModel> Lines { get; }
+        public ObservableCollection<ProjectSheetTemplateLineEndpointHandleViewModel> EndpointHandles { get; }
         public Guid? SelectedLineId => _selectedLineId;
         public bool HasSelectedLine => _selectedLineId.HasValue;
+        public bool EndpointHandlesVisible => EndpointHandles.Count > 0;
 
         public ProjectSheetTemplateLineViewModel? PreviewLine
         {
@@ -10156,6 +10801,7 @@ namespace Araci.ViewModels
 
             _selectedLineId = lineId;
             AtualizarSelecaoVisual();
+            RefreshEndpointHandles();
             OnPropertyChanged(nameof(SelectedLineId));
             OnPropertyChanged(nameof(HasSelectedLine));
             return true;
@@ -10168,6 +10814,7 @@ namespace Araci.ViewModels
 
             _selectedLineId = null;
             AtualizarSelecaoVisual();
+            RefreshEndpointHandles();
             OnPropertyChanged(nameof(SelectedLineId));
             OnPropertyChanged(nameof(HasSelectedLine));
         }
@@ -10182,6 +10829,130 @@ namespace Araci.ViewModels
 
             lineId = Guid.Empty;
             return false;
+        }
+
+        public bool TryGetLineCoordinates(Guid lineId, out double x1, out double y1, out double x2, out double y2)
+        {
+            ProjectSheetTemplateLineViewModel? line = Lines.FirstOrDefault(l => l.Id == lineId);
+
+            if (line == null)
+            {
+                x1 = 0.0;
+                y1 = 0.0;
+                x2 = 0.0;
+                y2 = 0.0;
+                return false;
+            }
+
+            x1 = line.ModelX1;
+            y1 = line.ModelY1;
+            x2 = line.ModelX2;
+            y2 = line.ModelY2;
+            return true;
+        }
+
+        public bool TryHitSelectedLineEndpoint(Point position, double tolerance, out Guid lineId, out ProjectSheetTemplateLineEndpoint endpoint)
+        {
+            lineId = Guid.Empty;
+            endpoint = ProjectSheetTemplateLineEndpoint.Start;
+
+            if (!_selectedLineId.HasValue)
+                return false;
+
+            ProjectSheetTemplateLineViewModel? line = Lines.FirstOrDefault(l => l.Id == _selectedLineId.Value && l.IsSelected);
+
+            if (line == null)
+                return false;
+
+            double startDistance = Distancia(position, new Point(line.X1, line.Y1));
+            double endDistance = Distancia(position, new Point(line.X2, line.Y2));
+
+            if (startDistance <= tolerance && startDistance <= endDistance)
+            {
+                lineId = line.Id;
+                endpoint = ProjectSheetTemplateLineEndpoint.Start;
+                return true;
+            }
+
+            if (endDistance <= tolerance)
+            {
+                lineId = line.Id;
+                endpoint = ProjectSheetTemplateLineEndpoint.End;
+                return true;
+            }
+
+            return false;
+        }
+
+        public bool SetLinePreviewOffset(Guid lineId, double deltaX, double deltaY)
+        {
+            ProjectSheetTemplateLineViewModel? line = Lines.FirstOrDefault(l => l.Id == lineId);
+
+            if (line == null)
+                return false;
+
+            line.SetPreviewOffset(deltaX, deltaY);
+            RefreshEndpointHandles();
+            return true;
+        }
+
+        public void ClearLinePreviewOffset(Guid lineId)
+        {
+            ProjectSheetTemplateLineViewModel? line = Lines.FirstOrDefault(l => l.Id == lineId);
+            line?.ClearPreviewOffset();
+            RefreshEndpointHandles();
+        }
+
+        public void ClearLinePreviewOffsets()
+        {
+            foreach (ProjectSheetTemplateLineViewModel line in Lines)
+                line.ClearPreviewOffset();
+
+            RefreshEndpointHandles();
+        }
+
+        public bool SetLineEndpointPreview(Guid lineId, ProjectSheetTemplateLineEndpoint endpoint, double x, double y)
+        {
+            ProjectSheetTemplateLineViewModel? line = Lines.FirstOrDefault(l => l.Id == lineId);
+
+            if (line == null)
+                return false;
+
+            line.SetEndpointPreview(endpoint, x, y);
+            RefreshEndpointHandles();
+            return true;
+        }
+
+        public bool SetLinePreviewCoordinates(Guid lineId, double x1, double y1, double x2, double y2)
+        {
+            ProjectSheetTemplateLineViewModel? line = Lines.FirstOrDefault(l => l.Id == lineId);
+
+            if (line == null)
+                return false;
+
+            line.SetPreviewCoordinates(x1, y1, x2, y2);
+            RefreshEndpointHandles();
+            return true;
+        }
+
+        public void ClearLineEndpointPreview(Guid lineId)
+        {
+            ProjectSheetTemplateLineViewModel? line = Lines.FirstOrDefault(l => l.Id == lineId);
+            line?.ClearEndpointPreview();
+            RefreshEndpointHandles();
+        }
+
+        public void ClearLinePreviewCoordinates(Guid lineId)
+        {
+            ClearLineEndpointPreview(lineId);
+        }
+
+        public void ClearLineEndpointPreviews()
+        {
+            foreach (ProjectSheetTemplateLineViewModel line in Lines)
+                line.ClearEndpointPreview();
+
+            RefreshEndpointHandles();
         }
 
         public event PropertyChangedEventHandler? PropertyChanged;
@@ -10215,6 +10986,7 @@ namespace Araci.ViewModels
                 _selectedLineId = null;
 
             AtualizarSelecaoVisual();
+            RefreshEndpointHandles();
             OnPropertyChanged(nameof(SelectedLineId));
             OnPropertyChanged(nameof(HasSelectedLine));
         }
@@ -10223,6 +10995,24 @@ namespace Araci.ViewModels
         {
             foreach (ProjectSheetTemplateLineViewModel line in Lines)
                 line.IsSelected = _selectedLineId.HasValue && line.Id == _selectedLineId.Value;
+        }
+
+        private void RefreshEndpointHandles()
+        {
+            EndpointHandles.Clear();
+
+            if (_selectedLineId.HasValue)
+            {
+                ProjectSheetTemplateLineViewModel? line = Lines.FirstOrDefault(l => l.Id == _selectedLineId.Value && l.IsSelected);
+
+                if (line != null)
+                {
+                    EndpointHandles.Add(ProjectSheetTemplateLineEndpointHandleViewModel.Create(line.Id, ProjectSheetTemplateLineEndpoint.Start, line.X1, line.Y1, EndpointHandleSize));
+                    EndpointHandles.Add(ProjectSheetTemplateLineEndpointHandleViewModel.Create(line.Id, ProjectSheetTemplateLineEndpoint.End, line.X2, line.Y2, EndpointHandleSize));
+                }
+            }
+
+            OnPropertyChanged(nameof(EndpointHandlesVisible));
         }
 
         private static double DistanciaAoSegmento(Point point, Point a, Point b)
@@ -10250,6 +11040,44 @@ namespace Araci.ViewModels
         private void OnPropertyChanged([CallerMemberName] string? propertyName = null)
         {
             PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
+        }
+    }
+
+    public sealed class ProjectSheetTemplateLineEndpointHandleViewModel
+    {
+        private ProjectSheetTemplateLineEndpointHandleViewModel(
+            Guid lineId,
+            ProjectSheetTemplateLineEndpoint endpoint,
+            double x,
+            double y,
+            double size)
+        {
+            LineId = lineId;
+            Endpoint = endpoint;
+            X = x;
+            Y = y;
+            Size = size;
+        }
+
+        public Guid LineId { get; }
+        public ProjectSheetTemplateLineEndpoint Endpoint { get; }
+        public double X { get; }
+        public double Y { get; }
+        public double Size { get; }
+        public double Left => X - Size / 2.0;
+        public double Top => Y - Size / 2.0;
+        public Brush Fill => Brushes.White;
+        public Brush Stroke => Brushes.DodgerBlue;
+        public double StrokeThickness => 2.0;
+
+        public static ProjectSheetTemplateLineEndpointHandleViewModel Create(
+            Guid lineId,
+            ProjectSheetTemplateLineEndpoint endpoint,
+            double x,
+            double y,
+            double size)
+        {
+            return new ProjectSheetTemplateLineEndpointHandleViewModel(lineId, endpoint, x, y, size);
         }
     }
 }
@@ -10332,7 +11160,8 @@ ARQUIVO: C:\Users\User\source\repos\lucasffxavier\Araci-front\Views\ProjectSheet
                                           Width="{Binding SheetWidth}"
                                           Height="{Binding SheetHeight}"
                                           ClipToBounds="True"
-                                          IsHitTestVisible="False">
+                                          IsHitTestVisible="False"
+                                          Panel.ZIndex="10">
 								<ItemsControl.ItemsPanel>
 									<ItemsPanelTemplate>
 										<Canvas Background="Transparent"
@@ -10349,14 +11178,74 @@ ARQUIVO: C:\Users\User\source\repos\lucasffxavier\Araci-front\Views\ProjectSheet
 								</ItemsControl.ItemContainerStyle>
 								<ItemsControl.ItemTemplate>
 									<DataTemplate>
-										<Line X1="{Binding X1}"
-                                              Y1="{Binding Y1}"
-                                              X2="{Binding X2}"
-                                              Y2="{Binding Y2}"
-                                              Stroke="{Binding SelectionStrokeBrush}"
-                                              StrokeThickness="{Binding SelectionStrokeThickness}"
-                                              StrokeStartLineCap="Square"
-                                              StrokeEndLineCap="Square"/>
+										<Canvas Width="{Binding DataContext.SheetWidth, RelativeSource={RelativeSource AncestorType={x:Type UserControl}}}"
+                                                Height="{Binding DataContext.SheetHeight, RelativeSource={RelativeSource AncestorType={x:Type UserControl}}}"
+                                                Background="Transparent"
+                                                ClipToBounds="False">
+											<Line X1="{Binding X1}"
+                                                  Y1="{Binding Y1}"
+                                                  X2="{Binding X2}"
+                                                  Y2="{Binding Y2}"
+                                                  Stroke="{Binding SelectionStrokeBrush}"
+                                                  StrokeThickness="{Binding SelectionStrokeThickness}"
+                                                  StrokeStartLineCap="Square"
+                                                  StrokeEndLineCap="Square"
+                                                  IsHitTestVisible="False"/>
+											<Ellipse Width="{Binding EndpointHandleSize}"
+                                                     Height="{Binding EndpointHandleSize}"
+                                                     Canvas.Left="{Binding StartHandleLeft}"
+                                                     Canvas.Top="{Binding StartHandleTop}"
+                                                     Fill="#FFFFFFFF"
+                                                     Stroke="#FF1E90FF"
+                                                     StrokeThickness="1.5"
+                                                     Visibility="{Binding EndpointHandlesVisibility}"
+                                                     Panel.ZIndex="20"
+                                                     IsHitTestVisible="False"/>
+											<Ellipse Width="{Binding EndpointHandleSize}"
+                                                     Height="{Binding EndpointHandleSize}"
+                                                     Canvas.Left="{Binding EndHandleLeft}"
+                                                     Canvas.Top="{Binding EndHandleTop}"
+                                                     Fill="#FFFFFFFF"
+                                                     Stroke="#FF1E90FF"
+                                                     StrokeThickness="1.5"
+                                                     Visibility="{Binding EndpointHandlesVisibility}"
+                                                     Panel.ZIndex="20"
+                                                     IsHitTestVisible="False"/>
+										</Canvas>
+									</DataTemplate>
+								</ItemsControl.ItemTemplate>
+							</ItemsControl>
+							<ItemsControl ItemsSource="{Binding EndpointHandles}"
+                                          Width="{Binding SheetWidth}"
+                                          Height="{Binding SheetHeight}"
+                                          ClipToBounds="False"
+                                          IsHitTestVisible="False"
+                                          Panel.ZIndex="30"
+                                          Tag="{Binding EndpointHandlesVisible}">
+								<ItemsControl.ItemsPanel>
+									<ItemsPanelTemplate>
+										<Canvas Background="Transparent"
+                                                ClipToBounds="False"
+                                                Width="{Binding DataContext.SheetWidth, RelativeSource={RelativeSource AncestorType={x:Type UserControl}}}"
+                                                Height="{Binding DataContext.SheetHeight, RelativeSource={RelativeSource AncestorType={x:Type UserControl}}}"/>
+									</ItemsPanelTemplate>
+								</ItemsControl.ItemsPanel>
+								<ItemsControl.ItemContainerStyle>
+									<Style TargetType="{x:Type ContentPresenter}">
+										<Setter Property="Canvas.Left" Value="{Binding Left}"/>
+										<Setter Property="Canvas.Top" Value="{Binding Top}"/>
+										<Setter Property="Panel.ZIndex" Value="30"/>
+									</Style>
+								</ItemsControl.ItemContainerStyle>
+								<ItemsControl.ItemTemplate>
+									<DataTemplate>
+										<Ellipse Width="{Binding Size}"
+                                                 Height="{Binding Size}"
+                                                 Fill="{Binding Fill}"
+                                                 Stroke="{Binding Stroke}"
+                                                 StrokeThickness="{Binding StrokeThickness}"
+                                                 SnapsToDevicePixels="True"
+                                                 IsHitTestVisible="False"/>
 									</DataTemplate>
 								</ItemsControl.ItemTemplate>
 							</ItemsControl>
@@ -10367,7 +11256,8 @@ ARQUIVO: C:\Users\User\source\repos\lucasffxavier\Araci-front\Views\ProjectSheet
                                   Stroke="#FF1E90FF"
                                   StrokeThickness="{Binding PreviewLine.StrokeThickness, TargetNullValue=1}"
                                   StrokeDashArray="4 2"
-                                  IsHitTestVisible="False">
+                                  IsHitTestVisible="False"
+                                  Panel.ZIndex="40">
 								<Line.Style>
 									<Style TargetType="Line">
 										<Setter Property="Visibility" Value="Collapsed"/>
@@ -10404,9 +11294,30 @@ namespace Araci.Views
 {
     public partial class ProjectSheetTypeView : UserControl
     {
+        private enum LinhaTemplateInteractionMode
+        {
+            None,
+            Line,
+            Endpoint
+        }
+
         private const double LineHitTolerance = 6.0;
+        private const double EndpointHitTolerance = 8.0;
+        private const double DragThresholdSquared = 9.0;
 
         private EditorContext? _context;
+        private LinhaTemplateInteractionMode _linhaTemplateInteractionMode;
+        private Guid? _linhaTemplateEmArrasteId;
+        private Point _linhaTemplateDragStart;
+        private bool _linhaTemplateArrastando;
+        private Guid? _linhaTemplateEndpointEmArrasteId;
+        private ProjectSheetTemplateLineEndpoint _linhaTemplateEndpointEmArraste;
+        private Point _linhaTemplateEndpointDragStart;
+        private bool _linhaTemplateEndpointArrastando;
+        private double _linhaTemplateEndpointOriginalX1;
+        private double _linhaTemplateEndpointOriginalY1;
+        private double _linhaTemplateEndpointOriginalX2;
+        private double _linhaTemplateEndpointOriginalY2;
 
         public ProjectSheetTypeView()
         {
@@ -10428,7 +11339,13 @@ namespace Araci.Views
             Keyboard.Focus(this);
             Point position = e.GetPosition(TemplatePageBorder);
 
-            if (TentarSelecionarLinhaTemplate(position))
+            if (TentarIniciarEdicaoExtremidadeLinhaTemplate(position))
+            {
+                e.Handled = true;
+                return;
+            }
+
+            if (TentarIniciarInteracaoLinhaTemplate(position))
             {
                 e.Handled = true;
                 return;
@@ -10446,6 +11363,19 @@ namespace Araci.Views
                 return;
 
             Point position = e.GetPosition(TemplatePageBorder);
+
+            if (AtualizarEdicaoExtremidadeLinhaTemplate(position, e))
+            {
+                e.Handled = true;
+                return;
+            }
+
+            if (AtualizarArrasteLinhaTemplate(position, e))
+            {
+                e.Handled = true;
+                return;
+            }
+
             _context.Tools.FerramentaAtual.OnMouseMove(position, CriarInputState(e, position));
         }
 
@@ -10455,6 +11385,25 @@ namespace Araci.Views
                 return;
 
             Point position = e.GetPosition(TemplatePageBorder);
+
+            if (FinalizarEdicaoExtremidadeLinhaTemplate(position))
+            {
+                if (TemplatePageBorder.IsMouseCaptured)
+                    TemplatePageBorder.ReleaseMouseCapture();
+
+                e.Handled = true;
+                return;
+            }
+
+            if (FinalizarArrasteLinhaTemplate(position))
+            {
+                if (TemplatePageBorder.IsMouseCaptured)
+                    TemplatePageBorder.ReleaseMouseCapture();
+
+                e.Handled = true;
+                return;
+            }
+
             _context.Tools.FerramentaAtual.OnMouseUp(position, CriarInputState(e, position, e.ChangedButton, e.ClickCount));
 
             if (TemplatePageBorder.IsMouseCaptured)
@@ -10465,12 +11414,31 @@ namespace Araci.Views
 
         private void TemplatePageBorder_LostMouseCapture(object sender, MouseEventArgs e)
         {
+            if (_linhaTemplateEndpointEmArrasteId.HasValue)
+                CancelarEdicaoExtremidadeLinhaTemplate();
+
+            if (_linhaTemplateEmArrasteId.HasValue)
+                CancelarArrasteLinhaTemplate();
         }
 
         private void OnPreviewKeyDown(object sender, KeyEventArgs e)
         {
             if (_context == null)
                 return;
+
+            if (e.Key == Key.Escape && _linhaTemplateEndpointEmArrasteId.HasValue)
+            {
+                CancelarEdicaoExtremidadeLinhaTemplate();
+                e.Handled = true;
+                return;
+            }
+
+            if (e.Key == Key.Escape && _linhaTemplateEmArrasteId.HasValue)
+            {
+                CancelarArrasteLinhaTemplate();
+                e.Handled = true;
+                return;
+            }
 
             if (e.Key == Key.Delete && ExcluirLinhaSelecionada())
             {
@@ -10482,7 +11450,7 @@ namespace Araci.Views
                 e.Handled = true;
         }
 
-        private bool TentarSelecionarLinhaTemplate(Point position)
+        private bool TentarIniciarEdicaoExtremidadeLinhaTemplate(Point position)
         {
             if (_context == null || _context.ProjectSheetTypeViewModelAtivo == null)
                 return false;
@@ -10492,8 +11460,198 @@ namespace Araci.Views
             if (!string.Equals(ferramentaAtual.Nome, "Selecionar", StringComparison.OrdinalIgnoreCase) || ferramentaAtual.IsBusy)
                 return false;
 
-            _context.ProjectSheetTypeViewModelAtivo.SelectLineAt(position, LineHitTolerance);
+            ProjectSheetTypeViewModel viewModel = _context.ProjectSheetTypeViewModelAtivo;
+
+            if (!viewModel.TryHitSelectedLineEndpoint(position, EndpointHitTolerance, out Guid lineId, out ProjectSheetTemplateLineEndpoint endpoint))
+                return false;
+
+            if (!viewModel.TryGetLineCoordinates(
+                    lineId,
+                    out _linhaTemplateEndpointOriginalX1,
+                    out _linhaTemplateEndpointOriginalY1,
+                    out _linhaTemplateEndpointOriginalX2,
+                    out _linhaTemplateEndpointOriginalY2))
+                return false;
+
+            _linhaTemplateEndpointEmArrasteId = lineId;
+            _linhaTemplateEndpointEmArraste = endpoint;
+            _linhaTemplateEndpointDragStart = position;
+            _linhaTemplateEndpointArrastando = false;
+            _linhaTemplateInteractionMode = LinhaTemplateInteractionMode.Endpoint;
+            _linhaTemplateEmArrasteId = null;
+            _linhaTemplateArrastando = false;
+            TemplatePageBorder.CaptureMouse();
             return true;
+        }
+
+        private bool AtualizarEdicaoExtremidadeLinhaTemplate(Point position, MouseEventArgs e)
+        {
+            if (_context == null || _context.ProjectSheetTypeViewModelAtivo == null || !_linhaTemplateEndpointEmArrasteId.HasValue)
+                return false;
+
+            if (e.LeftButton != MouseButtonState.Pressed)
+                return false;
+
+            Vector delta = position - _linhaTemplateEndpointDragStart;
+
+            if (!_linhaTemplateEndpointArrastando && delta.LengthSquared < DragThresholdSquared)
+                return true;
+
+            _linhaTemplateEndpointArrastando = true;
+
+            double previewX1 = _linhaTemplateEndpointEmArraste == ProjectSheetTemplateLineEndpoint.Start
+                ? position.X
+                : _linhaTemplateEndpointOriginalX1;
+            double previewY1 = _linhaTemplateEndpointEmArraste == ProjectSheetTemplateLineEndpoint.Start
+                ? position.Y
+                : _linhaTemplateEndpointOriginalY1;
+            double previewX2 = _linhaTemplateEndpointEmArraste == ProjectSheetTemplateLineEndpoint.End
+                ? position.X
+                : _linhaTemplateEndpointOriginalX2;
+            double previewY2 = _linhaTemplateEndpointEmArraste == ProjectSheetTemplateLineEndpoint.End
+                ? position.Y
+                : _linhaTemplateEndpointOriginalY2;
+
+            _context.ProjectSheetTypeViewModelAtivo.SetLinePreviewCoordinates(
+                _linhaTemplateEndpointEmArrasteId.Value,
+                previewX1,
+                previewY1,
+                previewX2,
+                previewY2);
+
+            return true;
+        }
+
+        private bool FinalizarEdicaoExtremidadeLinhaTemplate(Point position)
+        {
+            if (_context == null || _context.ProjectSheetTypeViewModelAtivo == null || !_linhaTemplateEndpointEmArrasteId.HasValue)
+                return false;
+
+            Guid lineId = _linhaTemplateEndpointEmArrasteId.Value;
+            bool arrastou = _linhaTemplateEndpointArrastando;
+            ProjectSheetTemplateLineEndpoint endpoint = _linhaTemplateEndpointEmArraste;
+            ProjectSheetTypeViewModel viewModel = _context.ProjectSheetTypeViewModelAtivo;
+
+            viewModel.ClearLinePreviewCoordinates(lineId);
+            LimparEstadoEdicaoExtremidadeLinhaTemplate();
+
+            if (!arrastou)
+                return true;
+
+            double newX1 = endpoint == ProjectSheetTemplateLineEndpoint.Start ? position.X : _linhaTemplateEndpointOriginalX1;
+            double newY1 = endpoint == ProjectSheetTemplateLineEndpoint.Start ? position.Y : _linhaTemplateEndpointOriginalY1;
+            double newX2 = endpoint == ProjectSheetTemplateLineEndpoint.End ? position.X : _linhaTemplateEndpointOriginalX2;
+            double newY2 = endpoint == ProjectSheetTemplateLineEndpoint.End ? position.Y : _linhaTemplateEndpointOriginalY2;
+
+            _context.MoverLinhaDoTipoPrancha.AlterarCoordenadas(viewModel.Id, lineId, newX1, newY1, newX2, newY2);
+            viewModel.SelectLine(lineId);
+            return true;
+        }
+
+        private void CancelarEdicaoExtremidadeLinhaTemplate()
+        {
+            if (_context?.ProjectSheetTypeViewModelAtivo != null && _linhaTemplateEndpointEmArrasteId.HasValue)
+                _context.ProjectSheetTypeViewModelAtivo.ClearLinePreviewCoordinates(_linhaTemplateEndpointEmArrasteId.Value);
+
+            LimparEstadoEdicaoExtremidadeLinhaTemplate();
+        }
+
+        private void LimparEstadoEdicaoExtremidadeLinhaTemplate()
+        {
+            _linhaTemplateEndpointEmArrasteId = null;
+            _linhaTemplateEndpointArrastando = false;
+            _linhaTemplateEndpointOriginalX1 = 0.0;
+            _linhaTemplateEndpointOriginalY1 = 0.0;
+            _linhaTemplateEndpointOriginalX2 = 0.0;
+            _linhaTemplateEndpointOriginalY2 = 0.0;
+            _linhaTemplateInteractionMode = LinhaTemplateInteractionMode.None;
+        }
+
+        private bool TentarIniciarInteracaoLinhaTemplate(Point position)
+        {
+            if (_context == null || _context.ProjectSheetTypeViewModelAtivo == null)
+                return false;
+
+            ITool ferramentaAtual = _context.Tools.FerramentaAtual;
+
+            if (!string.Equals(ferramentaAtual.Nome, "Selecionar", StringComparison.OrdinalIgnoreCase) || ferramentaAtual.IsBusy)
+                return false;
+
+            ProjectSheetTypeViewModel viewModel = _context.ProjectSheetTypeViewModelAtivo;
+            bool selecionou = viewModel.SelectLineAt(position, LineHitTolerance);
+
+            if (!selecionou)
+            {
+                LimparEstadoArrasteLinhaTemplate();
+                return true;
+            }
+
+            if (!viewModel.TryGetSelectedLineId(out Guid lineId))
+                return true;
+
+            _linhaTemplateEmArrasteId = lineId;
+            _linhaTemplateDragStart = position;
+            _linhaTemplateArrastando = false;
+            _linhaTemplateInteractionMode = LinhaTemplateInteractionMode.Line;
+            TemplatePageBorder.CaptureMouse();
+            return true;
+        }
+
+        private bool AtualizarArrasteLinhaTemplate(Point position, MouseEventArgs e)
+        {
+            if (_context == null || _context.ProjectSheetTypeViewModelAtivo == null || !_linhaTemplateEmArrasteId.HasValue)
+                return false;
+
+            if (e.LeftButton != MouseButtonState.Pressed)
+                return false;
+
+            Vector delta = position - _linhaTemplateDragStart;
+
+            if (!_linhaTemplateArrastando && delta.LengthSquared < DragThresholdSquared)
+                return true;
+
+            _linhaTemplateArrastando = true;
+            _context.ProjectSheetTypeViewModelAtivo.SetLinePreviewOffset(_linhaTemplateEmArrasteId.Value, delta.X, delta.Y);
+            return true;
+        }
+
+        private bool FinalizarArrasteLinhaTemplate(Point position)
+        {
+            if (_context == null || _context.ProjectSheetTypeViewModelAtivo == null || !_linhaTemplateEmArrasteId.HasValue)
+                return false;
+
+            Guid lineId = _linhaTemplateEmArrasteId.Value;
+            bool arrastou = _linhaTemplateArrastando;
+            Vector delta = position - _linhaTemplateDragStart;
+            ProjectSheetTypeViewModel viewModel = _context.ProjectSheetTypeViewModelAtivo;
+
+            viewModel.ClearLinePreviewOffset(lineId);
+            LimparEstadoArrasteLinhaTemplate();
+
+            if (!arrastou)
+                return true;
+
+            bool moveu = _context.MoverLinhaDoTipoPrancha.Mover(viewModel.Id, lineId, delta.X, delta.Y);
+
+            if (moveu)
+                viewModel.SelectLine(lineId);
+
+            return true;
+        }
+
+        private void CancelarArrasteLinhaTemplate()
+        {
+            if (_context?.ProjectSheetTypeViewModelAtivo != null && _linhaTemplateEmArrasteId.HasValue)
+                _context.ProjectSheetTypeViewModelAtivo.ClearLinePreviewOffset(_linhaTemplateEmArrasteId.Value);
+
+            LimparEstadoArrasteLinhaTemplate();
+        }
+
+        private void LimparEstadoArrasteLinhaTemplate()
+        {
+            _linhaTemplateEmArrasteId = null;
+            _linhaTemplateArrastando = false;
+            _linhaTemplateInteractionMode = LinhaTemplateInteractionMode.None;
         }
 
         private bool ExcluirLinhaSelecionada()

@@ -139,6 +139,10 @@ namespace Araci.TechnicalChecks
                 ("Mover linha template undo redo", MoverLinhaTemplateUndoRedo),
                 ("ProjectSheetTypeViewModel aplica preview de movimento de linha", ProjectSheetTypeViewModelAplicaPreviewMovimentoLinha),
                 ("ProjectSheetTypeView possui interacao de arraste de linha", ProjectSheetTypeViewPossuiInteracaoArrasteLinha),
+                ("Mover extremidade linha template undo redo", MoverExtremidadeLinhaTemplateUndoRedo),
+                ("ProjectSheetTypeViewModel aplica preview de extremidade de linha", ProjectSheetTypeViewModelAplicaPreviewExtremidadeLinha),
+                ("ProjectSheetTypeView renderiza handles de extremidade de linha", ProjectSheetTypeViewRenderizaHandlesExtremidadeLinha),
+                ("ProjectSheetTypeView possui interacao de extremidade de linha", ProjectSheetTypeViewPossuiInteracaoExtremidadeLinha),
                 ("EditorContext expoe mover linha do tipo prancha", EditorContextExpoeMoverLinhaDoTipoPrancha),
                 ("ToolService linha em contexto diagrama preserva ferramenta anotativa", ToolServiceLinhaContextoDiagramaPreservaFerramentaAnotativa),
                 ("Project Browser seleciona tipo abre visualizacao de tipo", ProjectBrowserSelecionaTipoAbreVisualizacaoTipo),
@@ -6529,6 +6533,119 @@ namespace Araci.TechnicalChecks
             AssertContains(code, "AtualizarArrasteLinhaTemplate", "ProjectSheetTypeView atualizar arraste linha");
             AssertContains(code, "FinalizarArrasteLinhaTemplate", "ProjectSheetTypeView finalizar arraste linha");
             AssertContains(code, "MoverLinhaDoTipoPrancha", "ProjectSheetTypeView deve chamar use case de movimento");
+        }
+
+        private static void MoverExtremidadeLinhaTemplateUndoRedo()
+        {
+            var document = new AraciDocument();
+            var commands = new Araci.Core.Commands.CommandManager();
+            var inserir = new InserirLinhaNoTipoPranchaUseCase(document, commands);
+            var mover = new MoverLinhaDoTipoPranchaUseCase(document, commands);
+            ProjectSheetType tipo = document.TipoPranchaPadrao;
+            ProjectSheetTemplateLine linha = inserir.Inserir(tipo.Id, 10, 20, 80, 25)!;
+
+            bool alterou = mover.AlterarCoordenadas(tipo.Id, linha.Id, 30, 40, 80, 25);
+
+            Assert(alterou, "Alterar extremidade deveria retornar true.");
+            AssertEqual(30, linha.X1, "Linha.X1 apos editar extremidade");
+            AssertEqual(40, linha.Y1, "Linha.Y1 apos editar extremidade");
+            AssertEqual(80, linha.X2, "Linha.X2 preservado apos editar extremidade");
+            AssertEqual(25, linha.Y2, "Linha.Y2 preservado apos editar extremidade");
+
+            commands.Undo();
+
+            AssertEqual(10, linha.X1, "Linha.X1 apos undo extremidade");
+            AssertEqual(20, linha.Y1, "Linha.Y1 apos undo extremidade");
+            AssertEqual(80, linha.X2, "Linha.X2 apos undo extremidade");
+            AssertEqual(25, linha.Y2, "Linha.Y2 apos undo extremidade");
+
+            commands.Redo();
+
+            AssertEqual(30, linha.X1, "Linha.X1 apos redo extremidade");
+            AssertEqual(40, linha.Y1, "Linha.Y1 apos redo extremidade");
+            AssertEqual(80, linha.X2, "Linha.X2 apos redo extremidade");
+            AssertEqual(25, linha.Y2, "Linha.Y2 apos redo extremidade");
+        }
+
+        private static void ProjectSheetTypeViewModelAplicaPreviewExtremidadeLinha()
+        {
+            var document = new AraciDocument();
+            ProjectSheetType tipo = document.TipoPranchaPadrao;
+            ProjectSheetTemplateLine linha = new()
+            {
+                X1 = 10,
+                Y1 = 20,
+                X2 = 80,
+                Y2 = 25
+            };
+            tipo.Linhas.Add(linha);
+            var viewModel = new ProjectSheetTypeViewModel(document, tipo);
+
+            viewModel.SelectLine(linha.Id);
+            bool hitouEndpoint = viewModel.TryHitSelectedLineEndpoint(new Point(10, 20), 9, out Guid linhaId, out ProjectSheetTemplateLineEndpoint endpoint);
+            bool aplicado = viewModel.SetLinePreviewCoordinates(linha.Id, 30, 40, 80, 25);
+            ProjectSheetTemplateLineEndpointHandleViewModel handleInicialSelecionado = viewModel.EndpointHandles.Single(h => h.Endpoint == ProjectSheetTemplateLineEndpoint.Start);
+            ProjectSheetTemplateLineEndpointHandleViewModel handleFinalSelecionado = viewModel.EndpointHandles.Single(h => h.Endpoint == ProjectSheetTemplateLineEndpoint.End);
+
+            AssertEqual(2, viewModel.EndpointHandles.Count, "Linha selecionada deveria expor dois handles concretos.");
+            Assert(viewModel.EndpointHandlesVisible, "Linha selecionada deveria marcar handles visiveis.");
+            AssertEqual(linha.Id, handleInicialSelecionado.LineId, "Handle inicial lineId");
+            AssertEqual(30, handleInicialSelecionado.X, "Handle inicial X apos preview");
+            AssertEqual(40, handleInicialSelecionado.Y, "Handle inicial Y apos preview");
+            AssertEqual(80, handleFinalSelecionado.X, "Handle final X apos preview");
+            AssertEqual(25, handleFinalSelecionado.Y, "Handle final Y apos preview");
+            Assert(hitouEndpoint, "Hit-test deveria encontrar endpoint selecionado.");
+            AssertEqual(linha.Id, linhaId, "Endpoint lineId");
+            AssertEqual(ProjectSheetTemplateLineEndpoint.Start, endpoint, "Endpoint inicial");
+            Assert(aplicado, "Preview de extremidade deveria ser aplicado.");
+            AssertEqual(30, viewModel.Lines[0].X1, "Preview extremidade X1");
+            AssertEqual(40, viewModel.Lines[0].Y1, "Preview extremidade Y1");
+            AssertEqual(80, viewModel.Lines[0].X2, "Preview extremidade X2");
+            AssertEqual(25, viewModel.Lines[0].Y2, "Preview extremidade Y2");
+            AssertEqual(10, linha.X1, "Preview extremidade nao deve alterar modelo X1");
+            AssertEqual(20, linha.Y1, "Preview extremidade nao deve alterar modelo Y1");
+
+            viewModel.ClearLinePreviewCoordinates(linha.Id);
+
+            AssertEqual(10, viewModel.Lines[0].X1, "Preview extremidade limpo X1");
+            AssertEqual(20, viewModel.Lines[0].Y1, "Preview extremidade limpo Y1");
+            AssertEqual(80, viewModel.Lines[0].X2, "Preview extremidade limpo X2");
+            AssertEqual(25, viewModel.Lines[0].Y2, "Preview extremidade limpo Y2");
+            AssertEqual(10, viewModel.EndpointHandles.Single(h => h.Endpoint == ProjectSheetTemplateLineEndpoint.Start).X, "Handle inicial X apos limpar preview");
+            AssertEqual(20, viewModel.EndpointHandles.Single(h => h.Endpoint == ProjectSheetTemplateLineEndpoint.Start).Y, "Handle inicial Y apos limpar preview");
+
+            viewModel.ClearLineSelection();
+
+            Assert(!viewModel.HasSelectedLine, "Limpar selecao deveria remover estado selecionado.");
+            Assert(!viewModel.EndpointHandlesVisible, "Limpar selecao deveria esconder handles.");
+            AssertEqual(0, viewModel.EndpointHandles.Count, "Limpar selecao deveria remover handles concretos.");
+        }
+
+        private static void ProjectSheetTypeViewRenderizaHandlesExtremidadeLinha()
+        {
+            string xaml = File.ReadAllText(FindProjectFile("Views/ProjectSheetTypeView.xaml"));
+            int lineLayerIndex = xaml.IndexOf("ItemsSource=\"{Binding Lines}\"", StringComparison.Ordinal);
+            int handleLayerIndex = xaml.IndexOf("x:Name=\"TemplateEndpointHandlesOverlay\"", StringComparison.Ordinal);
+
+            AssertContains(xaml, "EndpointHandlesVisible", "ProjectSheetTypeView handles visibilidade");
+            AssertContains(xaml, "ItemsSource=\"{Binding EndpointHandles}\"", "ProjectSheetTypeView EndpointHandles binding");
+            AssertContains(xaml, "TemplateEndpointHandlesOverlay", "ProjectSheetTypeView overlay unico de handles");
+            AssertContains(xaml, "Canvas.Left\" Value=\"{Binding Left}\"", "ProjectSheetTypeView handle left local");
+            AssertContains(xaml, "Canvas.Top\" Value=\"{Binding Top}\"", "ProjectSheetTypeView handle top local");
+            AssertContains(xaml, "Panel.ZIndex=\"30\"", "ProjectSheetTypeView handles acima das linhas");
+            AssertContains(xaml, "ClipToBounds=\"False\"", "ProjectSheetTypeView handles sem clip no overlay");
+            Assert(lineLayerIndex >= 0, "Camada de linhas deveria existir.");
+            Assert(handleLayerIndex > lineLayerIndex, "Camada de handles deveria ficar depois/acima da camada de linhas.");
+        }
+
+        private static void ProjectSheetTypeViewPossuiInteracaoExtremidadeLinha()
+        {
+            string code = File.ReadAllText(FindProjectFile("Views/ProjectSheetTypeView.xaml.cs"));
+
+            AssertContains(code, "TryHitSelectedLineEndpoint", "ProjectSheetTypeView deve detectar endpoint selecionado");
+            AssertContains(code, "SetLinePreviewCoordinates", "ProjectSheetTypeView deve aplicar preview de endpoint");
+            AssertContains(code, "AlterarCoordenadas", "ProjectSheetTypeView deve confirmar edicao de endpoint por use case");
+            AssertContains(code, "LinhaTemplateInteractionMode.Endpoint", "ProjectSheetTypeView deve possuir modo de endpoint");
         }
 
         private static void EditorContextExpoeMoverLinhaDoTipoPrancha()

@@ -4,6 +4,7 @@ using System.ComponentModel;
 using System.Linq;
 using System.Runtime.CompilerServices;
 using System.Windows;
+using System.Windows.Media;
 using Araci.Core.Documents;
 
 namespace Araci.ViewModels
@@ -11,6 +12,7 @@ namespace Araci.ViewModels
     public sealed class ProjectSheetTypeViewModel : INotifyPropertyChanged
     {
         private const double WorkspaceMargin = 360.0;
+        private const double EndpointHandleSize = 12.0;
 
         private readonly AraciDocument _document;
         private readonly ProjectSheetType _tipo;
@@ -22,6 +24,7 @@ namespace Araci.ViewModels
             _document = document ?? throw new ArgumentNullException(nameof(document));
             _tipo = tipo ?? throw new ArgumentNullException(nameof(tipo));
             Lines = new ObservableCollection<ProjectSheetTemplateLineViewModel>();
+            EndpointHandles = new ObservableCollection<ProjectSheetTemplateLineEndpointHandleViewModel>();
             _document.PropriedadesTipoPranchaAlteradas += OnPropriedadesTipoPranchaAlteradas;
             _document.ItemProjetoRenomeado += OnItemProjetoRenomeado;
             Refresh();
@@ -43,8 +46,10 @@ namespace Araci.ViewModels
         public string Titulo => $"Tipo de Prancha - {Nome}";
         public string Descricao => $"{FormatoFolha} {OrientacaoFolha} - {LarguraFolha:0.#} x {AlturaFolha:0.#}";
         public ObservableCollection<ProjectSheetTemplateLineViewModel> Lines { get; }
+        public ObservableCollection<ProjectSheetTemplateLineEndpointHandleViewModel> EndpointHandles { get; }
         public Guid? SelectedLineId => _selectedLineId;
         public bool HasSelectedLine => _selectedLineId.HasValue;
+        public bool EndpointHandlesVisible => EndpointHandles.Count > 0;
 
         public ProjectSheetTemplateLineViewModel? PreviewLine
         {
@@ -109,6 +114,7 @@ namespace Araci.ViewModels
 
             _selectedLineId = lineId;
             AtualizarSelecaoVisual();
+            RefreshEndpointHandles();
             OnPropertyChanged(nameof(SelectedLineId));
             OnPropertyChanged(nameof(HasSelectedLine));
             return true;
@@ -121,6 +127,7 @@ namespace Araci.ViewModels
 
             _selectedLineId = null;
             AtualizarSelecaoVisual();
+            RefreshEndpointHandles();
             OnPropertyChanged(nameof(SelectedLineId));
             OnPropertyChanged(nameof(HasSelectedLine));
         }
@@ -137,6 +144,59 @@ namespace Araci.ViewModels
             return false;
         }
 
+        public bool TryGetLineCoordinates(Guid lineId, out double x1, out double y1, out double x2, out double y2)
+        {
+            ProjectSheetTemplateLineViewModel? line = Lines.FirstOrDefault(l => l.Id == lineId);
+
+            if (line == null)
+            {
+                x1 = 0.0;
+                y1 = 0.0;
+                x2 = 0.0;
+                y2 = 0.0;
+                return false;
+            }
+
+            x1 = line.ModelX1;
+            y1 = line.ModelY1;
+            x2 = line.ModelX2;
+            y2 = line.ModelY2;
+            return true;
+        }
+
+        public bool TryHitSelectedLineEndpoint(Point position, double tolerance, out Guid lineId, out ProjectSheetTemplateLineEndpoint endpoint)
+        {
+            lineId = Guid.Empty;
+            endpoint = ProjectSheetTemplateLineEndpoint.Start;
+
+            if (!_selectedLineId.HasValue)
+                return false;
+
+            ProjectSheetTemplateLineViewModel? line = Lines.FirstOrDefault(l => l.Id == _selectedLineId.Value && l.IsSelected);
+
+            if (line == null)
+                return false;
+
+            double startDistance = Distancia(position, new Point(line.X1, line.Y1));
+            double endDistance = Distancia(position, new Point(line.X2, line.Y2));
+
+            if (startDistance <= tolerance && startDistance <= endDistance)
+            {
+                lineId = line.Id;
+                endpoint = ProjectSheetTemplateLineEndpoint.Start;
+                return true;
+            }
+
+            if (endDistance <= tolerance)
+            {
+                lineId = line.Id;
+                endpoint = ProjectSheetTemplateLineEndpoint.End;
+                return true;
+            }
+
+            return false;
+        }
+
         public bool SetLinePreviewOffset(Guid lineId, double deltaX, double deltaY)
         {
             ProjectSheetTemplateLineViewModel? line = Lines.FirstOrDefault(l => l.Id == lineId);
@@ -145,6 +205,7 @@ namespace Araci.ViewModels
                 return false;
 
             line.SetPreviewOffset(deltaX, deltaY);
+            RefreshEndpointHandles();
             return true;
         }
 
@@ -152,12 +213,59 @@ namespace Araci.ViewModels
         {
             ProjectSheetTemplateLineViewModel? line = Lines.FirstOrDefault(l => l.Id == lineId);
             line?.ClearPreviewOffset();
+            RefreshEndpointHandles();
         }
 
         public void ClearLinePreviewOffsets()
         {
             foreach (ProjectSheetTemplateLineViewModel line in Lines)
                 line.ClearPreviewOffset();
+
+            RefreshEndpointHandles();
+        }
+
+        public bool SetLineEndpointPreview(Guid lineId, ProjectSheetTemplateLineEndpoint endpoint, double x, double y)
+        {
+            ProjectSheetTemplateLineViewModel? line = Lines.FirstOrDefault(l => l.Id == lineId);
+
+            if (line == null)
+                return false;
+
+            line.SetEndpointPreview(endpoint, x, y);
+            RefreshEndpointHandles();
+            return true;
+        }
+
+        public bool SetLinePreviewCoordinates(Guid lineId, double x1, double y1, double x2, double y2)
+        {
+            ProjectSheetTemplateLineViewModel? line = Lines.FirstOrDefault(l => l.Id == lineId);
+
+            if (line == null)
+                return false;
+
+            line.SetPreviewCoordinates(x1, y1, x2, y2);
+            RefreshEndpointHandles();
+            return true;
+        }
+
+        public void ClearLineEndpointPreview(Guid lineId)
+        {
+            ProjectSheetTemplateLineViewModel? line = Lines.FirstOrDefault(l => l.Id == lineId);
+            line?.ClearEndpointPreview();
+            RefreshEndpointHandles();
+        }
+
+        public void ClearLinePreviewCoordinates(Guid lineId)
+        {
+            ClearLineEndpointPreview(lineId);
+        }
+
+        public void ClearLineEndpointPreviews()
+        {
+            foreach (ProjectSheetTemplateLineViewModel line in Lines)
+                line.ClearEndpointPreview();
+
+            RefreshEndpointHandles();
         }
 
         public event PropertyChangedEventHandler? PropertyChanged;
@@ -191,6 +299,7 @@ namespace Araci.ViewModels
                 _selectedLineId = null;
 
             AtualizarSelecaoVisual();
+            RefreshEndpointHandles();
             OnPropertyChanged(nameof(SelectedLineId));
             OnPropertyChanged(nameof(HasSelectedLine));
         }
@@ -199,6 +308,24 @@ namespace Araci.ViewModels
         {
             foreach (ProjectSheetTemplateLineViewModel line in Lines)
                 line.IsSelected = _selectedLineId.HasValue && line.Id == _selectedLineId.Value;
+        }
+
+        private void RefreshEndpointHandles()
+        {
+            EndpointHandles.Clear();
+
+            if (_selectedLineId.HasValue)
+            {
+                ProjectSheetTemplateLineViewModel? line = Lines.FirstOrDefault(l => l.Id == _selectedLineId.Value && l.IsSelected);
+
+                if (line != null)
+                {
+                    EndpointHandles.Add(ProjectSheetTemplateLineEndpointHandleViewModel.Create(line.Id, ProjectSheetTemplateLineEndpoint.Start, line.X1, line.Y1, EndpointHandleSize));
+                    EndpointHandles.Add(ProjectSheetTemplateLineEndpointHandleViewModel.Create(line.Id, ProjectSheetTemplateLineEndpoint.End, line.X2, line.Y2, EndpointHandleSize));
+                }
+            }
+
+            OnPropertyChanged(nameof(EndpointHandlesVisible));
         }
 
         private static double DistanciaAoSegmento(Point point, Point a, Point b)
@@ -226,6 +353,44 @@ namespace Araci.ViewModels
         private void OnPropertyChanged([CallerMemberName] string? propertyName = null)
         {
             PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
+        }
+    }
+
+    public sealed class ProjectSheetTemplateLineEndpointHandleViewModel
+    {
+        private ProjectSheetTemplateLineEndpointHandleViewModel(
+            Guid lineId,
+            ProjectSheetTemplateLineEndpoint endpoint,
+            double x,
+            double y,
+            double size)
+        {
+            LineId = lineId;
+            Endpoint = endpoint;
+            X = x;
+            Y = y;
+            Size = size;
+        }
+
+        public Guid LineId { get; }
+        public ProjectSheetTemplateLineEndpoint Endpoint { get; }
+        public double X { get; }
+        public double Y { get; }
+        public double Size { get; }
+        public double Left => X - Size / 2.0;
+        public double Top => Y - Size / 2.0;
+        public Brush Fill => Brushes.White;
+        public Brush Stroke => Brushes.DodgerBlue;
+        public double StrokeThickness => 2.0;
+
+        public static ProjectSheetTemplateLineEndpointHandleViewModel Create(
+            Guid lineId,
+            ProjectSheetTemplateLineEndpoint endpoint,
+            double x,
+            double y,
+            double size)
+        {
+            return new ProjectSheetTemplateLineEndpointHandleViewModel(lineId, endpoint, x, y, size);
         }
     }
 }

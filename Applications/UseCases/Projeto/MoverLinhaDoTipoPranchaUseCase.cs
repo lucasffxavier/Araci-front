@@ -34,10 +34,41 @@ namespace Araci.Applications.UseCases.Projeto
             if (linha == null)
                 return false;
 
-            double newX1 = linha.X1 + deltaX;
-            double newY1 = linha.Y1 + deltaY;
-            double newX2 = linha.X2 + deltaX;
-            double newY2 = linha.Y2 + deltaY;
+            return AlterarCoordenadas(
+                tipo,
+                linha,
+                linha.X1 + deltaX,
+                linha.Y1 + deltaY,
+                linha.X2 + deltaX,
+                linha.Y2 + deltaY);
+        }
+
+        public bool AlterarCoordenadas(Guid tipoId, Guid linhaId, double x1, double y1, double x2, double y2)
+        {
+            ProjectSheetType? tipo = _document.TiposPrancha.FirstOrDefault(t => t.Id == tipoId);
+
+            if (tipo == null)
+                return false;
+
+            ProjectSheetTemplateLine? linha = tipo.Linhas.FirstOrDefault(l => l.Id == linhaId);
+
+            if (linha == null)
+                return false;
+
+            return AlterarCoordenadas(tipo, linha, x1, y1, x2, y2);
+        }
+
+        private bool AlterarCoordenadas(ProjectSheetType tipo, ProjectSheetTemplateLine linha, double x1, double y1, double x2, double y2)
+        {
+            if (!CoordenadasValidas(x1, y1, x2, y2))
+                return false;
+
+            double deltaSquared =
+                DistanciaQuadrada(linha.X1, linha.Y1, x1, y1) +
+                DistanciaQuadrada(linha.X2, linha.Y2, x2, y2);
+
+            if (deltaSquared < MinDeltaSquared)
+                return false;
 
             _commands.Execute(new MoveProjectSheetTypeLineCommand(
                 _document,
@@ -47,20 +78,40 @@ namespace Araci.Applications.UseCases.Projeto
                 linha.Y1,
                 linha.X2,
                 linha.Y2,
-                newX1,
-                newY1,
-                newX2,
-                newY2));
+                x1,
+                y1,
+                x2,
+                y2));
 
             return true;
         }
 
         private static bool TemDeltaValido(double deltaX, double deltaY)
         {
-            if (double.IsNaN(deltaX) || double.IsNaN(deltaY) || double.IsInfinity(deltaX) || double.IsInfinity(deltaY))
+            if (!ValorFinito(deltaX) || !ValorFinito(deltaY))
                 return false;
 
             return deltaX * deltaX + deltaY * deltaY >= MinDeltaSquared;
+        }
+
+        private static bool CoordenadasValidas(double x1, double y1, double x2, double y2)
+        {
+            if (!ValorFinito(x1) || !ValorFinito(y1) || !ValorFinito(x2) || !ValorFinito(y2))
+                return false;
+
+            return DistanciaQuadrada(x1, y1, x2, y2) >= MinDeltaSquared;
+        }
+
+        private static bool ValorFinito(double value)
+        {
+            return !double.IsNaN(value) && !double.IsInfinity(value);
+        }
+
+        private static double DistanciaQuadrada(double x1, double y1, double x2, double y2)
+        {
+            double dx = x2 - x1;
+            double dy = y2 - y1;
+            return dx * dx + dy * dy;
         }
     }
 }
