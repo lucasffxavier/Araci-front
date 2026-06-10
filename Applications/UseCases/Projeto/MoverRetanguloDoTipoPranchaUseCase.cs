@@ -40,6 +40,14 @@ namespace Araci.Applications.UseCases.Projeto
             return AlterarPosicao(tipo, retangulo, x, y);
         }
 
+        public bool AlterarGeometria(Guid tipoId, Guid retanguloId, double x, double y, double largura, double altura)
+        {
+            if (!TryGetRetangulo(tipoId, retanguloId, out ProjectSheetType tipo, out ProjectSheetTemplateRectangle retangulo))
+                return false;
+
+            return AlterarGeometria(tipo, retangulo, x, y, largura, altura);
+        }
+
         public bool AlterarNome(Guid tipoId, Guid retanguloId, string nome)
         {
             string nomeNormalizado = NormalizarNome(nome);
@@ -201,6 +209,28 @@ namespace Araci.Applications.UseCases.Projeto
             return true;
         }
 
+        private bool AlterarGeometria(ProjectSheetType tipo, ProjectSheetTemplateRectangle retangulo, double x, double y, double largura, double altura)
+        {
+            if (!ValorFinito(x) || !ValorFinito(y) || !DimensaoValida(largura) || !DimensaoValida(altura))
+                return false;
+
+            if (GeometriaIgual(retangulo, x, y, largura, altura))
+                return false;
+
+            var estadoAnterior = ProjectSheetTemplateRectangleGeometryState.FromRectangle(retangulo);
+            var estadoNovo = new ProjectSheetTemplateRectangleGeometryState(x, y, largura, altura);
+
+            _commands.Execute(new UpdateProjectSheetTypeRectanglePropertyCommand<ProjectSheetTemplateRectangleGeometryState>(
+                _document,
+                tipo,
+                retangulo.Id,
+                (r, value) => value.Aplicar(r),
+                estadoAnterior,
+                estadoNovo));
+
+            return true;
+        }
+
         private bool TryGetRetangulo(Guid tipoId, Guid retanguloId, out ProjectSheetType tipo, out ProjectSheetTemplateRectangle retangulo)
         {
             tipo = _document.TiposPrancha.FirstOrDefault(t => t.Id == tipoId)!;
@@ -241,6 +271,14 @@ namespace Araci.Applications.UseCases.Projeto
         private static bool ValorFinito(double value)
         {
             return !double.IsNaN(value) && !double.IsInfinity(value);
+        }
+
+        private static bool GeometriaIgual(ProjectSheetTemplateRectangle retangulo, double x, double y, double largura, double altura)
+        {
+            return Math.Abs(retangulo.X - x) < 0.000001 &&
+                Math.Abs(retangulo.Y - y) < 0.000001 &&
+                Math.Abs(retangulo.Largura - largura) < 0.000001 &&
+                Math.Abs(retangulo.Altura - altura) < 0.000001;
         }
 
         private static double DistanciaQuadrada(double x1, double y1, double x2, double y2)

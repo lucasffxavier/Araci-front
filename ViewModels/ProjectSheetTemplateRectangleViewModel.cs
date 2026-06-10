@@ -18,6 +18,11 @@ namespace Araci.ViewModels
         private bool _isSelected;
         private double _previewOffsetX;
         private double _previewOffsetY;
+        private bool _hasPreviewGeometry;
+        private double _previewX;
+        private double _previewY;
+        private double _previewLargura;
+        private double _previewAltura;
 
         public ProjectSheetTemplateRectangleViewModel(ProjectSheetTemplateRectangle retangulo)
             : this(retangulo, new TypeLibraryService())
@@ -32,12 +37,14 @@ namespace Araci.ViewModels
         }
 
         public Guid Id => _retangulo.Id;
-        public double X => _retangulo.X + _previewOffsetX;
-        public double Y => _retangulo.Y + _previewOffsetY;
+        public double X => _hasPreviewGeometry ? _previewX : _retangulo.X + _previewOffsetX;
+        public double Y => _hasPreviewGeometry ? _previewY : _retangulo.Y + _previewOffsetY;
         public double ModelX => _retangulo.X;
         public double ModelY => _retangulo.Y;
-        public double Largura => _retangulo.Largura;
-        public double Altura => _retangulo.Altura;
+        public double Largura => _hasPreviewGeometry ? _previewLargura : _retangulo.Largura;
+        public double Altura => _hasPreviewGeometry ? _previewAltura : _retangulo.Altura;
+        public double ModelLargura => _retangulo.Largura;
+        public double ModelAltura => _retangulo.Altura;
         public TipoLinhaAnotativa? TipoLinha => _tipoLinha;
         public string CorLinha => _retangulo.Stroke;
         public double StrokeThickness => _retangulo.StrokeThickness;
@@ -47,6 +54,7 @@ namespace Araci.ViewModels
         public DoubleCollection? StrokeDashArray => CriarStrokeDashArray(EstiloLinha);
         public bool Visible => _retangulo.Visible;
         public bool HasPreviewOffset => Math.Abs(_previewOffsetX) > 0.0001 || Math.Abs(_previewOffsetY) > 0.0001;
+        public bool HasPreviewGeometry => _hasPreviewGeometry;
 
         public bool IsSelected
         {
@@ -68,6 +76,9 @@ namespace Araci.ViewModels
 
         public void SetPreviewOffset(double deltaX, double deltaY)
         {
+            if (_hasPreviewGeometry)
+                ClearPreviewGeometry();
+
             if (Math.Abs(_previewOffsetX - deltaX) < 0.0001 && Math.Abs(_previewOffsetY - deltaY) < 0.0001)
                 return;
 
@@ -86,6 +97,43 @@ namespace Araci.ViewModels
             _previewOffsetY = 0.0;
             NotificarPosicao();
             OnPropertyChanged(nameof(HasPreviewOffset));
+        }
+
+        public void SetPreviewGeometry(double x, double y, double largura, double altura)
+        {
+            if (_hasPreviewGeometry &&
+                Math.Abs(_previewX - x) < 0.0001 &&
+                Math.Abs(_previewY - y) < 0.0001 &&
+                Math.Abs(_previewLargura - largura) < 0.0001 &&
+                Math.Abs(_previewAltura - altura) < 0.0001)
+            {
+                return;
+            }
+
+            _hasPreviewGeometry = true;
+            _previewOffsetX = 0.0;
+            _previewOffsetY = 0.0;
+            _previewX = x;
+            _previewY = y;
+            _previewLargura = largura;
+            _previewAltura = altura;
+            NotificarGeometria();
+            OnPropertyChanged(nameof(HasPreviewOffset));
+            OnPropertyChanged(nameof(HasPreviewGeometry));
+        }
+
+        public void ClearPreviewGeometry()
+        {
+            if (!_hasPreviewGeometry)
+                return;
+
+            _hasPreviewGeometry = false;
+            _previewX = 0.0;
+            _previewY = 0.0;
+            _previewLargura = 0.0;
+            _previewAltura = 0.0;
+            NotificarGeometria();
+            OnPropertyChanged(nameof(HasPreviewGeometry));
         }
 
         public bool Contains(Point position, double tolerance)
@@ -134,6 +182,14 @@ namespace Araci.ViewModels
         {
             OnPropertyChanged(nameof(X));
             OnPropertyChanged(nameof(Y));
+        }
+
+        private void NotificarGeometria()
+        {
+            OnPropertyChanged(nameof(X));
+            OnPropertyChanged(nameof(Y));
+            OnPropertyChanged(nameof(Largura));
+            OnPropertyChanged(nameof(Altura));
         }
 
         private void NotificarEstilo()

@@ -15,6 +15,7 @@ namespace Araci.Views
         private const double LineHitTolerance = 6.0;
         private const double EndpointHitTolerance = 8.0;
         private const double RectangleHitTolerance = 3.0;
+        private const double RectangleResizeHandleHitTolerance = 8.0;
         private const double DragThresholdSquared = 9.0;
         private const double LayoutTolerance = 1.0;
         private const int CenterSheetMaxAttempts = 10;
@@ -27,6 +28,16 @@ namespace Araci.Views
         private Guid? _retanguloTemplateEmArrasteId;
         private Point _retanguloTemplateDragStart;
         private bool _retanguloTemplateArrastando;
+        private Guid? _retanguloTemplateResizeEmArrasteId;
+        private RetanguloResizeHandleKind? _retanguloTemplateResizeHandleEmArraste;
+        private Point _retanguloTemplateResizeDragStart;
+        private Point _retanguloTemplateResizeLastPosition;
+        private bool _retanguloTemplateResizeLastPositionValid;
+        private bool _retanguloTemplateResizeArrastando;
+        private double _retanguloTemplateResizeOriginalX;
+        private double _retanguloTemplateResizeOriginalY;
+        private double _retanguloTemplateResizeOriginalLargura;
+        private double _retanguloTemplateResizeOriginalAltura;
         private Guid? _linhaTemplateEndpointEmArrasteId;
         private ProjectSheetTemplateLineEndpoint _linhaTemplateEndpointEmArraste;
         private Point _linhaTemplateEndpointDragStart;
@@ -82,6 +93,12 @@ namespace Araci.Views
 
             Point position = ObterPontoLocalFolha(e);
 
+            if (TentarIniciarResizeRetanguloTemplate(position))
+            {
+                e.Handled = true;
+                return;
+            }
+
             if (TentarIniciarEdicaoExtremidadeLinhaTemplate(position))
             {
                 e.Handled = true;
@@ -107,6 +124,12 @@ namespace Araci.Views
                 return;
 
             Point position = ObterPontoLocalFolha(e);
+
+            if (AtualizarResizeRetanguloTemplate(position, e))
+            {
+                e.Handled = true;
+                return;
+            }
 
             if (AtualizarEdicaoExtremidadeLinhaTemplate(position, e))
             {
@@ -135,6 +158,16 @@ namespace Araci.Views
                 return;
 
             Point position = ObterPontoLocalFolha(e);
+
+            if (FinalizarResizeRetanguloTemplate())
+            {
+                if (TemplatePageBorder.IsMouseCaptured)
+                    TemplatePageBorder.ReleaseMouseCapture();
+
+                AtualizarHandlesOverlay();
+                e.Handled = true;
+                return;
+            }
 
             if (FinalizarEdicaoExtremidadeLinhaTemplate())
             {
@@ -177,6 +210,9 @@ namespace Araci.Views
 
         private void TemplatePageBorder_LostMouseCapture(object sender, MouseEventArgs e)
         {
+            if (_retanguloTemplateResizeEmArrasteId.HasValue)
+                CancelarResizeRetanguloTemplate();
+
             if (_linhaTemplateEndpointEmArrasteId.HasValue)
                 CancelarEdicaoExtremidadeLinhaTemplate();
 
@@ -193,6 +229,14 @@ namespace Araci.Views
         {
             if (_context == null)
                 return;
+
+            if (e.Key == Key.Escape && _retanguloTemplateResizeEmArrasteId.HasValue)
+            {
+                CancelarResizeRetanguloTemplate();
+                AtualizarHandlesOverlay();
+                e.Handled = true;
+                return;
+            }
 
             if (e.Key == Key.Escape && _linhaTemplateEndpointEmArrasteId.HasValue)
             {
@@ -229,6 +273,163 @@ namespace Araci.Views
                 e.Handled = true;
         }
 
+        private bool TentarIniciarResizeRetanguloTemplate(Point position)
+        {
+            ProjectSheetTypeViewModel? viewModel = ObterViewModelAtivo();
+
+            if (_context == null || viewModel == null)
+                return false;
+
+            ITool ferramentaAtual = _context.Tools.FerramentaAtual;
+
+            if (!string.Equals(ferramentaAtual.Nome, "Selecionar", StringComparison.OrdinalIgnoreCase) || ferramentaAtual.IsBusy)
+                return false;
+
+            if (!viewModel.TryHitSelectedRectangleResizeHandle(position, RectangleResizeHandleHitTolerance, out Guid rectangleId, out RetanguloResizeHandleKind kind))
+                return false;
+
+            if (!viewModel.TryGetRectangleGeometry(
+                    rectangleId,
+                    out _retanguloTemplateResizeOriginalX,
+                    out _retanguloTemplateResizeOriginalY,
+                    out _retanguloTemplateResizeOriginalLargura,
+                    out _retanguloTemplateResizeOriginalAltura))
+            {
+                return false;
+            }
+
+            _retanguloTemplateResizeEmArrasteId = rectangleId;
+            _retanguloTemplateResizeHandleEmArraste = kind;
+            _retanguloTemplateResizeDragStart = position;
+            _retanguloTemplateResizeLastPosition = position;
+            _retanguloTemplateResizeLastPositionValid = PontoValido(position);
+            _retanguloTemplateResizeArrastando = false;
+            LimparEstadoArrasteLinhaTemplate();
+            LimparEstadoArrasteRetanguloTemplate();
+            TemplatePageBorder.CaptureMouse();
+            AtualizarHandlesOverlay();
+            return true;
+        }
+
+        private bool AtualizarResizeRetanguloTemplate(Point position, MouseEventArgs e)
+        {
+            ProjectSheetTypeViewModel? viewModel = ObterViewModelAtivo();
+
+            if (viewModel == null || !_retanguloTemplateResizeEmArrasteId.HasValue || !_retanguloTemplateResizeHandleEmArraste.HasValue)
+                return false;
+
+            if (e.LeftButton != MouseButtonState.Pressed)
+                return false;
+
+            Vector delta = position - _retanguloTemplateResizeDragStart;
+
+            if (!_retanguloTemplateResizeArrastando && delta.LengthSquared < DragThresholdSquared)
+                return true;
+
+            if (!PontoValido(position))
+                return true;
+
+            Rect geometry = CalcularGeometriaRetanguloTemplate(
+                _retanguloTemplateResizeOriginalX,
+                _retanguloTemplateResizeOriginalY,
+                _retanguloTemplateResizeOriginalLargura,
+                _retanguloTemplateResizeOriginalAltura,
+                _retanguloTemplateResizeHandleEmArraste.Value,
+                position);
+
+            bool previewAplicado = viewModel.SetRectanglePreviewGeometry(
+                _retanguloTemplateResizeEmArrasteId.Value,
+                geometry.X,
+                geometry.Y,
+                geometry.Width,
+                geometry.Height);
+
+            if (!previewAplicado)
+                return true;
+
+            _retanguloTemplateResizeArrastando = true;
+            _retanguloTemplateResizeLastPosition = position;
+            _retanguloTemplateResizeLastPositionValid = true;
+            AtualizarHandlesOverlay();
+            return true;
+        }
+
+        private bool FinalizarResizeRetanguloTemplate()
+        {
+            ProjectSheetTypeViewModel? viewModel = ObterViewModelAtivo();
+
+            if (_context == null || viewModel == null || !_retanguloTemplateResizeEmArrasteId.HasValue || !_retanguloTemplateResizeHandleEmArraste.HasValue)
+                return false;
+
+            Guid rectangleId = _retanguloTemplateResizeEmArrasteId.Value;
+            RetanguloResizeHandleKind kind = _retanguloTemplateResizeHandleEmArraste.Value;
+            bool arrastou = _retanguloTemplateResizeArrastando;
+            Point finalPosition = _retanguloTemplateResizeLastPosition;
+            bool finalPositionValid = _retanguloTemplateResizeLastPositionValid && PontoValido(finalPosition);
+            double originalX = _retanguloTemplateResizeOriginalX;
+            double originalY = _retanguloTemplateResizeOriginalY;
+            double originalLargura = _retanguloTemplateResizeOriginalLargura;
+            double originalAltura = _retanguloTemplateResizeOriginalAltura;
+
+            viewModel.ClearRectanglePreviewGeometry(rectangleId);
+            LimparEstadoResizeRetanguloTemplate();
+
+            if (!arrastou || !finalPositionValid)
+            {
+                AtualizarHandlesOverlay();
+                return true;
+            }
+
+            Rect geometry = CalcularGeometriaRetanguloTemplate(
+                originalX,
+                originalY,
+                originalLargura,
+                originalAltura,
+                kind,
+                finalPosition);
+
+            bool alterou = _context.MoverRetanguloDoTipoPrancha.AlterarGeometria(
+                viewModel.Id,
+                rectangleId,
+                geometry.X,
+                geometry.Y,
+                geometry.Width,
+                geometry.Height);
+
+            if (alterou)
+                viewModel.SelectRectangle(rectangleId);
+
+            AtualizarPainelPropriedadesTemplateSelecionado();
+            AtualizarHandlesOverlay();
+            return true;
+        }
+
+        private void CancelarResizeRetanguloTemplate()
+        {
+            ProjectSheetTypeViewModel? viewModel = ObterViewModelAtivo();
+
+            if (viewModel != null && _retanguloTemplateResizeEmArrasteId.HasValue)
+                viewModel.ClearRectanglePreviewGeometry(_retanguloTemplateResizeEmArrasteId.Value);
+
+            LimparEstadoResizeRetanguloTemplate();
+            AtualizarHandlesOverlay();
+        }
+
+        private void LimparEstadoResizeRetanguloTemplate()
+        {
+            _retanguloTemplateResizeEmArrasteId = null;
+            _retanguloTemplateResizeHandleEmArraste = null;
+            _retanguloTemplateResizeDragStart = default;
+            _retanguloTemplateResizeLastPosition = default;
+            _retanguloTemplateResizeLastPositionValid = false;
+            _retanguloTemplateResizeArrastando = false;
+            _retanguloTemplateResizeOriginalX = 0.0;
+            _retanguloTemplateResizeOriginalY = 0.0;
+            _retanguloTemplateResizeOriginalLargura = 0.0;
+            _retanguloTemplateResizeOriginalAltura = 0.0;
+        }
+
+
         private bool TentarIniciarEdicaoExtremidadeLinhaTemplate(Point position)
         {
             ProjectSheetTypeViewModel? viewModel = ObterViewModelAtivo();
@@ -260,6 +461,7 @@ namespace Araci.Views
             _linhaTemplateEndpointArrastando = false;
             _linhaTemplateEmArrasteId = null;
             _linhaTemplateArrastando = false;
+            LimparEstadoResizeRetanguloTemplate();
             TemplatePageBorder.CaptureMouse();
             AtualizarHandlesOverlay();
             return true;
@@ -397,6 +599,7 @@ namespace Araci.Views
                 _linhaTemplateDragStart = position;
                 _linhaTemplateArrastando = false;
                 LimparEstadoArrasteRetanguloTemplate();
+                LimparEstadoResizeRetanguloTemplate();
                 TemplatePageBorder.CaptureMouse();
                 AtualizarPainelPropriedadesTemplateSelecionado();
                 AtualizarHandlesOverlay();
@@ -410,6 +613,7 @@ namespace Araci.Views
                 _retanguloTemplateDragStart = position;
                 _retanguloTemplateArrastando = false;
                 LimparEstadoArrasteLinhaTemplate();
+                LimparEstadoResizeRetanguloTemplate();
                 TemplatePageBorder.CaptureMouse();
                 AtualizarPainelPropriedadesTemplateSelecionado();
                 AtualizarHandlesOverlay();
@@ -419,6 +623,7 @@ namespace Araci.Views
             viewModel.ClearTemplateSelection();
             LimparEstadoArrasteLinhaTemplate();
             LimparEstadoArrasteRetanguloTemplate();
+            LimparEstadoResizeRetanguloTemplate();
             AtualizarPainelPropriedadesTemplateSelecionado();
             AtualizarHandlesOverlay();
             return true;
@@ -808,6 +1013,35 @@ namespace Araci.Views
                 return value;
 
             return Math.Min(value, maximum);
+        }
+
+        private static Rect CalcularGeometriaRetanguloTemplate(
+            double originalX,
+            double originalY,
+            double originalLargura,
+            double originalAltura,
+            RetanguloResizeHandleKind kind,
+            Point position)
+        {
+            double left = originalX;
+            double top = originalY;
+            double right = originalX + originalLargura;
+            double bottom = originalY + originalAltura;
+            double minDimension = ProjectSheetTemplateRectangle.MinDimension;
+
+            if (kind is RetanguloResizeHandleKind.TopLeft or RetanguloResizeHandleKind.Left or RetanguloResizeHandleKind.BottomLeft)
+                left = Math.Min(position.X, right - minDimension);
+
+            if (kind is RetanguloResizeHandleKind.TopRight or RetanguloResizeHandleKind.Right or RetanguloResizeHandleKind.BottomRight)
+                right = Math.Max(position.X, left + minDimension);
+
+            if (kind is RetanguloResizeHandleKind.TopLeft or RetanguloResizeHandleKind.Top or RetanguloResizeHandleKind.TopRight)
+                top = Math.Min(position.Y, bottom - minDimension);
+
+            if (kind is RetanguloResizeHandleKind.BottomLeft or RetanguloResizeHandleKind.Bottom or RetanguloResizeHandleKind.BottomRight)
+                bottom = Math.Max(position.Y, top + minDimension);
+
+            return new Rect(left, top, Math.Max(minDimension, right - left), Math.Max(minDimension, bottom - top));
         }
 
         private Point ObterPontoLocalFolha(MouseEventArgs e)

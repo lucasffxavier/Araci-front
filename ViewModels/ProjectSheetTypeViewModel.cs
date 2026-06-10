@@ -14,6 +14,7 @@ namespace Araci.ViewModels
     {
         private const double WorkspaceMargin = 360.0;
         private const double EndpointHandleSize = 12.0;
+        private const double RectangleResizeHandleSize = 10.0;
 
         private readonly AraciDocument _document;
         private readonly ProjectSheetType _tipo;
@@ -35,6 +36,7 @@ namespace Araci.ViewModels
             Lines = new ObservableCollection<ProjectSheetTemplateLineViewModel>();
             Rectangles = new ObservableCollection<ProjectSheetTemplateRectangleViewModel>();
             EndpointHandles = new ObservableCollection<ProjectSheetTemplateLineEndpointHandleViewModel>();
+            RectangleResizeHandles = new ObservableCollection<ProjectSheetTemplateRectangleResizeHandleViewModel>();
             _document.PropriedadesTipoPranchaAlteradas += OnPropriedadesTipoPranchaAlteradas;
             _document.ItemProjetoRenomeado += OnItemProjetoRenomeado;
             Refresh();
@@ -58,12 +60,14 @@ namespace Araci.ViewModels
         public ObservableCollection<ProjectSheetTemplateLineViewModel> Lines { get; }
         public ObservableCollection<ProjectSheetTemplateRectangleViewModel> Rectangles { get; }
         public ObservableCollection<ProjectSheetTemplateLineEndpointHandleViewModel> EndpointHandles { get; }
+        public ObservableCollection<ProjectSheetTemplateRectangleResizeHandleViewModel> RectangleResizeHandles { get; }
         public Guid? SelectedLineId => _selectedLineId;
         public Guid? SelectedRectangleId => _selectedRectangleId;
         public bool HasSelectedLine => _selectedLineId.HasValue;
         public bool HasSelectedRectangle => _selectedRectangleId.HasValue;
         public bool HasTemplateSelection => HasSelectedLine || HasSelectedRectangle;
         public bool EndpointHandlesVisible => EndpointHandles.Count > 0;
+        public bool RectangleResizeHandlesVisible => RectangleResizeHandles.Count > 0;
 
         public ProjectSheetTemplateLineViewModel? PreviewLine
         {
@@ -138,6 +142,7 @@ namespace Araci.ViewModels
             _selectedRectangleId = null;
             AtualizarSelecaoVisual();
             RefreshEndpointHandles();
+            RefreshRectangleResizeHandles();
             NotificarSelecao();
             return true;
         }
@@ -150,6 +155,7 @@ namespace Araci.ViewModels
             _selectedLineId = null;
             AtualizarSelecaoVisual();
             RefreshEndpointHandles();
+            RefreshRectangleResizeHandles();
             NotificarSelecao();
         }
 
@@ -329,6 +335,7 @@ namespace Araci.ViewModels
             _selectedLineId = null;
             AtualizarSelecaoVisual();
             RefreshEndpointHandles();
+            RefreshRectangleResizeHandles();
             NotificarSelecao();
             return true;
         }
@@ -340,6 +347,7 @@ namespace Araci.ViewModels
 
             _selectedRectangleId = null;
             AtualizarSelecaoVisual();
+            RefreshRectangleResizeHandles();
             NotificarSelecao();
         }
 
@@ -376,13 +384,85 @@ namespace Araci.ViewModels
         {
             ProjectSheetTemplateRectangleViewModel? rectangle = Rectangles.FirstOrDefault(r => r.Id == rectangleId);
             rectangle?.ClearPreviewOffset();
+            RefreshRectangleResizeHandles();
         }
 
         public void ClearRectanglePreviewOffsets()
         {
             foreach (ProjectSheetTemplateRectangleViewModel rectangle in Rectangles)
                 rectangle.ClearPreviewOffset();
+
+            RefreshRectangleResizeHandles();
         }
+
+        public bool TryHitSelectedRectangleResizeHandle(Point position, double tolerance, out Guid rectangleId, out RetanguloResizeHandleKind kind)
+        {
+            rectangleId = Guid.Empty;
+            kind = RetanguloResizeHandleKind.TopLeft;
+
+            if (!_selectedRectangleId.HasValue)
+                return false;
+
+            double toleranceSquared = Math.Max(0.0, tolerance) * Math.Max(0.0, tolerance);
+            ProjectSheetTemplateRectangleResizeHandleViewModel? hit = RectangleResizeHandles
+                .Reverse()
+                .FirstOrDefault(h => DistanciaQuadrada(position, new Point(h.X, h.Y)) <= toleranceSquared);
+
+            if (hit == null)
+                return false;
+
+            rectangleId = hit.RectangleId;
+            kind = hit.Kind;
+            return true;
+        }
+
+        public bool TryGetRectangleGeometry(Guid rectangleId, out double x, out double y, out double largura, out double altura)
+        {
+            ProjectSheetTemplateRectangleViewModel? rectangle = Rectangles.FirstOrDefault(r => r.Id == rectangleId);
+
+            if (rectangle == null)
+            {
+                x = 0.0;
+                y = 0.0;
+                largura = 0.0;
+                altura = 0.0;
+                return false;
+            }
+
+            x = rectangle.ModelX;
+            y = rectangle.ModelY;
+            largura = rectangle.ModelLargura;
+            altura = rectangle.ModelAltura;
+            return true;
+        }
+
+        public bool SetRectanglePreviewGeometry(Guid rectangleId, double x, double y, double largura, double altura)
+        {
+            ProjectSheetTemplateRectangleViewModel? rectangle = Rectangles.FirstOrDefault(r => r.Id == rectangleId);
+
+            if (rectangle == null)
+                return false;
+
+            rectangle.SetPreviewGeometry(x, y, largura, altura);
+            RefreshRectangleResizeHandles();
+            return true;
+        }
+
+        public void ClearRectanglePreviewGeometry(Guid rectangleId)
+        {
+            ProjectSheetTemplateRectangleViewModel? rectangle = Rectangles.FirstOrDefault(r => r.Id == rectangleId);
+            rectangle?.ClearPreviewGeometry();
+            RefreshRectangleResizeHandles();
+        }
+
+        public void ClearRectanglePreviewGeometries()
+        {
+            foreach (ProjectSheetTemplateRectangleViewModel rectangle in Rectangles)
+                rectangle.ClearPreviewGeometry();
+
+            RefreshRectangleResizeHandles();
+        }
+
 
         public void ClearTemplateSelection()
         {
@@ -391,6 +471,7 @@ namespace Araci.ViewModels
             _selectedRectangleId = null;
             AtualizarSelecaoVisual();
             RefreshEndpointHandles();
+            RefreshRectangleResizeHandles();
 
             if (tinhaSelecao)
                 NotificarSelecao();
@@ -427,6 +508,7 @@ namespace Araci.ViewModels
                 _selectedRectangleId = null;
 
             AtualizarSelecaoVisualRetangulos();
+            RefreshRectangleResizeHandles();
             OnPropertyChanged(nameof(SelectedRectangleId));
             OnPropertyChanged(nameof(HasSelectedRectangle));
         }
@@ -486,6 +568,42 @@ namespace Araci.ViewModels
             OnPropertyChanged(nameof(EndpointHandlesVisible));
         }
 
+        private void RefreshRectangleResizeHandles()
+        {
+            RectangleResizeHandles.Clear();
+
+            if (_selectedRectangleId.HasValue)
+            {
+                ProjectSheetTemplateRectangleViewModel? rectangle = Rectangles.FirstOrDefault(r => r.Id == _selectedRectangleId.Value && r.IsSelected);
+
+                if (rectangle != null)
+                {
+                    double left = rectangle.X;
+                    double top = rectangle.Y;
+                    double right = rectangle.X + rectangle.Largura;
+                    double bottom = rectangle.Y + rectangle.Altura;
+                    double centerX = rectangle.X + rectangle.Largura / 2.0;
+                    double centerY = rectangle.Y + rectangle.Altura / 2.0;
+
+                    AddRectangleResizeHandle(rectangle.Id, RetanguloResizeHandleKind.TopLeft, left, top);
+                    AddRectangleResizeHandle(rectangle.Id, RetanguloResizeHandleKind.Top, centerX, top);
+                    AddRectangleResizeHandle(rectangle.Id, RetanguloResizeHandleKind.TopRight, right, top);
+                    AddRectangleResizeHandle(rectangle.Id, RetanguloResizeHandleKind.Right, right, centerY);
+                    AddRectangleResizeHandle(rectangle.Id, RetanguloResizeHandleKind.BottomRight, right, bottom);
+                    AddRectangleResizeHandle(rectangle.Id, RetanguloResizeHandleKind.Bottom, centerX, bottom);
+                    AddRectangleResizeHandle(rectangle.Id, RetanguloResizeHandleKind.BottomLeft, left, bottom);
+                    AddRectangleResizeHandle(rectangle.Id, RetanguloResizeHandleKind.Left, left, centerY);
+                }
+            }
+
+            OnPropertyChanged(nameof(RectangleResizeHandlesVisible));
+        }
+
+        private void AddRectangleResizeHandle(Guid rectangleId, RetanguloResizeHandleKind kind, double x, double y)
+        {
+            RectangleResizeHandles.Add(ProjectSheetTemplateRectangleResizeHandleViewModel.Create(rectangleId, kind, x, y, RectangleResizeHandleSize));
+        }
+
         private void NotificarSelecao()
         {
             OnPropertyChanged(nameof(SelectedLineId));
@@ -493,6 +611,7 @@ namespace Araci.ViewModels
             OnPropertyChanged(nameof(HasSelectedLine));
             OnPropertyChanged(nameof(HasSelectedRectangle));
             OnPropertyChanged(nameof(HasTemplateSelection));
+            OnPropertyChanged(nameof(RectangleResizeHandlesVisible));
         }
 
         private static double DistanciaAoSegmento(Point point, Point a, Point b)
@@ -512,9 +631,14 @@ namespace Araci.ViewModels
 
         private static double Distancia(Point a, Point b)
         {
+            return Math.Sqrt(DistanciaQuadrada(a, b));
+        }
+
+        private static double DistanciaQuadrada(Point a, Point b)
+        {
             double dx = a.X - b.X;
             double dy = a.Y - b.Y;
-            return Math.Sqrt(dx * dx + dy * dy);
+            return dx * dx + dy * dy;
         }
 
         private void OnPropertyChanged([CallerMemberName] string? propertyName = null)
@@ -560,4 +684,42 @@ namespace Araci.ViewModels
             return new ProjectSheetTemplateLineEndpointHandleViewModel(lineId, endpoint, x, y, size);
         }
     }
+    public sealed class ProjectSheetTemplateRectangleResizeHandleViewModel
+    {
+        private ProjectSheetTemplateRectangleResizeHandleViewModel(
+            Guid rectangleId,
+            RetanguloResizeHandleKind kind,
+            double x,
+            double y,
+            double size)
+        {
+            RectangleId = rectangleId;
+            Kind = kind;
+            X = x;
+            Y = y;
+            Size = size;
+        }
+
+        public Guid RectangleId { get; }
+        public RetanguloResizeHandleKind Kind { get; }
+        public double X { get; }
+        public double Y { get; }
+        public double Size { get; }
+        public double Left => X - Size / 2.0;
+        public double Top => Y - Size / 2.0;
+        public Brush Fill => Brushes.White;
+        public Brush Stroke => Brushes.DodgerBlue;
+        public double StrokeThickness => 2.0;
+
+        public static ProjectSheetTemplateRectangleResizeHandleViewModel Create(
+            Guid rectangleId,
+            RetanguloResizeHandleKind kind,
+            double x,
+            double y,
+            double size)
+        {
+            return new ProjectSheetTemplateRectangleResizeHandleViewModel(rectangleId, kind, x, y, size);
+        }
+    }
+
 }
