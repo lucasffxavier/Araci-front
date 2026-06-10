@@ -117,6 +117,22 @@ namespace Araci.Infrastructure.Persistence
 
         public void ApplyTypeLibraries(TypeLibrariesDto? dto)
         {
+            IEnumerable<LineAnnotationTypeDto> lineTypes = dto?.LineAnnotationTypes != null && dto.LineAnnotationTypes.Count > 0
+                ? dto.LineAnnotationTypes
+                : CreateDefaultLineAnnotationTypeDtos();
+
+            List<TipoLinhaAnotativa> linhas = lineTypes
+                .Select(CriarTipoLinhaAnotativa)
+                .Where(t => !string.IsNullOrWhiteSpace(t.NomeTipo))
+                .GroupBy(CriarChaveTipo, StringComparer.OrdinalIgnoreCase)
+                .Select(g => g.Last())
+                .ToList();
+
+            if (linhas.Count == 0)
+                linhas = CreateDefaultLineAnnotationTypeDtos().Select(CriarTipoLinhaAnotativa).ToList();
+
+            _elements.ReplaceTypes(ElementKinds.LinhaAnotativa, linhas);
+
             IEnumerable<TextAnnotationTypeDto> textTypes = dto?.TextAnnotationTypes != null && dto.TextAnnotationTypes.Count > 0
                 ? dto.TextAnnotationTypes
                 : CreateDefaultTextAnnotationTypeDtos();
@@ -265,10 +281,48 @@ namespace Araci.Infrastructure.Persistence
         {
             return new TypeLibrariesDto
             {
+                LineAnnotationTypes = _elements.GetTypes(ElementKinds.LinhaAnotativa)
+                    .OfType<TipoLinhaAnotativa>()
+                    .Select(CriarLineAnnotationTypeDto)
+                    .ToList(),
                 TextAnnotationTypes = _elements.GetTypes(ElementKinds.TextoAnotativo)
                     .OfType<TipoTextoAnotativo>()
                     .Select(CriarTextAnnotationTypeDto)
                     .ToList()
+            };
+        }
+
+        private static IEnumerable<LineAnnotationTypeDto> CreateDefaultLineAnnotationTypeDtos()
+        {
+            yield return new LineAnnotationTypeDto { NomeTipo = "Linha contínua", Familia = "Anotações", Categoria = "Linhas", EstiloLinha = "Contínuo", CorLinha = "#FF000000", EspessuraLinha = 1.0 };
+            yield return new LineAnnotationTypeDto { NomeTipo = "Linha tracejada", Familia = "Anotações", Categoria = "Linhas", EstiloLinha = "Tracejado", CorLinha = "#FF000000", EspessuraLinha = 1.0 };
+            yield return new LineAnnotationTypeDto { NomeTipo = "Linha traço ponto", Familia = "Anotações", Categoria = "Linhas", EstiloLinha = "Traço ponto", CorLinha = "#FF000000", EspessuraLinha = 1.0 };
+            yield return new LineAnnotationTypeDto { NomeTipo = "Linha traço dois pontos", Familia = "Anotações", Categoria = "Linhas", EstiloLinha = "Traço dois pontos", CorLinha = "#FF000000", EspessuraLinha = 1.0 };
+        }
+
+        private static LineAnnotationTypeDto CriarLineAnnotationTypeDto(TipoLinhaAnotativa tipo)
+        {
+            return new LineAnnotationTypeDto
+            {
+                NomeTipo = tipo.NomeTipo,
+                Familia = tipo.Familia,
+                Categoria = tipo.Categoria,
+                EstiloLinha = tipo.EstiloLinha,
+                CorLinha = tipo.CorLinha,
+                EspessuraLinha = tipo.EspessuraLinha
+            };
+        }
+
+        private static TipoLinhaAnotativa CriarTipoLinhaAnotativa(LineAnnotationTypeDto dto)
+        {
+            return new TipoLinhaAnotativa
+            {
+                NomeTipo = string.IsNullOrWhiteSpace(dto.NomeTipo) ? "Linha contínua" : dto.NomeTipo.Trim(),
+                Familia = string.IsNullOrWhiteSpace(dto.Familia) ? "Anotações" : dto.Familia.Trim(),
+                Categoria = string.IsNullOrWhiteSpace(dto.Categoria) ? "Linhas" : dto.Categoria.Trim(),
+                EstiloLinha = dto.EstiloLinha,
+                CorLinha = dto.CorLinha,
+                EspessuraLinha = dto.EspessuraLinha
             };
         }
 
@@ -317,7 +371,7 @@ namespace Araci.Infrastructure.Persistence
             return tipo;
         }
 
-        private static string CriarChaveTipo(TipoTextoAnotativo tipo)
+        private static string CriarChaveTipo(TipoElemento tipo)
         {
             return $"{tipo.NomeTipo.Trim()}|{tipo.Familia.Trim()}|{tipo.Categoria.Trim()}";
         }
@@ -493,10 +547,23 @@ namespace Araci.Infrastructure.Persistence
                 Y1 = linha.Y1,
                 X2 = linha.X2,
                 Y2 = linha.Y2,
+                Type = CriarProjectSheetTemplateLineTypeRef(linha),
                 Stroke = string.IsNullOrWhiteSpace(linha.Stroke) ? "#FF000000" : linha.Stroke,
                 StrokeThickness = NormalizarEspessuraLinha(linha.StrokeThickness),
                 Visible = linha.Visible
             };
+        }
+
+        private static TypeRefDto? CriarProjectSheetTemplateLineTypeRef(ProjectSheetTemplateLine linha)
+        {
+            return linha.PossuiTipoLinha
+                ? new TypeRefDto
+                {
+                    NomeTipo = linha.TipoLinhaNome,
+                    Familia = linha.TipoLinhaFamilia,
+                    Categoria = linha.TipoLinhaCategoria
+                }
+                : null;
         }
 
         private static ProjectView? CriarProjectView(ProjectViewDto dto)
@@ -585,18 +652,38 @@ namespace Araci.Infrastructure.Persistence
 
             return valores
                 .Where(v => v != null)
-                .Select(v => new ProjectSheetTemplateLine
-                {
-                    Id = v.Id == Guid.Empty ? Guid.NewGuid() : v.Id,
-                    X1 = NormalizarCoordenada(v.X1),
-                    Y1 = NormalizarCoordenada(v.Y1),
-                    X2 = NormalizarCoordenada(v.X2),
-                    Y2 = NormalizarCoordenada(v.Y2),
-                    Stroke = string.IsNullOrWhiteSpace(v.Stroke) ? "#FF000000" : v.Stroke,
-                    StrokeThickness = NormalizarEspessuraLinha(v.StrokeThickness),
-                    Visible = v.Visible
-                })
+                .Select(CriarProjectSheetTemplateLine)
                 .ToList();
+        }
+
+        private static ProjectSheetTemplateLine CriarProjectSheetTemplateLine(ProjectSheetTemplateLineDto dto)
+        {
+            var linha = new ProjectSheetTemplateLine
+            {
+                Id = dto.Id == Guid.Empty ? Guid.NewGuid() : dto.Id,
+                X1 = NormalizarCoordenada(dto.X1),
+                Y1 = NormalizarCoordenada(dto.Y1),
+                X2 = NormalizarCoordenada(dto.X2),
+                Y2 = NormalizarCoordenada(dto.Y2),
+                Stroke = string.IsNullOrWhiteSpace(dto.Stroke) ? "#FF000000" : dto.Stroke,
+                StrokeThickness = NormalizarEspessuraLinha(dto.StrokeThickness),
+                Visible = dto.Visible
+            };
+
+            if (dto.Type != null && !string.IsNullOrWhiteSpace(dto.Type.NomeTipo))
+            {
+                linha.DefinirTipoLinha(dto.Type.NomeTipo, dto.Type.Familia, dto.Type.Categoria);
+                return linha;
+            }
+
+            bool possuiEstiloLegadoCustomizado =
+                !string.Equals(linha.Stroke, "#FF000000", StringComparison.OrdinalIgnoreCase) ||
+                Math.Abs(linha.StrokeThickness - 1.0) > 0.000001;
+
+            if (possuiEstiloLegadoCustomizado)
+                linha.DefinirTipoLinha(null, null, null);
+
+            return linha;
         }
 
         private Elemento? CriarElemento(ElementDto dto)

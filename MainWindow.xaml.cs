@@ -166,7 +166,7 @@ namespace Araci
             if (tipo == null)
                 return;
 
-            _projectSheetTypeViewModel = new ProjectSheetTypeViewModel(_context.Document, tipo);
+            _projectSheetTypeViewModel = new ProjectSheetTypeViewModel(_context.Document, tipo, _context.Types);
             _context.ProjectSheetTypeViewModelAtivo = _projectSheetTypeViewModel;
             _context.Editor.SuperficieAtiva = EditorSurfaceKind.ProjectSheetType;
 

@@ -6,6 +6,7 @@ using System.Runtime.CompilerServices;
 using System.Windows;
 using System.Windows.Media;
 using Araci.Core.Documents;
+using Araci.Services.Catalog;
 
 namespace Araci.ViewModels
 {
@@ -16,13 +17,20 @@ namespace Araci.ViewModels
 
         private readonly AraciDocument _document;
         private readonly ProjectSheetType _tipo;
+        private readonly TypeLibraryService _types;
         private ProjectSheetTemplateLineViewModel? _previewLine;
         private Guid? _selectedLineId;
 
         public ProjectSheetTypeViewModel(AraciDocument document, ProjectSheetType tipo)
+            : this(document, tipo, new TypeLibraryService())
+        {
+        }
+
+        public ProjectSheetTypeViewModel(AraciDocument document, ProjectSheetType tipo, TypeLibraryService types)
         {
             _document = document ?? throw new ArgumentNullException(nameof(document));
             _tipo = tipo ?? throw new ArgumentNullException(nameof(tipo));
+            _types = types ?? throw new ArgumentNullException(nameof(types));
             Lines = new ObservableCollection<ProjectSheetTemplateLineViewModel>();
             EndpointHandles = new ObservableCollection<ProjectSheetTemplateLineEndpointHandleViewModel>();
             _document.PropriedadesTipoPranchaAlteradas += OnPropriedadesTipoPranchaAlteradas;
@@ -85,7 +93,7 @@ namespace Araci.ViewModels
 
         public void SetPreviewLine(ProjectSheetTemplateLine? linha)
         {
-            PreviewLine = linha == null ? null : new ProjectSheetTemplateLineViewModel(linha);
+            PreviewLine = linha == null ? null : new ProjectSheetTemplateLineViewModel(linha, _types);
         }
 
         public bool SelectLineAt(Point position, double tolerance)
@@ -297,7 +305,7 @@ namespace Araci.ViewModels
             Lines.Clear();
 
             foreach (ProjectSheetTemplateLine linha in (_tipo.Linhas ?? new()).Where(l => l != null && l.Visible))
-                Lines.Add(new ProjectSheetTemplateLineViewModel(linha));
+                Lines.Add(new ProjectSheetTemplateLineViewModel(linha, _types));
 
             if (selectedId.HasValue && Lines.Any(l => l.Id == selectedId.Value))
                 _selectedLineId = selectedId;

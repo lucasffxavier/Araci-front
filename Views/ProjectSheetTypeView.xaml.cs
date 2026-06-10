@@ -516,7 +516,8 @@ namespace Araci.Views
                 _context.Editor.ElementoSelecionado = new ProjectSheetTemplateLinePropertiesViewModel(
                     viewModel.Tipo,
                     linha,
-                    _context.MoverLinhaDoTipoPrancha);
+                    _context.MoverLinhaDoTipoPrancha,
+                    _context.Types);
                 return;
             }
 

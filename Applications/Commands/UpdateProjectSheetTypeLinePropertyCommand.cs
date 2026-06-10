@@ -1,7 +1,6 @@
-using Araci.Core.Commands;
-using Araci.Core.Documents;
 using System;
 using System.Linq;
+using Araci.Core.Documents;
 
 namespace Araci.Core.Commands
 {
@@ -56,5 +55,31 @@ namespace Araci.Core.Commands
             _document.AtualizarPropriedadesTipoPrancha(_tipo);
         }
     }
-}
 
+    public readonly struct ProjectSheetTemplateLineGraphicTypeState
+    {
+        public ProjectSheetTemplateLineGraphicTypeState(string nomeTipo, string familia, string categoria)
+        {
+            NomeTipo = nomeTipo ?? string.Empty;
+            Familia = familia ?? string.Empty;
+            Categoria = categoria ?? string.Empty;
+        }
+
+        public string NomeTipo { get; }
+        public string Familia { get; }
+        public string Categoria { get; }
+
+        public void Aplicar(ProjectSheetTemplateLine linha)
+        {
+            linha.DefinirTipoLinha(NomeTipo, Familia, Categoria);
+        }
+
+        public static ProjectSheetTemplateLineGraphicTypeState FromLine(ProjectSheetTemplateLine linha)
+        {
+            return new ProjectSheetTemplateLineGraphicTypeState(
+                linha.TipoLinhaNome,
+                linha.TipoLinhaFamilia,
+                linha.TipoLinhaCategoria);
+        }
+    }
+}

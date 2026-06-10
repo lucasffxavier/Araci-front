@@ -1,9 +1,12 @@
 using System;
 using System.ComponentModel;
+using System.Linq;
 using System.Runtime.CompilerServices;
 using System.Windows;
 using System.Windows.Media;
 using Araci.Core.Documents;
+using Araci.Models.Tipos;
+using Araci.Services.Catalog;
 
 namespace Araci.ViewModels
 {
@@ -18,6 +21,8 @@ namespace Araci.ViewModels
         private const double EndpointHandleSizeValue = 10.0;
 
         private readonly ProjectSheetTemplateLine _linha;
+        private readonly TypeLibraryService _types;
+        private TipoLinhaAnotativa? _tipoLinha;
         private bool _isSelected;
         private double _previewOffsetX;
         private double _previewOffsetY;
@@ -28,8 +33,15 @@ namespace Araci.ViewModels
         private double _previewY2;
 
         public ProjectSheetTemplateLineViewModel(ProjectSheetTemplateLine linha)
+            : this(linha, new TypeLibraryService())
+        {
+        }
+
+        public ProjectSheetTemplateLineViewModel(ProjectSheetTemplateLine linha, TypeLibraryService types)
         {
             _linha = linha ?? throw new ArgumentNullException(nameof(linha));
+            _types = types ?? throw new ArgumentNullException(nameof(types));
+            AtualizarTipoLinhaAssinado();
         }
 
         public Guid Id => _linha.Id;
@@ -41,8 +53,12 @@ namespace Araci.ViewModels
         public double ModelY1 => _linha.Y1;
         public double ModelX2 => _linha.X2;
         public double ModelY2 => _linha.Y2;
-        public Brush StrokeBrush => CriarBrush(_linha.Stroke);
-        public double StrokeThickness => _linha.StrokeThickness;
+        public TipoLinhaAnotativa? TipoLinha => _tipoLinha;
+        public string CorLinha => TipoLinha?.CorLinha ?? _linha.Stroke;
+        public double StrokeThickness => TipoLinha?.EspessuraLinha ?? _linha.StrokeThickness;
+        public string EstiloLinha => TipoLinha?.EstiloLinha ?? "Contínuo";
+        public Brush StrokeBrush => CriarBrush(CorLinha);
+        public DoubleCollection? StrokeDashArray => CriarStrokeDashArray(EstiloLinha);
         public bool Visible => _linha.Visible;
         public bool HasPreviewOffset => Math.Abs(_previewOffsetX) > 0.0001 || Math.Abs(_previewOffsetY) > 0.0001;
         public bool HasEndpointPreview => _hasEndpointPreview;
@@ -158,6 +174,39 @@ namespace Araci.ViewModels
 
         public event PropertyChangedEventHandler? PropertyChanged;
 
+        private void AtualizarTipoLinhaAssinado()
+        {
+            if (_tipoLinha != null)
+                _tipoLinha.PropertyChanged -= OnTipoLinhaPropertyChanged;
+
+            _tipoLinha = ResolverTipoLinha();
+
+            if (_tipoLinha != null)
+                _tipoLinha.PropertyChanged += OnTipoLinhaPropertyChanged;
+        }
+
+        private TipoLinhaAnotativa? ResolverTipoLinha()
+        {
+            if (!_linha.PossuiTipoLinha)
+                return null;
+
+            return _types.TiposLinhasAnotativas.FirstOrDefault(t =>
+                string.Equals(t.NomeTipo, _linha.TipoLinhaNome, StringComparison.OrdinalIgnoreCase) &&
+                string.Equals(t.Familia, _linha.TipoLinhaFamilia, StringComparison.OrdinalIgnoreCase) &&
+                string.Equals(t.Categoria, _linha.TipoLinhaCategoria, StringComparison.OrdinalIgnoreCase)) ?? _types.TipoLinhaAnotativaPadrao;
+        }
+
+        private void OnTipoLinhaPropertyChanged(object? sender, PropertyChangedEventArgs e)
+        {
+            if (string.IsNullOrEmpty(e.PropertyName) ||
+                e.PropertyName == nameof(TipoLinhaAnotativa.CorLinha) ||
+                e.PropertyName == nameof(TipoLinhaAnotativa.EspessuraLinha) ||
+                e.PropertyName == nameof(TipoLinhaAnotativa.EstiloLinha))
+            {
+                NotificarEstilo();
+            }
+        }
+
         private void NotificarCoordenadas()
         {
             OnPropertyChanged(nameof(X1));
@@ -168,6 +217,18 @@ namespace Araci.ViewModels
             OnPropertyChanged(nameof(StartHandleTop));
             OnPropertyChanged(nameof(EndHandleLeft));
             OnPropertyChanged(nameof(EndHandleTop));
+        }
+
+        private void NotificarEstilo()
+        {
+            OnPropertyChanged(nameof(TipoLinha));
+            OnPropertyChanged(nameof(CorLinha));
+            OnPropertyChanged(nameof(StrokeBrush));
+            OnPropertyChanged(nameof(StrokeThickness));
+            OnPropertyChanged(nameof(EstiloLinha));
+            OnPropertyChanged(nameof(StrokeDashArray));
+            OnPropertyChanged(nameof(SelectionStrokeBrush));
+            OnPropertyChanged(nameof(SelectionStrokeThickness));
         }
 
         private static Brush CriarBrush(string stroke)
@@ -182,6 +243,34 @@ namespace Araci.ViewModels
             }
 
             return Brushes.Black;
+        }
+
+        private static DoubleCollection? CriarStrokeDashArray(string estilo)
+        {
+            string normalizado = NormalizarEstilo(estilo);
+
+            return normalizado switch
+            {
+                "tracejado" => new DoubleCollection { 6, 4 },
+                "tracoponto" => new DoubleCollection { 8, 3, 2, 3 },
+                "tracodoispontos" => new DoubleCollection { 8, 3, 2, 3, 2, 3 },
+                _ => null
+            };
+        }
+
+        private static string NormalizarEstilo(string valor)
+        {
+            return valor
+                .Replace(" ", string.Empty)
+                .Replace("-", string.Empty)
+                .Replace("ç", "c")
+                .Replace("Ç", "c")
+                .Replace("ã", "a")
+                .Replace("Ã", "a")
+                .Replace("í", "i")
+                .Replace("Í", "i")
+                .ToLowerInvariant()
+                .Trim();
         }
 
         private void OnPropertyChanged([CallerMemberName] string? propertyName = null)

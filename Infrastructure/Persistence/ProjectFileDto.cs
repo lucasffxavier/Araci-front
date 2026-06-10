@@ -41,6 +41,7 @@ namespace Araci.Infrastructure.Persistence
         public double Y1 { get; set; }
         public double X2 { get; set; }
         public double Y2 { get; set; }
+        public TypeRefDto? Type { get; set; }
         public string Stroke { get; set; } = "#FF000000";
         public double StrokeThickness { get; set; } = 1.0;
         public bool Visible { get; set; } = true;
@@ -147,7 +148,18 @@ namespace Araci.Infrastructure.Persistence
 
     public sealed class TypeLibrariesDto
     {
+        public List<LineAnnotationTypeDto> LineAnnotationTypes { get; set; } = new();
         public List<TextAnnotationTypeDto> TextAnnotationTypes { get; set; } = new();
+    }
+
+    public sealed class LineAnnotationTypeDto
+    {
+        public string NomeTipo { get; set; } = string.Empty;
+        public string Familia { get; set; } = string.Empty;
+        public string Categoria { get; set; } = string.Empty;
+        public string EstiloLinha { get; set; } = "Contínuo";
+        public string CorLinha { get; set; } = "#FF000000";
+        public double EspessuraLinha { get; set; } = 1.0;
     }
 
     public sealed class TextAnnotationTypeDto

@@ -1,5 +1,6 @@
 using System;
 using System.Collections;
+using System.ComponentModel;
 using System.Windows;
 using System.Windows.Media;
 using Araci.Core.Rendering;
@@ -15,6 +16,8 @@ namespace Araci.ViewModels
 {
     public class LinhaAnotativaViewModel : ElementoViewModel
     {
+        private TipoLinhaAnotativa? _tipoLinhaAssinado;
+
         public LinhaAnotativaViewModel(
             LinhaAnotativa modelo,
             TypeLibraryService types,
@@ -23,6 +26,7 @@ namespace Araci.ViewModels
             : base(modelo, new LinhaAnotativaNode(modelo), types, names, typePropertiesDialogs)
         {
             SelecionarPrimeiroTipoDisponivel();
+            AtualizarAssinaturaTipoLinha();
         }
 
         public LinhaAnotativa Linha => (LinhaAnotativa)Modelo;
@@ -41,11 +45,11 @@ namespace Araci.ViewModels
                 if (ReferenceEquals(Linha.Tipo, value))
                     return;
 
+                DesassinarTipoLinha();
                 base.Tipo = value;
+                AtualizarAssinaturaTipoLinha();
                 OnPropertyChanged(nameof(TipoLinha));
-                OnPropertyChanged(nameof(EstiloLinha));
-                OnPropertyChanged(nameof(StrokeDashArray));
-                OnPropertyChanged(nameof(RenderData));
+                NotificarEstiloTipoLinha();
             }
         }
 
@@ -142,13 +146,24 @@ namespace Araci.ViewModels
 
         public string CorLinha
         {
-            get => Linha.CorLinha;
+            get => TipoLinha?.CorLinha ?? Linha.CorLinha;
             set
             {
-                if (Linha.CorLinha == value)
+                string normalizada = TipoLinhaAnotativa.NormalizarCor(value);
+
+                if (TipoLinha != null)
+                {
+                    if (string.Equals(TipoLinha.CorLinha, normalizada, StringComparison.OrdinalIgnoreCase))
+                        return;
+
+                    TipoLinha.CorLinha = normalizada;
+                    return;
+                }
+
+                if (Linha.CorLinha == normalizada)
                     return;
 
-                Linha.CorLinha = value;
+                Linha.CorLinha = normalizada;
                 OnPropertyChanged();
                 OnPropertyChanged(nameof(RenderData));
                 NotificarParametros();
@@ -157,13 +172,24 @@ namespace Araci.ViewModels
 
         public double EspessuraLinha
         {
-            get => Linha.EspessuraLinha;
+            get => TipoLinha?.EspessuraLinha ?? Linha.EspessuraLinha;
             set
             {
-                if (Math.Abs(Linha.EspessuraLinha - value) < 0.0001)
+                double normalizada = TipoLinhaAnotativa.NormalizarEspessura(value);
+
+                if (TipoLinha != null)
+                {
+                    if (Math.Abs(TipoLinha.EspessuraLinha - normalizada) < 0.0001)
+                        return;
+
+                    TipoLinha.EspessuraLinha = normalizada;
+                    return;
+                }
+
+                if (Math.Abs(Linha.EspessuraLinha - normalizada) < 0.0001)
                     return;
 
-                Linha.EspessuraLinha = value;
+                Linha.EspessuraLinha = normalizada;
                 OnPropertyChanged();
                 OnPropertyChanged(nameof(RenderData));
                 NotificarParametros();
@@ -241,6 +267,42 @@ namespace Araci.ViewModels
                     node.PontoFinal.X - Bounds.X,
                     node.PontoFinal.Y - Bounds.Y);
             }
+        }
+
+        private void AtualizarAssinaturaTipoLinha()
+        {
+            _tipoLinhaAssinado = TipoLinha;
+
+            if (_tipoLinhaAssinado != null)
+                _tipoLinhaAssinado.PropertyChanged += OnTipoLinhaPropertyChanged;
+        }
+
+        private void DesassinarTipoLinha()
+        {
+            if (_tipoLinhaAssinado != null)
+                _tipoLinhaAssinado.PropertyChanged -= OnTipoLinhaPropertyChanged;
+
+            _tipoLinhaAssinado = null;
+        }
+
+        private void OnTipoLinhaPropertyChanged(object? sender, PropertyChangedEventArgs e)
+        {
+            if (string.IsNullOrEmpty(e.PropertyName) ||
+                e.PropertyName == nameof(TipoLinhaAnotativa.CorLinha) ||
+                e.PropertyName == nameof(TipoLinhaAnotativa.EspessuraLinha) ||
+                e.PropertyName == nameof(TipoLinhaAnotativa.EstiloLinha))
+            {
+                NotificarEstiloTipoLinha();
+            }
+        }
+
+        private void NotificarEstiloTipoLinha()
+        {
+            OnPropertyChanged(nameof(CorLinha));
+            OnPropertyChanged(nameof(EspessuraLinha));
+            OnPropertyChanged(nameof(EstiloLinha));
+            OnPropertyChanged(nameof(StrokeDashArray));
+            OnPropertyChanged(nameof(RenderData));
         }
 
         private static Brush CriarBrush(string cor)

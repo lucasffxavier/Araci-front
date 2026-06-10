@@ -3,6 +3,7 @@ using System.Linq;
 using Araci.Applications.Abstractions;
 using Araci.Core.Commands;
 using Araci.Core.Documents;
+using Araci.Models.Tipos;
 
 namespace Araci.Applications.UseCases.Projeto
 {
@@ -45,6 +46,34 @@ namespace Araci.Applications.UseCases.Projeto
             return AlterarCoordenadas(tipo, linha, x1, y1, x2, y2);
         }
 
+        public bool AlterarTipoGrafico(Guid tipoId, Guid linhaId, TipoLinhaAnotativa tipoLinha)
+        {
+            if (tipoLinha == null)
+                return false;
+
+            if (!TryGetLinha(tipoId, linhaId, out ProjectSheetType tipo, out ProjectSheetTemplateLine linha))
+                return false;
+
+            if (linha.TipoLinhaIgual(tipoLinha.NomeTipo, tipoLinha.Familia, tipoLinha.Categoria))
+                return false;
+
+            var estadoAnterior = ProjectSheetTemplateLineGraphicTypeState.FromLine(linha);
+            var estadoNovo = new ProjectSheetTemplateLineGraphicTypeState(
+                tipoLinha.NomeTipo,
+                tipoLinha.Familia,
+                tipoLinha.Categoria);
+
+            _commands.Execute(new UpdateProjectSheetTypeLinePropertyCommand<ProjectSheetTemplateLineGraphicTypeState>(
+                _document,
+                tipo,
+                linha.Id,
+                (l, value) => value.Aplicar(l),
+                estadoAnterior,
+                estadoNovo));
+
+            return true;
+        }
+
         public bool AlterarStroke(Guid tipoId, Guid linhaId, string stroke)
         {
             if (!TryNormalizeStroke(stroke, out string normalizedStroke))
@@ -85,6 +114,63 @@ namespace Araci.Applications.UseCases.Projeto
                 (l, value) => l.StrokeThickness = value,
                 linha.StrokeThickness,
                 strokeThickness));
+
+            return true;
+        }
+
+        public bool AlterarCorTipo(TipoLinhaAnotativa tipoLinha, string cor)
+        {
+            if (tipoLinha == null)
+                return false;
+
+            string corNormalizada = TipoLinhaAnotativa.NormalizarCor(cor);
+
+            if (string.Equals(tipoLinha.CorLinha, corNormalizada, StringComparison.OrdinalIgnoreCase))
+                return false;
+
+            _commands.Execute(new UpdateLineAnnotationTypePropertyCommand<string>(
+                tipoLinha,
+                (t, value) => t.CorLinha = value,
+                tipoLinha.CorLinha,
+                corNormalizada));
+
+            return true;
+        }
+
+        public bool AlterarEspessuraTipo(TipoLinhaAnotativa tipoLinha, double espessura)
+        {
+            if (tipoLinha == null)
+                return false;
+
+            double espessuraNormalizada = TipoLinhaAnotativa.NormalizarEspessura(espessura);
+
+            if (Math.Abs(tipoLinha.EspessuraLinha - espessuraNormalizada) < 0.000001)
+                return false;
+
+            _commands.Execute(new UpdateLineAnnotationTypePropertyCommand<double>(
+                tipoLinha,
+                (t, value) => t.EspessuraLinha = value,
+                tipoLinha.EspessuraLinha,
+                espessuraNormalizada));
+
+            return true;
+        }
+
+        public bool AlterarEstiloTipo(TipoLinhaAnotativa tipoLinha, string estilo)
+        {
+            if (tipoLinha == null)
+                return false;
+
+            string estiloNormalizado = TipoLinhaAnotativa.NormalizarEstilo(estilo);
+
+            if (string.Equals(tipoLinha.EstiloLinha, estiloNormalizado, StringComparison.Ordinal))
+                return false;
+
+            _commands.Execute(new UpdateLineAnnotationTypePropertyCommand<string>(
+                tipoLinha,
+                (t, value) => t.EstiloLinha = value,
+                tipoLinha.EstiloLinha,
+                estiloNormalizado));
 
             return true;
         }
@@ -148,7 +234,7 @@ namespace Araci.Applications.UseCases.Projeto
 
         private static bool TryNormalizeStroke(string stroke, out string normalizedStroke)
         {
-            normalizedStroke = (stroke ?? string.Empty).Trim();
+            normalizedStroke = TipoLinhaAnotativa.NormalizarCor(stroke);
             return !string.IsNullOrWhiteSpace(normalizedStroke);
         }
 
