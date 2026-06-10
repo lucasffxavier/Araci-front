@@ -56,6 +56,29 @@ namespace Araci.Core.Commands
         }
     }
 
+    public readonly struct ProjectSheetTemplateRectanglePositionState
+    {
+        public ProjectSheetTemplateRectanglePositionState(double x, double y)
+        {
+            X = x;
+            Y = y;
+        }
+
+        public double X { get; }
+        public double Y { get; }
+
+        public void Aplicar(ProjectSheetTemplateRectangle retangulo)
+        {
+            retangulo.X = X;
+            retangulo.Y = Y;
+        }
+
+        public static ProjectSheetTemplateRectanglePositionState FromRectangle(ProjectSheetTemplateRectangle retangulo)
+        {
+            return new ProjectSheetTemplateRectanglePositionState(retangulo.X, retangulo.Y);
+        }
+    }
+
     public readonly struct ProjectSheetTemplateRectangleGraphicTypeState
     {
         public ProjectSheetTemplateRectangleGraphicTypeState(string nomeTipo, string familia, string categoria)

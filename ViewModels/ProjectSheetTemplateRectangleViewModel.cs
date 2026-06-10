@@ -15,6 +15,9 @@ namespace Araci.ViewModels
         private readonly ProjectSheetTemplateRectangle _retangulo;
         private readonly TypeLibraryService _types;
         private TipoLinhaAnotativa? _tipoLinha;
+        private bool _isSelected;
+        private double _previewOffsetX;
+        private double _previewOffsetY;
 
         public ProjectSheetTemplateRectangleViewModel(ProjectSheetTemplateRectangle retangulo)
             : this(retangulo, new TypeLibraryService())
@@ -29,8 +32,10 @@ namespace Araci.ViewModels
         }
 
         public Guid Id => _retangulo.Id;
-        public double X => _retangulo.X;
-        public double Y => _retangulo.Y;
+        public double X => _retangulo.X + _previewOffsetX;
+        public double Y => _retangulo.Y + _previewOffsetY;
+        public double ModelX => _retangulo.X;
+        public double ModelY => _retangulo.Y;
         public double Largura => _retangulo.Largura;
         public double Altura => _retangulo.Altura;
         public TipoLinhaAnotativa? TipoLinha => _tipoLinha;
@@ -41,6 +46,56 @@ namespace Araci.ViewModels
         public Brush FillBrush => Brushes.Transparent;
         public DoubleCollection? StrokeDashArray => CriarStrokeDashArray(EstiloLinha);
         public bool Visible => _retangulo.Visible;
+        public bool HasPreviewOffset => Math.Abs(_previewOffsetX) > 0.0001 || Math.Abs(_previewOffsetY) > 0.0001;
+
+        public bool IsSelected
+        {
+            get => _isSelected;
+            set
+            {
+                if (_isSelected == value)
+                    return;
+
+                _isSelected = value;
+                OnPropertyChanged();
+                OnPropertyChanged(nameof(SelectionStrokeBrush));
+                OnPropertyChanged(nameof(SelectionStrokeThickness));
+            }
+        }
+
+        public Brush SelectionStrokeBrush => IsSelected ? Brushes.DodgerBlue : StrokeBrush;
+        public double SelectionStrokeThickness => IsSelected ? Math.Max(StrokeThickness + 3.0, 4.0) : StrokeThickness;
+
+        public void SetPreviewOffset(double deltaX, double deltaY)
+        {
+            if (Math.Abs(_previewOffsetX - deltaX) < 0.0001 && Math.Abs(_previewOffsetY - deltaY) < 0.0001)
+                return;
+
+            _previewOffsetX = deltaX;
+            _previewOffsetY = deltaY;
+            NotificarPosicao();
+            OnPropertyChanged(nameof(HasPreviewOffset));
+        }
+
+        public void ClearPreviewOffset()
+        {
+            if (!HasPreviewOffset)
+                return;
+
+            _previewOffsetX = 0.0;
+            _previewOffsetY = 0.0;
+            NotificarPosicao();
+            OnPropertyChanged(nameof(HasPreviewOffset));
+        }
+
+        public bool Contains(Point position, double tolerance)
+        {
+            double margem = Math.Max(0.0, tolerance);
+            return position.X >= X - margem &&
+                position.X <= X + Largura + margem &&
+                position.Y >= Y - margem &&
+                position.Y <= Y + Altura + margem;
+        }
 
         public event PropertyChangedEventHandler? PropertyChanged;
 
@@ -75,6 +130,12 @@ namespace Araci.ViewModels
             }
         }
 
+        private void NotificarPosicao()
+        {
+            OnPropertyChanged(nameof(X));
+            OnPropertyChanged(nameof(Y));
+        }
+
         private void NotificarEstilo()
         {
             OnPropertyChanged(nameof(TipoLinha));
@@ -83,6 +144,8 @@ namespace Araci.ViewModels
             OnPropertyChanged(nameof(StrokeThickness));
             OnPropertyChanged(nameof(EstiloLinha));
             OnPropertyChanged(nameof(StrokeDashArray));
+            OnPropertyChanged(nameof(SelectionStrokeBrush));
+            OnPropertyChanged(nameof(SelectionStrokeThickness));
         }
 
         private static Brush CriarBrush(string stroke)

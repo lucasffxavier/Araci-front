@@ -14,6 +14,7 @@ namespace Araci.Views
     {
         private const double LineHitTolerance = 6.0;
         private const double EndpointHitTolerance = 8.0;
+        private const double RectangleHitTolerance = 3.0;
         private const double DragThresholdSquared = 9.0;
         private const double LayoutTolerance = 1.0;
         private const int CenterSheetMaxAttempts = 10;
@@ -23,6 +24,9 @@ namespace Araci.Views
         private Guid? _linhaTemplateEmArrasteId;
         private Point _linhaTemplateDragStart;
         private bool _linhaTemplateArrastando;
+        private Guid? _retanguloTemplateEmArrasteId;
+        private Point _retanguloTemplateDragStart;
+        private bool _retanguloTemplateArrastando;
         private Guid? _linhaTemplateEndpointEmArrasteId;
         private ProjectSheetTemplateLineEndpoint _linhaTemplateEndpointEmArraste;
         private Point _linhaTemplateEndpointDragStart;
@@ -50,7 +54,7 @@ namespace Araci.Views
 
             if (DataContext is ProjectSheetTypeViewModel viewModel)
             {
-                _context.ProjectSheetTypeViewModelAtivo = viewModel;
+                DefinirComoSuperficieAtiva(viewModel);
                 CenterSheetInViewportDeferred();
             }
         }
@@ -72,6 +76,10 @@ namespace Araci.Views
 
             Focus();
             Keyboard.Focus(this);
+
+            if (ObterViewModelAtivo() is ProjectSheetTypeViewModel viewModel)
+                DefinirComoSuperficieAtiva(viewModel);
+
             Point position = ObterPontoLocalFolha(e);
 
             if (TentarIniciarEdicaoExtremidadeLinhaTemplate(position))
@@ -80,7 +88,7 @@ namespace Araci.Views
                 return;
             }
 
-            if (TentarIniciarInteracaoLinhaTemplate(position))
+            if (TentarIniciarInteracaoTemplate(position))
             {
                 e.Handled = true;
                 return;
@@ -107,6 +115,12 @@ namespace Araci.Views
             }
 
             if (AtualizarArrasteLinhaTemplate(position, e))
+            {
+                e.Handled = true;
+                return;
+            }
+
+            if (AtualizarArrasteRetanguloTemplate(position, e))
             {
                 e.Handled = true;
                 return;
@@ -142,6 +156,16 @@ namespace Araci.Views
                 return;
             }
 
+            if (FinalizarArrasteRetanguloTemplate(position))
+            {
+                if (TemplatePageBorder.IsMouseCaptured)
+                    TemplatePageBorder.ReleaseMouseCapture();
+
+                AtualizarHandlesOverlay();
+                e.Handled = true;
+                return;
+            }
+
             _context.Tools.FerramentaAtual.OnMouseUp(position, CriarInputState(e, position, e.ChangedButton, e.ClickCount));
 
             if (TemplatePageBorder.IsMouseCaptured)
@@ -158,6 +182,9 @@ namespace Araci.Views
 
             if (_linhaTemplateEmArrasteId.HasValue)
                 CancelarArrasteLinhaTemplate();
+
+            if (_retanguloTemplateEmArrasteId.HasValue)
+                CancelarArrasteRetanguloTemplate();
 
             AtualizarHandlesOverlay();
         }
@@ -183,7 +210,15 @@ namespace Araci.Views
                 return;
             }
 
-            if (e.Key == Key.Delete && ExcluirLinhaSelecionada())
+            if (e.Key == Key.Escape && _retanguloTemplateEmArrasteId.HasValue)
+            {
+                CancelarArrasteRetanguloTemplate();
+                AtualizarHandlesOverlay();
+                e.Handled = true;
+                return;
+            }
+
+            if (e.Key == Key.Delete && ExcluirTemplateSelecionado())
             {
                 AtualizarHandlesOverlay();
                 e.Handled = true;
@@ -314,7 +349,7 @@ namespace Araci.Views
             if (alterou)
                 viewModel.SelectLine(lineId);
 
-            AtualizarPainelPropriedadesLinhaSelecionada();
+            AtualizarPainelPropriedadesTemplateSelecionado();
             AtualizarHandlesOverlay();
             return true;
         }
@@ -343,7 +378,7 @@ namespace Araci.Views
             _linhaTemplateEndpointOriginalY2 = 0.0;
         }
 
-        private bool TentarIniciarInteracaoLinhaTemplate(Point position)
+        private bool TentarIniciarInteracaoTemplate(Point position)
         {
             ProjectSheetTypeViewModel? viewModel = ObterViewModelAtivo();
 
@@ -355,28 +390,36 @@ namespace Araci.Views
             if (!string.Equals(ferramentaAtual.Nome, "Selecionar", StringComparison.OrdinalIgnoreCase) || ferramentaAtual.IsBusy)
                 return false;
 
-            bool selecionou = viewModel.SelectLineAt(position, LineHitTolerance);
-            AtualizarHandlesOverlay();
-
-            if (!selecionou)
+            if (viewModel.TryHitLineAt(position, LineHitTolerance, out Guid lineId))
             {
-                LimparEstadoArrasteLinhaTemplate();
-                AtualizarPainelPropriedadesLinhaSelecionada();
+                viewModel.SelectLine(lineId);
+                _linhaTemplateEmArrasteId = lineId;
+                _linhaTemplateDragStart = position;
+                _linhaTemplateArrastando = false;
+                LimparEstadoArrasteRetanguloTemplate();
+                TemplatePageBorder.CaptureMouse();
+                AtualizarPainelPropriedadesTemplateSelecionado();
                 AtualizarHandlesOverlay();
                 return true;
             }
 
-            if (!viewModel.TryGetSelectedLineId(out Guid lineId))
+            if (viewModel.TryHitRectangleAt(position, RectangleHitTolerance, out Guid rectangleId))
             {
-                AtualizarPainelPropriedadesLinhaSelecionada();
+                viewModel.SelectRectangle(rectangleId);
+                _retanguloTemplateEmArrasteId = rectangleId;
+                _retanguloTemplateDragStart = position;
+                _retanguloTemplateArrastando = false;
+                LimparEstadoArrasteLinhaTemplate();
+                TemplatePageBorder.CaptureMouse();
+                AtualizarPainelPropriedadesTemplateSelecionado();
+                AtualizarHandlesOverlay();
                 return true;
             }
 
-            _linhaTemplateEmArrasteId = lineId;
-            _linhaTemplateDragStart = position;
-            _linhaTemplateArrastando = false;
-            TemplatePageBorder.CaptureMouse();
-            AtualizarPainelPropriedadesLinhaSelecionada();
+            viewModel.ClearTemplateSelection();
+            LimparEstadoArrasteLinhaTemplate();
+            LimparEstadoArrasteRetanguloTemplate();
+            AtualizarPainelPropriedadesTemplateSelecionado();
             AtualizarHandlesOverlay();
             return true;
         }
@@ -448,6 +491,79 @@ namespace Araci.Views
             _linhaTemplateArrastando = false;
         }
 
+        private bool AtualizarArrasteRetanguloTemplate(Point position, MouseEventArgs e)
+        {
+            ProjectSheetTypeViewModel? viewModel = ObterViewModelAtivo();
+
+            if (viewModel == null || !_retanguloTemplateEmArrasteId.HasValue)
+                return false;
+
+            if (e.LeftButton != MouseButtonState.Pressed)
+                return false;
+
+            Vector delta = position - _retanguloTemplateDragStart;
+
+            if (!_retanguloTemplateArrastando && delta.LengthSquared < DragThresholdSquared)
+                return true;
+
+            _retanguloTemplateArrastando = true;
+            viewModel.SetRectanglePreviewOffset(_retanguloTemplateEmArrasteId.Value, delta.X, delta.Y);
+            AtualizarHandlesOverlay();
+            return true;
+        }
+
+        private bool FinalizarArrasteRetanguloTemplate(Point position)
+        {
+            ProjectSheetTypeViewModel? viewModel = ObterViewModelAtivo();
+
+            if (_context == null || viewModel == null || !_retanguloTemplateEmArrasteId.HasValue)
+                return false;
+
+            Guid rectangleId = _retanguloTemplateEmArrasteId.Value;
+            bool arrastou = _retanguloTemplateArrastando;
+            Vector delta = position - _retanguloTemplateDragStart;
+
+            viewModel.ClearRectanglePreviewOffset(rectangleId);
+            LimparEstadoArrasteRetanguloTemplate();
+
+            if (!arrastou)
+            {
+                AtualizarHandlesOverlay();
+                return true;
+            }
+
+            bool moveu = _context.MoverRetanguloDoTipoPrancha.Mover(viewModel.Id, rectangleId, delta.X, delta.Y);
+
+            if (moveu)
+                viewModel.SelectRectangle(rectangleId);
+
+            AtualizarPainelPropriedadesTemplateSelecionado();
+            AtualizarHandlesOverlay();
+            return true;
+        }
+
+        private void CancelarArrasteRetanguloTemplate()
+        {
+            ProjectSheetTypeViewModel? viewModel = ObterViewModelAtivo();
+
+            if (viewModel != null && _retanguloTemplateEmArrasteId.HasValue)
+                viewModel.ClearRectanglePreviewOffset(_retanguloTemplateEmArrasteId.Value);
+
+            LimparEstadoArrasteRetanguloTemplate();
+            AtualizarHandlesOverlay();
+        }
+
+        private void LimparEstadoArrasteRetanguloTemplate()
+        {
+            _retanguloTemplateEmArrasteId = null;
+            _retanguloTemplateArrastando = false;
+        }
+
+        private bool ExcluirTemplateSelecionado()
+        {
+            return ExcluirLinhaSelecionada() || ExcluirRetanguloSelecionado();
+        }
+
         private bool ExcluirLinhaSelecionada()
         {
             ProjectSheetTypeViewModel? viewModel = ObterViewModelAtivo();
@@ -463,7 +579,27 @@ namespace Araci.Views
             if (excluiu)
                 viewModel.ClearLineSelection();
 
-            AtualizarPainelPropriedadesLinhaSelecionada();
+            AtualizarPainelPropriedadesTemplateSelecionado();
+            AtualizarHandlesOverlay();
+            return excluiu;
+        }
+
+        private bool ExcluirRetanguloSelecionado()
+        {
+            ProjectSheetTypeViewModel? viewModel = ObterViewModelAtivo();
+
+            if (_context == null || viewModel == null)
+                return false;
+
+            if (!viewModel.TryGetSelectedRectangleId(out Guid rectangleId))
+                return false;
+
+            bool excluiu = _context.ExcluirRetanguloDoTipoPrancha.Excluir(viewModel.Id, rectangleId);
+
+            if (excluiu)
+                viewModel.ClearRectangleSelection();
+
+            AtualizarPainelPropriedadesTemplateSelecionado();
             AtualizarHandlesOverlay();
             return excluiu;
         }
@@ -472,9 +608,7 @@ namespace Araci.Views
         {
             if (DataContext is ProjectSheetTypeViewModel viewModel)
             {
-                if (_context != null && !ReferenceEquals(_context.ProjectSheetTypeViewModelAtivo, viewModel))
-                    _context.ProjectSheetTypeViewModelAtivo = viewModel;
-
+                DefinirComoSuperficieAtiva(viewModel);
                 return viewModel;
             }
 
@@ -485,9 +619,7 @@ namespace Araci.Views
         {
             if (e.NewValue is ProjectSheetTypeViewModel viewModel)
             {
-                if (_context != null)
-                    _context.ProjectSheetTypeViewModelAtivo = viewModel;
-
+                DefinirComoSuperficieAtiva(viewModel);
                 CenterSheetInViewportDeferred();
             }
 
@@ -499,7 +631,19 @@ namespace Araci.Views
             ObterViewModelAtivo();
         }
 
-        private void AtualizarPainelPropriedadesLinhaSelecionada()
+        private void DefinirComoSuperficieAtiva(ProjectSheetTypeViewModel viewModel)
+        {
+            if (_context == null)
+                return;
+
+            if (!ReferenceEquals(_context.ProjectSheetTypeViewModelAtivo, viewModel))
+                _context.ProjectSheetTypeViewModelAtivo = viewModel;
+
+            if (_context.Editor.SuperficieAtiva != EditorSurfaceKind.ProjectSheetType)
+                _context.Editor.SuperficieAtiva = EditorSurfaceKind.ProjectSheetType;
+        }
+
+        private void AtualizarPainelPropriedadesTemplateSelecionado()
         {
             if (_context == null)
                 return;

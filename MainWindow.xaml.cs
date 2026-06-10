@@ -75,13 +75,37 @@ namespace Araci
 
         public void FocarSuperficieAtiva()
         {
-            if (_context.Editor.SuperficieAtiva == EditorSurfaceKind.ProjectSheetType)
+            if (ProjectSheetTypeViewer.Visibility == Visibility.Visible &&
+                ProjectSheetTypeViewer.DataContext is ProjectSheetTypeViewModel projectSheetTypeViewModel)
             {
+                _projectSheetTypeViewModel = projectSheetTypeViewModel;
+                _context.ProjectSheetTypeViewModelAtivo = projectSheetTypeViewModel;
+                _context.Editor.SuperficieAtiva = EditorSurfaceKind.ProjectSheetType;
                 ProjectSheetTypeViewer.Focus();
                 System.Windows.Input.Keyboard.Focus(ProjectSheetTypeViewer);
                 return;
             }
 
+            if (ProjectSheetViewer.Visibility == Visibility.Visible)
+            {
+                _context.ProjectSheetTypeViewModelAtivo = null;
+                _context.Editor.SuperficieAtiva = EditorSurfaceKind.ProjectSheet;
+                ProjectSheetViewer.Focus();
+                System.Windows.Input.Keyboard.Focus(ProjectSheetViewer);
+                return;
+            }
+
+            if (ProjectTableGrid.Visibility == Visibility.Visible)
+            {
+                _context.ProjectSheetTypeViewModelAtivo = null;
+                _context.Editor.SuperficieAtiva = EditorSurfaceKind.ProjectTable;
+                ProjectTableGrid.Focus();
+                System.Windows.Input.Keyboard.Focus(ProjectTableGrid);
+                return;
+            }
+
+            _context.ProjectSheetTypeViewModelAtivo = null;
+            _context.Editor.SuperficieAtiva = EditorSurfaceKind.Diagram;
             FocarViewport();
         }
 

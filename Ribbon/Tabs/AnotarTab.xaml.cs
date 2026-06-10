@@ -133,14 +133,14 @@ namespace Araci.Ribbon.Tabs
 
         private void LinhaButton_Click(object sender, RoutedEventArgs e)
         {
-            Context?.Tools.AtivarInserirLinhaAnotativa();
             FocarSuperficieAtiva();
+            Context?.Tools.AtivarInserirLinhaAnotativa();
         }
 
         private void RetanguloButton_Click(object sender, RoutedEventArgs e)
         {
-            Context?.Tools.AtivarInserirRetanguloAnotativo();
             FocarSuperficieAtiva();
+            Context?.Tools.AtivarInserirRetanguloAnotativo();
         }
 
         private void CirculoButton_Click(object sender, RoutedEventArgs e)

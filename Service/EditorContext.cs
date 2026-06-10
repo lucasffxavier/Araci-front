@@ -116,6 +116,8 @@ namespace Araci.Services
             InserirRetanguloNoTipoPrancha = new InserirRetanguloNoTipoPranchaUseCase(Document, Commands);
             ExcluirLinhaDoTipoPrancha = new ExcluirLinhaDoTipoPranchaUseCase(Document, Commands);
             MoverLinhaDoTipoPrancha = new MoverLinhaDoTipoPranchaUseCase(Document, Commands);
+            ExcluirRetanguloDoTipoPrancha = new ExcluirRetanguloDoTipoPranchaUseCase(Document, Commands);
+            MoverRetanguloDoTipoPrancha = new MoverRetanguloDoTipoPranchaUseCase(Document, Commands);
             ExportarTabela = new ExportarTabelaUseCase(Document, Dialogs, new ProjectTableDataBuilder(), new ProjectTableCsvExportService());
             InserirTabelaNaPrancha = new InserirTabelaNaPranchaUseCase(Document, Commands);
             MoverTabelaNaPrancha = new MoverTabelaNaPranchaUseCase(Document, Commands);
@@ -153,7 +155,7 @@ namespace Araci.Services
                 CriarInserirCirculoAnotativoTool,
                 CriarInserirLinhaTipoPranchaTool,
                 CriarInserirRetanguloTipoPranchaTool,
-                () => Editor.SuperficieAtiva == EditorSurfaceKind.ProjectSheetType);
+                () => ProjectSheetTypeViewModelAtivo != null || Editor.SuperficieAtiva == EditorSurfaceKind.ProjectSheetType);
 
             Input = EditingComposition.CreateInput(Tools, Commands, SafeDelete, Selection, Elements, Hover, Clipboard.CopiarSelecionados, Clipboard.Colar);
             AlterarUnidadesProjeto = new AlterarUnidadesProjetoUseCase(Settings, RefreshProperties);
@@ -228,6 +230,8 @@ namespace Araci.Services
         public InserirRetanguloNoTipoPranchaUseCase InserirRetanguloNoTipoPrancha { get; }
         public ExcluirLinhaDoTipoPranchaUseCase ExcluirLinhaDoTipoPrancha { get; }
         public MoverLinhaDoTipoPranchaUseCase MoverLinhaDoTipoPrancha { get; }
+        public ExcluirRetanguloDoTipoPranchaUseCase ExcluirRetanguloDoTipoPrancha { get; }
+        public MoverRetanguloDoTipoPranchaUseCase MoverRetanguloDoTipoPrancha { get; }
         public ExportarTabelaUseCase ExportarTabela { get; }
         public InserirTabelaNaPranchaUseCase InserirTabelaNaPrancha { get; }
         public MoverTabelaNaPranchaUseCase MoverTabelaNaPrancha { get; }

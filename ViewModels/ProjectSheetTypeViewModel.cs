@@ -20,6 +20,7 @@ namespace Araci.ViewModels
         private readonly TypeLibraryService _types;
         private ProjectSheetTemplateLineViewModel? _previewLine;
         private Guid? _selectedLineId;
+        private Guid? _selectedRectangleId;
 
         public ProjectSheetTypeViewModel(AraciDocument document, ProjectSheetType tipo)
             : this(document, tipo, new TypeLibraryService())
@@ -58,7 +59,10 @@ namespace Araci.ViewModels
         public ObservableCollection<ProjectSheetTemplateRectangleViewModel> Rectangles { get; }
         public ObservableCollection<ProjectSheetTemplateLineEndpointHandleViewModel> EndpointHandles { get; }
         public Guid? SelectedLineId => _selectedLineId;
+        public Guid? SelectedRectangleId => _selectedRectangleId;
         public bool HasSelectedLine => _selectedLineId.HasValue;
+        public bool HasSelectedRectangle => _selectedRectangleId.HasValue;
+        public bool HasTemplateSelection => HasSelectedLine || HasSelectedRectangle;
         public bool EndpointHandlesVisible => EndpointHandles.Count > 0;
 
         public ProjectSheetTemplateLineViewModel? PreviewLine
@@ -92,6 +96,7 @@ namespace Araci.ViewModels
             OnPropertyChanged(nameof(Descricao));
             RefreshRectangles();
             RefreshLines();
+            OnPropertyChanged(nameof(HasTemplateSelection));
         }
 
         public void SetPreviewLine(ProjectSheetTemplateLine? linha)
@@ -99,19 +104,25 @@ namespace Araci.ViewModels
             PreviewLine = linha == null ? null : new ProjectSheetTemplateLineViewModel(linha, _types);
         }
 
-        public bool SelectLineAt(Point position, double tolerance)
+        public bool TryHitLineAt(Point position, double tolerance, out Guid lineId)
         {
             ProjectSheetTemplateLineViewModel? hit = Lines
                 .Reverse()
                 .FirstOrDefault(l => DistanciaAoSegmento(position, new Point(l.X1, l.Y1), new Point(l.X2, l.Y2)) <= tolerance);
 
-            if (hit == null)
+            lineId = hit?.Id ?? Guid.Empty;
+            return hit != null;
+        }
+
+        public bool SelectLineAt(Point position, double tolerance)
+        {
+            if (!TryHitLineAt(position, tolerance, out Guid lineId))
             {
                 ClearLineSelection();
                 return false;
             }
 
-            SelectLine(hit.Id);
+            SelectLine(lineId);
             return true;
         }
 
@@ -124,10 +135,10 @@ namespace Araci.ViewModels
             }
 
             _selectedLineId = lineId;
+            _selectedRectangleId = null;
             AtualizarSelecaoVisual();
             RefreshEndpointHandles();
-            OnPropertyChanged(nameof(SelectedLineId));
-            OnPropertyChanged(nameof(HasSelectedLine));
+            NotificarSelecao();
             return true;
         }
 
@@ -139,8 +150,7 @@ namespace Araci.ViewModels
             _selectedLineId = null;
             AtualizarSelecaoVisual();
             RefreshEndpointHandles();
-            OnPropertyChanged(nameof(SelectedLineId));
-            OnPropertyChanged(nameof(HasSelectedLine));
+            NotificarSelecao();
         }
 
         public bool TryGetSelectedLineId(out Guid lineId)
@@ -285,6 +295,107 @@ namespace Araci.ViewModels
             RefreshEndpointHandles();
         }
 
+        public bool TryHitRectangleAt(Point position, double tolerance, out Guid rectangleId)
+        {
+            ProjectSheetTemplateRectangleViewModel? hit = Rectangles
+                .Reverse()
+                .FirstOrDefault(r => r.Contains(position, tolerance));
+
+            rectangleId = hit?.Id ?? Guid.Empty;
+            return hit != null;
+        }
+
+        public bool SelectRectangleAt(Point position, double tolerance)
+        {
+            if (!TryHitRectangleAt(position, tolerance, out Guid rectangleId))
+            {
+                ClearRectangleSelection();
+                return false;
+            }
+
+            SelectRectangle(rectangleId);
+            return true;
+        }
+
+        public bool SelectRectangle(Guid rectangleId)
+        {
+            if (!Rectangles.Any(r => r.Id == rectangleId))
+            {
+                ClearRectangleSelection();
+                return false;
+            }
+
+            _selectedRectangleId = rectangleId;
+            _selectedLineId = null;
+            AtualizarSelecaoVisual();
+            RefreshEndpointHandles();
+            NotificarSelecao();
+            return true;
+        }
+
+        public void ClearRectangleSelection()
+        {
+            if (!_selectedRectangleId.HasValue)
+                return;
+
+            _selectedRectangleId = null;
+            AtualizarSelecaoVisual();
+            NotificarSelecao();
+        }
+
+        public bool TryGetSelectedRectangleId(out Guid rectangleId)
+        {
+            if (_selectedRectangleId.HasValue && Rectangles.Any(r => r.Id == _selectedRectangleId.Value))
+            {
+                rectangleId = _selectedRectangleId.Value;
+                return true;
+            }
+
+            rectangleId = Guid.Empty;
+            return false;
+        }
+
+        public bool TryGetRectangle(Guid rectangleId, out ProjectSheetTemplateRectangle? retangulo)
+        {
+            retangulo = _tipo.Retangulos.FirstOrDefault(r => r.Id == rectangleId);
+            return retangulo != null;
+        }
+
+        public bool SetRectanglePreviewOffset(Guid rectangleId, double deltaX, double deltaY)
+        {
+            ProjectSheetTemplateRectangleViewModel? rectangle = Rectangles.FirstOrDefault(r => r.Id == rectangleId);
+
+            if (rectangle == null)
+                return false;
+
+            rectangle.SetPreviewOffset(deltaX, deltaY);
+            return true;
+        }
+
+        public void ClearRectanglePreviewOffset(Guid rectangleId)
+        {
+            ProjectSheetTemplateRectangleViewModel? rectangle = Rectangles.FirstOrDefault(r => r.Id == rectangleId);
+            rectangle?.ClearPreviewOffset();
+        }
+
+        public void ClearRectanglePreviewOffsets()
+        {
+            foreach (ProjectSheetTemplateRectangleViewModel rectangle in Rectangles)
+                rectangle.ClearPreviewOffset();
+        }
+
+        public void ClearTemplateSelection()
+        {
+            bool tinhaSelecao = _selectedLineId.HasValue || _selectedRectangleId.HasValue;
+            _selectedLineId = null;
+            _selectedRectangleId = null;
+            AtualizarSelecaoVisual();
+            RefreshEndpointHandles();
+
+            if (tinhaSelecao)
+                NotificarSelecao();
+        }
+
         public event PropertyChangedEventHandler? PropertyChanged;
 
         private void OnItemProjetoRenomeado()
@@ -304,10 +415,20 @@ namespace Araci.ViewModels
 
         private void RefreshRectangles()
         {
+            Guid? selectedId = _selectedRectangleId;
             Rectangles.Clear();
 
             foreach (ProjectSheetTemplateRectangle retangulo in (_tipo.Retangulos ?? new()).Where(r => r != null && r.Visible))
                 Rectangles.Add(new ProjectSheetTemplateRectangleViewModel(retangulo, _types));
+
+            if (selectedId.HasValue && Rectangles.Any(r => r.Id == selectedId.Value))
+                _selectedRectangleId = selectedId;
+            else
+                _selectedRectangleId = null;
+
+            AtualizarSelecaoVisualRetangulos();
+            OnPropertyChanged(nameof(SelectedRectangleId));
+            OnPropertyChanged(nameof(HasSelectedRectangle));
         }
 
         private void RefreshLines()
@@ -323,7 +444,7 @@ namespace Araci.ViewModels
             else
                 _selectedLineId = null;
 
-            AtualizarSelecaoVisual();
+            AtualizarSelecaoVisualLinhas();
             RefreshEndpointHandles();
             OnPropertyChanged(nameof(SelectedLineId));
             OnPropertyChanged(nameof(HasSelectedLine));
@@ -331,8 +452,20 @@ namespace Araci.ViewModels
 
         private void AtualizarSelecaoVisual()
         {
+            AtualizarSelecaoVisualLinhas();
+            AtualizarSelecaoVisualRetangulos();
+        }
+
+        private void AtualizarSelecaoVisualLinhas()
+        {
             foreach (ProjectSheetTemplateLineViewModel line in Lines)
                 line.IsSelected = _selectedLineId.HasValue && line.Id == _selectedLineId.Value;
+        }
+
+        private void AtualizarSelecaoVisualRetangulos()
+        {
+            foreach (ProjectSheetTemplateRectangleViewModel rectangle in Rectangles)
+                rectangle.IsSelected = _selectedRectangleId.HasValue && rectangle.Id == _selectedRectangleId.Value;
         }
 
         private void RefreshEndpointHandles()
@@ -351,6 +484,15 @@ namespace Araci.ViewModels
             }
 
             OnPropertyChanged(nameof(EndpointHandlesVisible));
+        }
+
+        private void NotificarSelecao()
+        {
+            OnPropertyChanged(nameof(SelectedLineId));
+            OnPropertyChanged(nameof(SelectedRectangleId));
+            OnPropertyChanged(nameof(HasSelectedLine));
+            OnPropertyChanged(nameof(HasSelectedRectangle));
+            OnPropertyChanged(nameof(HasTemplateSelection));
         }
 
         private static double DistanciaAoSegmento(Point point, Point a, Point b)
