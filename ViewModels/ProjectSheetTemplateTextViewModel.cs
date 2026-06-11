@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.ComponentModel;
 using System.Linq;
 using System.Runtime.CompilerServices;
@@ -12,6 +13,7 @@ namespace Araci.ViewModels
 {
     public sealed class ProjectSheetTemplateTextViewModel : INotifyPropertyChanged
     {
+        private const double TextHorizontalMargin = 8.0;
         private readonly ProjectSheetTemplateText _texto;
         private readonly TypeLibraryService _types;
         private TipoTextoAnotativo? _tipoTexto;
@@ -54,6 +56,8 @@ namespace Araci.ViewModels
         };
 
         public double LineHeight => Math.Max(AlturaTexto * 1.25, AlturaTexto + 1.0);
+        public double AlturaEstimada => CalcularAlturaEstimada(Conteudo, LarguraCaixa, AlturaTexto, LineHeight);
+        public Transform RenderTransform => CriarRenderTransform();
 
         public void Refresh()
         {
@@ -68,6 +72,8 @@ namespace Araci.ViewModels
             OnPropertyChanged(nameof(LarguraCaixa));
             OnPropertyChanged(nameof(Rotacao));
             OnPropertyChanged(nameof(Visible));
+            OnPropertyChanged(nameof(AlturaEstimada));
+            OnPropertyChanged(nameof(RenderTransform));
             NotificarVisual();
         }
 
@@ -100,6 +106,92 @@ namespace Araci.ViewModels
             OnPropertyChanged(nameof(FontFamily));
             OnPropertyChanged(nameof(TextAlignment));
             OnPropertyChanged(nameof(LineHeight));
+            OnPropertyChanged(nameof(AlturaEstimada));
+            OnPropertyChanged(nameof(RenderTransform));
+        }
+
+        private Transform CriarRenderTransform()
+        {
+            double rotacao = Rotacao;
+
+            if (Math.Abs(rotacao) < 0.000001)
+                return Transform.Identity;
+
+            return new RotateTransform(rotacao);
+        }
+
+        private static double CalcularAlturaEstimada(string? texto, double larguraCaixa, double alturaTexto, double lineHeight)
+        {
+            int linhas = ContarLinhasRenderizadas(texto, larguraCaixa, alturaTexto);
+            double alturaLinha = Math.Max(lineHeight, alturaTexto);
+            return Math.Max(alturaTexto, linhas * alturaLinha + 4.0);
+        }
+
+        private static int ContarLinhasRenderizadas(string? texto, double larguraCaixa, double alturaTexto)
+        {
+            string[] linhasManuais = ObterLinhasManuais(texto);
+            int caracteresPorLinha = CalcularCaracteresPorLinha(larguraCaixa, alturaTexto);
+            int total = 0;
+
+            foreach (string linha in linhasManuais)
+                total += Math.Max(1, ContarQuebrasLinha(linha, caracteresPorLinha));
+
+            return Math.Max(1, total);
+        }
+
+        private static int ContarQuebrasLinha(string linha, int caracteresPorLinha)
+        {
+            string texto = linha ?? string.Empty;
+
+            if (texto.Length == 0)
+                return 1;
+
+            if (texto.Length <= caracteresPorLinha)
+                return 1;
+
+            int total = 0;
+            int inicio = 0;
+
+            while (inicio < texto.Length)
+            {
+                int restante = texto.Length - inicio;
+
+                if (restante <= caracteresPorLinha)
+                {
+                    total++;
+                    break;
+                }
+
+                int limite = inicio + caracteresPorLinha;
+                int quebra = texto.LastIndexOf(' ', limite, caracteresPorLinha);
+
+                if (quebra <= inicio)
+                    quebra = limite;
+
+                total++;
+                inicio = quebra;
+
+                while (inicio < texto.Length && texto[inicio] == ' ')
+                    inicio++;
+            }
+
+            return Math.Max(1, total);
+        }
+
+        private static int CalcularCaracteresPorLinha(double larguraCaixa, double alturaTexto)
+        {
+            double larguraUtil = Math.Max(1.0, NormalizarLargura(larguraCaixa) - TextHorizontalMargin);
+            double altura = NormalizarAltura(alturaTexto);
+            double larguraMedia = Math.Max(1.0, altura * 0.58);
+            return Math.Max(1, (int)Math.Floor(larguraUtil / larguraMedia));
+        }
+
+        private static string[] ObterLinhasManuais(string? texto)
+        {
+            return (texto ?? string.Empty)
+                .Replace("\r\n", "\n", StringComparison.Ordinal)
+                .Replace('\r', '\n')
+                .Split('\n');
         }
 
         private static string NormalizarCor(string? valor)
@@ -120,6 +212,13 @@ namespace Araci.ViewModels
                 "Direita" => "Direita",
                 _ => "Esquerda"
             };
+        }
+
+        private static double NormalizarLargura(double valor)
+        {
+            return double.IsNaN(valor) || double.IsInfinity(valor) || valor < ProjectSheetTemplateText.MinBoxWidth
+                ? ProjectSheetTemplateText.DefaultBoxWidth
+                : valor;
         }
 
         private static double NormalizarAltura(double valor)
