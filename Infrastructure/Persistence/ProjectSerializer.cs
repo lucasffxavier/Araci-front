@@ -717,7 +717,12 @@ namespace Araci.Infrastructure.Persistence
             if (string.IsNullOrWhiteSpace(dto.Nome))
                 return null;
 
+            ProjectSheetFormat formato = ParseEnum(dto.FormatoFolha, ProjectSheetFormat.A1);
+            ProjectSheetOrientation orientacao = ParseEnum(dto.OrientacaoFolha, ProjectSheetOrientation.Paisagem);
+            SheetDimensionMigration dimensoes = ResolverDimensoesFolha(formato, orientacao, dto.LarguraFolha, dto.AlturaFolha);
             HashSet<Guid> tabelasValidas = tableIds.ToHashSet();
+            List<ProjectSheetTableInstance> tabelas = ParseProjectSheetTableInstances(dto.Tabelas, tabelasValidas);
+            AplicarEscalaTabelaPrancha(tabelas, dimensoes);
 
             return new ProjectSheet
             {
@@ -725,11 +730,11 @@ namespace Araci.Infrastructure.Persistence
                 Nome = dto.Nome,
                 Numero = dto.Numero ?? string.Empty,
                 SheetTypeId = dto.SheetTypeId == Guid.Empty ? null : dto.SheetTypeId,
-                FormatoFolha = ParseEnum(dto.FormatoFolha, ProjectSheetFormat.A1),
-                OrientacaoFolha = ParseEnum(dto.OrientacaoFolha, ProjectSheetOrientation.Paisagem),
-                LarguraFolha = NormalizarDimensaoFolha(dto.LarguraFolha, ProjectSheet.DefaultWidth),
-                AlturaFolha = NormalizarDimensaoFolha(dto.AlturaFolha, ProjectSheet.DefaultHeight),
-                Tabelas = ParseProjectSheetTableInstances(dto.Tabelas, tabelasValidas)
+                FormatoFolha = formato,
+                OrientacaoFolha = orientacao,
+                LarguraFolha = dimensoes.Largura,
+                AlturaFolha = dimensoes.Altura,
+                Tabelas = tabelas
             };
         }
 
@@ -738,18 +743,27 @@ namespace Araci.Infrastructure.Persistence
             if (string.IsNullOrWhiteSpace(dto.Nome))
                 return null;
 
+            ProjectSheetFormat formato = ParseEnum(dto.FormatoFolha, ProjectSheetFormat.A1);
+            ProjectSheetOrientation orientacao = ParseEnum(dto.OrientacaoFolha, ProjectSheetOrientation.Paisagem);
+            SheetDimensionMigration dimensoes = ResolverDimensoesFolha(formato, orientacao, dto.LarguraFolha, dto.AlturaFolha);
+            List<ProjectSheetTemplateLine> linhas = ParseProjectSheetTemplateLines(dto.Linhas);
+            List<ProjectSheetTemplateRectangle> retangulos = ParseProjectSheetTemplateRectangles(dto.Retangulos);
+            List<ProjectSheetTemplateCircle> circulos = ParseProjectSheetTemplateCircles(dto.Circulos);
+            List<ProjectSheetTemplateText> textos = ParseProjectSheetTemplateTexts(dto.Textos);
+            AplicarEscalaTipoPrancha(linhas, retangulos, circulos, textos, dimensoes);
+
             return new ProjectSheetType
             {
                 Id = dto.Id == Guid.Empty ? Guid.NewGuid() : dto.Id,
                 Nome = dto.Nome.Trim(),
-                FormatoFolha = ParseEnum(dto.FormatoFolha, ProjectSheetFormat.A1),
-                OrientacaoFolha = ParseEnum(dto.OrientacaoFolha, ProjectSheetOrientation.Paisagem),
-                LarguraFolha = NormalizarDimensaoFolha(dto.LarguraFolha, ProjectSheet.DefaultWidth),
-                AlturaFolha = NormalizarDimensaoFolha(dto.AlturaFolha, ProjectSheet.DefaultHeight),
-                Linhas = ParseProjectSheetTemplateLines(dto.Linhas),
-                Retangulos = ParseProjectSheetTemplateRectangles(dto.Retangulos),
-                Circulos = ParseProjectSheetTemplateCircles(dto.Circulos),
-                Textos = ParseProjectSheetTemplateTexts(dto.Textos)
+                FormatoFolha = formato,
+                OrientacaoFolha = orientacao,
+                LarguraFolha = dimensoes.Largura,
+                AlturaFolha = dimensoes.Altura,
+                Linhas = linhas,
+                Retangulos = retangulos,
+                Circulos = circulos,
+                Textos = textos
             };
         }
 
@@ -1184,6 +1198,127 @@ namespace Araci.Infrastructure.Persistence
             return Math.Max(Camera.MinZoom, Math.Min(Camera.MaxZoom, valor));
         }
 
+        private static SheetDimensionMigration ResolverDimensoesFolha(
+            ProjectSheetFormat formato,
+            ProjectSheetOrientation orientacao,
+            double? larguraArquivo,
+            double? alturaArquivo)
+        {
+            if (formato == ProjectSheetFormat.Personalizado)
+            {
+                double larguraPersonalizada = NormalizarDimensaoFolha(larguraArquivo, ProjectSheet.DefaultWidth);
+                double alturaPersonalizada = NormalizarDimensaoFolha(alturaArquivo, ProjectSheet.DefaultHeight);
+                return new SheetDimensionMigration(larguraPersonalizada, alturaPersonalizada, 1.0, 1.0);
+            }
+
+            (double larguraReal, double alturaReal) = ProjectSheet.ObterDimensoesFormato(formato, orientacao);
+            double larguraOrigem = NormalizarDimensaoFolha(larguraArquivo, larguraReal);
+            double alturaOrigem = NormalizarDimensaoFolha(alturaArquivo, alturaReal);
+            double escalaX = CalcularEscalaDimensional(larguraOrigem, larguraReal);
+            double escalaY = CalcularEscalaDimensional(alturaOrigem, alturaReal);
+
+            return new SheetDimensionMigration(larguraReal, alturaReal, escalaX, escalaY);
+        }
+
+        private static double CalcularEscalaDimensional(double origem, double destino)
+        {
+            if (double.IsNaN(origem) || double.IsInfinity(origem) || origem < ProjectSheet.MinDimension)
+                return 1.0;
+
+            if (double.IsNaN(destino) || double.IsInfinity(destino) || destino < ProjectSheet.MinDimension)
+                return 1.0;
+
+            double escala = destino / origem;
+            return Math.Abs(escala - 1.0) < 0.000001 ? 1.0 : escala;
+        }
+
+        private static void AplicarEscalaTipoPrancha(
+            IEnumerable<ProjectSheetTemplateLine> linhas,
+            IEnumerable<ProjectSheetTemplateRectangle> retangulos,
+            IEnumerable<ProjectSheetTemplateCircle> circulos,
+            IEnumerable<ProjectSheetTemplateText> textos,
+            SheetDimensionMigration dimensoes)
+        {
+            if (!dimensoes.RequerEscala)
+                return;
+
+            foreach (ProjectSheetTemplateLine linha in linhas.Where(l => l != null))
+            {
+                linha.X1 = EscalarX(linha.X1, dimensoes);
+                linha.Y1 = EscalarY(linha.Y1, dimensoes);
+                linha.X2 = EscalarX(linha.X2, dimensoes);
+                linha.Y2 = EscalarY(linha.Y2, dimensoes);
+            }
+
+            foreach (ProjectSheetTemplateRectangle retangulo in retangulos.Where(r => r != null))
+            {
+                retangulo.X = EscalarX(retangulo.X, dimensoes);
+                retangulo.Y = EscalarY(retangulo.Y, dimensoes);
+                retangulo.Largura = EscalarLargura(retangulo.Largura, dimensoes);
+                retangulo.Altura = EscalarAltura(retangulo.Altura, dimensoes);
+            }
+
+            foreach (ProjectSheetTemplateCircle circulo in circulos.Where(c => c != null))
+            {
+                circulo.X = EscalarX(circulo.X, dimensoes);
+                circulo.Y = EscalarY(circulo.Y, dimensoes);
+                circulo.Raio = EscalarMedia(circulo.Raio, dimensoes);
+            }
+
+            foreach (ProjectSheetTemplateText texto in textos.Where(t => t != null))
+            {
+                texto.X = EscalarX(texto.X, dimensoes);
+                texto.Y = EscalarY(texto.Y, dimensoes);
+                texto.LarguraCaixa = EscalarLargura(texto.LarguraCaixa, dimensoes);
+                texto.AlturaTexto = EscalarMedia(texto.AlturaTexto, dimensoes);
+                texto.LeaderX = EscalarX(texto.LeaderX, dimensoes);
+                texto.LeaderY = EscalarY(texto.LeaderY, dimensoes);
+                texto.LeaderCotoveloX = EscalarX(texto.LeaderCotoveloX, dimensoes);
+                texto.LeaderCotoveloY = EscalarY(texto.LeaderCotoveloY, dimensoes);
+            }
+        }
+
+        private static void AplicarEscalaTabelaPrancha(
+            IEnumerable<ProjectSheetTableInstance> tabelas,
+            SheetDimensionMigration dimensoes)
+        {
+            if (!dimensoes.RequerEscala)
+                return;
+
+            foreach (ProjectSheetTableInstance tabela in tabelas.Where(t => t != null))
+            {
+                tabela.X = EscalarX(tabela.X, dimensoes);
+                tabela.Y = EscalarY(tabela.Y, dimensoes);
+                tabela.Width = EscalarLargura(tabela.Width, dimensoes);
+                tabela.Height = EscalarAltura(tabela.Height, dimensoes);
+            }
+        }
+
+        private static double EscalarX(double valor, SheetDimensionMigration dimensoes)
+        {
+            return NormalizarCoordenada(valor) * dimensoes.EscalaX;
+        }
+
+        private static double EscalarY(double valor, SheetDimensionMigration dimensoes)
+        {
+            return NormalizarCoordenada(valor) * dimensoes.EscalaY;
+        }
+
+        private static double EscalarLargura(double valor, SheetDimensionMigration dimensoes)
+        {
+            return NormalizarCoordenada(valor) * dimensoes.EscalaX;
+        }
+
+        private static double EscalarAltura(double valor, SheetDimensionMigration dimensoes)
+        {
+            return NormalizarCoordenada(valor) * dimensoes.EscalaY;
+        }
+
+        private static double EscalarMedia(double valor, SheetDimensionMigration dimensoes)
+        {
+            return NormalizarCoordenada(valor) * dimensoes.EscalaMedia;
+        }
+
         private static double NormalizarDimensaoFolha(double? valor, double fallback)
         {
             if (!valor.HasValue || double.IsNaN(valor.Value) || double.IsInfinity(valor.Value) || valor.Value < ProjectSheet.MinDimension)
@@ -1448,6 +1583,24 @@ namespace Araci.Infrastructure.Persistence
         private static string CriarChaveCampoTabela(ProjectTableElementCategory categoria, string campoId)
         {
             return $"{categoria}|{campoId.Trim()}";
+        }
+
+        private readonly struct SheetDimensionMigration
+        {
+            public SheetDimensionMigration(double largura, double altura, double escalaX, double escalaY)
+            {
+                Largura = largura;
+                Altura = altura;
+                EscalaX = escalaX;
+                EscalaY = escalaY;
+            }
+
+            public double Largura { get; }
+            public double Altura { get; }
+            public double EscalaX { get; }
+            public double EscalaY { get; }
+            public double EscalaMedia => (EscalaX + EscalaY) / 2.0;
+            public bool RequerEscala => Math.Abs(EscalaX - 1.0) > 0.000001 || Math.Abs(EscalaY - 1.0) > 0.000001;
         }
     }
 }

@@ -91,6 +91,8 @@ namespace Araci.Views
             DataContextChanged += OnDataContextChanged;
         }
 
+        private ProjectSheetTypeViewModel? ViewModel => DataContext as ProjectSheetTypeViewModel;
+
         public void Inicializar(EditorContext context)
         {
             _context = context ?? throw new ArgumentNullException(nameof(context));
@@ -471,6 +473,40 @@ namespace Araci.Views
 
             if (_context.Input.KeyDown(e.Key))
                 e.Handled = true;
+        }
+
+        private void ZoomInButton_Click(object sender, RoutedEventArgs e)
+        {
+            ApplySheetTypeCenteredZoom(() => ViewModel?.ZoomIn());
+            Focus();
+        }
+
+        private void ZoomOutButton_Click(object sender, RoutedEventArgs e)
+        {
+            ApplySheetTypeCenteredZoom(() => ViewModel?.ZoomOut());
+            Focus();
+        }
+
+        private void ResetZoomButton_Click(object sender, RoutedEventArgs e)
+        {
+            ApplySheetTypeCenteredZoom(() => ViewModel?.ResetZoom());
+            Focus();
+        }
+
+        private void ProjectSheetTypeView_PreviewMouseWheel(object sender, MouseWheelEventArgs e)
+        {
+            if ((Keyboard.Modifiers & ModifierKeys.Control) != ModifierKeys.Control)
+                return;
+
+            ApplySheetTypeCenteredZoom(() =>
+            {
+                if (e.Delta > 0)
+                    ViewModel?.ZoomIn();
+                else if (e.Delta < 0)
+                    ViewModel?.ZoomOut();
+            });
+
+            e.Handled = true;
         }
 
         private bool TentarIniciarResizeCirculoTemplate(Point position)
@@ -1973,6 +2009,15 @@ namespace Araci.Views
                 _context.EditarPropriedadesTipoPrancha);
         }
 
+        private void ApplySheetTypeCenteredZoom(Action zoomAction)
+        {
+            if (zoomAction == null)
+                return;
+
+            zoomAction();
+            CenterSheetInViewport(updateLayout: true);
+        }
+
         private void CenterSheetInViewportDeferred()
         {
             int version = ++_centerSheetRequestVersion;
@@ -2008,14 +2053,28 @@ namespace Araci.Views
         {
             ProjectSheetTypeViewModel? viewModel = ObterViewModelAtivo();
 
-            if (!IsLoaded || viewModel == null)
+            if (!IsLoaded || viewModel == null || TemplatePageBorder.ActualWidth <= 0 || TemplatePageBorder.ActualHeight <= 0)
                 return false;
 
             if (updateLayout)
             {
+                SheetTypeZoomHost.UpdateLayout();
                 SheetTypeSurface.UpdateLayout();
                 TemplatePageBorder.UpdateLayout();
                 SheetTypeScrollViewer.UpdateLayout();
+            }
+
+            Rect sheetBounds;
+
+            try
+            {
+                sheetBounds = TemplatePageBorder
+                    .TransformToAncestor(SheetTypeScrollViewer)
+                    .TransformBounds(new Rect(0, 0, TemplatePageBorder.ActualWidth, TemplatePageBorder.ActualHeight));
+            }
+            catch (InvalidOperationException)
+            {
+                return false;
             }
 
             double viewportWidth = ResolveViewportDimension(SheetTypeScrollViewer.ViewportWidth, SheetTypeScrollViewer.ActualWidth);
@@ -2024,26 +2083,11 @@ namespace Araci.Views
             if (viewportWidth <= 0 || viewportHeight <= 0)
                 return false;
 
-            double extentWidth = ResolveExtentDimension(SheetTypeScrollViewer.ExtentWidth, SheetTypeSurface.ActualWidth, viewModel.WorkspaceWidth);
-            double extentHeight = ResolveExtentDimension(SheetTypeScrollViewer.ExtentHeight, SheetTypeSurface.ActualHeight, viewModel.WorkspaceHeight);
-            double expectedScrollableWidth = Math.Max(0.0, extentWidth - viewportWidth);
-            double expectedScrollableHeight = Math.Max(0.0, extentHeight - viewportHeight);
+            double targetHorizontal = SheetTypeScrollViewer.HorizontalOffset + sheetBounds.Left + sheetBounds.Width / 2.0 - viewportWidth / 2.0;
+            double targetVertical = SheetTypeScrollViewer.VerticalOffset + sheetBounds.Top + sheetBounds.Height / 2.0 - viewportHeight / 2.0;
 
-            if (!ScrollableDimensionReady(SheetTypeScrollViewer.ScrollableWidth, expectedScrollableWidth) ||
-                !ScrollableDimensionReady(SheetTypeScrollViewer.ScrollableHeight, expectedScrollableHeight))
-                return false;
-
-            double sheetCenterX = viewModel.SheetOriginOffsetX + viewModel.SheetWidth / 2.0;
-            double sheetCenterY = viewModel.SheetOriginOffsetY + viewModel.SheetHeight / 2.0;
-            double targetHorizontal = sheetCenterX - viewportWidth / 2.0;
-            double targetVertical = sheetCenterY - viewportHeight / 2.0;
-            double maximumHorizontal = Math.Max(SheetTypeScrollViewer.ScrollableWidth, expectedScrollableWidth);
-            double maximumVertical = Math.Max(SheetTypeScrollViewer.ScrollableHeight, expectedScrollableHeight);
-            double normalizedHorizontal = NormalizeScrollOffset(targetHorizontal, maximumHorizontal);
-            double normalizedVertical = NormalizeScrollOffset(targetVertical, maximumVertical);
-
-            SheetTypeScrollViewer.ScrollToHorizontalOffset(normalizedHorizontal);
-            SheetTypeScrollViewer.ScrollToVerticalOffset(normalizedVertical);
+            SheetTypeScrollViewer.ScrollToHorizontalOffset(NormalizeScrollOffset(targetHorizontal, SheetTypeScrollViewer.ScrollableWidth));
+            SheetTypeScrollViewer.ScrollToVerticalOffset(NormalizeScrollOffset(targetVertical, SheetTypeScrollViewer.ScrollableHeight));
             SheetTypeScrollViewer.UpdateLayout();
             return true;
         }

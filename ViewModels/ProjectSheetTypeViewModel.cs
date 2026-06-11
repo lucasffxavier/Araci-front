@@ -18,6 +18,9 @@ namespace Araci.ViewModels
         private const double CircleResizeHandleSize = 10.0;
         private const double TextResizeHandleSize = 10.0;
         private const double TextLeaderHandleSize = 10.0;
+        private const double MinZoomScale = 0.25;
+        private const double MaxZoomScale = 4.0;
+        private const double ZoomStep = 0.10;
 
         private readonly AraciDocument _document;
         private readonly ProjectSheetType _tipo;
@@ -29,6 +32,7 @@ namespace Araci.ViewModels
         private Guid? _selectedRectangleId;
         private Guid? _selectedCircleId;
         private Guid? _selectedTextId;
+        private double _zoomScale = 1.0;
 
         public ProjectSheetTypeViewModel(AraciDocument document, ProjectSheetType tipo)
             : this(document, tipo, new TypeLibraryService())
@@ -68,7 +72,7 @@ namespace Araci.ViewModels
         public double WorkspaceWidth => SheetWidth + WorkspaceMargin * 2;
         public double WorkspaceHeight => SheetHeight + WorkspaceMargin * 2;
         public string Titulo => $"Tipo de Prancha - {Nome}";
-        public string Descricao => $"{FormatoFolha} {OrientacaoFolha} - {LarguraFolha:0.#} x {AlturaFolha:0.#}";
+        public string Descricao => $"{FormatoFolha} {OrientacaoFolha} - {LarguraFolha:0.#} x {AlturaFolha:0.#} {ProjectSheet.UnitLabel}";
         public ObservableCollection<ProjectSheetTemplateLineViewModel> Lines { get; }
         public ObservableCollection<ProjectSheetTemplateRectangleViewModel> Rectangles { get; }
         public ObservableCollection<ProjectSheetTemplateCircleViewModel> Circles { get; }
@@ -93,6 +97,24 @@ namespace Araci.ViewModels
         public bool CircleResizeHandlesVisible => CircleResizeHandles.Count > 0;
         public bool TextResizeHandlesVisible => TextResizeHandles.Count > 0;
         public bool TextLeaderHandlesVisible => TextLeaderHandles.Count > 0;
+
+        public double ZoomScale
+        {
+            get => _zoomScale;
+            private set
+            {
+                double normalized = NormalizeZoom(value);
+
+                if (Math.Abs(_zoomScale - normalized) < 0.000001)
+                    return;
+
+                _zoomScale = normalized;
+                OnPropertyChanged();
+                OnPropertyChanged(nameof(ZoomPercentText));
+            }
+        }
+
+        public string ZoomPercentText => $"{Math.Round(ZoomScale * 100):0}%";
 
         public ProjectSheetTemplateLineViewModel? PreviewLine
         {
@@ -463,6 +485,8 @@ namespace Araci.ViewModels
             OnPropertyChanged(nameof(SheetHeight));
             OnPropertyChanged(nameof(WorkspaceWidth));
             OnPropertyChanged(nameof(WorkspaceHeight));
+            OnPropertyChanged(nameof(ZoomScale));
+            OnPropertyChanged(nameof(ZoomPercentText));
             OnPropertyChanged(nameof(Titulo));
             OnPropertyChanged(nameof(Descricao));
             RefreshTexts();
@@ -1040,6 +1064,21 @@ namespace Araci.ViewModels
                 NotificarSelecao();
         }
 
+        public void ZoomIn()
+        {
+            ZoomScale += ZoomStep;
+        }
+
+        public void ZoomOut()
+        {
+            ZoomScale -= ZoomStep;
+        }
+
+        public void ResetZoom()
+        {
+            ZoomScale = 1.0;
+        }
+
         public event PropertyChangedEventHandler? PropertyChanged;
 
         private void OnItemProjetoRenomeado()
@@ -1307,6 +1346,20 @@ namespace Araci.ViewModels
             OnPropertyChanged(nameof(CircleResizeHandlesVisible));
             OnPropertyChanged(nameof(TextResizeHandlesVisible));
             OnPropertyChanged(nameof(TextLeaderHandlesVisible));
+        }
+
+        private static double NormalizeZoom(double value)
+        {
+            if (double.IsNaN(value) || double.IsInfinity(value))
+                return 1.0;
+
+            if (value < MinZoomScale)
+                return MinZoomScale;
+
+            if (value > MaxZoomScale)
+                return MaxZoomScale;
+
+            return value;
         }
 
         private static double DistanciaAoSegmento(Point point, Point a, Point b)
