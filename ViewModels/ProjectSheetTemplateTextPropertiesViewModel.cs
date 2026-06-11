@@ -1,41 +1,25 @@
 using System;
 using System.Collections.Generic;
 using System.ComponentModel;
+using System.Globalization;
 using System.Linq;
 using System.Runtime.CompilerServices;
-using System.Windows;
 using System.Windows.Input;
-using System.Windows.Media;
 using Araci.Applications.UseCases.Projeto;
 using Araci.Core.Documents;
 using Araci.Models.Tipos;
-using Araci.Properties;
 using Araci.Services.Catalog;
+using Araci.Services.Settings;
 using Araci.Services.UI;
 
 namespace Araci.ViewModels
 {
     public sealed class ProjectSheetTemplateTextPropertiesViewModel : INotifyPropertyChanged
     {
-        private static readonly string[] FontesPadrao =
+        private static readonly IReadOnlyList<BooleanPropertyOption> BooleanOptionsPadrao = new[]
         {
-            "Arial",
-            "Arial Narrow",
-            "Calibri",
-            "Segoe UI",
-            "Courier New",
-            "Times New Roman",
-            "ISOCP",
-            "ISOCPEUR",
-            "Romans",
-            "Simplex"
-        };
-
-        private static readonly string[] AlinhamentosPadrao =
-        {
-            "Esquerda",
-            "Centro",
-            "Direita"
+            new BooleanPropertyOption(true, "Sim"),
+            new BooleanPropertyOption(false, "Não")
         };
 
         private readonly ProjectSheetType _tipo;
@@ -44,7 +28,6 @@ namespace Araci.ViewModels
         private readonly TypeLibraryService _types;
         private readonly TypePropertiesDialogService _typePropertiesDialogs;
         private SimpleCommand? _abrirPropriedadesTipoCommand;
-        private SimpleCommand? _escolherCorCommand;
 
         public ProjectSheetTemplateTextPropertiesViewModel(
             ProjectSheetType tipo,
@@ -61,12 +44,10 @@ namespace Araci.ViewModels
         }
 
         public Guid Id => _texto.Id;
-        public string Titulo => "Texto do Tipo de Prancha";
+        public string Titulo => "1 Texto selecionado";
         public IReadOnlyList<TipoTextoAnotativo> TiposDisponiveis => _types.TiposTextosAnotativos;
-        public IReadOnlyList<string> FontesDisponiveis => FontesPadrao;
-        public IReadOnlyList<string> AlinhamentosDisponiveis => AlinhamentosPadrao;
+        public IReadOnlyList<BooleanPropertyOption> BooleanOptions => BooleanOptionsPadrao;
         public ICommand AbrirPropriedadesTipoCommand => _abrirPropriedadesTipoCommand ??= new SimpleCommand(AbrirPropriedadesTipo, () => PodeAbrirPropriedadesTipo);
-        public ICommand EscolherCorCommand => _escolherCorCommand ??= new SimpleCommand(EscolherCor);
         public bool PodeAbrirPropriedadesTipo => TipoTexto != null;
 
         public TipoTextoAnotativo? TipoTexto
@@ -108,49 +89,57 @@ namespace Araci.ViewModels
             set
             {
                 if (_editarTexto.AlterarLarguraCaixa(_tipo.Id, _texto.Id, value))
+                    OnLarguraCaixaChanged();
+            }
+        }
+
+        public string LarguraCaixaTexto
+        {
+            get => FormatarComprimento(LarguraCaixa);
+            set
+            {
+                if (TentarConverterComprimento(value, out double largura))
+                    LarguraCaixa = largura;
+            }
+        }
+
+        public double Rotacao
+        {
+            get => NormalizarRotacao(_texto.Rotacao);
+            set
+            {
+                if (_editarTexto.AlterarRotacao(_tipo.Id, _texto.Id, value))
+                    OnRotacaoChanged();
+            }
+        }
+
+        public string RotacaoTexto
+        {
+            get => Rotacao.ToString("0.00", CultureInfo.CurrentCulture);
+            set
+            {
+                if (PropertiesViewModel.TentarConverterValor(value, typeof(double), out object? convertido) && convertido is double rotacao)
+                    Rotacao = rotacao;
+            }
+        }
+
+        public bool LeaderAtivo
+        {
+            get => _texto.LeaderAtivo;
+            set
+            {
+                if (_editarTexto.AlterarLeaderAtivo(_tipo.Id, _texto.Id, value))
                     OnPropertyChanged();
             }
         }
 
-        public string CorTexto
+        public bool LeaderComCotovelo
         {
-            get => _texto.CorTexto;
+            get => _texto.LeaderComCotovelo;
             set
             {
-                if (_editarTexto.AlterarCorTexto(_tipo.Id, _texto.Id, value))
-                    OnStylePropertiesChanged();
-            }
-        }
-
-        public Brush CorTextoBrush => CriarBrush(CorTexto);
-
-        public string Fonte
-        {
-            get => _texto.Fonte;
-            set
-            {
-                if (_editarTexto.AlterarFonte(_tipo.Id, _texto.Id, value))
-                    OnStylePropertiesChanged();
-            }
-        }
-
-        public double AlturaTexto
-        {
-            get => _texto.AlturaTexto;
-            set
-            {
-                if (_editarTexto.AlterarAlturaTexto(_tipo.Id, _texto.Id, value))
-                    OnStylePropertiesChanged();
-            }
-        }
-
-        public string AlinhamentoHorizontal
-        {
-            get => _texto.AlinhamentoHorizontal;
-            set
-            {
-                if (_editarTexto.AlterarAlinhamentoHorizontal(_tipo.Id, _texto.Id, value))
-                    OnStylePropertiesChanged();
+                if (_editarTexto.AlterarLeaderComCotovelo(_tipo.Id, _texto.Id, value))
+                    OnPropertyChanged();
             }
         }
 
@@ -164,8 +153,10 @@ namespace Araci.ViewModels
             OnPropertyChanged(nameof(PodeAbrirPropriedadesTipo));
             OnPropertyChanged(nameof(Nome));
             OnPropertyChanged(nameof(Conteudo));
-            OnPropertyChanged(nameof(LarguraCaixa));
-            OnStylePropertiesChanged();
+            OnLarguraCaixaChanged();
+            OnRotacaoChanged();
+            OnPropertyChanged(nameof(LeaderAtivo));
+            OnPropertyChanged(nameof(LeaderComCotovelo));
             OnPropertyChanged(nameof(AindaExiste));
             _abrirPropriedadesTipoCommand?.RaiseCanExecuteChanged();
         }
@@ -193,17 +184,7 @@ namespace Araci.ViewModels
                 return;
 
             _editarTexto.AlterarTipoTexto(_tipo.Id, _texto.Id, tipoTexto);
-        }
-
-        private void EscolherCor()
-        {
-            var window = new ColorPickerWindow(CorTexto)
-            {
-                Owner = Application.Current?.MainWindow
-            };
-
-            if (window.ShowDialog() == true)
-                CorTexto = window.SelectedColorHex;
+            Refresh();
         }
 
         private TipoTextoAnotativo? ResolverTipoTexto()
@@ -234,27 +215,45 @@ namespace Araci.ViewModels
                 : "TEXTO";
         }
 
-        private void OnStylePropertiesChanged()
+        private void OnLarguraCaixaChanged()
         {
-            OnPropertyChanged(nameof(CorTexto));
-            OnPropertyChanged(nameof(CorTextoBrush));
-            OnPropertyChanged(nameof(Fonte));
-            OnPropertyChanged(nameof(AlturaTexto));
-            OnPropertyChanged(nameof(AlinhamentoHorizontal));
+            OnPropertyChanged(nameof(LarguraCaixa));
+            OnPropertyChanged(nameof(LarguraCaixaTexto));
         }
 
-        private static Brush CriarBrush(string stroke)
+        private void OnRotacaoChanged()
         {
-            try
-            {
-                if (ColorConverter.ConvertFromString(string.IsNullOrWhiteSpace(stroke) ? ProjectSheetTemplateText.DefaultTextColor : stroke) is Color color)
-                    return new SolidColorBrush(color);
-            }
-            catch (FormatException)
-            {
-            }
+            OnPropertyChanged(nameof(Rotacao));
+            OnPropertyChanged(nameof(RotacaoTexto));
+        }
 
-            return Brushes.Black;
+        private static string FormatarComprimento(double valor)
+        {
+            return PropertiesViewModel.FormatarValor(valor, UnitKind.LengthMeter, UnitKind.LengthMeter);
+        }
+
+        private static bool TentarConverterComprimento(string valor, out double convertido)
+        {
+            convertido = 0.0;
+
+            if (!PropertiesViewModel.TentarConverterValor(valor, typeof(double), UnitKind.LengthMeter, UnitKind.LengthMeter, out object? resultado) || resultado is not double valorConvertido)
+                return false;
+
+            convertido = valorConvertido;
+            return true;
+        }
+
+        private static double NormalizarRotacao(double valor)
+        {
+            if (double.IsNaN(valor) || double.IsInfinity(valor))
+                return 0.0;
+
+            double normalizada = valor % 360.0;
+
+            if (normalizada < 0.0)
+                normalizada += 360.0;
+
+            return normalizada >= 360.0 ? 0.0 : normalizada;
         }
 
         private void OnPropertyChanged([CallerMemberName] string? propertyName = null)

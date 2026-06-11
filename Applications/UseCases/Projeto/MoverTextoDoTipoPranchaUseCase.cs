@@ -103,6 +103,67 @@ namespace Araci.Applications.UseCases.Projeto
             return true;
         }
 
+        public bool AlterarRotacao(Guid tipoId, Guid textoId, double rotacao)
+        {
+            double rotacaoNormalizada = NormalizarRotacao(rotacao);
+
+            if (!TryGetTexto(tipoId, textoId, out ProjectSheetType tipo, out ProjectSheetTemplateText texto))
+                return false;
+
+            double rotacaoAtual = NormalizarRotacao(texto.Rotacao);
+
+            if (Math.Abs(rotacaoAtual - rotacaoNormalizada) < 0.000001)
+                return false;
+
+            _commands.Execute(new UpdateProjectSheetTypeTextPropertyCommand<double>(
+                _document,
+                tipo,
+                texto.Id,
+                (t, value) => t.Rotacao = value,
+                texto.Rotacao,
+                rotacaoNormalizada));
+
+            return true;
+        }
+
+        public bool AlterarLeaderAtivo(Guid tipoId, Guid textoId, bool leaderAtivo)
+        {
+            if (!TryGetTexto(tipoId, textoId, out ProjectSheetType tipo, out ProjectSheetTemplateText texto))
+                return false;
+
+            if (texto.LeaderAtivo == leaderAtivo)
+                return false;
+
+            _commands.Execute(new UpdateProjectSheetTypeTextPropertyCommand<bool>(
+                _document,
+                tipo,
+                texto.Id,
+                (t, value) => t.LeaderAtivo = value,
+                texto.LeaderAtivo,
+                leaderAtivo));
+
+            return true;
+        }
+
+        public bool AlterarLeaderComCotovelo(Guid tipoId, Guid textoId, bool leaderComCotovelo)
+        {
+            if (!TryGetTexto(tipoId, textoId, out ProjectSheetType tipo, out ProjectSheetTemplateText texto))
+                return false;
+
+            if (texto.LeaderComCotovelo == leaderComCotovelo)
+                return false;
+
+            _commands.Execute(new UpdateProjectSheetTypeTextPropertyCommand<bool>(
+                _document,
+                tipo,
+                texto.Id,
+                (t, value) => t.LeaderComCotovelo = value,
+                texto.LeaderComCotovelo,
+                leaderComCotovelo));
+
+            return true;
+        }
+
         public bool AlterarTipoTexto(Guid tipoId, Guid textoId, TipoTextoAnotativo tipoTexto)
         {
             if (tipoTexto == null)
@@ -315,6 +376,19 @@ namespace Araci.Applications.UseCases.Projeto
                 "Direita" => "Direita",
                 _ => "Esquerda"
             };
+        }
+
+        private static double NormalizarRotacao(double valor)
+        {
+            if (!ValorFinito(valor))
+                return 0.0;
+
+            double normalizada = valor % 360.0;
+
+            if (normalizada < 0.0)
+                normalizada += 360.0;
+
+            return normalizada >= 360.0 ? 0.0 : normalizada;
         }
 
         private static bool ValorFinito(double value)

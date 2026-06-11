@@ -31,6 +31,8 @@ namespace Araci.Core.Documents
         public string Fonte { get; set; } = DefaultFont;
         public string AlinhamentoHorizontal { get; set; } = DefaultHorizontalAlignment;
         public double Rotacao { get; set; }
+        public bool LeaderAtivo { get; set; }
+        public bool LeaderComCotovelo { get; set; }
         public bool Visible { get; set; } = true;
 
         public string Texto
@@ -88,6 +90,8 @@ namespace Araci.Core.Documents
                 AlturaTexto = AlturaTexto,
                 AlinhamentoHorizontal = AlinhamentoHorizontal,
                 Rotacao = Rotacao,
+                LeaderAtivo = LeaderAtivo,
+                LeaderComCotovelo = LeaderComCotovelo,
                 Visible = Visible
             };
         }
