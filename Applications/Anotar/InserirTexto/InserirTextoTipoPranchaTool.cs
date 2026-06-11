@@ -80,12 +80,25 @@ namespace Araci.Applications.Anotar.InserirTexto
 
         private static Point NormalizarPonto(Point ponto, ProjectSheetTypeViewModel viewModel)
         {
-            double larguraCaixa = Math.Min(ProjectSheetTemplateText.DefaultBoxWidth, Math.Max(ProjectSheetTemplateText.MinBoxWidth, viewModel.SheetWidth));
+            double larguraCaixa = CalcularLarguraInicialTexto(viewModel);
             double xMaximo = Math.Max(0.0, viewModel.SheetWidth - larguraCaixa);
 
             return new Point(
                 Math.Max(0.0, Math.Min(xMaximo, ponto.X)),
                 Math.Max(0.0, Math.Min(viewModel.SheetHeight, ponto.Y)));
+        }
+
+        private static double CalcularLarguraInicialTexto(ProjectSheetTypeViewModel viewModel)
+        {
+            double larguraNatural = ProjectSheetTemplateText.CalcularLarguraNatural(
+                ProjectSheetTemplateText.DefaultText,
+                ProjectSheetTemplateText.DefaultTextHeight);
+
+            double larguraFolha = double.IsNaN(viewModel.SheetWidth) || double.IsInfinity(viewModel.SheetWidth)
+                ? ProjectSheetTemplateText.MinBoxWidth
+                : Math.Max(ProjectSheetTemplateText.MinBoxWidth, viewModel.SheetWidth);
+
+            return Math.Min(larguraNatural, larguraFolha);
         }
     }
 }

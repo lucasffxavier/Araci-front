@@ -7,6 +7,7 @@ namespace Araci.Core.Documents
         public const string DefaultText = "Texto";
         public const double DefaultBoxWidth = 200.0;
         public const double MinBoxWidth = 20.0;
+        public const double MargemHorizontalCaixa = 8.0;
         public const string DefaultTextTypeName = "Texto padrão";
         public const string DefaultTextTypeFamily = "Anotações";
         public const string DefaultTextTypeCategory = "Textos";
@@ -15,6 +16,8 @@ namespace Araci.Core.Documents
         public const double DefaultTextHeight = 14.0;
         public const double MinTextHeight = 0.0001;
         public const string DefaultHorizontalAlignment = "Esquerda";
+
+        private const double FatorLarguraMediaCaractere = 0.58;
 
         private string _texto = DefaultText;
         private double _larguraCaixa = DefaultBoxWidth;
@@ -49,13 +52,13 @@ namespace Araci.Core.Documents
         public double LarguraCaixa
         {
             get => _larguraCaixa;
-            set => _larguraCaixa = NormalizarDimensao(value, DefaultBoxWidth, MinBoxWidth);
+            set => _larguraCaixa = NormalizarLargura(value);
         }
 
         public double AlturaTexto
         {
             get => _alturaTexto;
-            set => _alturaTexto = NormalizarDimensao(value, DefaultTextHeight, MinTextHeight);
+            set => _alturaTexto = NormalizarAlturaTexto(value);
         }
 
         public bool PossuiTipoTexto =>
@@ -114,6 +117,37 @@ namespace Araci.Core.Documents
                 LeaderCotoveloManual = LeaderCotoveloManual,
                 Visible = Visible
             };
+        }
+
+        public static double CalcularLarguraNatural(string? texto, double alturaTexto)
+        {
+            string[] linhas = ObterLinhasManuais(texto);
+            int maiorLinha = 1;
+
+            foreach (string linha in linhas)
+                maiorLinha = Math.Max(maiorLinha, linha.Length);
+
+            double altura = NormalizarAlturaTexto(alturaTexto);
+            double largura = maiorLinha * altura * FatorLarguraMediaCaractere + MargemHorizontalCaixa;
+            return NormalizarLargura(largura);
+        }
+
+        public static double NormalizarLargura(double valor)
+        {
+            return NormalizarDimensao(valor, DefaultBoxWidth, MinBoxWidth);
+        }
+
+        public static double NormalizarAlturaTexto(double valor)
+        {
+            return NormalizarDimensao(valor, DefaultTextHeight, MinTextHeight);
+        }
+
+        private static string[] ObterLinhasManuais(string? texto)
+        {
+            return (texto ?? string.Empty)
+                .Replace("\r\n", "\n", StringComparison.Ordinal)
+                .Replace('\r', '\n')
+                .Split('\n');
         }
 
         private static string NormalizarTexto(string? valor)

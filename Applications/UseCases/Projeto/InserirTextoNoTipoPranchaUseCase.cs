@@ -19,7 +19,14 @@ namespace Araci.Applications.UseCases.Projeto
 
         public ProjectSheetTemplateText? Inserir(Guid tipoId, double x, double y)
         {
-            return Inserir(tipoId, x, y, ProjectSheetTemplateText.DefaultText, ProjectSheetTemplateText.DefaultBoxWidth);
+            return InserirComLarguraNatural(tipoId, x, y, ProjectSheetTemplateText.DefaultText);
+        }
+
+        public ProjectSheetTemplateText? InserirComLarguraNatural(Guid tipoId, double x, double y, string texto)
+        {
+            string textoFinal = NormalizarTextoInicial(texto);
+            double larguraNatural = ProjectSheetTemplateText.CalcularLarguraNatural(textoFinal, ProjectSheetTemplateText.DefaultTextHeight);
+            return Inserir(tipoId, x, y, textoFinal, larguraNatural);
         }
 
         public ProjectSheetTemplateText? Inserir(Guid tipoId, double x, double y, string texto, double larguraCaixa)
@@ -29,6 +36,7 @@ namespace Araci.Applications.UseCases.Projeto
             if (tipo == null)
                 return null;
 
+            string textoFinal = NormalizarTextoInicial(texto);
             double larguraFinal = CalcularLarguraFinal(tipo, larguraCaixa);
             double xFinal = Limitar(NormalizarCoordenada(x), 0.0, Math.Max(0.0, tipo.LarguraFolha - larguraFinal));
             double yFinal = Limitar(NormalizarCoordenada(y), 0.0, Math.Max(0.0, tipo.AlturaFolha));
@@ -37,7 +45,7 @@ namespace Araci.Applications.UseCases.Projeto
             {
                 X = xFinal,
                 Y = yFinal,
-                Texto = string.IsNullOrWhiteSpace(texto) ? ProjectSheetTemplateText.DefaultText : texto.Trim(),
+                Texto = textoFinal,
                 LarguraCaixa = larguraFinal
             };
 
@@ -47,17 +55,15 @@ namespace Araci.Applications.UseCases.Projeto
 
         private static double CalcularLarguraFinal(ProjectSheetType tipo, double larguraCaixa)
         {
-            double larguraNormalizada = NormalizarLargura(larguraCaixa);
+            double larguraNormalizada = ProjectSheetTemplateText.NormalizarLargura(larguraCaixa);
             double larguraFolha = NormalizarDimensaoFolha(tipo.LarguraFolha);
             double larguraMaxima = Math.Max(ProjectSheetTemplateText.MinBoxWidth, larguraFolha);
             return Math.Min(larguraNormalizada, larguraMaxima);
         }
 
-        private static double NormalizarLargura(double valor)
+        private static string NormalizarTextoInicial(string? texto)
         {
-            return double.IsNaN(valor) || double.IsInfinity(valor) || valor < ProjectSheetTemplateText.MinBoxWidth
-                ? ProjectSheetTemplateText.DefaultBoxWidth
-                : valor;
+            return string.IsNullOrWhiteSpace(texto) ? ProjectSheetTemplateText.DefaultText : texto.Trim();
         }
 
         private static double NormalizarDimensaoFolha(double valor)
