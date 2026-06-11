@@ -7,6 +7,7 @@ using System.Runtime.CompilerServices;
 using Araci.Applications.Projects.Tables;
 using Araci.Applications.UseCases.Projeto;
 using Araci.Core.Documents;
+using Araci.Services.Catalog;
 
 namespace Araci.ViewModels
 {
@@ -24,6 +25,7 @@ namespace Araci.ViewModels
         private readonly RemoverTabelaDaPranchaUseCase? _removerTabelaDaPrancha;
         private readonly DividirTabelaNaPranchaUseCase? _dividirTabelaNaPrancha;
         private readonly ProjectTableDataBuilder _tableDataBuilder = new();
+        private readonly TypeLibraryService _types = new();
         private string _titulo = string.Empty;
         private string _emptyMessage = string.Empty;
         private Guid? _selectedInstanceId;
@@ -46,13 +48,27 @@ namespace Araci.ViewModels
             _removerTabelaDaPrancha = removerTabelaDaPrancha;
             _dividirTabelaNaPrancha = dividirTabelaNaPrancha;
             TableInstances = new ObservableCollection<ProjectSheetTableInstanceViewModel>();
+            TemplateLines = new ObservableCollection<ProjectSheetTemplateLineViewModel>();
+            TemplateRectangles = new ObservableCollection<ProjectSheetTemplateRectangleViewModel>();
+            TemplateCircles = new ObservableCollection<ProjectSheetTemplateCircleViewModel>();
+            TemplateTexts = new ObservableCollection<ProjectSheetTemplateTextViewModel>();
             _document.PropriedadesPranchaAlteradas += OnPropriedadesPranchaAlteradas;
+            _document.PropriedadesTipoPranchaAlteradas += OnPropriedadesTipoPranchaAlteradas;
             Refresh();
         }
 
         public Guid SheetId => _sheet.Id;
         public ObservableCollection<ProjectSheetTableInstanceViewModel> TableInstances { get; }
+        public ObservableCollection<ProjectSheetTemplateLineViewModel> TemplateLines { get; }
+        public ObservableCollection<ProjectSheetTemplateRectangleViewModel> TemplateRectangles { get; }
+        public ObservableCollection<ProjectSheetTemplateCircleViewModel> TemplateCircles { get; }
+        public ObservableCollection<ProjectSheetTemplateTextViewModel> TemplateTexts { get; }
         public bool HasInstances => TableInstances.Count > 0;
+        public bool HasSheetTypeTemplate =>
+            TemplateLines.Count > 0 ||
+            TemplateRectangles.Count > 0 ||
+            TemplateCircles.Count > 0 ||
+            TemplateTexts.Count > 0;
         public bool HasEmptyMessage => !string.IsNullOrWhiteSpace(EmptyMessage);
         public Guid? SelectedInstanceId => _selectedInstanceId;
         public bool HasSelectedInstance => _selectedInstanceId.HasValue;
@@ -146,6 +162,7 @@ namespace Araci.ViewModels
                 : $"{_sheet.Numero} - {_sheet.Nome}";
 
             TableInstances.Clear();
+            RefreshSheetTemplate();
             NormalizeInstances();
             RecalculateWorkspaceFromDocument();
 
@@ -170,9 +187,58 @@ namespace Araci.ViewModels
             if (selectedBeforeRefresh.HasValue && !TableInstances.Any(i => i.Id == selectedBeforeRefresh.Value))
                 _selectedInstanceId = null;
 
-            EmptyMessage = HasInstances ? string.Empty : "Nenhuma tabela inserida na prancha";
+            EmptyMessage = HasInstances || HasSheetTypeTemplate ? string.Empty : "Nenhuma tabela inserida na prancha";
             OnPropertyChanged(nameof(HasInstances));
+            OnPropertyChanged(nameof(HasSheetTypeTemplate));
             OnSelectionChanged();
+        }
+
+
+        private void RefreshSheetTemplate()
+        {
+            TemplateLines.Clear();
+            TemplateRectangles.Clear();
+            TemplateCircles.Clear();
+            TemplateTexts.Clear();
+
+            ProjectSheetType? tipo = ResolverTipoPrancha();
+
+            if (tipo == null)
+            {
+                NotificarTemplate();
+                return;
+            }
+
+            foreach (ProjectSheetTemplateCircle circulo in tipo.Circulos.Where(c => c != null && c.Visible))
+                TemplateCircles.Add(new ProjectSheetTemplateCircleViewModel(circulo, _types));
+
+            foreach (ProjectSheetTemplateRectangle retangulo in tipo.Retangulos.Where(r => r != null && r.Visible))
+                TemplateRectangles.Add(new ProjectSheetTemplateRectangleViewModel(retangulo, _types));
+
+            foreach (ProjectSheetTemplateLine linha in tipo.Linhas.Where(l => l != null && l.Visible))
+                TemplateLines.Add(new ProjectSheetTemplateLineViewModel(linha, _types));
+
+            foreach (ProjectSheetTemplateText texto in tipo.Textos.Where(t => t != null && t.Visible))
+                TemplateTexts.Add(new ProjectSheetTemplateTextViewModel(texto, _types));
+
+            NotificarTemplate();
+        }
+
+        private ProjectSheetType? ResolverTipoPrancha()
+        {
+            if (!_sheet.SheetTypeId.HasValue)
+                return null;
+
+            return _document.TiposPrancha.FirstOrDefault(t => t.Id == _sheet.SheetTypeId.Value);
+        }
+
+        private void NotificarTemplate()
+        {
+            OnPropertyChanged(nameof(TemplateLines));
+            OnPropertyChanged(nameof(TemplateRectangles));
+            OnPropertyChanged(nameof(TemplateCircles));
+            OnPropertyChanged(nameof(TemplateTexts));
+            OnPropertyChanged(nameof(HasSheetTypeTemplate));
         }
 
         public void SelecionarInstancia(Guid instanceId)
@@ -393,6 +459,15 @@ namespace Araci.ViewModels
         {
             OnPropertyChanged(nameof(SelectedInstanceId));
             OnPropertyChanged(nameof(HasSelectedInstance));
+        }
+
+
+        private void OnPropriedadesTipoPranchaAlteradas(ProjectSheetType tipo)
+        {
+            if (!_sheet.SheetTypeId.HasValue || tipo.Id != _sheet.SheetTypeId.Value)
+                return;
+
+            Refresh();
         }
 
         private void OnPropriedadesPranchaAlteradas(ProjectSheet prancha)
