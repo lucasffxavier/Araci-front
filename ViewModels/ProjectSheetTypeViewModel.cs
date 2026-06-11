@@ -21,6 +21,7 @@ namespace Araci.ViewModels
         private readonly TypeLibraryService _types;
         private ProjectSheetTemplateLineViewModel? _previewLine;
         private ProjectSheetTemplateRectangleViewModel? _previewRectangle;
+        private ProjectSheetTemplateCircleViewModel? _previewCircle;
         private Guid? _selectedLineId;
         private Guid? _selectedRectangleId;
 
@@ -36,6 +37,7 @@ namespace Araci.ViewModels
             _types = types ?? throw new ArgumentNullException(nameof(types));
             Lines = new ObservableCollection<ProjectSheetTemplateLineViewModel>();
             Rectangles = new ObservableCollection<ProjectSheetTemplateRectangleViewModel>();
+            Circles = new ObservableCollection<ProjectSheetTemplateCircleViewModel>();
             EndpointHandles = new ObservableCollection<ProjectSheetTemplateLineEndpointHandleViewModel>();
             RectangleResizeHandles = new ObservableCollection<ProjectSheetTemplateRectangleResizeHandleViewModel>();
             _document.PropriedadesTipoPranchaAlteradas += OnPropriedadesTipoPranchaAlteradas;
@@ -60,6 +62,7 @@ namespace Araci.ViewModels
         public string Descricao => $"{FormatoFolha} {OrientacaoFolha} - {LarguraFolha:0.#} x {AlturaFolha:0.#}";
         public ObservableCollection<ProjectSheetTemplateLineViewModel> Lines { get; }
         public ObservableCollection<ProjectSheetTemplateRectangleViewModel> Rectangles { get; }
+        public ObservableCollection<ProjectSheetTemplateCircleViewModel> Circles { get; }
         public ObservableCollection<ProjectSheetTemplateLineEndpointHandleViewModel> EndpointHandles { get; }
         public ObservableCollection<ProjectSheetTemplateRectangleResizeHandleViewModel> RectangleResizeHandles { get; }
         public Guid? SelectedLineId => _selectedLineId;
@@ -98,8 +101,23 @@ namespace Araci.ViewModels
             }
         }
 
+        public ProjectSheetTemplateCircleViewModel? PreviewCircle
+        {
+            get => _previewCircle;
+            private set
+            {
+                if (ReferenceEquals(_previewCircle, value))
+                    return;
+
+                _previewCircle = value;
+                OnPropertyChanged();
+                OnPropertyChanged(nameof(HasPreviewCircle));
+            }
+        }
+
         public bool HasPreviewLine => PreviewLine != null;
         public bool HasPreviewRectangle => PreviewRectangle != null;
+        public bool HasPreviewCircle => PreviewCircle != null;
 
         public void Refresh()
         {
@@ -114,6 +132,7 @@ namespace Araci.ViewModels
             OnPropertyChanged(nameof(WorkspaceHeight));
             OnPropertyChanged(nameof(Titulo));
             OnPropertyChanged(nameof(Descricao));
+            RefreshCircles();
             RefreshRectangles();
             RefreshLines();
             OnPropertyChanged(nameof(HasTemplateSelection));
@@ -127,6 +146,11 @@ namespace Araci.ViewModels
         public void SetPreviewRectangle(ProjectSheetTemplateRectangle? retangulo)
         {
             PreviewRectangle = retangulo == null ? null : new ProjectSheetTemplateRectangleViewModel(retangulo, _types);
+        }
+
+        public void SetPreviewCircle(ProjectSheetTemplateCircle? circulo)
+        {
+            PreviewCircle = circulo == null ? null : new ProjectSheetTemplateCircleViewModel(circulo, _types);
         }
 
         public bool TryHitLineAt(Point position, double tolerance, out Guid lineId)
@@ -484,7 +508,6 @@ namespace Araci.ViewModels
             RefreshRectangleResizeHandles();
         }
 
-
         public void ClearTemplateSelection()
         {
             bool tinhaSelecao = _selectedLineId.HasValue || _selectedRectangleId.HasValue;
@@ -513,6 +536,14 @@ namespace Araci.ViewModels
                 return;
 
             Refresh();
+        }
+
+        private void RefreshCircles()
+        {
+            Circles.Clear();
+
+            foreach (ProjectSheetTemplateCircle circulo in (_tipo.Circulos ?? new()).Where(c => c != null && c.Visible))
+                Circles.Add(new ProjectSheetTemplateCircleViewModel(circulo, _types));
         }
 
         private void RefreshRectangles()
@@ -705,6 +736,7 @@ namespace Araci.ViewModels
             return new ProjectSheetTemplateLineEndpointHandleViewModel(lineId, endpoint, x, y, size);
         }
     }
+
     public sealed class ProjectSheetTemplateRectangleResizeHandleViewModel
     {
         private ProjectSheetTemplateRectangleResizeHandleViewModel(
@@ -742,5 +774,4 @@ namespace Araci.ViewModels
             return new ProjectSheetTemplateRectangleResizeHandleViewModel(rectangleId, kind, x, y, size);
         }
     }
-
 }

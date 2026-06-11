@@ -114,6 +114,7 @@ namespace Araci.Services
             EditarPropriedadesTipoPrancha = new EditarPropriedadesTipoPranchaUseCase(Document, Commands);
             InserirLinhaNoTipoPrancha = new InserirLinhaNoTipoPranchaUseCase(Document, Commands);
             InserirRetanguloNoTipoPrancha = new InserirRetanguloNoTipoPranchaUseCase(Document, Commands);
+            InserirCirculoNoTipoPrancha = new InserirCirculoNoTipoPranchaUseCase(Document, Commands);
             ExcluirLinhaDoTipoPrancha = new ExcluirLinhaDoTipoPranchaUseCase(Document, Commands);
             MoverLinhaDoTipoPrancha = new MoverLinhaDoTipoPranchaUseCase(Document, Commands);
             ExcluirRetanguloDoTipoPrancha = new ExcluirRetanguloDoTipoPranchaUseCase(Document, Commands);
@@ -155,6 +156,7 @@ namespace Araci.Services
                 CriarInserirCirculoAnotativoTool,
                 CriarInserirLinhaTipoPranchaTool,
                 CriarInserirRetanguloTipoPranchaTool,
+                CriarInserirCirculoTipoPranchaTool,
                 () => ProjectSheetTypeViewModelAtivo != null || Editor.SuperficieAtiva == EditorSurfaceKind.ProjectSheetType);
 
             Input = EditingComposition.CreateInput(Tools, Commands, SafeDelete, Selection, Elements, Hover, Clipboard.CopiarSelecionados, Clipboard.Colar);
@@ -228,6 +230,7 @@ namespace Araci.Services
         public EditarPropriedadesTipoPranchaUseCase EditarPropriedadesTipoPrancha { get; }
         public InserirLinhaNoTipoPranchaUseCase InserirLinhaNoTipoPrancha { get; }
         public InserirRetanguloNoTipoPranchaUseCase InserirRetanguloNoTipoPrancha { get; }
+        public InserirCirculoNoTipoPranchaUseCase InserirCirculoNoTipoPrancha { get; }
         public ExcluirLinhaDoTipoPranchaUseCase ExcluirLinhaDoTipoPrancha { get; }
         public MoverLinhaDoTipoPranchaUseCase MoverLinhaDoTipoPrancha { get; }
         public ExcluirRetanguloDoTipoPranchaUseCase ExcluirRetanguloDoTipoPrancha { get; }
@@ -396,6 +399,11 @@ namespace Araci.Services
         private InserirRetanguloTipoPranchaTool CriarInserirRetanguloTipoPranchaTool()
         {
             return new InserirRetanguloTipoPranchaTool(() => ProjectSheetTypeViewModelAtivo, InserirRetanguloNoTipoPrancha, () => Tools.VoltarParaSelecao());
+        }
+
+        private InserirCirculoTipoPranchaTool CriarInserirCirculoTipoPranchaTool()
+        {
+            return new InserirCirculoTipoPranchaTool(() => ProjectSheetTypeViewModelAtivo, InserirCirculoNoTipoPrancha, () => Tools.VoltarParaSelecao());
         }
 
         private InserirCirculoAnotativoTool CriarInserirCirculoAnotativoTool()

@@ -145,8 +145,8 @@ namespace Araci.Ribbon.Tabs
 
         private void CirculoButton_Click(object sender, RoutedEventArgs e)
         {
+            FocarSuperficieAtiva();
             Context?.Tools.AtivarInserirCirculoAnotativo();
-            FocarViewport();
         }
 
         private void TextoButton_Click(object sender, RoutedEventArgs e)
