@@ -119,6 +119,8 @@ namespace Araci.Services
             MoverLinhaDoTipoPrancha = new MoverLinhaDoTipoPranchaUseCase(Document, Commands);
             ExcluirRetanguloDoTipoPrancha = new ExcluirRetanguloDoTipoPranchaUseCase(Document, Commands);
             MoverRetanguloDoTipoPrancha = new MoverRetanguloDoTipoPranchaUseCase(Document, Commands);
+            ExcluirCirculoDoTipoPrancha = new ExcluirCirculoDoTipoPranchaUseCase(Document, Commands);
+            MoverCirculoDoTipoPrancha = new MoverCirculoDoTipoPranchaUseCase(Document, Commands);
             ExportarTabela = new ExportarTabelaUseCase(Document, Dialogs, new ProjectTableDataBuilder(), new ProjectTableCsvExportService());
             InserirTabelaNaPrancha = new InserirTabelaNaPranchaUseCase(Document, Commands);
             MoverTabelaNaPrancha = new MoverTabelaNaPranchaUseCase(Document, Commands);
@@ -235,6 +237,8 @@ namespace Araci.Services
         public MoverLinhaDoTipoPranchaUseCase MoverLinhaDoTipoPrancha { get; }
         public ExcluirRetanguloDoTipoPranchaUseCase ExcluirRetanguloDoTipoPrancha { get; }
         public MoverRetanguloDoTipoPranchaUseCase MoverRetanguloDoTipoPrancha { get; }
+        public ExcluirCirculoDoTipoPranchaUseCase ExcluirCirculoDoTipoPrancha { get; }
+        public MoverCirculoDoTipoPranchaUseCase MoverCirculoDoTipoPrancha { get; }
         public ExportarTabelaUseCase ExportarTabela { get; }
         public InserirTabelaNaPranchaUseCase InserirTabelaNaPrancha { get; }
         public MoverTabelaNaPranchaUseCase MoverTabelaNaPrancha { get; }
