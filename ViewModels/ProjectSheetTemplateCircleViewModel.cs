@@ -18,6 +18,7 @@ namespace Araci.ViewModels
         private bool _isSelected;
         private double _previewOffsetX;
         private double _previewOffsetY;
+        private double? _previewRaio;
 
         public ProjectSheetTemplateCircleViewModel(ProjectSheetTemplateCircle circulo)
             : this(circulo, new TypeLibraryService())
@@ -36,8 +37,9 @@ namespace Araci.ViewModels
         public double Y => _circulo.Y + _previewOffsetY;
         public double ModelX => _circulo.X;
         public double ModelY => _circulo.Y;
-        public double Raio => _circulo.Raio;
-        public double Diametro => _circulo.Diametro;
+        public double ModelRaio => _circulo.Raio;
+        public double Raio => _previewRaio ?? _circulo.Raio;
+        public double Diametro => Raio * 2.0;
         public double Left => X - Raio;
         public double Top => Y - Raio;
         public TipoLinhaAnotativa? TipoLinha => _tipoLinha;
@@ -49,6 +51,7 @@ namespace Araci.ViewModels
         public DoubleCollection? StrokeDashArray => CriarStrokeDashArray(EstiloLinha);
         public bool Visible => _circulo.Visible;
         public bool HasPreviewOffset => Math.Abs(_previewOffsetX) > 0.0001 || Math.Abs(_previewOffsetY) > 0.0001;
+        public bool HasPreviewRadius => _previewRaio.HasValue;
 
         public bool IsSelected
         {
@@ -88,6 +91,31 @@ namespace Araci.ViewModels
             _previewOffsetY = 0.0;
             NotificarPosicao();
             OnPropertyChanged(nameof(HasPreviewOffset));
+        }
+
+        public void SetPreviewRadius(double raio)
+        {
+            if (!ValorFinito(raio))
+                return;
+
+            double normalizado = Math.Max(ProjectSheetTemplateCircle.MinRadius, raio);
+
+            if (_previewRaio.HasValue && Math.Abs(_previewRaio.Value - normalizado) < 0.0001)
+                return;
+
+            _previewRaio = normalizado;
+            NotificarGeometria();
+            OnPropertyChanged(nameof(HasPreviewRadius));
+        }
+
+        public void ClearPreviewRadius()
+        {
+            if (!_previewRaio.HasValue)
+                return;
+
+            _previewRaio = null;
+            NotificarGeometria();
+            OnPropertyChanged(nameof(HasPreviewRadius));
         }
 
         public bool Contains(Point position, double tolerance)
@@ -151,6 +179,14 @@ namespace Araci.ViewModels
             OnPropertyChanged(nameof(Top));
         }
 
+        private void NotificarGeometria()
+        {
+            OnPropertyChanged(nameof(Raio));
+            OnPropertyChanged(nameof(Diametro));
+            OnPropertyChanged(nameof(Left));
+            OnPropertyChanged(nameof(Top));
+        }
+
         private static Brush CriarBrush(string stroke)
         {
             try
@@ -191,6 +227,11 @@ namespace Araci.ViewModels
                 .Replace("Í", "i")
                 .ToLowerInvariant()
                 .Trim();
+        }
+
+        private static bool ValorFinito(double value)
+        {
+            return !double.IsNaN(value) && !double.IsInfinity(value);
         }
 
         private static double Distancia(Point a, Point b)

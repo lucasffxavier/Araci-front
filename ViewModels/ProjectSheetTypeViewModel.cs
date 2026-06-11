@@ -15,6 +15,7 @@ namespace Araci.ViewModels
         private const double WorkspaceMargin = 360.0;
         private const double EndpointHandleSize = 12.0;
         private const double RectangleResizeHandleSize = 10.0;
+        private const double CircleResizeHandleSize = 10.0;
 
         private readonly AraciDocument _document;
         private readonly ProjectSheetType _tipo;
@@ -41,6 +42,7 @@ namespace Araci.ViewModels
             Circles = new ObservableCollection<ProjectSheetTemplateCircleViewModel>();
             EndpointHandles = new ObservableCollection<ProjectSheetTemplateLineEndpointHandleViewModel>();
             RectangleResizeHandles = new ObservableCollection<ProjectSheetTemplateRectangleResizeHandleViewModel>();
+            CircleResizeHandles = new ObservableCollection<ProjectSheetTemplateCircleResizeHandleViewModel>();
             _document.PropriedadesTipoPranchaAlteradas += OnPropriedadesTipoPranchaAlteradas;
             _document.ItemProjetoRenomeado += OnItemProjetoRenomeado;
             Refresh();
@@ -66,6 +68,7 @@ namespace Araci.ViewModels
         public ObservableCollection<ProjectSheetTemplateCircleViewModel> Circles { get; }
         public ObservableCollection<ProjectSheetTemplateLineEndpointHandleViewModel> EndpointHandles { get; }
         public ObservableCollection<ProjectSheetTemplateRectangleResizeHandleViewModel> RectangleResizeHandles { get; }
+        public ObservableCollection<ProjectSheetTemplateCircleResizeHandleViewModel> CircleResizeHandles { get; }
         public Guid? SelectedLineId => _selectedLineId;
         public Guid? SelectedRectangleId => _selectedRectangleId;
         public Guid? SelectedCircleId => _selectedCircleId;
@@ -75,6 +78,7 @@ namespace Araci.ViewModels
         public bool HasTemplateSelection => HasSelectedLine || HasSelectedRectangle || HasSelectedCircle;
         public bool EndpointHandlesVisible => EndpointHandles.Count > 0;
         public bool RectangleResizeHandlesVisible => RectangleResizeHandles.Count > 0;
+        public bool CircleResizeHandlesVisible => CircleResizeHandles.Count > 0;
 
         public ProjectSheetTemplateLineViewModel? PreviewLine
         {
@@ -192,6 +196,7 @@ namespace Araci.ViewModels
             AtualizarSelecaoVisual();
             RefreshEndpointHandles();
             RefreshRectangleResizeHandles();
+            RefreshCircleResizeHandles();
             NotificarSelecao();
             return true;
         }
@@ -203,6 +208,7 @@ namespace Araci.ViewModels
 
             _selectedCircleId = null;
             AtualizarSelecaoVisual();
+            RefreshCircleResizeHandles();
             NotificarSelecao();
         }
 
@@ -232,6 +238,8 @@ namespace Araci.ViewModels
                 return false;
 
             circle.SetPreviewOffset(deltaX, deltaY);
+            AtualizarSelecaoVisualCirculos();
+            RefreshCircleResizeHandles();
             return true;
         }
 
@@ -239,12 +247,84 @@ namespace Araci.ViewModels
         {
             ProjectSheetTemplateCircleViewModel? circle = Circles.FirstOrDefault(c => c.Id == circleId);
             circle?.ClearPreviewOffset();
+            AtualizarSelecaoVisualCirculos();
+            RefreshCircleResizeHandles();
         }
 
         public void ClearCirclePreviewOffsets()
         {
             foreach (ProjectSheetTemplateCircleViewModel circle in Circles)
                 circle.ClearPreviewOffset();
+
+            AtualizarSelecaoVisualCirculos();
+            RefreshCircleResizeHandles();
+        }
+
+        public bool TryHitSelectedCircleResizeHandle(Point position, double tolerance, out Guid circleId)
+        {
+            circleId = Guid.Empty;
+
+            if (!_selectedCircleId.HasValue)
+                return false;
+
+            double toleranceSquared = Math.Max(0.0, tolerance) * Math.Max(0.0, tolerance);
+            ProjectSheetTemplateCircleResizeHandleViewModel? hit = CircleResizeHandles
+                .Reverse()
+                .FirstOrDefault(h => DistanciaQuadrada(position, new Point(h.X, h.Y)) <= toleranceSquared);
+
+            if (hit == null)
+                return false;
+
+            circleId = hit.CircleId;
+            return true;
+        }
+
+        public bool TryGetCircleGeometry(Guid circleId, out double x, out double y, out double raio)
+        {
+            ProjectSheetTemplateCircleViewModel? circle = Circles.FirstOrDefault(c => c.Id == circleId);
+
+            if (circle == null)
+            {
+                x = 0.0;
+                y = 0.0;
+                raio = 0.0;
+                return false;
+            }
+
+            x = circle.ModelX;
+            y = circle.ModelY;
+            raio = circle.ModelRaio;
+            return true;
+        }
+
+        public bool SetCirclePreviewRadius(Guid circleId, double raio)
+        {
+            ProjectSheetTemplateCircleViewModel? circle = Circles.FirstOrDefault(c => c.Id == circleId);
+
+            if (circle == null)
+                return false;
+
+            circle.SetPreviewRadius(raio);
+            AtualizarSelecaoVisualCirculos();
+            RefreshCircleResizeHandles();
+            return true;
+        }
+
+        public void ClearCirclePreviewRadius(Guid circleId)
+        {
+            ProjectSheetTemplateCircleViewModel? circle = Circles.FirstOrDefault(c => c.Id == circleId);
+            circle?.ClearPreviewRadius();
+            AtualizarSelecaoVisualCirculos();
+            RefreshCircleResizeHandles();
+        }
+
+        public void ClearCirclePreviewRadii()
+        {
+            foreach (ProjectSheetTemplateCircleViewModel circle in Circles)
+                circle.ClearPreviewRadius();
+
+            AtualizarSelecaoVisualCirculos();
+            RefreshCircleResizeHandles();
         }
 
         public bool TryHitLineAt(Point position, double tolerance, out Guid lineId)
@@ -283,6 +363,7 @@ namespace Araci.ViewModels
             AtualizarSelecaoVisual();
             RefreshEndpointHandles();
             RefreshRectangleResizeHandles();
+            RefreshCircleResizeHandles();
             NotificarSelecao();
             return true;
         }
@@ -477,6 +558,7 @@ namespace Araci.ViewModels
             AtualizarSelecaoVisual();
             RefreshEndpointHandles();
             RefreshRectangleResizeHandles();
+            RefreshCircleResizeHandles();
             NotificarSelecao();
             return true;
         }
@@ -613,6 +695,7 @@ namespace Araci.ViewModels
             AtualizarSelecaoVisual();
             RefreshEndpointHandles();
             RefreshRectangleResizeHandles();
+            RefreshCircleResizeHandles();
 
             if (tinhaSelecao)
                 NotificarSelecao();
@@ -649,6 +732,7 @@ namespace Araci.ViewModels
                 _selectedCircleId = null;
 
             AtualizarSelecaoVisualCirculos();
+            RefreshCircleResizeHandles();
             OnPropertyChanged(nameof(SelectedCircleId));
             OnPropertyChanged(nameof(HasSelectedCircle));
         }
@@ -765,9 +849,29 @@ namespace Araci.ViewModels
             OnPropertyChanged(nameof(RectangleResizeHandlesVisible));
         }
 
+        private void RefreshCircleResizeHandles()
+        {
+            CircleResizeHandles.Clear();
+
+            if (_selectedCircleId.HasValue)
+            {
+                ProjectSheetTemplateCircleViewModel? circle = Circles.FirstOrDefault(c => c.Id == _selectedCircleId.Value && c.IsSelected);
+
+                if (circle != null)
+                    AddCircleResizeHandle(circle.Id, circle.X + circle.Raio, circle.Y);
+            }
+
+            OnPropertyChanged(nameof(CircleResizeHandlesVisible));
+        }
+
         private void AddRectangleResizeHandle(Guid rectangleId, RetanguloResizeHandleKind kind, double x, double y)
         {
             RectangleResizeHandles.Add(ProjectSheetTemplateRectangleResizeHandleViewModel.Create(rectangleId, kind, x, y, RectangleResizeHandleSize));
+        }
+
+        private void AddCircleResizeHandle(Guid circleId, double x, double y)
+        {
+            CircleResizeHandles.Add(ProjectSheetTemplateCircleResizeHandleViewModel.Create(circleId, x, y, CircleResizeHandleSize));
         }
 
         private void NotificarSelecao()
@@ -780,6 +884,7 @@ namespace Araci.ViewModels
             OnPropertyChanged(nameof(HasSelectedCircle));
             OnPropertyChanged(nameof(HasTemplateSelection));
             OnPropertyChanged(nameof(RectangleResizeHandlesVisible));
+            OnPropertyChanged(nameof(CircleResizeHandlesVisible));
         }
 
         private static double DistanciaAoSegmento(Point point, Point a, Point b)
@@ -888,6 +993,40 @@ namespace Araci.ViewModels
             double size)
         {
             return new ProjectSheetTemplateRectangleResizeHandleViewModel(rectangleId, kind, x, y, size);
+        }
+    }
+
+    public sealed class ProjectSheetTemplateCircleResizeHandleViewModel
+    {
+        private ProjectSheetTemplateCircleResizeHandleViewModel(
+            Guid circleId,
+            double x,
+            double y,
+            double size)
+        {
+            CircleId = circleId;
+            X = x;
+            Y = y;
+            Size = size;
+        }
+
+        public Guid CircleId { get; }
+        public double X { get; }
+        public double Y { get; }
+        public double Size { get; }
+        public double Left => X - Size / 2.0;
+        public double Top => Y - Size / 2.0;
+        public Brush Fill => Brushes.White;
+        public Brush Stroke => Brushes.DodgerBlue;
+        public double StrokeThickness => 2.0;
+
+        public static ProjectSheetTemplateCircleResizeHandleViewModel Create(
+            Guid circleId,
+            double x,
+            double y,
+            double size)
+        {
+            return new ProjectSheetTemplateCircleResizeHandleViewModel(circleId, x, y, size);
         }
     }
 }
