@@ -40,6 +40,7 @@ namespace Araci.ViewModels
             Lines = new ObservableCollection<ProjectSheetTemplateLineViewModel>();
             Rectangles = new ObservableCollection<ProjectSheetTemplateRectangleViewModel>();
             Circles = new ObservableCollection<ProjectSheetTemplateCircleViewModel>();
+            Texts = new ObservableCollection<ProjectSheetTemplateTextViewModel>();
             EndpointHandles = new ObservableCollection<ProjectSheetTemplateLineEndpointHandleViewModel>();
             RectangleResizeHandles = new ObservableCollection<ProjectSheetTemplateRectangleResizeHandleViewModel>();
             CircleResizeHandles = new ObservableCollection<ProjectSheetTemplateCircleResizeHandleViewModel>();
@@ -66,6 +67,7 @@ namespace Araci.ViewModels
         public ObservableCollection<ProjectSheetTemplateLineViewModel> Lines { get; }
         public ObservableCollection<ProjectSheetTemplateRectangleViewModel> Rectangles { get; }
         public ObservableCollection<ProjectSheetTemplateCircleViewModel> Circles { get; }
+        public ObservableCollection<ProjectSheetTemplateTextViewModel> Texts { get; }
         public ObservableCollection<ProjectSheetTemplateLineEndpointHandleViewModel> EndpointHandles { get; }
         public ObservableCollection<ProjectSheetTemplateRectangleResizeHandleViewModel> RectangleResizeHandles { get; }
         public ObservableCollection<ProjectSheetTemplateCircleResizeHandleViewModel> CircleResizeHandles { get; }
@@ -139,6 +141,7 @@ namespace Araci.ViewModels
             OnPropertyChanged(nameof(WorkspaceHeight));
             OnPropertyChanged(nameof(Titulo));
             OnPropertyChanged(nameof(Descricao));
+            RefreshTexts();
             RefreshCircles();
             RefreshRectangles();
             RefreshLines();
@@ -773,6 +776,14 @@ namespace Araci.ViewModels
             RefreshEndpointHandles();
             OnPropertyChanged(nameof(SelectedLineId));
             OnPropertyChanged(nameof(HasSelectedLine));
+        }
+
+        private void RefreshTexts()
+        {
+            Texts.Clear();
+
+            foreach (ProjectSheetTemplateText texto in (_tipo.Textos ?? new()).Where(t => t != null && t.Visible))
+                Texts.Add(new ProjectSheetTemplateTextViewModel(texto, _types));
         }
 
         private void AtualizarSelecaoVisual()
