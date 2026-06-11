@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.ComponentModel;
 using System.Linq;
@@ -32,6 +33,10 @@ namespace Araci.ViewModels
         private Guid? _selectedRectangleId;
         private Guid? _selectedCircleId;
         private Guid? _selectedTextId;
+        private readonly HashSet<Guid> _selectedLineIds = new();
+        private readonly HashSet<Guid> _selectedRectangleIds = new();
+        private readonly HashSet<Guid> _selectedCircleIds = new();
+        private readonly HashSet<Guid> _selectedTextIds = new();
         private double _zoomScale = 1.0;
 
         public ProjectSheetTypeViewModel(AraciDocument document, ProjectSheetType tipo)
@@ -53,6 +58,7 @@ namespace Araci.ViewModels
             CircleResizeHandles = new ObservableCollection<ProjectSheetTemplateCircleResizeHandleViewModel>();
             TextResizeHandles = new ObservableCollection<ProjectSheetTemplateTextResizeHandleViewModel>();
             TextLeaderHandles = new ObservableCollection<ProjectSheetTemplateTextLeaderHandleViewModel>();
+            SelectionBox = new SelectionBoxViewModel();
             _document.PropriedadesTipoPranchaAlteradas += OnPropriedadesTipoPranchaAlteradas;
             _document.ItemProjetoRenomeado += OnItemProjetoRenomeado;
             Refresh();
@@ -82,16 +88,19 @@ namespace Araci.ViewModels
         public ObservableCollection<ProjectSheetTemplateCircleResizeHandleViewModel> CircleResizeHandles { get; }
         public ObservableCollection<ProjectSheetTemplateTextResizeHandleViewModel> TextResizeHandles { get; }
         public ObservableCollection<ProjectSheetTemplateTextLeaderHandleViewModel> TextLeaderHandles { get; }
+        public SelectionBoxViewModel SelectionBox { get; }
         public Guid? SelectedLineId => _selectedLineId;
         public Guid? SelectedRectangleId => _selectedRectangleId;
         public Guid? SelectedCircleId => _selectedCircleId;
         public Guid? SelectedTextId => _selectedTextId;
-        public bool HasSelectedLine => _selectedLineId.HasValue;
-        public bool HasSelectedRectangle => _selectedRectangleId.HasValue;
-        public bool HasSelectedCircle => _selectedCircleId.HasValue;
-        public bool HasSelectedText => _selectedTextId.HasValue;
+        public bool HasSelectedLine => _selectedLineId.HasValue || _selectedLineIds.Count > 0;
+        public bool HasSelectedRectangle => _selectedRectangleId.HasValue || _selectedRectangleIds.Count > 0;
+        public bool HasSelectedCircle => _selectedCircleId.HasValue || _selectedCircleIds.Count > 0;
+        public bool HasSelectedText => _selectedTextId.HasValue || _selectedTextIds.Count > 0;
+        public int SelectedTemplateCount => _selectedLineIds.Count + _selectedRectangleIds.Count + _selectedCircleIds.Count + _selectedTextIds.Count;
+        public bool HasSingleTemplateSelection => SelectedTemplateCount == 1;
         public bool HasTextInlineEditing => Texts.Any(t => t.IsEditingInline);
-        public bool HasTemplateSelection => HasSelectedLine || HasSelectedRectangle || HasSelectedCircle || HasSelectedText;
+        public bool HasTemplateSelection => SelectedTemplateCount > 0;
         public bool EndpointHandlesVisible => EndpointHandles.Count > 0;
         public bool RectangleResizeHandlesVisible => RectangleResizeHandles.Count > 0;
         public bool CircleResizeHandlesVisible => CircleResizeHandles.Count > 0;
@@ -192,10 +201,9 @@ namespace Araci.ViewModels
                 return false;
             }
 
+            LimparSelecaoInterna();
             _selectedTextId = textId;
-            _selectedLineId = null;
-            _selectedRectangleId = null;
-            _selectedCircleId = null;
+            _selectedTextIds.Add(textId);
             AtualizarSelecaoVisual();
             RefreshEndpointHandles();
             RefreshRectangleResizeHandles();
@@ -207,10 +215,12 @@ namespace Araci.ViewModels
 
         public void ClearTextSelection()
         {
-            if (!_selectedTextId.HasValue)
+            if (!_selectedTextId.HasValue && _selectedTextIds.Count == 0)
                 return;
 
             _selectedTextId = null;
+            _selectedTextIds.Clear();
+            AtualizarSelecaoPrimariaAposSelecaoPorCaixa();
             AtualizarSelecaoVisual();
             RefreshTextResizeHandles();
             NotificarSelecao();
@@ -493,6 +503,8 @@ namespace Araci.ViewModels
             RefreshCircles();
             RefreshRectangles();
             RefreshLines();
+            OnPropertyChanged(nameof(SelectedTemplateCount));
+            OnPropertyChanged(nameof(HasSingleTemplateSelection));
             OnPropertyChanged(nameof(HasTextInlineEditing));
             OnPropertyChanged(nameof(HasTemplateSelection));
         }
@@ -542,10 +554,9 @@ namespace Araci.ViewModels
                 return false;
             }
 
+            LimparSelecaoInterna();
             _selectedCircleId = circleId;
-            _selectedLineId = null;
-            _selectedRectangleId = null;
-            _selectedTextId = null;
+            _selectedCircleIds.Add(circleId);
             AtualizarSelecaoVisual();
             RefreshEndpointHandles();
             RefreshRectangleResizeHandles();
@@ -557,10 +568,12 @@ namespace Araci.ViewModels
 
         public void ClearCircleSelection()
         {
-            if (!_selectedCircleId.HasValue)
+            if (!_selectedCircleId.HasValue && _selectedCircleIds.Count == 0)
                 return;
 
             _selectedCircleId = null;
+            _selectedCircleIds.Clear();
+            AtualizarSelecaoPrimariaAposSelecaoPorCaixa();
             AtualizarSelecaoVisual();
             RefreshCircleResizeHandles();
             RefreshTextResizeHandles();
@@ -712,10 +725,9 @@ namespace Araci.ViewModels
                 return false;
             }
 
+            LimparSelecaoInterna();
             _selectedLineId = lineId;
-            _selectedRectangleId = null;
-            _selectedCircleId = null;
-            _selectedTextId = null;
+            _selectedLineIds.Add(lineId);
             AtualizarSelecaoVisual();
             RefreshEndpointHandles();
             RefreshRectangleResizeHandles();
@@ -727,10 +739,12 @@ namespace Araci.ViewModels
 
         public void ClearLineSelection()
         {
-            if (!_selectedLineId.HasValue)
+            if (!_selectedLineId.HasValue && _selectedLineIds.Count == 0)
                 return;
 
             _selectedLineId = null;
+            _selectedLineIds.Clear();
+            AtualizarSelecaoPrimariaAposSelecaoPorCaixa();
             AtualizarSelecaoVisual();
             RefreshEndpointHandles();
             RefreshRectangleResizeHandles();
@@ -910,10 +924,9 @@ namespace Araci.ViewModels
                 return false;
             }
 
+            LimparSelecaoInterna();
             _selectedRectangleId = rectangleId;
-            _selectedLineId = null;
-            _selectedCircleId = null;
-            _selectedTextId = null;
+            _selectedRectangleIds.Add(rectangleId);
             AtualizarSelecaoVisual();
             RefreshEndpointHandles();
             RefreshRectangleResizeHandles();
@@ -925,10 +938,12 @@ namespace Araci.ViewModels
 
         public void ClearRectangleSelection()
         {
-            if (!_selectedRectangleId.HasValue)
+            if (!_selectedRectangleId.HasValue && _selectedRectangleIds.Count == 0)
                 return;
 
             _selectedRectangleId = null;
+            _selectedRectangleIds.Clear();
+            AtualizarSelecaoPrimariaAposSelecaoPorCaixa();
             AtualizarSelecaoVisual();
             RefreshRectangleResizeHandles();
             RefreshTextResizeHandles();
@@ -1049,11 +1064,8 @@ namespace Araci.ViewModels
 
         public void ClearTemplateSelection()
         {
-            bool tinhaSelecao = _selectedLineId.HasValue || _selectedRectangleId.HasValue || _selectedCircleId.HasValue || _selectedTextId.HasValue;
-            _selectedLineId = null;
-            _selectedRectangleId = null;
-            _selectedCircleId = null;
-            _selectedTextId = null;
+            bool tinhaSelecao = HasTemplateSelection;
+            LimparSelecaoInterna();
             AtualizarSelecaoVisual();
             RefreshEndpointHandles();
             RefreshRectangleResizeHandles();
@@ -1062,6 +1074,62 @@ namespace Araci.ViewModels
 
             if (tinhaSelecao)
                 NotificarSelecao();
+        }
+
+        public bool SelectByBox(Rect bounds)
+        {
+            Rect normalized = NormalizeRect(bounds);
+
+            if (normalized.Width <= 0.0001 || normalized.Height <= 0.0001)
+            {
+                ClearTemplateSelection();
+                return false;
+            }
+
+            LimparSelecaoInterna();
+
+            foreach (ProjectSheetTemplateLineViewModel line in Lines)
+            {
+                if (LineIntersectsRect(new Point(line.X1, line.Y1), new Point(line.X2, line.Y2), normalized))
+                    _selectedLineIds.Add(line.Id);
+            }
+
+            foreach (ProjectSheetTemplateRectangleViewModel rectangle in Rectangles)
+            {
+                Rect rectBounds = NormalizeRect(new Rect(rectangle.X, rectangle.Y, rectangle.Largura, rectangle.Altura));
+
+                if (rectBounds.IntersectsWith(normalized))
+                    _selectedRectangleIds.Add(rectangle.Id);
+            }
+
+            foreach (ProjectSheetTemplateCircleViewModel circle in Circles)
+            {
+                Rect circleBounds = new(circle.Left, circle.Top, circle.Diametro, circle.Diametro);
+
+                if (circleBounds.IntersectsWith(normalized))
+                    _selectedCircleIds.Add(circle.Id);
+            }
+
+            foreach (ProjectSheetTemplateTextViewModel text in Texts)
+            {
+                Rect textBounds = NormalizeRect(new Rect(
+                    text.X,
+                    text.Y,
+                    Math.Max(ProjectSheetTemplateText.MinBoxWidth, text.LarguraCaixa),
+                    Math.Max(text.AlturaTexto, text.AlturaVisual)));
+
+                if (textBounds.IntersectsWith(normalized))
+                    _selectedTextIds.Add(text.Id);
+            }
+
+            AtualizarSelecaoPrimariaAposSelecaoPorCaixa();
+            AtualizarSelecaoVisual();
+            RefreshEndpointHandles();
+            RefreshRectangleResizeHandles();
+            RefreshCircleResizeHandles();
+            RefreshTextResizeHandles();
+            NotificarSelecao();
+            return HasTemplateSelection;
         }
 
         public void ZoomIn()
@@ -1104,10 +1172,12 @@ namespace Araci.ViewModels
             foreach (ProjectSheetTemplateCircle circulo in (_tipo.Circulos ?? new()).Where(c => c != null && c.Visible))
                 Circles.Add(new ProjectSheetTemplateCircleViewModel(circulo, _types));
 
+            _selectedCircleIds.RemoveWhere(id => !Circles.Any(c => c.Id == id));
+
             if (selectedId.HasValue && Circles.Any(c => c.Id == selectedId.Value))
                 _selectedCircleId = selectedId;
             else
-                _selectedCircleId = null;
+                _selectedCircleId = _selectedCircleIds.Count == 1 && SelectedTemplateCount == 1 ? _selectedCircleIds.First() : null;
 
             AtualizarSelecaoVisualCirculos();
             RefreshCircleResizeHandles();
@@ -1123,10 +1193,12 @@ namespace Araci.ViewModels
             foreach (ProjectSheetTemplateRectangle retangulo in (_tipo.Retangulos ?? new()).Where(r => r != null && r.Visible))
                 Rectangles.Add(new ProjectSheetTemplateRectangleViewModel(retangulo, _types));
 
+            _selectedRectangleIds.RemoveWhere(id => !Rectangles.Any(r => r.Id == id));
+
             if (selectedId.HasValue && Rectangles.Any(r => r.Id == selectedId.Value))
                 _selectedRectangleId = selectedId;
             else
-                _selectedRectangleId = null;
+                _selectedRectangleId = _selectedRectangleIds.Count == 1 && SelectedTemplateCount == 1 ? _selectedRectangleIds.First() : null;
 
             AtualizarSelecaoVisualRetangulos();
             RefreshRectangleResizeHandles();
@@ -1142,10 +1214,12 @@ namespace Araci.ViewModels
             foreach (ProjectSheetTemplateLine linha in (_tipo.Linhas ?? new()).Where(l => l != null && l.Visible))
                 Lines.Add(new ProjectSheetTemplateLineViewModel(linha, _types));
 
+            _selectedLineIds.RemoveWhere(id => !Lines.Any(l => l.Id == id));
+
             if (selectedId.HasValue && Lines.Any(l => l.Id == selectedId.Value))
                 _selectedLineId = selectedId;
             else
-                _selectedLineId = null;
+                _selectedLineId = _selectedLineIds.Count == 1 && SelectedTemplateCount == 1 ? _selectedLineIds.First() : null;
 
             AtualizarSelecaoVisualLinhas();
             RefreshEndpointHandles();
@@ -1161,10 +1235,12 @@ namespace Araci.ViewModels
             foreach (ProjectSheetTemplateText texto in (_tipo.Textos ?? new()).Where(t => t != null && t.Visible))
                 Texts.Add(new ProjectSheetTemplateTextViewModel(texto, _types));
 
+            _selectedTextIds.RemoveWhere(id => !Texts.Any(t => t.Id == id));
+
             if (selectedId.HasValue && Texts.Any(t => t.Id == selectedId.Value))
                 _selectedTextId = selectedId;
             else
-                _selectedTextId = null;
+                _selectedTextId = _selectedTextIds.Count == 1 && SelectedTemplateCount == 1 ? _selectedTextIds.First() : null;
 
             AtualizarSelecaoVisualTextos();
             RefreshTextResizeHandles();
@@ -1184,25 +1260,25 @@ namespace Araci.ViewModels
         private void AtualizarSelecaoVisualLinhas()
         {
             foreach (ProjectSheetTemplateLineViewModel line in Lines)
-                line.IsSelected = _selectedLineId.HasValue && line.Id == _selectedLineId.Value;
+                line.IsSelected = _selectedLineIds.Contains(line.Id);
         }
 
         private void AtualizarSelecaoVisualRetangulos()
         {
             foreach (ProjectSheetTemplateRectangleViewModel rectangle in Rectangles)
-                rectangle.IsSelected = _selectedRectangleId.HasValue && rectangle.Id == _selectedRectangleId.Value;
+                rectangle.IsSelected = _selectedRectangleIds.Contains(rectangle.Id);
         }
 
         private void AtualizarSelecaoVisualCirculos()
         {
             foreach (ProjectSheetTemplateCircleViewModel circle in Circles)
-                circle.IsSelected = _selectedCircleId.HasValue && circle.Id == _selectedCircleId.Value;
+                circle.IsSelected = _selectedCircleIds.Contains(circle.Id);
         }
 
         private void AtualizarSelecaoVisualTextos()
         {
             foreach (ProjectSheetTemplateTextViewModel text in Texts)
-                text.IsSelected = _selectedTextId.HasValue && text.Id == _selectedTextId.Value;
+                text.IsSelected = _selectedTextIds.Contains(text.Id);
         }
 
         private void RefreshEndpointHandles()
@@ -1340,12 +1416,107 @@ namespace Araci.ViewModels
             OnPropertyChanged(nameof(HasSelectedRectangle));
             OnPropertyChanged(nameof(HasSelectedCircle));
             OnPropertyChanged(nameof(HasSelectedText));
+            OnPropertyChanged(nameof(SelectedTemplateCount));
+            OnPropertyChanged(nameof(HasSingleTemplateSelection));
             OnPropertyChanged(nameof(HasTextInlineEditing));
             OnPropertyChanged(nameof(HasTemplateSelection));
             OnPropertyChanged(nameof(RectangleResizeHandlesVisible));
             OnPropertyChanged(nameof(CircleResizeHandlesVisible));
             OnPropertyChanged(nameof(TextResizeHandlesVisible));
             OnPropertyChanged(nameof(TextLeaderHandlesVisible));
+        }
+
+        private void LimparSelecaoInterna()
+        {
+            _selectedLineId = null;
+            _selectedRectangleId = null;
+            _selectedCircleId = null;
+            _selectedTextId = null;
+            _selectedLineIds.Clear();
+            _selectedRectangleIds.Clear();
+            _selectedCircleIds.Clear();
+            _selectedTextIds.Clear();
+        }
+
+        private void AtualizarSelecaoPrimariaAposSelecaoPorCaixa()
+        {
+            _selectedLineId = null;
+            _selectedRectangleId = null;
+            _selectedCircleId = null;
+            _selectedTextId = null;
+
+            if (SelectedTemplateCount != 1)
+                return;
+
+            if (_selectedLineIds.Count == 1)
+                _selectedLineId = _selectedLineIds.First();
+            else if (_selectedRectangleIds.Count == 1)
+                _selectedRectangleId = _selectedRectangleIds.First();
+            else if (_selectedCircleIds.Count == 1)
+                _selectedCircleId = _selectedCircleIds.First();
+            else if (_selectedTextIds.Count == 1)
+                _selectedTextId = _selectedTextIds.First();
+        }
+
+        private static Rect NormalizeRect(Rect rect)
+        {
+            double left = Math.Min(rect.Left, rect.Right);
+            double top = Math.Min(rect.Top, rect.Bottom);
+            double right = Math.Max(rect.Left, rect.Right);
+            double bottom = Math.Max(rect.Top, rect.Bottom);
+            return new Rect(left, top, Math.Max(0.0, right - left), Math.Max(0.0, bottom - top));
+        }
+
+        private static bool LineIntersectsRect(Point a, Point b, Rect rect)
+        {
+            if (rect.Contains(a) || rect.Contains(b))
+                return true;
+
+            Point topLeft = new(rect.Left, rect.Top);
+            Point topRight = new(rect.Right, rect.Top);
+            Point bottomRight = new(rect.Right, rect.Bottom);
+            Point bottomLeft = new(rect.Left, rect.Bottom);
+
+            return SegmentsIntersect(a, b, topLeft, topRight) ||
+                   SegmentsIntersect(a, b, topRight, bottomRight) ||
+                   SegmentsIntersect(a, b, bottomRight, bottomLeft) ||
+                   SegmentsIntersect(a, b, bottomLeft, topLeft);
+        }
+
+        private static bool SegmentsIntersect(Point a, Point b, Point c, Point d)
+        {
+            double o1 = Orientacao(a, b, c);
+            double o2 = Orientacao(a, b, d);
+            double o3 = Orientacao(c, d, a);
+            double o4 = Orientacao(c, d, b);
+
+            if (Math.Abs(o1) < 0.000001 && PontoNoSegmento(c, a, b))
+                return true;
+
+            if (Math.Abs(o2) < 0.000001 && PontoNoSegmento(d, a, b))
+                return true;
+
+            if (Math.Abs(o3) < 0.000001 && PontoNoSegmento(a, c, d))
+                return true;
+
+            if (Math.Abs(o4) < 0.000001 && PontoNoSegmento(b, c, d))
+                return true;
+
+            return (o1 > 0 && o2 < 0 || o1 < 0 && o2 > 0) &&
+                   (o3 > 0 && o4 < 0 || o3 < 0 && o4 > 0);
+        }
+
+        private static double Orientacao(Point a, Point b, Point c)
+        {
+            return (b.X - a.X) * (c.Y - a.Y) - (b.Y - a.Y) * (c.X - a.X);
+        }
+
+        private static bool PontoNoSegmento(Point p, Point a, Point b)
+        {
+            return p.X >= Math.Min(a.X, b.X) - 0.000001 &&
+                   p.X <= Math.Max(a.X, b.X) + 0.000001 &&
+                   p.Y >= Math.Min(a.Y, b.Y) - 0.000001 &&
+                   p.Y <= Math.Max(a.Y, b.Y) + 0.000001;
         }
 
         private static double NormalizeZoom(double value)

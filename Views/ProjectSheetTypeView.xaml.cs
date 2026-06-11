@@ -81,6 +81,10 @@ namespace Araci.Views
         private double _linhaTemplateEndpointOriginalX2;
         private double _linhaTemplateEndpointOriginalY2;
         private int _centerSheetRequestVersion;
+        private Point _selectionBoxTemplateStart;
+        private Point _selectionBoxTemplateLastPosition;
+        private bool _selectionBoxTemplateEmAndamento;
+        private bool _selectionBoxTemplateArrastando;
 
         public ProjectSheetTypeView()
         {
@@ -237,6 +241,12 @@ namespace Araci.Views
                 return;
             }
 
+            if (AtualizarSelecaoPorCaixaTemplate(position, e))
+            {
+                e.Handled = true;
+                return;
+            }
+
             _context.Tools.FerramentaAtual.OnMouseMove(position, CriarInputState(e, position));
         }
 
@@ -337,6 +347,16 @@ namespace Araci.Views
                 return;
             }
 
+            if (FinalizarSelecaoPorCaixaTemplate(position))
+            {
+                if (TemplatePageBorder.IsMouseCaptured)
+                    TemplatePageBorder.ReleaseMouseCapture();
+
+                AtualizarHandlesOverlay();
+                e.Handled = true;
+                return;
+            }
+
             _context.Tools.FerramentaAtual.OnMouseUp(position, CriarInputState(e, position, e.ChangedButton, e.ClickCount));
 
             if (TemplatePageBorder.IsMouseCaptured)
@@ -375,6 +395,9 @@ namespace Araci.Views
             if (_textoTemplateEmArrasteId.HasValue)
                 CancelarArrasteTextoTemplate();
 
+            if (_selectionBoxTemplateEmAndamento)
+                CancelarSelecaoPorCaixaTemplate();
+
             AtualizarHandlesOverlay();
         }
 
@@ -388,6 +411,14 @@ namespace Araci.Views
 
             if (e.Key == Key.Enter && IniciarEdicaoInlineTextoSelecionado())
             {
+                e.Handled = true;
+                return;
+            }
+
+            if (e.Key == Key.Escape && _selectionBoxTemplateEmAndamento)
+            {
+                CancelarSelecaoPorCaixaTemplate();
+                AtualizarHandlesOverlay();
                 e.Handled = true;
                 return;
             }
@@ -1332,10 +1363,95 @@ namespace Araci.Views
             LimparEstadoResizeCirculoTemplate();
             LimparEstadoResizeTextoTemplate();
             LimparEstadoEdicaoLeaderTextoTemplate();
+            IniciarSelecaoPorCaixaTemplate(viewModel, position);
             AtualizarPainelPropriedadesTemplateSelecionado();
             AtualizarHandlesOverlay();
             return true;
         }
+
+
+        private void IniciarSelecaoPorCaixaTemplate(ProjectSheetTypeViewModel viewModel, Point position)
+        {
+            ArgumentNullException.ThrowIfNull(viewModel);
+
+            viewModel.SelectionBox.Atualizar(position, position);
+            viewModel.SelectionBox.Visivel = false;
+            _selectionBoxTemplateStart = position;
+            _selectionBoxTemplateLastPosition = position;
+            _selectionBoxTemplateEmAndamento = true;
+            _selectionBoxTemplateArrastando = false;
+            TemplatePageBorder.CaptureMouse();
+        }
+
+        private bool AtualizarSelecaoPorCaixaTemplate(Point position, MouseEventArgs e)
+        {
+            ProjectSheetTypeViewModel? viewModel = ObterViewModelAtivo();
+
+            if (viewModel == null || !_selectionBoxTemplateEmAndamento)
+                return false;
+
+            if (e.LeftButton != MouseButtonState.Pressed)
+                return true;
+
+            Vector delta = position - _selectionBoxTemplateStart;
+
+            if (!_selectionBoxTemplateArrastando && delta.LengthSquared < DragThresholdSquared)
+                return true;
+
+            if (!PontoValido(position))
+                return true;
+
+            _selectionBoxTemplateArrastando = true;
+            _selectionBoxTemplateLastPosition = position;
+            viewModel.SelectionBox.Atualizar(_selectionBoxTemplateStart, position);
+            viewModel.SelectionBox.Visivel = viewModel.SelectionBox.Largura > 0.5 || viewModel.SelectionBox.Altura > 0.5;
+            AtualizarHandlesOverlay();
+            return true;
+        }
+
+        private bool FinalizarSelecaoPorCaixaTemplate(Point position)
+        {
+            ProjectSheetTypeViewModel? viewModel = ObterViewModelAtivo();
+
+            if (viewModel == null || !_selectionBoxTemplateEmAndamento)
+                return false;
+
+            bool arrastou = _selectionBoxTemplateArrastando;
+            Point finalPosition = PontoValido(position) ? position : _selectionBoxTemplateLastPosition;
+
+            if (arrastou)
+            {
+                viewModel.SelectionBox.Atualizar(_selectionBoxTemplateStart, finalPosition);
+                viewModel.SelectByBox(viewModel.SelectionBox.Bounds);
+            }
+
+            viewModel.SelectionBox.Visivel = false;
+            LimparEstadoSelecaoPorCaixaTemplate();
+            AtualizarPainelPropriedadesTemplateSelecionado();
+            AtualizarHandlesOverlay();
+            return true;
+        }
+
+        private void CancelarSelecaoPorCaixaTemplate()
+        {
+            ProjectSheetTypeViewModel? viewModel = ObterViewModelAtivo();
+
+            if (viewModel != null)
+                viewModel.SelectionBox.Visivel = false;
+
+            LimparEstadoSelecaoPorCaixaTemplate();
+            AtualizarHandlesOverlay();
+        }
+
+        private void LimparEstadoSelecaoPorCaixaTemplate()
+        {
+            _selectionBoxTemplateStart = default;
+            _selectionBoxTemplateLastPosition = default;
+            _selectionBoxTemplateEmAndamento = false;
+            _selectionBoxTemplateArrastando = false;
+        }
+
+
 
         private bool AtualizarArrasteTextoTemplate(Point position, MouseEventArgs e)
         {
