@@ -15,6 +15,7 @@ namespace Araci.ViewModels
     {
         private const double WorkspaceMargin = 360.0;
         private const double EndpointHandleSize = 12.0;
+        private const double LineSnapHandleSize = 10.0;
         private const double RectangleResizeHandleSize = 10.0;
         private const double CircleResizeHandleSize = 10.0;
         private const double TextResizeHandleSize = 10.0;
@@ -58,6 +59,7 @@ namespace Araci.ViewModels
             CircleResizeHandles = new ObservableCollection<ProjectSheetTemplateCircleResizeHandleViewModel>();
             TextResizeHandles = new ObservableCollection<ProjectSheetTemplateTextResizeHandleViewModel>();
             TextLeaderHandles = new ObservableCollection<ProjectSheetTemplateTextLeaderHandleViewModel>();
+            LineSnapPoints = new ObservableCollection<ProjectSheetTemplateLineSnapPointViewModel>();
             SelectionBox = new SelectionBoxViewModel();
             _document.PropriedadesTipoPranchaAlteradas += OnPropriedadesTipoPranchaAlteradas;
             _document.ItemProjetoRenomeado += OnItemProjetoRenomeado;
@@ -88,6 +90,7 @@ namespace Araci.ViewModels
         public ObservableCollection<ProjectSheetTemplateCircleResizeHandleViewModel> CircleResizeHandles { get; }
         public ObservableCollection<ProjectSheetTemplateTextResizeHandleViewModel> TextResizeHandles { get; }
         public ObservableCollection<ProjectSheetTemplateTextLeaderHandleViewModel> TextLeaderHandles { get; }
+        public ObservableCollection<ProjectSheetTemplateLineSnapPointViewModel> LineSnapPoints { get; }
         public SelectionBoxViewModel SelectionBox { get; }
         public Guid? SelectedLineId => _selectedLineId;
         public Guid? SelectedRectangleId => _selectedRectangleId;
@@ -106,6 +109,7 @@ namespace Araci.ViewModels
         public bool CircleResizeHandlesVisible => CircleResizeHandles.Count > 0;
         public bool TextResizeHandlesVisible => TextResizeHandles.Count > 0;
         public bool TextLeaderHandlesVisible => TextLeaderHandles.Count > 0;
+        public bool LineSnapPointsVisible => LineSnapPoints.Count > 0;
 
         public double ZoomScale
         {
@@ -497,6 +501,7 @@ namespace Araci.ViewModels
             OnPropertyChanged(nameof(WorkspaceHeight));
             OnPropertyChanged(nameof(ZoomScale));
             OnPropertyChanged(nameof(ZoomPercentText));
+            OnPropertyChanged(nameof(LineSnapPointsVisible));
             OnPropertyChanged(nameof(Titulo));
             OnPropertyChanged(nameof(Descricao));
             RefreshTexts();
@@ -892,6 +897,84 @@ namespace Araci.ViewModels
                 line.ClearEndpointPreview();
 
             RefreshEndpointHandles();
+        }
+
+        public bool TrySnapLineEndpoint(Point position, double tolerance, out Point snapPoint)
+        {
+            snapPoint = position;
+
+            if (!ValorFinito(position.X) || !ValorFinito(position.Y))
+            {
+                ClearLineSnapPoints();
+                return false;
+            }
+
+            double tolerancia = Math.Max(0.0, tolerance);
+            double toleranciaQuadrada = tolerancia * tolerancia;
+            double melhorDistanciaQuadrada = double.MaxValue;
+            Point melhorPonto = default;
+            bool encontrou = false;
+
+            foreach (ProjectSheetTemplateLineViewModel line in Lines)
+            {
+                AvaliarCandidato(new Point(line.X1, line.Y1));
+                AvaliarCandidato(new Point(line.X2, line.Y2));
+            }
+
+            if (!encontrou)
+            {
+                ClearLineSnapPoints();
+                return false;
+            }
+
+            snapPoint = melhorPonto;
+            ShowLineSnapPoint(melhorPonto);
+            return true;
+
+            void AvaliarCandidato(Point candidato)
+            {
+                if (!ValorFinito(candidato.X) || !ValorFinito(candidato.Y))
+                    return;
+
+                double distanciaQuadrada = DistanciaQuadrada(position, candidato);
+
+                if (distanciaQuadrada > toleranciaQuadrada || distanciaQuadrada >= melhorDistanciaQuadrada)
+                    return;
+
+                melhorDistanciaQuadrada = distanciaQuadrada;
+                melhorPonto = candidato;
+                encontrou = true;
+            }
+        }
+
+        public void ClearLineSnapPoints()
+        {
+            if (LineSnapPoints.Count == 0)
+                return;
+
+            LineSnapPoints.Clear();
+            OnPropertyChanged(nameof(LineSnapPointsVisible));
+        }
+
+        private void ShowLineSnapPoint(Point point)
+        {
+            if (!ValorFinito(point.X) || !ValorFinito(point.Y))
+            {
+                ClearLineSnapPoints();
+                return;
+            }
+
+            if (LineSnapPoints.Count == 1)
+            {
+                ProjectSheetTemplateLineSnapPointViewModel current = LineSnapPoints[0];
+
+                if (Math.Abs(current.X - point.X) < 0.0001 && Math.Abs(current.Y - point.Y) < 0.0001)
+                    return;
+            }
+
+            LineSnapPoints.Clear();
+            LineSnapPoints.Add(ProjectSheetTemplateLineSnapPointViewModel.Create(point.X, point.Y, LineSnapHandleSize));
+            OnPropertyChanged(nameof(LineSnapPointsVisible));
         }
 
         public bool TryHitRectangleAt(Point position, double tolerance, out Guid rectangleId)
@@ -1424,6 +1507,7 @@ namespace Araci.ViewModels
             OnPropertyChanged(nameof(CircleResizeHandlesVisible));
             OnPropertyChanged(nameof(TextResizeHandlesVisible));
             OnPropertyChanged(nameof(TextLeaderHandlesVisible));
+            OnPropertyChanged(nameof(LineSnapPointsVisible));
         }
 
         private void LimparSelecaoInterna()
@@ -1533,6 +1617,11 @@ namespace Araci.ViewModels
             return value;
         }
 
+        private static bool ValorFinito(double valor)
+        {
+            return !double.IsNaN(valor) && !double.IsInfinity(valor);
+        }
+
         private static double DistanciaAoSegmento(Point point, Point a, Point b)
         {
             double dx = b.X - a.X;
@@ -1563,6 +1652,30 @@ namespace Araci.ViewModels
         private void OnPropertyChanged([CallerMemberName] string? propertyName = null)
         {
             PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
+        }
+    }
+
+    public sealed class ProjectSheetTemplateLineSnapPointViewModel
+    {
+        private ProjectSheetTemplateLineSnapPointViewModel(double x, double y, double size)
+        {
+            X = x;
+            Y = y;
+            Size = size;
+        }
+
+        public double X { get; }
+        public double Y { get; }
+        public double Size { get; }
+        public double Left => X - Size / 2.0;
+        public double Top => Y - Size / 2.0;
+        public Brush Fill => Brushes.White;
+        public Brush Stroke => Brushes.DodgerBlue;
+        public double StrokeThickness => 2.0;
+
+        public static ProjectSheetTemplateLineSnapPointViewModel Create(double x, double y, double size)
+        {
+            return new ProjectSheetTemplateLineSnapPointViewModel(x, y, size);
         }
     }
 

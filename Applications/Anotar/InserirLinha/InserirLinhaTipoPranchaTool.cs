@@ -11,6 +11,7 @@ namespace Araci.Applications.Anotar.InserirLinha
     public sealed class InserirLinhaTipoPranchaTool : ITool
     {
         private const double ToleranciaDistanciaQuadrada = 0.0001;
+        private const double LineEndpointSnapTolerance = 8.0;
 
         private readonly Func<ProjectSheetTypeViewModel?> _obterViewModelAtivo;
         private readonly InserirLinhaNoTipoPranchaUseCase _inserirLinha;
@@ -43,7 +44,10 @@ namespace Araci.Applications.Anotar.InserirLinha
         public void Cancelar()
         {
             _pontoInicial = null;
-            _obterViewModelAtivo()?.SetPreviewLine(null);
+
+            ProjectSheetTypeViewModel? viewModel = _obterViewModelAtivo();
+            viewModel?.SetPreviewLine(null);
+            viewModel?.ClearLineSnapPoints();
         }
 
         public void OnMouseDown(ElementoViewModel? vm, Point position, ToolInputState inputState)
@@ -53,11 +57,12 @@ namespace Araci.Applications.Anotar.InserirLinha
             if (viewModel == null)
                 return;
 
-            Point ponto = NormalizarPonto(position, viewModel);
+            Point ponto = ObterPontoDeCriacao(position, viewModel, aplicarSnap: !inputState.IsShiftPressed);
 
             if (!_pontoInicial.HasValue)
             {
                 _pontoInicial = ponto;
+                viewModel.ClearLineSnapPoints();
                 AtualizarPreview(viewModel, ponto, false);
                 return;
             }
@@ -69,10 +74,17 @@ namespace Araci.Applications.Anotar.InserirLinha
         {
             ProjectSheetTypeViewModel? viewModel = _obterViewModelAtivo();
 
-            if (viewModel == null || !_pontoInicial.HasValue)
+            if (viewModel == null)
                 return;
 
-            AtualizarPreview(viewModel, NormalizarPonto(position, viewModel), inputState.IsShiftPressed);
+            if (!_pontoInicial.HasValue)
+            {
+                ObterPontoDeCriacao(position, viewModel, aplicarSnap: true);
+                return;
+            }
+
+            Point ponto = ObterPontoDeCriacao(position, viewModel, aplicarSnap: !inputState.IsShiftPressed);
+            AtualizarPreview(viewModel, ponto, inputState.IsShiftPressed);
         }
 
         public void OnMouseUp(Point position, ToolInputState inputState)
@@ -105,6 +117,7 @@ namespace Araci.Applications.Anotar.InserirLinha
 
             _inserirLinha.Inserir(viewModel.Id, pontoInicial.X, pontoInicial.Y, pontoFinalAjustado.X, pontoFinalAjustado.Y);
             viewModel.Refresh();
+            viewModel.ClearLineSnapPoints();
 
             if (manterAtiva)
             {
@@ -136,6 +149,21 @@ namespace Araci.Applications.Anotar.InserirLinha
                 Y2 = pontoFinalAjustado.Y,
                 Stroke = "#FF1E90FF"
             });
+        }
+
+        private static Point ObterPontoDeCriacao(Point ponto, ProjectSheetTypeViewModel viewModel, bool aplicarSnap)
+        {
+            Point normalizado = NormalizarPonto(ponto, viewModel);
+
+            if (!aplicarSnap)
+            {
+                viewModel.ClearLineSnapPoints();
+                return normalizado;
+            }
+
+            return viewModel.TrySnapLineEndpoint(normalizado, LineEndpointSnapTolerance, out Point snapPoint)
+                ? NormalizarPonto(snapPoint, viewModel)
+                : normalizado;
         }
 
         private static Point NormalizarPonto(Point ponto, ProjectSheetTypeViewModel viewModel)
