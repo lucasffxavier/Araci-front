@@ -170,6 +170,76 @@ namespace Araci.Applications.UseCases.Projeto
             return true;
         }
 
+        public bool AlterarLeaderPoint(Guid tipoId, Guid textoId, double x, double y)
+        {
+            if (!ValorFinito(x) || !ValorFinito(y))
+                return false;
+
+            if (!TryGetTexto(tipoId, textoId, out ProjectSheetType tipo, out ProjectSheetTemplateText texto))
+                return false;
+
+            if (!texto.LeaderAtivo)
+                return false;
+
+            if (Math.Abs(texto.LeaderX - x) < 0.000001 && Math.Abs(texto.LeaderY - y) < 0.000001 && texto.PossuiLeaderPointValido)
+                return false;
+
+            ProjectSheetTemplateTextLeaderState estadoAnterior = ProjectSheetTemplateTextLeaderState.FromText(texto);
+            ProjectSheetTemplateTextLeaderState estadoNovo = new(
+                true,
+                x,
+                y,
+                texto.LeaderComCotovelo,
+                texto.LeaderCotoveloX,
+                texto.LeaderCotoveloY,
+                texto.LeaderCotoveloManual);
+
+            _commands.Execute(new UpdateProjectSheetTypeTextPropertyCommand<ProjectSheetTemplateTextLeaderState>(
+                _document,
+                tipo,
+                texto.Id,
+                (t, value) => value.Aplicar(t),
+                estadoAnterior,
+                estadoNovo));
+
+            return true;
+        }
+
+        public bool AlterarLeaderCotoveloPoint(Guid tipoId, Guid textoId, double x, double y)
+        {
+            if (!ValorFinito(x) || !ValorFinito(y))
+                return false;
+
+            if (!TryGetTexto(tipoId, textoId, out ProjectSheetType tipo, out ProjectSheetTemplateText texto))
+                return false;
+
+            if (!texto.LeaderAtivo || !texto.LeaderComCotovelo)
+                return false;
+
+            if (texto.LeaderCotoveloManual && Math.Abs(texto.LeaderCotoveloX - x) < 0.000001 && Math.Abs(texto.LeaderCotoveloY - y) < 0.000001)
+                return false;
+
+            ProjectSheetTemplateTextLeaderState estadoAnterior = ProjectSheetTemplateTextLeaderState.FromText(texto);
+            ProjectSheetTemplateTextLeaderState estadoNovo = new(
+                true,
+                texto.LeaderX,
+                texto.LeaderY,
+                true,
+                x,
+                y,
+                true);
+
+            _commands.Execute(new UpdateProjectSheetTypeTextPropertyCommand<ProjectSheetTemplateTextLeaderState>(
+                _document,
+                tipo,
+                texto.Id,
+                (t, value) => value.Aplicar(t),
+                estadoAnterior,
+                estadoNovo));
+
+            return true;
+        }
+
         public bool AlterarTipoTexto(Guid tipoId, Guid textoId, TipoTextoAnotativo tipoTexto)
         {
             if (tipoTexto == null)

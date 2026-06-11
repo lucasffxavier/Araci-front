@@ -21,6 +21,7 @@ namespace Araci.Views
         private const double RectangleResizeHandleHitTolerance = 8.0;
         private const double CircleResizeHandleHitTolerance = 8.0;
         private const double TextResizeHandleHitTolerance = 8.0;
+        private const double TextLeaderHandleHitTolerance = 8.0;
         private const double DragThresholdSquared = 9.0;
         private const double LayoutTolerance = 1.0;
         private const int CenterSheetMaxAttempts = 10;
@@ -45,6 +46,12 @@ namespace Araci.Views
         private bool _textoTemplateResizeLastPositionValid;
         private bool _textoTemplateResizeArrastando;
         private double _textoTemplateResizeOriginalX;
+        private Guid? _textoTemplateLeaderEmArrasteId;
+        private ProjectSheetTemplateTextLeaderHandleKind? _textoTemplateLeaderHandleEmArraste;
+        private Point _textoTemplateLeaderDragStart;
+        private Point _textoTemplateLeaderLastPosition;
+        private bool _textoTemplateLeaderLastPositionValid;
+        private bool _textoTemplateLeaderArrastando;
         private bool _textoTemplateInlineCommitEmAndamento;
         private Guid? _circuloTemplateResizeEmArrasteId;
         private Point _circuloTemplateResizeDragStart;
@@ -121,6 +128,12 @@ namespace Araci.Views
 
             Point position = ObterPontoLocalFolha(e);
 
+            if (TentarIniciarEdicaoLeaderTextoTemplate(position))
+            {
+                e.Handled = true;
+                return;
+            }
+
             if (TentarIniciarResizeCirculoTemplate(position))
             {
                 e.Handled = true;
@@ -167,6 +180,12 @@ namespace Araci.Views
 
             if (TextoInlineEmEdicaoAtivo())
                 return;
+
+            if (AtualizarEdicaoLeaderTextoTemplate(position, e))
+            {
+                e.Handled = true;
+                return;
+            }
 
             if (AtualizarResizeCirculoTemplate(position, e))
             {
@@ -225,6 +244,16 @@ namespace Araci.Views
                 return;
 
             Point position = ObterPontoLocalFolha(e);
+
+            if (FinalizarEdicaoLeaderTextoTemplate())
+            {
+                if (TemplatePageBorder.IsMouseCaptured)
+                    TemplatePageBorder.ReleaseMouseCapture();
+
+                AtualizarHandlesOverlay();
+                e.Handled = true;
+                return;
+            }
 
             if (FinalizarResizeCirculoTemplate())
             {
@@ -326,6 +355,9 @@ namespace Araci.Views
             if (_textoTemplateResizeEmArrasteId.HasValue)
                 CancelarResizeTextoTemplate();
 
+            if (_textoTemplateLeaderEmArrasteId.HasValue)
+                CancelarEdicaoLeaderTextoTemplate();
+
             if (_linhaTemplateEndpointEmArrasteId.HasValue)
                 CancelarEdicaoExtremidadeLinhaTemplate();
 
@@ -354,6 +386,14 @@ namespace Araci.Views
 
             if (e.Key == Key.Enter && IniciarEdicaoInlineTextoSelecionado())
             {
+                e.Handled = true;
+                return;
+            }
+
+            if (e.Key == Key.Escape && _textoTemplateLeaderEmArrasteId.HasValue)
+            {
+                CancelarEdicaoLeaderTextoTemplate();
+                AtualizarHandlesOverlay();
                 e.Handled = true;
                 return;
             }
@@ -468,6 +508,7 @@ namespace Araci.Views
             LimparEstadoArrasteTextoTemplate();
             LimparEstadoResizeRetanguloTemplate();
             LimparEstadoResizeTextoTemplate();
+            LimparEstadoEdicaoLeaderTextoTemplate();
             TemplatePageBorder.CaptureMouse();
             AtualizarHandlesOverlay();
             return true;
@@ -564,6 +605,146 @@ namespace Araci.Views
             _circuloTemplateResizeOriginalY = 0.0;
         }
 
+        private bool TentarIniciarEdicaoLeaderTextoTemplate(Point position)
+        {
+            ProjectSheetTypeViewModel? viewModel = ObterViewModelAtivo();
+
+            if (_context == null || viewModel == null)
+                return false;
+
+            ITool ferramentaAtual = _context.Tools.FerramentaAtual;
+
+            if (!string.Equals(ferramentaAtual.Nome, "Selecionar", StringComparison.OrdinalIgnoreCase) || ferramentaAtual.IsBusy)
+                return false;
+
+            if (!viewModel.TryHitSelectedTextLeaderHandle(position, TextLeaderHandleHitTolerance, out Guid textId, out ProjectSheetTemplateTextLeaderHandleKind kind))
+                return false;
+
+            _textoTemplateLeaderEmArrasteId = textId;
+            _textoTemplateLeaderHandleEmArraste = kind;
+            _textoTemplateLeaderDragStart = position;
+            _textoTemplateLeaderLastPosition = position;
+            _textoTemplateLeaderLastPositionValid = PontoValido(position);
+            _textoTemplateLeaderArrastando = false;
+            LimparEstadoArrasteLinhaTemplate();
+            LimparEstadoArrasteRetanguloTemplate();
+            LimparEstadoArrasteCirculoTemplate();
+            LimparEstadoArrasteTextoTemplate();
+            LimparEstadoResizeRetanguloTemplate();
+            LimparEstadoResizeCirculoTemplate();
+            LimparEstadoResizeTextoTemplate();
+            TemplatePageBorder.CaptureMouse();
+            AtualizarHandlesOverlay();
+            return true;
+        }
+
+        private bool AtualizarEdicaoLeaderTextoTemplate(Point position, MouseEventArgs e)
+        {
+            ProjectSheetTypeViewModel? viewModel = ObterViewModelAtivo();
+
+            if (viewModel == null || !_textoTemplateLeaderEmArrasteId.HasValue || !_textoTemplateLeaderHandleEmArraste.HasValue)
+                return false;
+
+            if (e.LeftButton != MouseButtonState.Pressed)
+                return false;
+
+            Vector delta = position - _textoTemplateLeaderDragStart;
+
+            if (!_textoTemplateLeaderArrastando && delta.LengthSquared < DragThresholdSquared)
+                return true;
+
+            if (!PontoValido(position))
+                return true;
+
+            bool previewAplicado = AplicarPreviewLeaderTextoTemplate(viewModel, _textoTemplateLeaderEmArrasteId.Value, _textoTemplateLeaderHandleEmArraste.Value, position);
+
+            if (!previewAplicado)
+                return true;
+
+            _textoTemplateLeaderArrastando = true;
+            _textoTemplateLeaderLastPosition = position;
+            _textoTemplateLeaderLastPositionValid = true;
+            AtualizarHandlesOverlay();
+            return true;
+        }
+
+        private bool FinalizarEdicaoLeaderTextoTemplate()
+        {
+            ProjectSheetTypeViewModel? viewModel = ObterViewModelAtivo();
+
+            if (_context == null || viewModel == null || !_textoTemplateLeaderEmArrasteId.HasValue || !_textoTemplateLeaderHandleEmArraste.HasValue)
+                return false;
+
+            Guid textId = _textoTemplateLeaderEmArrasteId.Value;
+            ProjectSheetTemplateTextLeaderHandleKind kind = _textoTemplateLeaderHandleEmArraste.Value;
+            bool arrastou = _textoTemplateLeaderArrastando;
+            Point finalPosition = _textoTemplateLeaderLastPosition;
+            bool finalPositionValid = _textoTemplateLeaderLastPositionValid && PontoValido(finalPosition);
+
+            LimparPreviewLeaderTextoTemplate(viewModel, textId, kind);
+            LimparEstadoEdicaoLeaderTextoTemplate();
+
+            if (!arrastou || !finalPositionValid)
+            {
+                AtualizarHandlesOverlay();
+                return true;
+            }
+
+            bool alterou = kind == ProjectSheetTemplateTextLeaderHandleKind.End
+                ? _context.MoverTextoDoTipoPrancha.AlterarLeaderPoint(viewModel.Id, textId, finalPosition.X, finalPosition.Y)
+                : _context.MoverTextoDoTipoPrancha.AlterarLeaderCotoveloPoint(viewModel.Id, textId, finalPosition.X, finalPosition.Y);
+
+            if (alterou)
+                viewModel.SelectText(textId);
+
+            AtualizarPainelPropriedadesTemplateSelecionado();
+            AtualizarHandlesOverlay();
+            return true;
+        }
+
+        private void CancelarEdicaoLeaderTextoTemplate()
+        {
+            ProjectSheetTypeViewModel? viewModel = ObterViewModelAtivo();
+
+            if (viewModel != null && _textoTemplateLeaderEmArrasteId.HasValue && _textoTemplateLeaderHandleEmArraste.HasValue)
+                LimparPreviewLeaderTextoTemplate(viewModel, _textoTemplateLeaderEmArrasteId.Value, _textoTemplateLeaderHandleEmArraste.Value);
+
+            LimparEstadoEdicaoLeaderTextoTemplate();
+            AtualizarHandlesOverlay();
+        }
+
+        private void LimparEstadoEdicaoLeaderTextoTemplate()
+        {
+            _textoTemplateLeaderEmArrasteId = null;
+            _textoTemplateLeaderHandleEmArraste = null;
+            _textoTemplateLeaderDragStart = default;
+            _textoTemplateLeaderLastPosition = default;
+            _textoTemplateLeaderLastPositionValid = false;
+            _textoTemplateLeaderArrastando = false;
+        }
+
+        private static bool AplicarPreviewLeaderTextoTemplate(
+            ProjectSheetTypeViewModel viewModel,
+            Guid textId,
+            ProjectSheetTemplateTextLeaderHandleKind kind,
+            Point position)
+        {
+            return kind == ProjectSheetTemplateTextLeaderHandleKind.End
+                ? viewModel.SetTextPreviewLeaderPoint(textId, position)
+                : viewModel.SetTextPreviewLeaderCotoveloPoint(textId, position);
+        }
+
+        private static void LimparPreviewLeaderTextoTemplate(
+            ProjectSheetTypeViewModel viewModel,
+            Guid textId,
+            ProjectSheetTemplateTextLeaderHandleKind kind)
+        {
+            if (kind == ProjectSheetTemplateTextLeaderHandleKind.End)
+                viewModel.ClearTextPreviewLeaderPoint(textId);
+            else
+                viewModel.ClearTextPreviewLeaderCotoveloPoint(textId);
+        }
+
         private bool TentarIniciarResizeTextoTemplate(Point position)
         {
             ProjectSheetTypeViewModel? viewModel = ObterViewModelAtivo();
@@ -651,6 +832,7 @@ namespace Araci.Views
 
             viewModel.ClearTextPreviewBoxWidth(textId);
             LimparEstadoResizeTextoTemplate();
+            LimparEstadoEdicaoLeaderTextoTemplate();
 
             if (!arrastou || !finalPositionValid)
             {
@@ -677,6 +859,7 @@ namespace Araci.Views
                 viewModel.ClearTextPreviewBoxWidth(_textoTemplateResizeEmArrasteId.Value);
 
             LimparEstadoResizeTextoTemplate();
+            LimparEstadoEdicaoLeaderTextoTemplate();
             AtualizarHandlesOverlay();
         }
 
@@ -727,6 +910,7 @@ namespace Araci.Views
             LimparEstadoArrasteTextoTemplate();
             LimparEstadoResizeCirculoTemplate();
             LimparEstadoResizeTextoTemplate();
+            LimparEstadoEdicaoLeaderTextoTemplate();
             TemplatePageBorder.CaptureMouse();
             AtualizarHandlesOverlay();
             return true;
@@ -886,6 +1070,7 @@ namespace Araci.Views
             LimparEstadoArrasteTextoTemplate();
             LimparEstadoResizeRetanguloTemplate();
             LimparEstadoResizeTextoTemplate();
+            LimparEstadoEdicaoLeaderTextoTemplate();
             TemplatePageBorder.CaptureMouse();
             AtualizarHandlesOverlay();
             return true;
@@ -1025,6 +1210,7 @@ namespace Araci.Views
                 LimparEstadoResizeRetanguloTemplate();
                 LimparEstadoResizeCirculoTemplate();
                 LimparEstadoResizeTextoTemplate();
+                LimparEstadoEdicaoLeaderTextoTemplate();
 
                 if (clickCount >= 2)
                 {
@@ -1056,6 +1242,7 @@ namespace Araci.Views
                 LimparEstadoResizeRetanguloTemplate();
                 LimparEstadoResizeCirculoTemplate();
                 LimparEstadoResizeTextoTemplate();
+                LimparEstadoEdicaoLeaderTextoTemplate();
                 TemplatePageBorder.CaptureMouse();
                 AtualizarPainelPropriedadesTemplateSelecionado();
                 AtualizarHandlesOverlay();
@@ -1074,6 +1261,7 @@ namespace Araci.Views
                 LimparEstadoResizeRetanguloTemplate();
                 LimparEstadoResizeCirculoTemplate();
                 LimparEstadoResizeTextoTemplate();
+                LimparEstadoEdicaoLeaderTextoTemplate();
                 TemplatePageBorder.CaptureMouse();
                 AtualizarPainelPropriedadesTemplateSelecionado();
                 AtualizarHandlesOverlay();
@@ -1092,6 +1280,7 @@ namespace Araci.Views
                 LimparEstadoResizeRetanguloTemplate();
                 LimparEstadoResizeCirculoTemplate();
                 LimparEstadoResizeTextoTemplate();
+                LimparEstadoEdicaoLeaderTextoTemplate();
                 TemplatePageBorder.CaptureMouse();
                 AtualizarPainelPropriedadesTemplateSelecionado();
                 AtualizarHandlesOverlay();
@@ -1106,6 +1295,7 @@ namespace Araci.Views
             LimparEstadoResizeRetanguloTemplate();
             LimparEstadoResizeCirculoTemplate();
             LimparEstadoResizeTextoTemplate();
+            LimparEstadoEdicaoLeaderTextoTemplate();
             AtualizarPainelPropriedadesTemplateSelecionado();
             AtualizarHandlesOverlay();
             return true;
@@ -1404,6 +1594,7 @@ namespace Araci.Views
 
             LimparEstadoArrasteTextoTemplate();
             LimparEstadoResizeTextoTemplate();
+            LimparEstadoEdicaoLeaderTextoTemplate();
             FocarEditorTextoInlineDeferred(textId);
             AtualizarHandlesOverlay();
             return true;

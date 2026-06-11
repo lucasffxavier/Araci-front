@@ -24,6 +24,10 @@ namespace Araci.ViewModels
         private double _previewBoxWidth;
         private bool _isSelected;
         private bool _isEditingInline;
+        private bool _hasPreviewLeaderPoint;
+        private Point _previewLeaderPoint;
+        private bool _hasPreviewLeaderCotoveloPoint;
+        private Point _previewLeaderCotoveloPoint;
         private string _conteudoEdicao = string.Empty;
 
         public ProjectSheetTemplateTextViewModel(ProjectSheetTemplateText texto)
@@ -101,6 +105,8 @@ namespace Araci.ViewModels
         public PointCollection LeaderOpenArrowWorldPoints => CalcularLeaderOpenArrowWorldPoints();
         public bool HasPreviewOffset => Math.Abs(_previewOffsetX) > 0.000001 || Math.Abs(_previewOffsetY) > 0.000001;
         public bool HasPreviewBoxWidth => _hasPreviewBoxWidth;
+        public bool HasPreviewLeaderPoint => _hasPreviewLeaderPoint;
+        public bool HasPreviewLeaderCotoveloPoint => _hasPreviewLeaderCotoveloPoint;
         public bool IsNotEditingInline => !IsEditingInline;
         public Brush SelectionBorderBrush => IsSelected ? Brushes.DodgerBlue : Brushes.Transparent;
         public Thickness SelectionBorderThickness => IsSelected ? new Thickness(DefaultSelectionThickness) : new Thickness(0.0);
@@ -208,6 +214,58 @@ namespace Araci.ViewModels
             OnPropertyChanged(nameof(HasPreviewBoxWidth));
         }
 
+        public bool SetPreviewLeaderPoint(Point point)
+        {
+            if (!PontoValido(point))
+                return false;
+
+            if (_hasPreviewLeaderPoint && DistanciaQuadrada(_previewLeaderPoint, point) < 0.000001)
+                return true;
+
+            _hasPreviewLeaderPoint = true;
+            _previewLeaderPoint = point;
+            OnPropertyChanged(nameof(HasPreviewLeaderPoint));
+            NotificarLeader();
+            return true;
+        }
+
+        public void ClearPreviewLeaderPoint()
+        {
+            if (!_hasPreviewLeaderPoint)
+                return;
+
+            _hasPreviewLeaderPoint = false;
+            _previewLeaderPoint = default;
+            OnPropertyChanged(nameof(HasPreviewLeaderPoint));
+            NotificarLeader();
+        }
+
+        public bool SetPreviewLeaderCotoveloPoint(Point point)
+        {
+            if (!PontoValido(point))
+                return false;
+
+            if (_hasPreviewLeaderCotoveloPoint && DistanciaQuadrada(_previewLeaderCotoveloPoint, point) < 0.000001)
+                return true;
+
+            _hasPreviewLeaderCotoveloPoint = true;
+            _previewLeaderCotoveloPoint = point;
+            OnPropertyChanged(nameof(HasPreviewLeaderCotoveloPoint));
+            NotificarLeader();
+            return true;
+        }
+
+        public void ClearPreviewLeaderCotoveloPoint()
+        {
+            if (!_hasPreviewLeaderCotoveloPoint)
+                return;
+
+            _hasPreviewLeaderCotoveloPoint = false;
+            _previewLeaderCotoveloPoint = default;
+            OnPropertyChanged(nameof(HasPreviewLeaderCotoveloPoint));
+            NotificarLeader();
+        }
+
         public void IniciarEdicaoInline()
         {
             ConteudoEdicao = Conteudo;
@@ -242,6 +300,8 @@ namespace Araci.ViewModels
             OnPropertyChanged(nameof(LarguraCaixa));
             OnPropertyChanged(nameof(ModelLarguraCaixa));
             OnPropertyChanged(nameof(HasPreviewBoxWidth));
+            OnPropertyChanged(nameof(HasPreviewLeaderPoint));
+            OnPropertyChanged(nameof(HasPreviewLeaderCotoveloPoint));
             OnPropertyChanged(nameof(Rotacao));
             OnPropertyChanged(nameof(Visible));
             OnPropertyChanged(nameof(AlturaEstimada));
@@ -381,6 +441,9 @@ namespace Araci.ViewModels
 
         private Point CalcularLeaderPointWorld()
         {
+            if (_hasPreviewLeaderPoint)
+                return _previewLeaderPoint;
+
             if (_texto.PossuiLeaderPointValido)
                 return new Point(_texto.LeaderX + _previewOffsetX, _texto.LeaderY + _previewOffsetY);
 
@@ -389,6 +452,9 @@ namespace Araci.ViewModels
 
         private Point CalcularLeaderCotoveloWorld()
         {
+            if (_hasPreviewLeaderCotoveloPoint)
+                return _previewLeaderCotoveloPoint;
+
             if (_texto.LeaderCotoveloManual && _texto.PossuiLeaderCotoveloPointValido)
                 return new Point(_texto.LeaderCotoveloX + _previewOffsetX, _texto.LeaderCotoveloY + _previewOffsetY);
 
@@ -606,6 +672,18 @@ namespace Araci.ViewModels
         private static bool ValorFinito(double value)
         {
             return !double.IsNaN(value) && !double.IsInfinity(value);
+        }
+
+        private static bool PontoValido(Point point)
+        {
+            return ValorFinito(point.X) && ValorFinito(point.Y);
+        }
+
+        private static double DistanciaQuadrada(Point a, Point b)
+        {
+            double dx = a.X - b.X;
+            double dy = a.Y - b.Y;
+            return dx * dx + dy * dy;
         }
 
         private void OnPropertyChanged([CallerMemberName] string? propertyName = null)
