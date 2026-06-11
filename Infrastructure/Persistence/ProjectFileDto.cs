@@ -34,6 +34,7 @@ namespace Araci.Infrastructure.Persistence
         public List<ProjectSheetTemplateLineDto> Linhas { get; set; } = new();
         public List<ProjectSheetTemplateRectangleDto> Retangulos { get; set; } = new();
         public List<ProjectSheetTemplateCircleDto> Circulos { get; set; } = new();
+        public List<ProjectSheetTemplateTextDto> Textos { get; set; } = new();
     }
 
     public sealed class ProjectSheetTemplateLineDto
@@ -75,6 +76,23 @@ namespace Araci.Infrastructure.Persistence
         public TypeRefDto? Type { get; set; }
         public string Stroke { get; set; } = "#FF000000";
         public double StrokeThickness { get; set; } = 1.0;
+        public bool Visible { get; set; } = true;
+    }
+
+    public sealed class ProjectSheetTemplateTextDto
+    {
+        public Guid Id { get; set; }
+        public string Nome { get; set; } = string.Empty;
+        public double X { get; set; }
+        public double Y { get; set; }
+        public string Texto { get; set; } = "Texto";
+        public double LarguraCaixa { get; set; } = 200.0;
+        public TypeRefDto? Type { get; set; }
+        public string CorTexto { get; set; } = "#FF000000";
+        public string Fonte { get; set; } = "Arial";
+        public double AlturaTexto { get; set; } = 14.0;
+        public string AlinhamentoHorizontal { get; set; } = "Esquerda";
+        public double Rotacao { get; set; }
         public bool Visible { get; set; } = true;
     }
 

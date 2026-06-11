@@ -538,6 +538,10 @@ namespace Araci.Infrastructure.Persistence
                 Circulos = (tipo.Circulos ?? new List<ProjectSheetTemplateCircle>())
                     .Where(c => c != null)
                     .Select(CriarProjectSheetTemplateCircleDto)
+                    .ToList(),
+                Textos = (tipo.Textos ?? new List<ProjectSheetTemplateText>())
+                    .Where(t => t != null)
+                    .Select(CriarProjectSheetTemplateTextDto)
                     .ToList()
             };
         }
@@ -628,6 +632,38 @@ namespace Araci.Infrastructure.Persistence
                 : null;
         }
 
+        private static ProjectSheetTemplateTextDto CriarProjectSheetTemplateTextDto(ProjectSheetTemplateText texto)
+        {
+            return new ProjectSheetTemplateTextDto
+            {
+                Id = texto.Id,
+                Nome = texto.Nome,
+                X = texto.X,
+                Y = texto.Y,
+                Texto = texto.Texto,
+                LarguraCaixa = texto.LarguraCaixa,
+                Type = CriarProjectSheetTemplateTextTypeRef(texto),
+                CorTexto = string.IsNullOrWhiteSpace(texto.CorTexto) ? ProjectSheetTemplateText.DefaultTextColor : texto.CorTexto,
+                Fonte = string.IsNullOrWhiteSpace(texto.Fonte) ? ProjectSheetTemplateText.DefaultFont : texto.Fonte,
+                AlturaTexto = NormalizarAlturaTextoTemplate(texto.AlturaTexto),
+                AlinhamentoHorizontal = string.IsNullOrWhiteSpace(texto.AlinhamentoHorizontal) ? ProjectSheetTemplateText.DefaultHorizontalAlignment : texto.AlinhamentoHorizontal,
+                Rotacao = NormalizarRotacao(texto.Rotacao),
+                Visible = texto.Visible
+            };
+        }
+
+        private static TypeRefDto? CriarProjectSheetTemplateTextTypeRef(ProjectSheetTemplateText texto)
+        {
+            return texto.PossuiTipoTexto
+                ? new TypeRefDto
+                {
+                    NomeTipo = texto.TipoTextoNome,
+                    Familia = texto.TipoTextoFamilia,
+                    Categoria = texto.TipoTextoCategoria
+                }
+                : null;
+        }
+
         private static ProjectView? CriarProjectView(ProjectViewDto dto)
         {
             if (string.IsNullOrWhiteSpace(dto.Nome))
@@ -705,7 +741,8 @@ namespace Araci.Infrastructure.Persistence
                 AlturaFolha = NormalizarDimensaoFolha(dto.AlturaFolha, ProjectSheet.DefaultHeight),
                 Linhas = ParseProjectSheetTemplateLines(dto.Linhas),
                 Retangulos = ParseProjectSheetTemplateRectangles(dto.Retangulos),
-                Circulos = ParseProjectSheetTemplateCircles(dto.Circulos)
+                Circulos = ParseProjectSheetTemplateCircles(dto.Circulos),
+                Textos = ParseProjectSheetTemplateTexts(dto.Textos)
             };
         }
 
@@ -832,6 +869,53 @@ namespace Araci.Infrastructure.Persistence
                 circulo.DefinirTipoLinha(null, null, null);
 
             return circulo;
+        }
+
+        private static List<ProjectSheetTemplateText> ParseProjectSheetTemplateTexts(IEnumerable<ProjectSheetTemplateTextDto>? valores)
+        {
+            if (valores == null)
+                return new List<ProjectSheetTemplateText>();
+
+            return valores
+                .Where(v => v != null)
+                .Select(CriarProjectSheetTemplateText)
+                .ToList();
+        }
+
+        private static ProjectSheetTemplateText CriarProjectSheetTemplateText(ProjectSheetTemplateTextDto dto)
+        {
+            var texto = new ProjectSheetTemplateText
+            {
+                Id = dto.Id == Guid.Empty ? Guid.NewGuid() : dto.Id,
+                Nome = NormalizarNomeTemplate(dto.Nome),
+                X = NormalizarCoordenada(dto.X),
+                Y = NormalizarCoordenada(dto.Y),
+                Texto = dto.Texto ?? string.Empty,
+                LarguraCaixa = NormalizarLarguraTextoTemplate(dto.LarguraCaixa),
+                CorTexto = string.IsNullOrWhiteSpace(dto.CorTexto) ? ProjectSheetTemplateText.DefaultTextColor : dto.CorTexto,
+                Fonte = string.IsNullOrWhiteSpace(dto.Fonte) ? ProjectSheetTemplateText.DefaultFont : dto.Fonte.Trim(),
+                AlturaTexto = NormalizarAlturaTextoTemplate(dto.AlturaTexto),
+                AlinhamentoHorizontal = string.IsNullOrWhiteSpace(dto.AlinhamentoHorizontal) ? ProjectSheetTemplateText.DefaultHorizontalAlignment : dto.AlinhamentoHorizontal.Trim(),
+                Rotacao = NormalizarRotacao(dto.Rotacao),
+                Visible = dto.Visible
+            };
+
+            if (dto.Type != null && !string.IsNullOrWhiteSpace(dto.Type.NomeTipo))
+            {
+                texto.DefinirTipoTexto(dto.Type.NomeTipo, dto.Type.Familia, dto.Type.Categoria);
+                return texto;
+            }
+
+            bool possuiEstiloLegadoCustomizado =
+                !string.Equals(texto.CorTexto, ProjectSheetTemplateText.DefaultTextColor, StringComparison.OrdinalIgnoreCase) ||
+                !string.Equals(texto.Fonte, ProjectSheetTemplateText.DefaultFont, StringComparison.OrdinalIgnoreCase) ||
+                !string.Equals(texto.AlinhamentoHorizontal, ProjectSheetTemplateText.DefaultHorizontalAlignment, StringComparison.OrdinalIgnoreCase) ||
+                Math.Abs(texto.AlturaTexto - ProjectSheetTemplateText.DefaultTextHeight) > 0.000001;
+
+            if (possuiEstiloLegadoCustomizado)
+                texto.DefinirTipoTexto(null, null, null);
+
+            return texto;
         }
 
         private Elemento? CriarElemento(ElementDto dto)
@@ -1112,6 +1196,20 @@ namespace Araci.Infrastructure.Persistence
         {
             return double.IsNaN(valor) || double.IsInfinity(valor) || valor < ProjectSheetTemplateCircle.MinRadius
                 ? fallback
+                : valor;
+        }
+
+        private static double NormalizarLarguraTextoTemplate(double valor)
+        {
+            return double.IsNaN(valor) || double.IsInfinity(valor) || valor < ProjectSheetTemplateText.MinBoxWidth
+                ? ProjectSheetTemplateText.DefaultBoxWidth
+                : valor;
+        }
+
+        private static double NormalizarAlturaTextoTemplate(double valor)
+        {
+            return double.IsNaN(valor) || double.IsInfinity(valor) || valor < ProjectSheetTemplateText.MinTextHeight
+                ? ProjectSheetTemplateText.DefaultTextHeight
                 : valor;
         }
 
