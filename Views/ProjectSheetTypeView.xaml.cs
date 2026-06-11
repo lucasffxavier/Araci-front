@@ -19,6 +19,7 @@ namespace Araci.Views
         private const double TextHitTolerance = 3.0;
         private const double RectangleResizeHandleHitTolerance = 8.0;
         private const double CircleResizeHandleHitTolerance = 8.0;
+        private const double TextResizeHandleHitTolerance = 8.0;
         private const double DragThresholdSquared = 9.0;
         private const double LayoutTolerance = 1.0;
         private const int CenterSheetMaxAttempts = 10;
@@ -37,6 +38,12 @@ namespace Araci.Views
         private Guid? _textoTemplateEmArrasteId;
         private Point _textoTemplateDragStart;
         private bool _textoTemplateArrastando;
+        private Guid? _textoTemplateResizeEmArrasteId;
+        private Point _textoTemplateResizeDragStart;
+        private Point _textoTemplateResizeLastPosition;
+        private bool _textoTemplateResizeLastPositionValid;
+        private bool _textoTemplateResizeArrastando;
+        private double _textoTemplateResizeOriginalX;
         private Guid? _circuloTemplateResizeEmArrasteId;
         private Point _circuloTemplateResizeDragStart;
         private Point _circuloTemplateResizeLastPosition;
@@ -121,6 +128,12 @@ namespace Araci.Views
                 return;
             }
 
+            if (TentarIniciarResizeTextoTemplate(position))
+            {
+                e.Handled = true;
+                return;
+            }
+
             if (TentarIniciarEdicaoExtremidadeLinhaTemplate(position))
             {
                 e.Handled = true;
@@ -154,6 +167,12 @@ namespace Araci.Views
             }
 
             if (AtualizarResizeRetanguloTemplate(position, e))
+            {
+                e.Handled = true;
+                return;
+            }
+
+            if (AtualizarResizeTextoTemplate(position, e))
             {
                 e.Handled = true;
                 return;
@@ -210,6 +229,16 @@ namespace Araci.Views
             }
 
             if (FinalizarResizeRetanguloTemplate())
+            {
+                if (TemplatePageBorder.IsMouseCaptured)
+                    TemplatePageBorder.ReleaseMouseCapture();
+
+                AtualizarHandlesOverlay();
+                e.Handled = true;
+                return;
+            }
+
+            if (FinalizarResizeTextoTemplate())
             {
                 if (TemplatePageBorder.IsMouseCaptured)
                     TemplatePageBorder.ReleaseMouseCapture();
@@ -286,6 +315,9 @@ namespace Araci.Views
             if (_retanguloTemplateResizeEmArrasteId.HasValue)
                 CancelarResizeRetanguloTemplate();
 
+            if (_textoTemplateResizeEmArrasteId.HasValue)
+                CancelarResizeTextoTemplate();
+
             if (_linhaTemplateEndpointEmArrasteId.HasValue)
                 CancelarEdicaoExtremidadeLinhaTemplate();
 
@@ -320,6 +352,14 @@ namespace Araci.Views
             if (e.Key == Key.Escape && _retanguloTemplateResizeEmArrasteId.HasValue)
             {
                 CancelarResizeRetanguloTemplate();
+                AtualizarHandlesOverlay();
+                e.Handled = true;
+                return;
+            }
+
+            if (e.Key == Key.Escape && _textoTemplateResizeEmArrasteId.HasValue)
+            {
+                CancelarResizeTextoTemplate();
                 AtualizarHandlesOverlay();
                 e.Handled = true;
                 return;
@@ -410,6 +450,7 @@ namespace Araci.Views
             LimparEstadoArrasteCirculoTemplate();
             LimparEstadoArrasteTextoTemplate();
             LimparEstadoResizeRetanguloTemplate();
+            LimparEstadoResizeTextoTemplate();
             TemplatePageBorder.CaptureMouse();
             AtualizarHandlesOverlay();
             return true;
@@ -506,6 +547,132 @@ namespace Araci.Views
             _circuloTemplateResizeOriginalY = 0.0;
         }
 
+        private bool TentarIniciarResizeTextoTemplate(Point position)
+        {
+            ProjectSheetTypeViewModel? viewModel = ObterViewModelAtivo();
+
+            if (_context == null || viewModel == null)
+                return false;
+
+            ITool ferramentaAtual = _context.Tools.FerramentaAtual;
+
+            if (!string.Equals(ferramentaAtual.Nome, "Selecionar", StringComparison.OrdinalIgnoreCase) || ferramentaAtual.IsBusy)
+                return false;
+
+            if (!viewModel.TryHitSelectedTextResizeHandle(position, TextResizeHandleHitTolerance, out Guid textId))
+                return false;
+
+            if (!viewModel.TryGetTextGeometry(
+                    textId,
+                    out _textoTemplateResizeOriginalX,
+                    out _,
+                    out _,
+                    out _))
+            {
+                return false;
+            }
+
+            _textoTemplateResizeEmArrasteId = textId;
+            _textoTemplateResizeDragStart = position;
+            _textoTemplateResizeLastPosition = position;
+            _textoTemplateResizeLastPositionValid = PontoValido(position);
+            _textoTemplateResizeArrastando = false;
+            LimparEstadoArrasteLinhaTemplate();
+            LimparEstadoArrasteRetanguloTemplate();
+            LimparEstadoArrasteCirculoTemplate();
+            LimparEstadoArrasteTextoTemplate();
+            LimparEstadoResizeRetanguloTemplate();
+            LimparEstadoResizeCirculoTemplate();
+            TemplatePageBorder.CaptureMouse();
+            AtualizarHandlesOverlay();
+            return true;
+        }
+
+        private bool AtualizarResizeTextoTemplate(Point position, MouseEventArgs e)
+        {
+            ProjectSheetTypeViewModel? viewModel = ObterViewModelAtivo();
+
+            if (viewModel == null || !_textoTemplateResizeEmArrasteId.HasValue)
+                return false;
+
+            if (e.LeftButton != MouseButtonState.Pressed)
+                return false;
+
+            Vector delta = position - _textoTemplateResizeDragStart;
+
+            if (!_textoTemplateResizeArrastando && delta.LengthSquared < DragThresholdSquared)
+                return true;
+
+            if (!PontoValido(position))
+                return true;
+
+            double larguraCaixa = CalcularLarguraTextoTemplate(_textoTemplateResizeOriginalX, position);
+            bool previewAplicado = viewModel.SetTextPreviewBoxWidth(_textoTemplateResizeEmArrasteId.Value, larguraCaixa);
+
+            if (!previewAplicado)
+                return true;
+
+            _textoTemplateResizeArrastando = true;
+            _textoTemplateResizeLastPosition = position;
+            _textoTemplateResizeLastPositionValid = true;
+            AtualizarHandlesOverlay();
+            return true;
+        }
+
+        private bool FinalizarResizeTextoTemplate()
+        {
+            ProjectSheetTypeViewModel? viewModel = ObterViewModelAtivo();
+
+            if (_context == null || viewModel == null || !_textoTemplateResizeEmArrasteId.HasValue)
+                return false;
+
+            Guid textId = _textoTemplateResizeEmArrasteId.Value;
+            bool arrastou = _textoTemplateResizeArrastando;
+            Point finalPosition = _textoTemplateResizeLastPosition;
+            bool finalPositionValid = _textoTemplateResizeLastPositionValid && PontoValido(finalPosition);
+            double originalX = _textoTemplateResizeOriginalX;
+
+            viewModel.ClearTextPreviewBoxWidth(textId);
+            LimparEstadoResizeTextoTemplate();
+
+            if (!arrastou || !finalPositionValid)
+            {
+                AtualizarHandlesOverlay();
+                return true;
+            }
+
+            double larguraCaixa = CalcularLarguraTextoTemplate(originalX, finalPosition);
+            bool alterou = _context.MoverTextoDoTipoPrancha.AlterarLarguraCaixa(viewModel.Id, textId, larguraCaixa);
+
+            if (alterou)
+                viewModel.SelectText(textId);
+
+            AtualizarPainelPropriedadesTemplateSelecionado();
+            AtualizarHandlesOverlay();
+            return true;
+        }
+
+        private void CancelarResizeTextoTemplate()
+        {
+            ProjectSheetTypeViewModel? viewModel = ObterViewModelAtivo();
+
+            if (viewModel != null && _textoTemplateResizeEmArrasteId.HasValue)
+                viewModel.ClearTextPreviewBoxWidth(_textoTemplateResizeEmArrasteId.Value);
+
+            LimparEstadoResizeTextoTemplate();
+            AtualizarHandlesOverlay();
+        }
+
+        private void LimparEstadoResizeTextoTemplate()
+        {
+            _textoTemplateResizeEmArrasteId = null;
+            _textoTemplateResizeDragStart = default;
+            _textoTemplateResizeLastPosition = default;
+            _textoTemplateResizeLastPositionValid = false;
+            _textoTemplateResizeArrastando = false;
+            _textoTemplateResizeOriginalX = 0.0;
+        }
+
         private bool TentarIniciarResizeRetanguloTemplate(Point position)
         {
             ProjectSheetTypeViewModel? viewModel = ObterViewModelAtivo();
@@ -542,6 +709,7 @@ namespace Araci.Views
             LimparEstadoArrasteCirculoTemplate();
             LimparEstadoArrasteTextoTemplate();
             LimparEstadoResizeCirculoTemplate();
+            LimparEstadoResizeTextoTemplate();
             TemplatePageBorder.CaptureMouse();
             AtualizarHandlesOverlay();
             return true;
@@ -700,6 +868,7 @@ namespace Araci.Views
             LimparEstadoArrasteCirculoTemplate();
             LimparEstadoArrasteTextoTemplate();
             LimparEstadoResizeRetanguloTemplate();
+            LimparEstadoResizeTextoTemplate();
             TemplatePageBorder.CaptureMouse();
             AtualizarHandlesOverlay();
             return true;
@@ -841,6 +1010,7 @@ namespace Araci.Views
                 LimparEstadoArrasteCirculoTemplate();
                 LimparEstadoResizeRetanguloTemplate();
                 LimparEstadoResizeCirculoTemplate();
+                LimparEstadoResizeTextoTemplate();
                 TemplatePageBorder.CaptureMouse();
                 AtualizarPainelPropriedadesTemplateSelecionado();
                 AtualizarHandlesOverlay();
@@ -858,6 +1028,7 @@ namespace Araci.Views
                 LimparEstadoArrasteTextoTemplate();
                 LimparEstadoResizeRetanguloTemplate();
                 LimparEstadoResizeCirculoTemplate();
+                LimparEstadoResizeTextoTemplate();
                 TemplatePageBorder.CaptureMouse();
                 AtualizarPainelPropriedadesTemplateSelecionado();
                 AtualizarHandlesOverlay();
@@ -875,6 +1046,7 @@ namespace Araci.Views
                 LimparEstadoArrasteTextoTemplate();
                 LimparEstadoResizeRetanguloTemplate();
                 LimparEstadoResizeCirculoTemplate();
+                LimparEstadoResizeTextoTemplate();
                 TemplatePageBorder.CaptureMouse();
                 AtualizarPainelPropriedadesTemplateSelecionado();
                 AtualizarHandlesOverlay();
@@ -892,6 +1064,7 @@ namespace Araci.Views
                 LimparEstadoArrasteTextoTemplate();
                 LimparEstadoResizeRetanguloTemplate();
                 LimparEstadoResizeCirculoTemplate();
+                LimparEstadoResizeTextoTemplate();
                 TemplatePageBorder.CaptureMouse();
                 AtualizarPainelPropriedadesTemplateSelecionado();
                 AtualizarHandlesOverlay();
@@ -905,6 +1078,7 @@ namespace Araci.Views
             LimparEstadoArrasteTextoTemplate();
             LimparEstadoResizeRetanguloTemplate();
             LimparEstadoResizeCirculoTemplate();
+            LimparEstadoResizeTextoTemplate();
             AtualizarPainelPropriedadesTemplateSelecionado();
             AtualizarHandlesOverlay();
             return true;
@@ -1496,6 +1670,11 @@ namespace Araci.Views
                 return value;
 
             return Math.Min(value, maximum);
+        }
+
+        private static double CalcularLarguraTextoTemplate(double originalX, Point position)
+        {
+            return Math.Max(ProjectSheetTemplateText.MinBoxWidth, position.X - originalX);
         }
 
         private static double CalcularRaioCirculoTemplate(double centerX, double centerY, Point position)

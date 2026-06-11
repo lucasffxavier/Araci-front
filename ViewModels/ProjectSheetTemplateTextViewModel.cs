@@ -20,6 +20,8 @@ namespace Araci.ViewModels
         private TipoTextoAnotativo? _tipoTexto;
         private double _previewOffsetX;
         private double _previewOffsetY;
+        private bool _hasPreviewBoxWidth;
+        private double _previewBoxWidth;
         private bool _isSelected;
 
         public ProjectSheetTemplateTextViewModel(ProjectSheetTemplateText texto)
@@ -41,7 +43,8 @@ namespace Araci.ViewModels
         public double ModelY => _texto.Y;
         public string Nome => _texto.Nome;
         public string Conteudo => _texto.Texto;
-        public double LarguraCaixa => _texto.LarguraCaixa;
+        public double LarguraCaixa => _hasPreviewBoxWidth ? _previewBoxWidth : _texto.LarguraCaixa;
+        public double ModelLarguraCaixa => _texto.LarguraCaixa;
         public double Rotacao => NormalizarRotacao(_texto.Rotacao);
         public TipoTextoAnotativo? TipoTexto => _tipoTexto;
         public string CorTexto => NormalizarCor(_texto.CorTexto);
@@ -52,6 +55,7 @@ namespace Araci.ViewModels
         public Brush ForegroundBrush => CriarBrush(CorTexto);
         public FontFamily FontFamily => new(string.IsNullOrWhiteSpace(Fonte) ? ProjectSheetTemplateText.DefaultFont : Fonte);
         public bool HasPreviewOffset => Math.Abs(_previewOffsetX) > 0.000001 || Math.Abs(_previewOffsetY) > 0.000001;
+        public bool HasPreviewBoxWidth => _hasPreviewBoxWidth;
         public Brush SelectionBorderBrush => IsSelected ? Brushes.DodgerBlue : Brushes.Transparent;
         public Thickness SelectionBorderThickness => IsSelected ? new Thickness(DefaultSelectionThickness) : new Thickness(0.0);
 
@@ -107,6 +111,30 @@ namespace Araci.ViewModels
             NotificarPosicao();
         }
 
+        public void SetPreviewBoxWidth(double larguraCaixa)
+        {
+            double larguraNormalizada = NormalizarLargura(larguraCaixa);
+
+            if (_hasPreviewBoxWidth && Math.Abs(_previewBoxWidth - larguraNormalizada) < 0.0001)
+                return;
+
+            _hasPreviewBoxWidth = true;
+            _previewBoxWidth = larguraNormalizada;
+            NotificarLarguraCaixa();
+            OnPropertyChanged(nameof(HasPreviewBoxWidth));
+        }
+
+        public void ClearPreviewBoxWidth()
+        {
+            if (!_hasPreviewBoxWidth)
+                return;
+
+            _hasPreviewBoxWidth = false;
+            _previewBoxWidth = 0.0;
+            NotificarLarguraCaixa();
+            OnPropertyChanged(nameof(HasPreviewBoxWidth));
+        }
+
         public void Refresh()
         {
             AtualizarTipoTexto();
@@ -117,6 +145,8 @@ namespace Araci.ViewModels
             OnPropertyChanged(nameof(Nome));
             OnPropertyChanged(nameof(Conteudo));
             OnPropertyChanged(nameof(LarguraCaixa));
+            OnPropertyChanged(nameof(ModelLarguraCaixa));
+            OnPropertyChanged(nameof(HasPreviewBoxWidth));
             OnPropertyChanged(nameof(Rotacao));
             OnPropertyChanged(nameof(Visible));
             OnPropertyChanged(nameof(AlturaEstimada));
@@ -150,6 +180,13 @@ namespace Araci.ViewModels
             OnPropertyChanged(nameof(X));
             OnPropertyChanged(nameof(Y));
             OnPropertyChanged(nameof(HasPreviewOffset));
+        }
+
+        private void NotificarLarguraCaixa()
+        {
+            OnPropertyChanged(nameof(LarguraCaixa));
+            OnPropertyChanged(nameof(AlturaEstimada));
+            OnPropertyChanged(nameof(RenderTransform));
         }
 
         private void NotificarVisual()

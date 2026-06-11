@@ -16,6 +16,7 @@ namespace Araci.ViewModels
         private const double EndpointHandleSize = 12.0;
         private const double RectangleResizeHandleSize = 10.0;
         private const double CircleResizeHandleSize = 10.0;
+        private const double TextResizeHandleSize = 10.0;
 
         private readonly AraciDocument _document;
         private readonly ProjectSheetType _tipo;
@@ -45,6 +46,7 @@ namespace Araci.ViewModels
             EndpointHandles = new ObservableCollection<ProjectSheetTemplateLineEndpointHandleViewModel>();
             RectangleResizeHandles = new ObservableCollection<ProjectSheetTemplateRectangleResizeHandleViewModel>();
             CircleResizeHandles = new ObservableCollection<ProjectSheetTemplateCircleResizeHandleViewModel>();
+            TextResizeHandles = new ObservableCollection<ProjectSheetTemplateTextResizeHandleViewModel>();
             _document.PropriedadesTipoPranchaAlteradas += OnPropriedadesTipoPranchaAlteradas;
             _document.ItemProjetoRenomeado += OnItemProjetoRenomeado;
             Refresh();
@@ -72,6 +74,7 @@ namespace Araci.ViewModels
         public ObservableCollection<ProjectSheetTemplateLineEndpointHandleViewModel> EndpointHandles { get; }
         public ObservableCollection<ProjectSheetTemplateRectangleResizeHandleViewModel> RectangleResizeHandles { get; }
         public ObservableCollection<ProjectSheetTemplateCircleResizeHandleViewModel> CircleResizeHandles { get; }
+        public ObservableCollection<ProjectSheetTemplateTextResizeHandleViewModel> TextResizeHandles { get; }
         public Guid? SelectedLineId => _selectedLineId;
         public Guid? SelectedRectangleId => _selectedRectangleId;
         public Guid? SelectedCircleId => _selectedCircleId;
@@ -84,6 +87,7 @@ namespace Araci.ViewModels
         public bool EndpointHandlesVisible => EndpointHandles.Count > 0;
         public bool RectangleResizeHandlesVisible => RectangleResizeHandles.Count > 0;
         public bool CircleResizeHandlesVisible => CircleResizeHandles.Count > 0;
+        public bool TextResizeHandlesVisible => TextResizeHandles.Count > 0;
 
         public ProjectSheetTemplateLineViewModel? PreviewLine
         {
@@ -169,6 +173,7 @@ namespace Araci.ViewModels
             RefreshEndpointHandles();
             RefreshRectangleResizeHandles();
             RefreshCircleResizeHandles();
+            RefreshTextResizeHandles();
             NotificarSelecao();
             return true;
         }
@@ -180,6 +185,7 @@ namespace Araci.ViewModels
 
             _selectedTextId = null;
             AtualizarSelecaoVisual();
+            RefreshTextResizeHandles();
             NotificarSelecao();
         }
 
@@ -210,6 +216,7 @@ namespace Araci.ViewModels
 
             text.SetPreviewOffset(deltaX, deltaY);
             AtualizarSelecaoVisualTextos();
+            RefreshTextResizeHandles();
             return true;
         }
 
@@ -218,6 +225,7 @@ namespace Araci.ViewModels
             ProjectSheetTemplateTextViewModel? text = Texts.FirstOrDefault(t => t.Id == textId);
             text?.ClearPreviewOffset();
             AtualizarSelecaoVisualTextos();
+            RefreshTextResizeHandles();
         }
 
         public void ClearTextPreviewOffsets()
@@ -226,6 +234,76 @@ namespace Araci.ViewModels
                 text.ClearPreviewOffset();
 
             AtualizarSelecaoVisualTextos();
+            RefreshTextResizeHandles();
+        }
+
+        public bool TryHitSelectedTextResizeHandle(Point position, double tolerance, out Guid textId)
+        {
+            textId = Guid.Empty;
+
+            if (!_selectedTextId.HasValue)
+                return false;
+
+            double toleranceSquared = Math.Max(0.0, tolerance) * Math.Max(0.0, tolerance);
+            ProjectSheetTemplateTextResizeHandleViewModel? hit = TextResizeHandles
+                .Reverse()
+                .FirstOrDefault(h => DistanciaQuadrada(position, new Point(h.X, h.Y)) <= toleranceSquared);
+
+            if (hit == null)
+                return false;
+
+            textId = hit.TextId;
+            return true;
+        }
+
+        public bool TryGetTextGeometry(Guid textId, out double x, out double y, out double larguraCaixa, out double alturaEstimada)
+        {
+            ProjectSheetTemplateTextViewModel? text = Texts.FirstOrDefault(t => t.Id == textId);
+
+            if (text == null)
+            {
+                x = 0.0;
+                y = 0.0;
+                larguraCaixa = 0.0;
+                alturaEstimada = 0.0;
+                return false;
+            }
+
+            x = text.ModelX;
+            y = text.ModelY;
+            larguraCaixa = text.ModelLarguraCaixa;
+            alturaEstimada = text.AlturaEstimada;
+            return true;
+        }
+
+        public bool SetTextPreviewBoxWidth(Guid textId, double larguraCaixa)
+        {
+            ProjectSheetTemplateTextViewModel? text = Texts.FirstOrDefault(t => t.Id == textId);
+
+            if (text == null)
+                return false;
+
+            text.SetPreviewBoxWidth(larguraCaixa);
+            AtualizarSelecaoVisualTextos();
+            RefreshTextResizeHandles();
+            return true;
+        }
+
+        public void ClearTextPreviewBoxWidth(Guid textId)
+        {
+            ProjectSheetTemplateTextViewModel? text = Texts.FirstOrDefault(t => t.Id == textId);
+            text?.ClearPreviewBoxWidth();
+            AtualizarSelecaoVisualTextos();
+            RefreshTextResizeHandles();
+        }
+
+        public void ClearTextPreviewBoxWidths()
+        {
+            foreach (ProjectSheetTemplateTextViewModel text in Texts)
+                text.ClearPreviewBoxWidth();
+
+            AtualizarSelecaoVisualTextos();
+            RefreshTextResizeHandles();
         }
 
         public void Refresh()
@@ -301,6 +379,7 @@ namespace Araci.ViewModels
             RefreshEndpointHandles();
             RefreshRectangleResizeHandles();
             RefreshCircleResizeHandles();
+            RefreshTextResizeHandles();
             NotificarSelecao();
             return true;
         }
@@ -313,6 +392,7 @@ namespace Araci.ViewModels
             _selectedCircleId = null;
             AtualizarSelecaoVisual();
             RefreshCircleResizeHandles();
+            RefreshTextResizeHandles();
             NotificarSelecao();
         }
 
@@ -469,6 +549,7 @@ namespace Araci.ViewModels
             RefreshEndpointHandles();
             RefreshRectangleResizeHandles();
             RefreshCircleResizeHandles();
+            RefreshTextResizeHandles();
             NotificarSelecao();
             return true;
         }
@@ -482,6 +563,7 @@ namespace Araci.ViewModels
             AtualizarSelecaoVisual();
             RefreshEndpointHandles();
             RefreshRectangleResizeHandles();
+            RefreshTextResizeHandles();
             NotificarSelecao();
         }
 
@@ -665,6 +747,7 @@ namespace Araci.ViewModels
             RefreshEndpointHandles();
             RefreshRectangleResizeHandles();
             RefreshCircleResizeHandles();
+            RefreshTextResizeHandles();
             NotificarSelecao();
             return true;
         }
@@ -677,6 +760,7 @@ namespace Araci.ViewModels
             _selectedRectangleId = null;
             AtualizarSelecaoVisual();
             RefreshRectangleResizeHandles();
+            RefreshTextResizeHandles();
             NotificarSelecao();
         }
 
@@ -803,6 +887,7 @@ namespace Araci.ViewModels
             RefreshEndpointHandles();
             RefreshRectangleResizeHandles();
             RefreshCircleResizeHandles();
+            RefreshTextResizeHandles();
 
             if (tinhaSelecao)
                 NotificarSelecao();
@@ -896,6 +981,7 @@ namespace Araci.ViewModels
                 _selectedTextId = null;
 
             AtualizarSelecaoVisualTextos();
+            RefreshTextResizeHandles();
             OnPropertyChanged(nameof(SelectedTextId));
             OnPropertyChanged(nameof(HasSelectedText));
         }
@@ -996,6 +1082,21 @@ namespace Araci.ViewModels
             OnPropertyChanged(nameof(CircleResizeHandlesVisible));
         }
 
+        private void RefreshTextResizeHandles()
+        {
+            TextResizeHandles.Clear();
+
+            if (_selectedTextId.HasValue)
+            {
+                ProjectSheetTemplateTextViewModel? text = Texts.FirstOrDefault(t => t.Id == _selectedTextId.Value && t.IsSelected);
+
+                if (text != null)
+                    AddTextResizeHandle(text.Id, text.X + text.LarguraCaixa, text.Y + Math.Max(text.AlturaTexto, text.AlturaEstimada) / 2.0);
+            }
+
+            OnPropertyChanged(nameof(TextResizeHandlesVisible));
+        }
+
         private void AddRectangleResizeHandle(Guid rectangleId, RetanguloResizeHandleKind kind, double x, double y)
         {
             RectangleResizeHandles.Add(ProjectSheetTemplateRectangleResizeHandleViewModel.Create(rectangleId, kind, x, y, RectangleResizeHandleSize));
@@ -1004,6 +1105,11 @@ namespace Araci.ViewModels
         private void AddCircleResizeHandle(Guid circleId, double x, double y)
         {
             CircleResizeHandles.Add(ProjectSheetTemplateCircleResizeHandleViewModel.Create(circleId, x, y, CircleResizeHandleSize));
+        }
+
+        private void AddTextResizeHandle(Guid textId, double x, double y)
+        {
+            TextResizeHandles.Add(ProjectSheetTemplateTextResizeHandleViewModel.Create(textId, x, y, TextResizeHandleSize));
         }
 
         private void NotificarSelecao()
@@ -1019,6 +1125,7 @@ namespace Araci.ViewModels
             OnPropertyChanged(nameof(HasTemplateSelection));
             OnPropertyChanged(nameof(RectangleResizeHandlesVisible));
             OnPropertyChanged(nameof(CircleResizeHandlesVisible));
+            OnPropertyChanged(nameof(TextResizeHandlesVisible));
         }
 
         private static double DistanciaAoSegmento(Point point, Point a, Point b)
@@ -1161,6 +1268,40 @@ namespace Araci.ViewModels
             double size)
         {
             return new ProjectSheetTemplateCircleResizeHandleViewModel(circleId, x, y, size);
+        }
+    }
+
+    public sealed class ProjectSheetTemplateTextResizeHandleViewModel
+    {
+        private ProjectSheetTemplateTextResizeHandleViewModel(
+            Guid textId,
+            double x,
+            double y,
+            double size)
+        {
+            TextId = textId;
+            X = x;
+            Y = y;
+            Size = size;
+        }
+
+        public Guid TextId { get; }
+        public double X { get; }
+        public double Y { get; }
+        public double Size { get; }
+        public double Left => X - Size / 2.0;
+        public double Top => Y - Size / 2.0;
+        public Brush Fill => Brushes.White;
+        public Brush Stroke => Brushes.DodgerBlue;
+        public double StrokeThickness => 2.0;
+
+        public static ProjectSheetTemplateTextResizeHandleViewModel Create(
+            Guid textId,
+            double x,
+            double y,
+            double size)
+        {
+            return new ProjectSheetTemplateTextResizeHandleViewModel(textId, x, y, size);
         }
     }
 }
