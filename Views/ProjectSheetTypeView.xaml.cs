@@ -1319,11 +1319,12 @@ namespace Araci.Views
                 viewModel.TryGetText(textId, out ProjectSheetTemplateText? texto) &&
                 texto != null)
             {
-                _context.Editor.ElementoSelecionado = new ProjectSheetTypePropertiesViewModel(
-                    _context.Document,
+                _context.Editor.ElementoSelecionado = new ProjectSheetTemplateTextPropertiesViewModel(
                     viewModel.Tipo,
-                    _context.RenomearItemProjeto,
-                    _context.EditarPropriedadesTipoPrancha);
+                    texto,
+                    _context.MoverTextoDoTipoPrancha,
+                    _context.Types,
+                    _context.TypePropertiesDialogs);
                 return;
             }
 

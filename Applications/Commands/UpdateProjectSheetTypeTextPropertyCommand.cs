@@ -105,19 +105,50 @@ namespace Araci.Core.Commands
     public readonly struct ProjectSheetTemplateTextGraphicTypeState
     {
         public ProjectSheetTemplateTextGraphicTypeState(string nomeTipo, string familia, string categoria)
+            : this(
+                nomeTipo,
+                familia,
+                categoria,
+                ProjectSheetTemplateText.DefaultTextColor,
+                ProjectSheetTemplateText.DefaultFont,
+                ProjectSheetTemplateText.DefaultTextHeight,
+                ProjectSheetTemplateText.DefaultHorizontalAlignment)
+        {
+        }
+
+        public ProjectSheetTemplateTextGraphicTypeState(
+            string nomeTipo,
+            string familia,
+            string categoria,
+            string corTexto,
+            string fonte,
+            double alturaTexto,
+            string alinhamentoHorizontal)
         {
             NomeTipo = nomeTipo ?? string.Empty;
             Familia = familia ?? string.Empty;
             Categoria = categoria ?? string.Empty;
+            CorTexto = corTexto ?? string.Empty;
+            Fonte = fonte ?? string.Empty;
+            AlturaTexto = alturaTexto;
+            AlinhamentoHorizontal = alinhamentoHorizontal ?? string.Empty;
         }
 
         public string NomeTipo { get; }
         public string Familia { get; }
         public string Categoria { get; }
+        public string CorTexto { get; }
+        public string Fonte { get; }
+        public double AlturaTexto { get; }
+        public string AlinhamentoHorizontal { get; }
 
         public void Aplicar(ProjectSheetTemplateText texto)
         {
             texto.DefinirTipoTexto(NomeTipo, Familia, Categoria);
+            texto.CorTexto = CorTexto;
+            texto.Fonte = Fonte;
+            texto.AlturaTexto = AlturaTexto;
+            texto.AlinhamentoHorizontal = AlinhamentoHorizontal;
         }
 
         public static ProjectSheetTemplateTextGraphicTypeState FromText(ProjectSheetTemplateText texto)
@@ -125,7 +156,44 @@ namespace Araci.Core.Commands
             return new ProjectSheetTemplateTextGraphicTypeState(
                 texto.TipoTextoNome,
                 texto.TipoTextoFamilia,
-                texto.TipoTextoCategoria);
+                texto.TipoTextoCategoria,
+                texto.CorTexto,
+                texto.Fonte,
+                texto.AlturaTexto,
+                texto.AlinhamentoHorizontal);
+        }
+    }
+
+    public readonly struct ProjectSheetTemplateTextStyleState
+    {
+        public ProjectSheetTemplateTextStyleState(string corTexto, string fonte, double alturaTexto, string alinhamentoHorizontal)
+        {
+            CorTexto = corTexto ?? string.Empty;
+            Fonte = fonte ?? string.Empty;
+            AlturaTexto = alturaTexto;
+            AlinhamentoHorizontal = alinhamentoHorizontal ?? string.Empty;
+        }
+
+        public string CorTexto { get; }
+        public string Fonte { get; }
+        public double AlturaTexto { get; }
+        public string AlinhamentoHorizontal { get; }
+
+        public void Aplicar(ProjectSheetTemplateText texto)
+        {
+            texto.CorTexto = CorTexto;
+            texto.Fonte = Fonte;
+            texto.AlturaTexto = AlturaTexto;
+            texto.AlinhamentoHorizontal = AlinhamentoHorizontal;
+        }
+
+        public static ProjectSheetTemplateTextStyleState FromText(ProjectSheetTemplateText texto)
+        {
+            return new ProjectSheetTemplateTextStyleState(
+                texto.CorTexto,
+                texto.Fonte,
+                texto.AlturaTexto,
+                texto.AlinhamentoHorizontal);
         }
     }
 }

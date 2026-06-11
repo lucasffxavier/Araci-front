@@ -44,10 +44,10 @@ namespace Araci.ViewModels
         public double LarguraCaixa => _texto.LarguraCaixa;
         public double Rotacao => NormalizarRotacao(_texto.Rotacao);
         public TipoTextoAnotativo? TipoTexto => _tipoTexto;
-        public string CorTexto => TipoTexto?.CorTexto ?? NormalizarCor(_texto.CorTexto);
-        public string Fonte => TipoTexto?.Fonte ?? NormalizarFonte(_texto.Fonte);
-        public double AlturaTexto => NormalizarAltura(TipoTexto?.AlturaTexto ?? _texto.AlturaTexto);
-        public string AlinhamentoHorizontal => TipoTexto?.AlinhamentoHorizontal ?? NormalizarAlinhamento(_texto.AlinhamentoHorizontal);
+        public string CorTexto => NormalizarCor(_texto.CorTexto);
+        public string Fonte => NormalizarFonte(_texto.Fonte);
+        public double AlturaTexto => NormalizarAltura(_texto.AlturaTexto);
+        public string AlinhamentoHorizontal => NormalizarAlinhamento(_texto.AlinhamentoHorizontal);
         public bool Visible => _texto.Visible;
         public Brush ForegroundBrush => CriarBrush(CorTexto);
         public FontFamily FontFamily => new(string.IsNullOrWhiteSpace(Fonte) ? ProjectSheetTemplateText.DefaultFont : Fonte);
