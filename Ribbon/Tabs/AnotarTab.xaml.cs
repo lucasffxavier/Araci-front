@@ -151,8 +151,8 @@ namespace Araci.Ribbon.Tabs
 
         private void TextoButton_Click(object sender, RoutedEventArgs e)
         {
-            Context?.Tools.AtivarInsercaoElemento(ElementKinds.TextoAnotativo);
-            FocarViewport();
+            FocarSuperficieAtiva();
+            Context?.Tools.AtivarInserirTextoAnotativo();
         }
 
         private void FocarViewport()

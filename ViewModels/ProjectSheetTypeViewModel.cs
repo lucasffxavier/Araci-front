@@ -26,6 +26,7 @@ namespace Araci.ViewModels
         private Guid? _selectedLineId;
         private Guid? _selectedRectangleId;
         private Guid? _selectedCircleId;
+        private Guid? _selectedTextId;
 
         public ProjectSheetTypeViewModel(AraciDocument document, ProjectSheetType tipo)
             : this(document, tipo, new TypeLibraryService())
@@ -74,10 +75,12 @@ namespace Araci.ViewModels
         public Guid? SelectedLineId => _selectedLineId;
         public Guid? SelectedRectangleId => _selectedRectangleId;
         public Guid? SelectedCircleId => _selectedCircleId;
+        public Guid? SelectedTextId => _selectedTextId;
         public bool HasSelectedLine => _selectedLineId.HasValue;
         public bool HasSelectedRectangle => _selectedRectangleId.HasValue;
         public bool HasSelectedCircle => _selectedCircleId.HasValue;
-        public bool HasTemplateSelection => HasSelectedLine || HasSelectedRectangle || HasSelectedCircle;
+        public bool HasSelectedText => _selectedTextId.HasValue;
+        public bool HasTemplateSelection => HasSelectedLine || HasSelectedRectangle || HasSelectedCircle || HasSelectedText;
         public bool EndpointHandlesVisible => EndpointHandles.Count > 0;
         public bool RectangleResizeHandlesVisible => RectangleResizeHandles.Count > 0;
         public bool CircleResizeHandlesVisible => CircleResizeHandles.Count > 0;
@@ -127,6 +130,103 @@ namespace Araci.ViewModels
         public bool HasPreviewLine => PreviewLine != null;
         public bool HasPreviewRectangle => PreviewRectangle != null;
         public bool HasPreviewCircle => PreviewCircle != null;
+
+        public bool TryHitTextAt(Point position, double tolerance, out Guid textId)
+        {
+            ProjectSheetTemplateTextViewModel? hit = Texts
+                .Reverse()
+                .FirstOrDefault(t => t.Contains(position, tolerance));
+
+            textId = hit?.Id ?? Guid.Empty;
+            return hit != null;
+        }
+
+        public bool SelectTextAt(Point position, double tolerance)
+        {
+            if (!TryHitTextAt(position, tolerance, out Guid textId))
+            {
+                ClearTextSelection();
+                return false;
+            }
+
+            SelectText(textId);
+            return true;
+        }
+
+        public bool SelectText(Guid textId)
+        {
+            if (!Texts.Any(t => t.Id == textId))
+            {
+                ClearTextSelection();
+                return false;
+            }
+
+            _selectedTextId = textId;
+            _selectedLineId = null;
+            _selectedRectangleId = null;
+            _selectedCircleId = null;
+            AtualizarSelecaoVisual();
+            RefreshEndpointHandles();
+            RefreshRectangleResizeHandles();
+            RefreshCircleResizeHandles();
+            NotificarSelecao();
+            return true;
+        }
+
+        public void ClearTextSelection()
+        {
+            if (!_selectedTextId.HasValue)
+                return;
+
+            _selectedTextId = null;
+            AtualizarSelecaoVisual();
+            NotificarSelecao();
+        }
+
+        public bool TryGetSelectedTextId(out Guid textId)
+        {
+            if (_selectedTextId.HasValue && Texts.Any(t => t.Id == _selectedTextId.Value))
+            {
+                textId = _selectedTextId.Value;
+                return true;
+            }
+
+            textId = Guid.Empty;
+            return false;
+        }
+
+        public bool TryGetText(Guid textId, out ProjectSheetTemplateText? texto)
+        {
+            texto = _tipo.Textos.FirstOrDefault(t => t.Id == textId);
+            return texto != null;
+        }
+
+        public bool SetTextPreviewOffset(Guid textId, double deltaX, double deltaY)
+        {
+            ProjectSheetTemplateTextViewModel? text = Texts.FirstOrDefault(t => t.Id == textId);
+
+            if (text == null)
+                return false;
+
+            text.SetPreviewOffset(deltaX, deltaY);
+            AtualizarSelecaoVisualTextos();
+            return true;
+        }
+
+        public void ClearTextPreviewOffset(Guid textId)
+        {
+            ProjectSheetTemplateTextViewModel? text = Texts.FirstOrDefault(t => t.Id == textId);
+            text?.ClearPreviewOffset();
+            AtualizarSelecaoVisualTextos();
+        }
+
+        public void ClearTextPreviewOffsets()
+        {
+            foreach (ProjectSheetTemplateTextViewModel text in Texts)
+                text.ClearPreviewOffset();
+
+            AtualizarSelecaoVisualTextos();
+        }
 
         public void Refresh()
         {
@@ -196,6 +296,7 @@ namespace Araci.ViewModels
             _selectedCircleId = circleId;
             _selectedLineId = null;
             _selectedRectangleId = null;
+            _selectedTextId = null;
             AtualizarSelecaoVisual();
             RefreshEndpointHandles();
             RefreshRectangleResizeHandles();
@@ -363,6 +464,7 @@ namespace Araci.ViewModels
             _selectedLineId = lineId;
             _selectedRectangleId = null;
             _selectedCircleId = null;
+            _selectedTextId = null;
             AtualizarSelecaoVisual();
             RefreshEndpointHandles();
             RefreshRectangleResizeHandles();
@@ -558,6 +660,7 @@ namespace Araci.ViewModels
             _selectedRectangleId = rectangleId;
             _selectedLineId = null;
             _selectedCircleId = null;
+            _selectedTextId = null;
             AtualizarSelecaoVisual();
             RefreshEndpointHandles();
             RefreshRectangleResizeHandles();
@@ -691,10 +794,11 @@ namespace Araci.ViewModels
 
         public void ClearTemplateSelection()
         {
-            bool tinhaSelecao = _selectedLineId.HasValue || _selectedRectangleId.HasValue || _selectedCircleId.HasValue;
+            bool tinhaSelecao = _selectedLineId.HasValue || _selectedRectangleId.HasValue || _selectedCircleId.HasValue || _selectedTextId.HasValue;
             _selectedLineId = null;
             _selectedRectangleId = null;
             _selectedCircleId = null;
+            _selectedTextId = null;
             AtualizarSelecaoVisual();
             RefreshEndpointHandles();
             RefreshRectangleResizeHandles();
@@ -780,10 +884,20 @@ namespace Araci.ViewModels
 
         private void RefreshTexts()
         {
+            Guid? selectedId = _selectedTextId;
             Texts.Clear();
 
             foreach (ProjectSheetTemplateText texto in (_tipo.Textos ?? new()).Where(t => t != null && t.Visible))
                 Texts.Add(new ProjectSheetTemplateTextViewModel(texto, _types));
+
+            if (selectedId.HasValue && Texts.Any(t => t.Id == selectedId.Value))
+                _selectedTextId = selectedId;
+            else
+                _selectedTextId = null;
+
+            AtualizarSelecaoVisualTextos();
+            OnPropertyChanged(nameof(SelectedTextId));
+            OnPropertyChanged(nameof(HasSelectedText));
         }
 
         private void AtualizarSelecaoVisual()
@@ -791,6 +905,7 @@ namespace Araci.ViewModels
             AtualizarSelecaoVisualLinhas();
             AtualizarSelecaoVisualRetangulos();
             AtualizarSelecaoVisualCirculos();
+            AtualizarSelecaoVisualTextos();
         }
 
         private void AtualizarSelecaoVisualLinhas()
@@ -809,6 +924,12 @@ namespace Araci.ViewModels
         {
             foreach (ProjectSheetTemplateCircleViewModel circle in Circles)
                 circle.IsSelected = _selectedCircleId.HasValue && circle.Id == _selectedCircleId.Value;
+        }
+
+        private void AtualizarSelecaoVisualTextos()
+        {
+            foreach (ProjectSheetTemplateTextViewModel text in Texts)
+                text.IsSelected = _selectedTextId.HasValue && text.Id == _selectedTextId.Value;
         }
 
         private void RefreshEndpointHandles()
@@ -890,9 +1011,11 @@ namespace Araci.ViewModels
             OnPropertyChanged(nameof(SelectedLineId));
             OnPropertyChanged(nameof(SelectedRectangleId));
             OnPropertyChanged(nameof(SelectedCircleId));
+            OnPropertyChanged(nameof(SelectedTextId));
             OnPropertyChanged(nameof(HasSelectedLine));
             OnPropertyChanged(nameof(HasSelectedRectangle));
             OnPropertyChanged(nameof(HasSelectedCircle));
+            OnPropertyChanged(nameof(HasSelectedText));
             OnPropertyChanged(nameof(HasTemplateSelection));
             OnPropertyChanged(nameof(RectangleResizeHandlesVisible));
             OnPropertyChanged(nameof(CircleResizeHandlesVisible));

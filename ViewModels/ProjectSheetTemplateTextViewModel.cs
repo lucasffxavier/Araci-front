@@ -1,5 +1,4 @@
 using System;
-using System.Collections.Generic;
 using System.ComponentModel;
 using System.Linq;
 using System.Runtime.CompilerServices;
@@ -14,9 +13,14 @@ namespace Araci.ViewModels
     public sealed class ProjectSheetTemplateTextViewModel : INotifyPropertyChanged
     {
         private const double TextHorizontalMargin = 8.0;
+        private const double DefaultSelectionThickness = 1.5;
+
         private readonly ProjectSheetTemplateText _texto;
         private readonly TypeLibraryService _types;
         private TipoTextoAnotativo? _tipoTexto;
+        private double _previewOffsetX;
+        private double _previewOffsetY;
+        private bool _isSelected;
 
         public ProjectSheetTemplateTextViewModel(ProjectSheetTemplateText texto)
             : this(texto, new TypeLibraryService())
@@ -31,8 +35,8 @@ namespace Araci.ViewModels
         }
 
         public Guid Id => _texto.Id;
-        public double X => _texto.X;
-        public double Y => _texto.Y;
+        public double X => _texto.X + _previewOffsetX;
+        public double Y => _texto.Y + _previewOffsetY;
         public double ModelX => _texto.X;
         public double ModelY => _texto.Y;
         public string Nome => _texto.Nome;
@@ -47,6 +51,24 @@ namespace Araci.ViewModels
         public bool Visible => _texto.Visible;
         public Brush ForegroundBrush => CriarBrush(CorTexto);
         public FontFamily FontFamily => new(string.IsNullOrWhiteSpace(Fonte) ? ProjectSheetTemplateText.DefaultFont : Fonte);
+        public bool HasPreviewOffset => Math.Abs(_previewOffsetX) > 0.000001 || Math.Abs(_previewOffsetY) > 0.000001;
+        public Brush SelectionBorderBrush => IsSelected ? Brushes.DodgerBlue : Brushes.Transparent;
+        public Thickness SelectionBorderThickness => IsSelected ? new Thickness(DefaultSelectionThickness) : new Thickness(0.0);
+
+        public bool IsSelected
+        {
+            get => _isSelected;
+            set
+            {
+                if (_isSelected == value)
+                    return;
+
+                _isSelected = value;
+                OnPropertyChanged();
+                OnPropertyChanged(nameof(SelectionBorderBrush));
+                OnPropertyChanged(nameof(SelectionBorderThickness));
+            }
+        }
 
         public TextAlignment TextAlignment => AlinhamentoHorizontal switch
         {
@@ -59,12 +81,37 @@ namespace Araci.ViewModels
         public double AlturaEstimada => CalcularAlturaEstimada(Conteudo, LarguraCaixa, AlturaTexto, LineHeight);
         public Transform RenderTransform => CriarRenderTransform();
 
+        public bool Contains(Point position, double tolerance)
+        {
+            double margem = Math.Max(0.0, tolerance);
+            double largura = Math.Max(ProjectSheetTemplateText.MinBoxWidth, LarguraCaixa);
+            double altura = Math.Max(AlturaTexto, AlturaEstimada);
+            var bounds = new Rect(X - margem, Y - margem, largura + margem * 2.0, altura + margem * 2.0);
+            return bounds.Contains(position);
+        }
+
+        public void SetPreviewOffset(double deltaX, double deltaY)
+        {
+            _previewOffsetX = ValorFinito(deltaX) ? deltaX : 0.0;
+            _previewOffsetY = ValorFinito(deltaY) ? deltaY : 0.0;
+            NotificarPosicao();
+        }
+
+        public void ClearPreviewOffset()
+        {
+            if (!HasPreviewOffset)
+                return;
+
+            _previewOffsetX = 0.0;
+            _previewOffsetY = 0.0;
+            NotificarPosicao();
+        }
+
         public void Refresh()
         {
             AtualizarTipoTexto();
             OnPropertyChanged(nameof(Id));
-            OnPropertyChanged(nameof(X));
-            OnPropertyChanged(nameof(Y));
+            NotificarPosicao();
             OnPropertyChanged(nameof(ModelX));
             OnPropertyChanged(nameof(ModelY));
             OnPropertyChanged(nameof(Nome));
@@ -74,6 +121,9 @@ namespace Araci.ViewModels
             OnPropertyChanged(nameof(Visible));
             OnPropertyChanged(nameof(AlturaEstimada));
             OnPropertyChanged(nameof(RenderTransform));
+            OnPropertyChanged(nameof(IsSelected));
+            OnPropertyChanged(nameof(SelectionBorderBrush));
+            OnPropertyChanged(nameof(SelectionBorderThickness));
             NotificarVisual();
         }
 
@@ -93,6 +143,13 @@ namespace Araci.ViewModels
                 string.Equals(t.NomeTipo, _texto.TipoTextoNome, StringComparison.OrdinalIgnoreCase) &&
                 string.Equals(t.Familia, _texto.TipoTextoFamilia, StringComparison.OrdinalIgnoreCase) &&
                 string.Equals(t.Categoria, _texto.TipoTextoCategoria, StringComparison.OrdinalIgnoreCase)) ?? _types.TipoTextoAnotativoPadrao;
+        }
+
+        private void NotificarPosicao()
+        {
+            OnPropertyChanged(nameof(X));
+            OnPropertyChanged(nameof(Y));
+            OnPropertyChanged(nameof(HasPreviewOffset));
         }
 
         private void NotificarVisual()
@@ -255,6 +312,11 @@ namespace Araci.ViewModels
             }
 
             return Brushes.Black;
+        }
+
+        private static bool ValorFinito(double value)
+        {
+            return !double.IsNaN(value) && !double.IsInfinity(value);
         }
 
         private void OnPropertyChanged([CallerMemberName] string? propertyName = null)

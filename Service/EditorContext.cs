@@ -13,6 +13,7 @@ using Araci.Core.Transactions;
 using Araci.Applications.Anotar.InserirLinha;
 using Araci.Applications.Anotar.InserirRetangulo;
 using Araci.Applications.Anotar.InserirCirculo;
+using Araci.Applications.Anotar.InserirTexto;
 using Araci.Applications.Diagrama.InserirCabo;
 using Araci.Applications.Diagrama.InserirElemento;
 using Araci.Applications.Editar.Alinhar;
@@ -115,6 +116,9 @@ namespace Araci.Services
             InserirLinhaNoTipoPrancha = new InserirLinhaNoTipoPranchaUseCase(Document, Commands);
             InserirRetanguloNoTipoPrancha = new InserirRetanguloNoTipoPranchaUseCase(Document, Commands);
             InserirCirculoNoTipoPrancha = new InserirCirculoNoTipoPranchaUseCase(Document, Commands);
+            InserirTextoNoTipoPrancha = new InserirTextoNoTipoPranchaUseCase(Document, Commands);
+            ExcluirTextoDoTipoPrancha = new ExcluirTextoDoTipoPranchaUseCase(Document, Commands);
+            MoverTextoDoTipoPrancha = new MoverTextoDoTipoPranchaUseCase(Document, Commands);
             ExcluirLinhaDoTipoPrancha = new ExcluirLinhaDoTipoPranchaUseCase(Document, Commands);
             MoverLinhaDoTipoPrancha = new MoverLinhaDoTipoPranchaUseCase(Document, Commands);
             ExcluirRetanguloDoTipoPrancha = new ExcluirRetanguloDoTipoPranchaUseCase(Document, Commands);
@@ -159,6 +163,7 @@ namespace Araci.Services
                 CriarInserirLinhaTipoPranchaTool,
                 CriarInserirRetanguloTipoPranchaTool,
                 CriarInserirCirculoTipoPranchaTool,
+                CriarInserirTextoTipoPranchaTool,
                 () => ProjectSheetTypeViewModelAtivo != null || Editor.SuperficieAtiva == EditorSurfaceKind.ProjectSheetType);
 
             Input = EditingComposition.CreateInput(Tools, Commands, SafeDelete, Selection, Elements, Hover, Clipboard.CopiarSelecionados, Clipboard.Colar);
@@ -233,6 +238,9 @@ namespace Araci.Services
         public InserirLinhaNoTipoPranchaUseCase InserirLinhaNoTipoPrancha { get; }
         public InserirRetanguloNoTipoPranchaUseCase InserirRetanguloNoTipoPrancha { get; }
         public InserirCirculoNoTipoPranchaUseCase InserirCirculoNoTipoPrancha { get; }
+        public InserirTextoNoTipoPranchaUseCase InserirTextoNoTipoPrancha { get; }
+        public ExcluirTextoDoTipoPranchaUseCase ExcluirTextoDoTipoPrancha { get; }
+        public MoverTextoDoTipoPranchaUseCase MoverTextoDoTipoPrancha { get; }
         public ExcluirLinhaDoTipoPranchaUseCase ExcluirLinhaDoTipoPrancha { get; }
         public MoverLinhaDoTipoPranchaUseCase MoverLinhaDoTipoPrancha { get; }
         public ExcluirRetanguloDoTipoPranchaUseCase ExcluirRetanguloDoTipoPrancha { get; }
@@ -408,6 +416,11 @@ namespace Araci.Services
         private InserirCirculoTipoPranchaTool CriarInserirCirculoTipoPranchaTool()
         {
             return new InserirCirculoTipoPranchaTool(() => ProjectSheetTypeViewModelAtivo, InserirCirculoNoTipoPrancha, () => Tools.VoltarParaSelecao());
+        }
+
+        private InserirTextoTipoPranchaTool CriarInserirTextoTipoPranchaTool()
+        {
+            return new InserirTextoTipoPranchaTool(() => ProjectSheetTypeViewModelAtivo, InserirTextoNoTipoPrancha, () => Tools.VoltarParaSelecao());
         }
 
         private InserirCirculoAnotativoTool CriarInserirCirculoAnotativoTool()

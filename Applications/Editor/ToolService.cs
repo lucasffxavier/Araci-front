@@ -20,6 +20,7 @@ namespace Araci.Applications.Editor
         private readonly Func<ITool>? _criarInserirLinhaTipoPranchaTool;
         private readonly Func<ITool>? _criarInserirRetanguloTipoPranchaTool;
         private readonly Func<ITool>? _criarInserirCirculoTipoPranchaTool;
+        private readonly Func<ITool>? _criarInserirTextoTipoPranchaTool;
         private readonly Func<bool>? _isTipoPranchaAtivo;
         private ITool _ferramentaAtual;
 
@@ -37,6 +38,7 @@ namespace Araci.Applications.Editor
             Func<ITool>? criarInserirLinhaTipoPranchaTool = null,
             Func<ITool>? criarInserirRetanguloTipoPranchaTool = null,
             Func<ITool>? criarInserirCirculoTipoPranchaTool = null,
+            Func<ITool>? criarInserirTextoTipoPranchaTool = null,
             Func<bool>? isTipoPranchaAtivo = null)
         {
             _elements = elements ?? throw new ArgumentNullException(nameof(elements));
@@ -52,6 +54,7 @@ namespace Araci.Applications.Editor
             _criarInserirLinhaTipoPranchaTool = criarInserirLinhaTipoPranchaTool;
             _criarInserirRetanguloTipoPranchaTool = criarInserirRetanguloTipoPranchaTool;
             _criarInserirCirculoTipoPranchaTool = criarInserirCirculoTipoPranchaTool;
+            _criarInserirTextoTipoPranchaTool = criarInserirTextoTipoPranchaTool;
             _isTipoPranchaAtivo = isTipoPranchaAtivo;
             _ferramentaAtual = _criarSelecionarTool();
             _ferramentaAtual.Ativar();
@@ -119,6 +122,17 @@ namespace Araci.Applications.Editor
             FerramentaAtual = _isTipoPranchaAtivo?.Invoke() == true && _criarInserirCirculoTipoPranchaTool != null
                 ? _criarInserirCirculoTipoPranchaTool()
                 : _criarInserirCirculoAnotativoTool();
+        }
+
+        public void AtivarInserirTextoAnotativo()
+        {
+            if (_isTipoPranchaAtivo?.Invoke() == true && _criarInserirTextoTipoPranchaTool != null)
+            {
+                FerramentaAtual = _criarInserirTextoTipoPranchaTool();
+                return;
+            }
+
+            AtivarInsercaoElemento(ElementKinds.TextoAnotativo);
         }
 
         public bool AtivarInsercaoElemento(string kind)
