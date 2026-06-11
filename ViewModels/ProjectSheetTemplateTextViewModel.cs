@@ -22,6 +22,8 @@ namespace Araci.ViewModels
         private double _previewOffsetY;
         private bool _hasPreviewBoxWidth;
         private double _previewBoxWidth;
+        private bool _hasPreviewRotation;
+        private double _previewRotation;
         private bool _isSelected;
         private bool _isEditingInline;
         private bool _hasPreviewLeaderPoint;
@@ -71,7 +73,8 @@ namespace Araci.ViewModels
 
         public double LarguraCaixa => _hasPreviewBoxWidth ? _previewBoxWidth : _texto.LarguraCaixa;
         public double ModelLarguraCaixa => _texto.LarguraCaixa;
-        public double Rotacao => NormalizarRotacao(_texto.Rotacao);
+        public double Rotacao => _hasPreviewRotation ? _previewRotation : NormalizarRotacao(_texto.Rotacao);
+        public double ModelRotacao => NormalizarRotacao(_texto.Rotacao);
         public TipoTextoAnotativo? TipoTexto => _tipoTexto;
         public string CorTexto => NormalizarCor(_texto.CorTexto);
         public string Fonte => NormalizarFonte(_texto.Fonte);
@@ -105,6 +108,7 @@ namespace Araci.ViewModels
         public PointCollection LeaderOpenArrowWorldPoints => CalcularLeaderOpenArrowWorldPoints();
         public bool HasPreviewOffset => Math.Abs(_previewOffsetX) > 0.000001 || Math.Abs(_previewOffsetY) > 0.000001;
         public bool HasPreviewBoxWidth => _hasPreviewBoxWidth;
+        public bool HasPreviewRotation => _hasPreviewRotation;
         public bool HasPreviewLeaderPoint => _hasPreviewLeaderPoint;
         public bool HasPreviewLeaderCotoveloPoint => _hasPreviewLeaderCotoveloPoint;
         public bool IsNotEditingInline => !IsEditingInline;
@@ -166,11 +170,15 @@ namespace Araci.ViewModels
 
         public bool Contains(Point position, double tolerance)
         {
+            if (!PontoValido(position))
+                return false;
+
             double margem = Math.Max(0.0, tolerance);
             double largura = Math.Max(ProjectSheetTemplateText.MinBoxWidth, LarguraCaixa);
             double altura = Math.Max(AlturaTexto, AlturaVisual);
-            var bounds = new Rect(X - margem, Y - margem, largura + margem * 2.0, altura + margem * 2.0);
-            return bounds.Contains(position);
+            Point local = WorldToLocal(position);
+            var bounds = new Rect(-margem, -margem, largura + margem * 2.0, altura + margem * 2.0);
+            return bounds.Contains(local);
         }
 
         public void SetPreviewOffset(double deltaX, double deltaY)
@@ -212,6 +220,31 @@ namespace Araci.ViewModels
             _previewBoxWidth = 0.0;
             NotificarLarguraCaixa();
             OnPropertyChanged(nameof(HasPreviewBoxWidth));
+        }
+
+        public bool SetPreviewRotation(double rotacao)
+        {
+            double rotacaoNormalizada = NormalizarRotacao(rotacao);
+
+            if (_hasPreviewRotation && Math.Abs(_previewRotation - rotacaoNormalizada) < 0.0001)
+                return true;
+
+            _hasPreviewRotation = true;
+            _previewRotation = rotacaoNormalizada;
+            OnPropertyChanged(nameof(HasPreviewRotation));
+            NotificarRotacao();
+            return true;
+        }
+
+        public void ClearPreviewRotation()
+        {
+            if (!_hasPreviewRotation)
+                return;
+
+            _hasPreviewRotation = false;
+            _previewRotation = 0.0;
+            OnPropertyChanged(nameof(HasPreviewRotation));
+            NotificarRotacao();
         }
 
         public bool SetPreviewLeaderPoint(Point point)
@@ -300,9 +333,11 @@ namespace Araci.ViewModels
             OnPropertyChanged(nameof(LarguraCaixa));
             OnPropertyChanged(nameof(ModelLarguraCaixa));
             OnPropertyChanged(nameof(HasPreviewBoxWidth));
+            OnPropertyChanged(nameof(HasPreviewRotation));
             OnPropertyChanged(nameof(HasPreviewLeaderPoint));
             OnPropertyChanged(nameof(HasPreviewLeaderCotoveloPoint));
             OnPropertyChanged(nameof(Rotacao));
+            OnPropertyChanged(nameof(ModelRotacao));
             OnPropertyChanged(nameof(Visible));
             OnPropertyChanged(nameof(AlturaEstimada));
             OnPropertyChanged(nameof(AlturaEdicao));
@@ -349,6 +384,14 @@ namespace Araci.ViewModels
             OnPropertyChanged(nameof(AlturaEstimada));
             OnPropertyChanged(nameof(AlturaEdicao));
             OnPropertyChanged(nameof(AlturaVisual));
+            OnPropertyChanged(nameof(RenderTransform));
+            NotificarLeader();
+        }
+
+        private void NotificarRotacao()
+        {
+            OnPropertyChanged(nameof(Rotacao));
+            OnPropertyChanged(nameof(ModelRotacao));
             OnPropertyChanged(nameof(RenderTransform));
             NotificarLeader();
         }

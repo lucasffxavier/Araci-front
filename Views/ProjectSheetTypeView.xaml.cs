@@ -22,6 +22,7 @@ namespace Araci.Views
         private const double CircleResizeHandleHitTolerance = 8.0;
         private const double TextResizeHandleHitTolerance = 8.0;
         private const double TextLeaderHandleHitTolerance = 8.0;
+        private const double TextRotationHandleHitTolerance = 9.0;
         private const double DragThresholdSquared = 9.0;
         private const double LayoutTolerance = 1.0;
         private const int CenterSheetMaxAttempts = 10;
@@ -52,6 +53,12 @@ namespace Araci.Views
         private Point _textoTemplateLeaderLastPosition;
         private bool _textoTemplateLeaderLastPositionValid;
         private bool _textoTemplateLeaderArrastando;
+        private Guid? _textoTemplateRotationEmArrasteId;
+        private Point _textoTemplateRotationCenter;
+        private Point _textoTemplateRotationDragStart;
+        private Point _textoTemplateRotationLastPosition;
+        private bool _textoTemplateRotationLastPositionValid;
+        private bool _textoTemplateRotationArrastando;
         private bool _textoTemplateInlineCommitEmAndamento;
         private Guid? _circuloTemplateResizeEmArrasteId;
         private Point _circuloTemplateResizeDragStart;
@@ -134,6 +141,12 @@ namespace Araci.Views
 
             Point position = ObterPontoLocalFolha(e);
 
+            if (TentarIniciarRotacaoTextoTemplate(position))
+            {
+                e.Handled = true;
+                return;
+            }
+
             if (TentarIniciarEdicaoLeaderTextoTemplate(position))
             {
                 e.Handled = true;
@@ -186,6 +199,12 @@ namespace Araci.Views
 
             if (TextoInlineEmEdicaoAtivo())
                 return;
+
+            if (AtualizarRotacaoTextoTemplate(position, e))
+            {
+                e.Handled = true;
+                return;
+            }
 
             if (AtualizarEdicaoLeaderTextoTemplate(position, e))
             {
@@ -256,6 +275,16 @@ namespace Araci.Views
                 return;
 
             Point position = ObterPontoLocalFolha(e);
+
+            if (FinalizarRotacaoTextoTemplate())
+            {
+                if (TemplatePageBorder.IsMouseCaptured)
+                    TemplatePageBorder.ReleaseMouseCapture();
+
+                AtualizarHandlesOverlay();
+                e.Handled = true;
+                return;
+            }
 
             if (FinalizarEdicaoLeaderTextoTemplate())
             {
@@ -377,6 +406,9 @@ namespace Araci.Views
             if (_textoTemplateResizeEmArrasteId.HasValue)
                 CancelarResizeTextoTemplate();
 
+            if (_textoTemplateRotationEmArrasteId.HasValue)
+                CancelarRotacaoTextoTemplate();
+
             if (_textoTemplateLeaderEmArrasteId.HasValue)
                 CancelarEdicaoLeaderTextoTemplate();
 
@@ -418,6 +450,14 @@ namespace Araci.Views
             if (e.Key == Key.Escape && _selectionBoxTemplateEmAndamento)
             {
                 CancelarSelecaoPorCaixaTemplate();
+                AtualizarHandlesOverlay();
+                e.Handled = true;
+                return;
+            }
+
+            if (e.Key == Key.Escape && _textoTemplateRotationEmArrasteId.HasValue)
+            {
+                CancelarRotacaoTextoTemplate();
                 AtualizarHandlesOverlay();
                 e.Handled = true;
                 return;
@@ -670,6 +710,129 @@ namespace Araci.Views
             _circuloTemplateResizeArrastando = false;
             _circuloTemplateResizeOriginalX = 0.0;
             _circuloTemplateResizeOriginalY = 0.0;
+        }
+
+
+        private bool TentarIniciarRotacaoTextoTemplate(Point position)
+        {
+            ProjectSheetTypeViewModel? viewModel = ObterViewModelAtivo();
+
+            if (_context == null || viewModel == null)
+                return false;
+
+            ITool ferramentaAtual = _context.Tools.FerramentaAtual;
+
+            if (!string.Equals(ferramentaAtual.Nome, "Selecionar", StringComparison.OrdinalIgnoreCase) || ferramentaAtual.IsBusy)
+                return false;
+
+            if (!viewModel.TryHitSelectedTextRotationHandle(position, TextRotationHandleHitTolerance, out Guid textId))
+                return false;
+
+            if (!viewModel.TryGetTextRotationGeometry(textId, out Point center, out _))
+                return false;
+
+            _textoTemplateRotationEmArrasteId = textId;
+            _textoTemplateRotationCenter = center;
+            _textoTemplateRotationDragStart = position;
+            _textoTemplateRotationLastPosition = position;
+            _textoTemplateRotationLastPositionValid = PontoValido(position);
+            _textoTemplateRotationArrastando = false;
+            LimparEstadoArrasteLinhaTemplate();
+            LimparEstadoArrasteRetanguloTemplate();
+            LimparEstadoArrasteCirculoTemplate();
+            LimparEstadoArrasteTextoTemplate();
+            LimparEstadoResizeRetanguloTemplate();
+            LimparEstadoResizeCirculoTemplate();
+            LimparEstadoResizeTextoTemplate();
+            LimparEstadoEdicaoLeaderTextoTemplate();
+            TemplatePageBorder.CaptureMouse();
+            AtualizarHandlesOverlay();
+            return true;
+        }
+
+        private bool AtualizarRotacaoTextoTemplate(Point position, MouseEventArgs e)
+        {
+            ProjectSheetTypeViewModel? viewModel = ObterViewModelAtivo();
+
+            if (viewModel == null || !_textoTemplateRotationEmArrasteId.HasValue)
+                return false;
+
+            if (e.LeftButton != MouseButtonState.Pressed)
+                return false;
+
+            Vector delta = position - _textoTemplateRotationDragStart;
+
+            if (!_textoTemplateRotationArrastando && delta.LengthSquared < DragThresholdSquared)
+                return true;
+
+            if (!PontoValido(position))
+                return true;
+
+            double rotacao = CalcularRotacaoTextoTemplate(_textoTemplateRotationCenter, position);
+            bool previewAplicado = viewModel.SetTextPreviewRotation(_textoTemplateRotationEmArrasteId.Value, rotacao);
+
+            if (!previewAplicado)
+                return true;
+
+            _textoTemplateRotationArrastando = true;
+            _textoTemplateRotationLastPosition = position;
+            _textoTemplateRotationLastPositionValid = true;
+            AtualizarHandlesOverlay();
+            return true;
+        }
+
+        private bool FinalizarRotacaoTextoTemplate()
+        {
+            ProjectSheetTypeViewModel? viewModel = ObterViewModelAtivo();
+
+            if (_context == null || viewModel == null || !_textoTemplateRotationEmArrasteId.HasValue)
+                return false;
+
+            Guid textId = _textoTemplateRotationEmArrasteId.Value;
+            bool arrastou = _textoTemplateRotationArrastando;
+            Point finalPosition = _textoTemplateRotationLastPosition;
+            bool finalPositionValid = _textoTemplateRotationLastPositionValid && PontoValido(finalPosition);
+            Point center = _textoTemplateRotationCenter;
+
+            viewModel.ClearTextPreviewRotation(textId);
+            LimparEstadoRotacaoTextoTemplate();
+
+            if (!arrastou || !finalPositionValid || !PontoValido(center))
+            {
+                AtualizarHandlesOverlay();
+                return true;
+            }
+
+            double rotacao = CalcularRotacaoTextoTemplate(center, finalPosition);
+            bool alterou = _context.MoverTextoDoTipoPrancha.AlterarRotacao(viewModel.Id, textId, rotacao);
+
+            if (alterou)
+                viewModel.SelectText(textId);
+
+            AtualizarPainelPropriedadesTemplateSelecionado();
+            AtualizarHandlesOverlay();
+            return true;
+        }
+
+        private void CancelarRotacaoTextoTemplate()
+        {
+            ProjectSheetTypeViewModel? viewModel = ObterViewModelAtivo();
+
+            if (viewModel != null && _textoTemplateRotationEmArrasteId.HasValue)
+                viewModel.ClearTextPreviewRotation(_textoTemplateRotationEmArrasteId.Value);
+
+            LimparEstadoRotacaoTextoTemplate();
+            AtualizarHandlesOverlay();
+        }
+
+        private void LimparEstadoRotacaoTextoTemplate()
+        {
+            _textoTemplateRotationEmArrasteId = null;
+            _textoTemplateRotationCenter = default;
+            _textoTemplateRotationDragStart = default;
+            _textoTemplateRotationLastPosition = default;
+            _textoTemplateRotationLastPositionValid = false;
+            _textoTemplateRotationArrastando = false;
         }
 
         private bool TentarIniciarEdicaoLeaderTextoTemplate(Point position)
@@ -2255,6 +2418,34 @@ namespace Araci.Views
                 return value;
 
             return Math.Min(value, maximum);
+        }
+
+        private static double CalcularRotacaoTextoTemplate(Point center, Point position)
+        {
+            if (!PontoValido(center) || !PontoValido(position))
+                return 0.0;
+
+            double dx = position.X - center.X;
+            double dy = position.Y - center.Y;
+
+            if (Math.Abs(dx) < 0.000001 && Math.Abs(dy) < 0.000001)
+                return 0.0;
+
+            double degrees = Math.Atan2(dy, dx) * 180.0 / Math.PI + 90.0;
+            return NormalizarRotacaoTextoTemplate(degrees);
+        }
+
+        private static double NormalizarRotacaoTextoTemplate(double valor)
+        {
+            if (!ValorFinito(valor))
+                return 0.0;
+
+            double normalizada = valor % 360.0;
+
+            if (normalizada < 0.0)
+                normalizada += 360.0;
+
+            return normalizada >= 360.0 ? 0.0 : normalizada;
         }
 
         private static double CalcularLarguraTextoTemplate(double originalX, Point position)

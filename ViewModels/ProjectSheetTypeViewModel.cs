@@ -20,6 +20,8 @@ namespace Araci.ViewModels
         private const double CircleResizeHandleSize = 10.0;
         private const double TextResizeHandleSize = 10.0;
         private const double TextLeaderHandleSize = 10.0;
+        private const double TextRotationHandleSize = 12.0;
+        private const double TextRotationHandleDistance = 30.0;
         private const double MinZoomScale = 0.25;
         private const double MaxZoomScale = 4.0;
         private const double ZoomStep = 0.10;
@@ -59,6 +61,7 @@ namespace Araci.ViewModels
             CircleResizeHandles = new ObservableCollection<ProjectSheetTemplateCircleResizeHandleViewModel>();
             TextResizeHandles = new ObservableCollection<ProjectSheetTemplateTextResizeHandleViewModel>();
             TextLeaderHandles = new ObservableCollection<ProjectSheetTemplateTextLeaderHandleViewModel>();
+            TextRotationHandles = new ObservableCollection<ProjectSheetTemplateTextRotationHandleViewModel>();
             LineSnapPoints = new ObservableCollection<ProjectSheetTemplateLineSnapPointViewModel>();
             SelectionBox = new SelectionBoxViewModel();
             _document.PropriedadesTipoPranchaAlteradas += OnPropriedadesTipoPranchaAlteradas;
@@ -90,6 +93,7 @@ namespace Araci.ViewModels
         public ObservableCollection<ProjectSheetTemplateCircleResizeHandleViewModel> CircleResizeHandles { get; }
         public ObservableCollection<ProjectSheetTemplateTextResizeHandleViewModel> TextResizeHandles { get; }
         public ObservableCollection<ProjectSheetTemplateTextLeaderHandleViewModel> TextLeaderHandles { get; }
+        public ObservableCollection<ProjectSheetTemplateTextRotationHandleViewModel> TextRotationHandles { get; }
         public ObservableCollection<ProjectSheetTemplateLineSnapPointViewModel> LineSnapPoints { get; }
         public SelectionBoxViewModel SelectionBox { get; }
         public Guid? SelectedLineId => _selectedLineId;
@@ -109,6 +113,7 @@ namespace Araci.ViewModels
         public bool CircleResizeHandlesVisible => CircleResizeHandles.Count > 0;
         public bool TextResizeHandlesVisible => TextResizeHandles.Count > 0;
         public bool TextLeaderHandlesVisible => TextLeaderHandles.Count > 0;
+        public bool TextRotationHandlesVisible => TextRotationHandles.Count > 0;
         public bool LineSnapPointsVisible => LineSnapPoints.Count > 0;
 
         public double ZoomScale
@@ -351,6 +356,73 @@ namespace Araci.ViewModels
         {
             foreach (ProjectSheetTemplateTextViewModel text in Texts)
                 text.ClearPreviewOffset();
+
+            AtualizarSelecaoVisualTextos();
+            RefreshTextResizeHandles();
+        }
+
+        public bool TryHitSelectedTextRotationHandle(Point position, double tolerance, out Guid textId)
+        {
+            textId = Guid.Empty;
+
+            if (!_selectedTextId.HasValue)
+                return false;
+
+            double toleranceSquared = Math.Max(0.0, tolerance) * Math.Max(0.0, tolerance);
+            ProjectSheetTemplateTextRotationHandleViewModel? hit = TextRotationHandles
+                .Reverse()
+                .FirstOrDefault(h => DistanciaQuadrada(position, new Point(h.X, h.Y)) <= toleranceSquared);
+
+            if (hit == null)
+                return false;
+
+            textId = hit.TextId;
+            return true;
+        }
+
+        public bool TryGetTextRotationGeometry(Guid textId, out Point center, out double rotacao)
+        {
+            ProjectSheetTemplateTextViewModel? text = Texts.FirstOrDefault(t => t.Id == textId);
+
+            if (text == null)
+            {
+                center = default;
+                rotacao = 0.0;
+                return false;
+            }
+
+            double largura = Math.Max(ProjectSheetTemplateText.MinBoxWidth, text.LarguraCaixa);
+            double altura = Math.Max(text.AlturaTexto, text.AlturaVisual);
+            center = new Point(text.X + largura / 2.0, text.Y + altura / 2.0);
+            rotacao = text.Rotacao;
+            return ValorFinito(center.X) && ValorFinito(center.Y) && ValorFinito(rotacao);
+        }
+
+        public bool SetTextPreviewRotation(Guid textId, double rotacao)
+        {
+            ProjectSheetTemplateTextViewModel? text = Texts.FirstOrDefault(t => t.Id == textId);
+
+            if (text == null)
+                return false;
+
+            bool aplicado = text.SetPreviewRotation(rotacao);
+            AtualizarSelecaoVisualTextos();
+            RefreshTextResizeHandles();
+            return aplicado;
+        }
+
+        public void ClearTextPreviewRotation(Guid textId)
+        {
+            ProjectSheetTemplateTextViewModel? text = Texts.FirstOrDefault(t => t.Id == textId);
+            text?.ClearPreviewRotation();
+            AtualizarSelecaoVisualTextos();
+            RefreshTextResizeHandles();
+        }
+
+        public void ClearTextPreviewRotations()
+        {
+            foreach (ProjectSheetTemplateTextViewModel text in Texts)
+                text.ClearPreviewRotation();
 
             AtualizarSelecaoVisualTextos();
             RefreshTextResizeHandles();
@@ -1195,11 +1267,7 @@ namespace Araci.ViewModels
 
             foreach (ProjectSheetTemplateTextViewModel text in Texts)
             {
-                Rect textBounds = NormalizeRect(new Rect(
-                    text.X,
-                    text.Y,
-                    Math.Max(ProjectSheetTemplateText.MinBoxWidth, text.LarguraCaixa),
-                    Math.Max(text.AlturaTexto, text.AlturaVisual)));
+                Rect textBounds = CalcularBoundsTexto(text);
 
                 if (textBounds.IntersectsWith(normalized))
                     _selectedTextIds.Add(text.Id);
@@ -1441,8 +1509,10 @@ namespace Araci.ViewModels
             }
 
             RefreshTextLeaderHandles();
+            RefreshTextRotationHandles();
             OnPropertyChanged(nameof(TextResizeHandlesVisible));
             OnPropertyChanged(nameof(TextLeaderHandlesVisible));
+            OnPropertyChanged(nameof(TextRotationHandlesVisible));
         }
 
         private void RefreshTextLeaderHandles()
@@ -1469,6 +1539,40 @@ namespace Araci.ViewModels
             OnPropertyChanged(nameof(TextLeaderHandlesVisible));
         }
 
+        private void RefreshTextRotationHandles()
+        {
+            TextRotationHandles.Clear();
+
+            if (_selectedTextId.HasValue)
+            {
+                ProjectSheetTemplateTextViewModel? text = Texts.FirstOrDefault(t =>
+                    t.Id == _selectedTextId.Value &&
+                    t.IsSelected &&
+                    !t.IsEditingInline);
+
+                if (text != null)
+                {
+                    Point handlePoint = CalcularPontoHandleRotacaoTexto(text);
+                    AddTextRotationHandle(text.Id, handlePoint.X, handlePoint.Y);
+                }
+            }
+
+            OnPropertyChanged(nameof(TextRotationHandlesVisible));
+        }
+
+        private static Point CalcularPontoHandleRotacaoTexto(ProjectSheetTemplateTextViewModel text)
+        {
+            double largura = Math.Max(ProjectSheetTemplateText.MinBoxWidth, text.LarguraCaixa);
+            double altura = Math.Max(text.AlturaTexto, text.AlturaVisual);
+            Point center = new(text.X + largura / 2.0, text.Y + altura / 2.0);
+            double distancia = altura / 2.0 + TextRotationHandleDistance;
+            double radians = (text.Rotacao - 90.0) * Math.PI / 180.0;
+
+            return new Point(
+                center.X + Math.Cos(radians) * distancia,
+                center.Y + Math.Sin(radians) * distancia);
+        }
+
         private void AddRectangleResizeHandle(Guid rectangleId, RetanguloResizeHandleKind kind, double x, double y)
         {
             RectangleResizeHandles.Add(ProjectSheetTemplateRectangleResizeHandleViewModel.Create(rectangleId, kind, x, y, RectangleResizeHandleSize));
@@ -1489,6 +1593,11 @@ namespace Araci.ViewModels
             TextLeaderHandles.Add(ProjectSheetTemplateTextLeaderHandleViewModel.Create(textId, kind, x, y, TextLeaderHandleSize));
         }
 
+        private void AddTextRotationHandle(Guid textId, double x, double y)
+        {
+            TextRotationHandles.Add(ProjectSheetTemplateTextRotationHandleViewModel.Create(textId, x, y, TextRotationHandleSize));
+        }
+
         private void NotificarSelecao()
         {
             OnPropertyChanged(nameof(SelectedLineId));
@@ -1507,6 +1616,7 @@ namespace Araci.ViewModels
             OnPropertyChanged(nameof(CircleResizeHandlesVisible));
             OnPropertyChanged(nameof(TextResizeHandlesVisible));
             OnPropertyChanged(nameof(TextLeaderHandlesVisible));
+            OnPropertyChanged(nameof(TextRotationHandlesVisible));
             OnPropertyChanged(nameof(LineSnapPointsVisible));
         }
 
@@ -1540,6 +1650,36 @@ namespace Araci.ViewModels
                 _selectedCircleId = _selectedCircleIds.First();
             else if (_selectedTextIds.Count == 1)
                 _selectedTextId = _selectedTextIds.First();
+        }
+
+        private static Rect CalcularBoundsTexto(ProjectSheetTemplateTextViewModel text)
+        {
+            double largura = Math.Max(ProjectSheetTemplateText.MinBoxWidth, text.LarguraCaixa);
+            double altura = Math.Max(text.AlturaTexto, text.AlturaVisual);
+            Point center = new(text.X + largura / 2.0, text.Y + altura / 2.0);
+            double radians = text.Rotacao * Math.PI / 180.0;
+            double cos = Math.Cos(radians);
+            double sin = Math.Sin(radians);
+
+            Point Transformar(double localX, double localY)
+            {
+                double dx = localX - largura / 2.0;
+                double dy = localY - altura / 2.0;
+                return new Point(
+                    center.X + dx * cos - dy * sin,
+                    center.Y + dx * sin + dy * cos);
+            }
+
+            Point p1 = Transformar(0.0, 0.0);
+            Point p2 = Transformar(largura, 0.0);
+            Point p3 = Transformar(largura, altura);
+            Point p4 = Transformar(0.0, altura);
+            double left = Math.Min(Math.Min(p1.X, p2.X), Math.Min(p3.X, p4.X));
+            double top = Math.Min(Math.Min(p1.Y, p2.Y), Math.Min(p3.Y, p4.Y));
+            double right = Math.Max(Math.Max(p1.X, p2.X), Math.Max(p3.X, p4.X));
+            double bottom = Math.Max(Math.Max(p1.Y, p2.Y), Math.Max(p3.Y, p4.Y));
+
+            return new Rect(left, top, Math.Max(0.0, right - left), Math.Max(0.0, bottom - top));
         }
 
         private static Rect NormalizeRect(Rect rect)
@@ -1830,6 +1970,40 @@ namespace Araci.ViewModels
             double size)
         {
             return new ProjectSheetTemplateTextLeaderHandleViewModel(textId, kind, x, y, size);
+        }
+    }
+
+    public sealed class ProjectSheetTemplateTextRotationHandleViewModel
+    {
+        private ProjectSheetTemplateTextRotationHandleViewModel(
+            Guid textId,
+            double x,
+            double y,
+            double size)
+        {
+            TextId = textId;
+            X = x;
+            Y = y;
+            Size = size;
+        }
+
+        public Guid TextId { get; }
+        public double X { get; }
+        public double Y { get; }
+        public double Size { get; }
+        public double Left => X - Size / 2.0;
+        public double Top => Y - Size / 2.0;
+        public Brush Fill => Brushes.White;
+        public Brush Stroke => Brushes.DarkOrange;
+        public double StrokeThickness => 2.0;
+
+        public static ProjectSheetTemplateTextRotationHandleViewModel Create(
+            Guid textId,
+            double x,
+            double y,
+            double size)
+        {
+            return new ProjectSheetTemplateTextRotationHandleViewModel(textId, x, y, size);
         }
     }
 
