@@ -93,6 +93,13 @@ namespace Araci.Infrastructure.Persistence
         public double AlturaTexto { get; set; } = 14.0;
         public string AlinhamentoHorizontal { get; set; } = "Esquerda";
         public double Rotacao { get; set; }
+        public bool LeaderAtivo { get; set; }
+        public double LeaderX { get; set; }
+        public double LeaderY { get; set; }
+        public bool LeaderComCotovelo { get; set; }
+        public double LeaderCotoveloX { get; set; }
+        public double LeaderCotoveloY { get; set; }
+        public bool LeaderCotoveloManual { get; set; }
         public bool Visible { get; set; } = true;
     }
 

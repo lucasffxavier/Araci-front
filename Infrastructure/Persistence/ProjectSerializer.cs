@@ -648,6 +648,13 @@ namespace Araci.Infrastructure.Persistence
                 AlturaTexto = NormalizarAlturaTextoTemplate(texto.AlturaTexto),
                 AlinhamentoHorizontal = string.IsNullOrWhiteSpace(texto.AlinhamentoHorizontal) ? ProjectSheetTemplateText.DefaultHorizontalAlignment : texto.AlinhamentoHorizontal,
                 Rotacao = NormalizarRotacao(texto.Rotacao),
+                LeaderAtivo = texto.LeaderAtivo,
+                LeaderX = NormalizarCoordenada(texto.LeaderX),
+                LeaderY = NormalizarCoordenada(texto.LeaderY),
+                LeaderComCotovelo = texto.LeaderComCotovelo,
+                LeaderCotoveloX = NormalizarCoordenada(texto.LeaderCotoveloX),
+                LeaderCotoveloY = NormalizarCoordenada(texto.LeaderCotoveloY),
+                LeaderCotoveloManual = texto.LeaderCotoveloManual,
                 Visible = texto.Visible
             };
         }
@@ -897,6 +904,13 @@ namespace Araci.Infrastructure.Persistence
                 AlturaTexto = NormalizarAlturaTextoTemplate(dto.AlturaTexto),
                 AlinhamentoHorizontal = string.IsNullOrWhiteSpace(dto.AlinhamentoHorizontal) ? ProjectSheetTemplateText.DefaultHorizontalAlignment : dto.AlinhamentoHorizontal.Trim(),
                 Rotacao = NormalizarRotacao(dto.Rotacao),
+                LeaderAtivo = dto.LeaderAtivo,
+                LeaderX = NormalizarCoordenada(dto.LeaderX),
+                LeaderY = NormalizarCoordenada(dto.LeaderY),
+                LeaderComCotovelo = dto.LeaderComCotovelo,
+                LeaderCotoveloX = NormalizarCoordenada(dto.LeaderCotoveloX),
+                LeaderCotoveloY = NormalizarCoordenada(dto.LeaderCotoveloY),
+                LeaderCotoveloManual = dto.LeaderCotoveloManual,
                 Visible = dto.Visible
             };
 

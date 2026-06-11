@@ -59,23 +59,65 @@ namespace Araci.Core.Commands
     public readonly struct ProjectSheetTemplateTextPositionState
     {
         public ProjectSheetTemplateTextPositionState(double x, double y)
+            : this(x, y, 0.0, 0.0, 0.0, 0.0, false, false)
+        {
+        }
+
+        public ProjectSheetTemplateTextPositionState(
+            double x,
+            double y,
+            double leaderX,
+            double leaderY,
+            double leaderCotoveloX,
+            double leaderCotoveloY,
+            bool leaderCotoveloManual,
+            bool aplicarLeader)
         {
             X = x;
             Y = y;
+            LeaderX = leaderX;
+            LeaderY = leaderY;
+            LeaderCotoveloX = leaderCotoveloX;
+            LeaderCotoveloY = leaderCotoveloY;
+            LeaderCotoveloManual = leaderCotoveloManual;
+            AplicarLeader = aplicarLeader;
         }
 
         public double X { get; }
         public double Y { get; }
+        public double LeaderX { get; }
+        public double LeaderY { get; }
+        public double LeaderCotoveloX { get; }
+        public double LeaderCotoveloY { get; }
+        public bool LeaderCotoveloManual { get; }
+        public bool AplicarLeader { get; }
 
         public void Aplicar(ProjectSheetTemplateText texto)
         {
             texto.X = X;
             texto.Y = Y;
+
+            if (!AplicarLeader)
+                return;
+
+            texto.LeaderX = LeaderX;
+            texto.LeaderY = LeaderY;
+            texto.LeaderCotoveloX = LeaderCotoveloX;
+            texto.LeaderCotoveloY = LeaderCotoveloY;
+            texto.LeaderCotoveloManual = LeaderCotoveloManual;
         }
 
         public static ProjectSheetTemplateTextPositionState FromText(ProjectSheetTemplateText texto)
         {
-            return new ProjectSheetTemplateTextPositionState(texto.X, texto.Y);
+            return new ProjectSheetTemplateTextPositionState(
+                texto.X,
+                texto.Y,
+                texto.LeaderX,
+                texto.LeaderY,
+                texto.LeaderCotoveloX,
+                texto.LeaderCotoveloY,
+                texto.LeaderCotoveloManual,
+                true);
         }
     }
 
@@ -194,6 +236,58 @@ namespace Araci.Core.Commands
                 texto.Fonte,
                 texto.AlturaTexto,
                 texto.AlinhamentoHorizontal);
+        }
+    }
+
+    public readonly struct ProjectSheetTemplateTextLeaderState
+    {
+        public ProjectSheetTemplateTextLeaderState(
+            bool leaderAtivo,
+            double leaderX,
+            double leaderY,
+            bool leaderComCotovelo,
+            double leaderCotoveloX,
+            double leaderCotoveloY,
+            bool leaderCotoveloManual)
+        {
+            LeaderAtivo = leaderAtivo;
+            LeaderX = leaderX;
+            LeaderY = leaderY;
+            LeaderComCotovelo = leaderComCotovelo;
+            LeaderCotoveloX = leaderCotoveloX;
+            LeaderCotoveloY = leaderCotoveloY;
+            LeaderCotoveloManual = leaderCotoveloManual;
+        }
+
+        public bool LeaderAtivo { get; }
+        public double LeaderX { get; }
+        public double LeaderY { get; }
+        public bool LeaderComCotovelo { get; }
+        public double LeaderCotoveloX { get; }
+        public double LeaderCotoveloY { get; }
+        public bool LeaderCotoveloManual { get; }
+
+        public void Aplicar(ProjectSheetTemplateText texto)
+        {
+            texto.LeaderAtivo = LeaderAtivo;
+            texto.LeaderX = LeaderX;
+            texto.LeaderY = LeaderY;
+            texto.LeaderComCotovelo = LeaderComCotovelo;
+            texto.LeaderCotoveloX = LeaderCotoveloX;
+            texto.LeaderCotoveloY = LeaderCotoveloY;
+            texto.LeaderCotoveloManual = LeaderCotoveloManual;
+        }
+
+        public static ProjectSheetTemplateTextLeaderState FromText(ProjectSheetTemplateText texto)
+        {
+            return new ProjectSheetTemplateTextLeaderState(
+                texto.LeaderAtivo,
+                texto.LeaderX,
+                texto.LeaderY,
+                texto.LeaderComCotovelo,
+                texto.LeaderCotoveloX,
+                texto.LeaderCotoveloY,
+                texto.LeaderCotoveloManual);
         }
     }
 }

@@ -61,6 +61,7 @@ namespace Araci.ViewModels
                 OnPropertyChanged();
                 OnPropertyChanged(nameof(AlturaEdicao));
                 OnPropertyChanged(nameof(AlturaVisual));
+                NotificarLeader();
             }
         }
 
@@ -75,6 +76,29 @@ namespace Araci.ViewModels
         public bool Visible => _texto.Visible;
         public Brush ForegroundBrush => CriarBrush(CorTexto);
         public FontFamily FontFamily => new(string.IsNullOrWhiteSpace(Fonte) ? ProjectSheetTemplateText.DefaultFont : Fonte);
+        public bool LeaderAtivo => _texto.LeaderAtivo;
+        public bool LeaderComCotovelo => _texto.LeaderComCotovelo;
+        public bool LeaderVisivel => LeaderAtivo && !IsEditingInline;
+        public bool LeaderRetoVisivel => LeaderVisivel && !LeaderComCotovelo;
+        public bool LeaderCotoveloVisivel => LeaderVisivel && LeaderComCotovelo;
+        public string LeaderEstiloSeta => TipoTexto?.LeaderEstiloSeta ?? "Seta preenchida";
+        public string LeaderCor => TipoTexto?.LeaderCor ?? CorTexto;
+        public double LeaderEspessura => Math.Max(0.1, TipoTexto?.LeaderEspessura ?? 1.2);
+        public double LeaderTamanhoSeta => Math.Max(1.0, TipoTexto?.LeaderTamanhoSeta ?? 10.0);
+        public double LeaderArrowLength => Math.Max(1.0, LeaderTamanhoSeta);
+        public double LeaderArrowHalfWidth => Math.Max(2.0, LeaderTamanhoSeta * 0.45);
+        public bool LeaderArrowVisivel => LeaderVisivel && LeaderEstiloSeta != "Sem seta";
+        public bool LeaderArrowFillVisivel => LeaderArrowVisivel && LeaderEstiloSeta == "Seta preenchida";
+        public bool LeaderArrowOpenVisivel => LeaderArrowVisivel && LeaderEstiloSeta == "Seta aberta";
+        public Brush LeaderBrush => CriarBrush(LeaderCor);
+        public Point LeaderPoint => CalcularLeaderPointWorld();
+        public Point LeaderCotoveloPoint => CalcularLeaderCotoveloWorld();
+        public Point LeaderInicioLocal => CalcularLeaderInicioLocal();
+        public Point LeaderFimLocal => WorldToLocal(LeaderPoint);
+        public Point LeaderInicioWorld => LocalToWorld(LeaderInicioLocal);
+        public PointCollection LeaderPolylineWorldPoints => CalcularLeaderPolylineWorldPoints();
+        public PointCollection LeaderArrowWorldPoints => CalcularLeaderArrowWorldPoints();
+        public PointCollection LeaderOpenArrowWorldPoints => CalcularLeaderOpenArrowWorldPoints();
         public bool HasPreviewOffset => Math.Abs(_previewOffsetX) > 0.000001 || Math.Abs(_previewOffsetY) > 0.000001;
         public bool HasPreviewBoxWidth => _hasPreviewBoxWidth;
         public bool IsNotEditingInline => !IsEditingInline;
@@ -110,6 +134,7 @@ namespace Araci.ViewModels
                 OnPropertyChanged(nameof(AlturaVisual));
                 OnPropertyChanged(nameof(SelectionBorderBrush));
                 OnPropertyChanged(nameof(SelectionBorderThickness));
+                NotificarLeader();
             }
         }
 
@@ -229,6 +254,7 @@ namespace Araci.ViewModels
             OnPropertyChanged(nameof(SelectionBorderBrush));
             OnPropertyChanged(nameof(SelectionBorderThickness));
             NotificarVisual();
+            NotificarLeader();
         }
 
         public event PropertyChangedEventHandler? PropertyChanged;
@@ -254,6 +280,7 @@ namespace Araci.ViewModels
             OnPropertyChanged(nameof(X));
             OnPropertyChanged(nameof(Y));
             OnPropertyChanged(nameof(HasPreviewOffset));
+            NotificarLeader();
         }
 
         private void NotificarLarguraCaixa()
@@ -263,6 +290,7 @@ namespace Araci.ViewModels
             OnPropertyChanged(nameof(AlturaEdicao));
             OnPropertyChanged(nameof(AlturaVisual));
             OnPropertyChanged(nameof(RenderTransform));
+            NotificarLeader();
         }
 
         private void NotificarVisual()
@@ -281,6 +309,34 @@ namespace Araci.ViewModels
             OnPropertyChanged(nameof(AlturaEdicao));
             OnPropertyChanged(nameof(AlturaVisual));
             OnPropertyChanged(nameof(RenderTransform));
+            NotificarLeader();
+        }
+
+        private void NotificarLeader()
+        {
+            OnPropertyChanged(nameof(LeaderAtivo));
+            OnPropertyChanged(nameof(LeaderComCotovelo));
+            OnPropertyChanged(nameof(LeaderVisivel));
+            OnPropertyChanged(nameof(LeaderRetoVisivel));
+            OnPropertyChanged(nameof(LeaderCotoveloVisivel));
+            OnPropertyChanged(nameof(LeaderEstiloSeta));
+            OnPropertyChanged(nameof(LeaderCor));
+            OnPropertyChanged(nameof(LeaderEspessura));
+            OnPropertyChanged(nameof(LeaderTamanhoSeta));
+            OnPropertyChanged(nameof(LeaderArrowLength));
+            OnPropertyChanged(nameof(LeaderArrowHalfWidth));
+            OnPropertyChanged(nameof(LeaderArrowVisivel));
+            OnPropertyChanged(nameof(LeaderArrowFillVisivel));
+            OnPropertyChanged(nameof(LeaderArrowOpenVisivel));
+            OnPropertyChanged(nameof(LeaderBrush));
+            OnPropertyChanged(nameof(LeaderPoint));
+            OnPropertyChanged(nameof(LeaderCotoveloPoint));
+            OnPropertyChanged(nameof(LeaderInicioLocal));
+            OnPropertyChanged(nameof(LeaderFimLocal));
+            OnPropertyChanged(nameof(LeaderInicioWorld));
+            OnPropertyChanged(nameof(LeaderPolylineWorldPoints));
+            OnPropertyChanged(nameof(LeaderArrowWorldPoints));
+            OnPropertyChanged(nameof(LeaderOpenArrowWorldPoints));
         }
 
         private Transform CriarRenderTransform()
@@ -291,6 +347,123 @@ namespace Araci.ViewModels
                 return Transform.Identity;
 
             return new RotateTransform(rotacao);
+        }
+
+        private Point CalcularLeaderInicioLocal()
+        {
+            double largura = Math.Max(1.0, LarguraCaixa);
+            double altura = Math.Max(1.0, AlturaVisual);
+            Point centro = new(largura / 2.0, altura / 2.0);
+            Point fim = LeaderFimLocal;
+            Vector direcao = fim - centro;
+
+            if (direcao.Length < 0.000001)
+                return centro;
+
+            double t = double.PositiveInfinity;
+
+            if (direcao.X > 0.000001)
+                t = Math.Min(t, (largura - centro.X) / direcao.X);
+            else if (direcao.X < -0.000001)
+                t = Math.Min(t, (0.0 - centro.X) / direcao.X);
+
+            if (direcao.Y > 0.000001)
+                t = Math.Min(t, (altura - centro.Y) / direcao.Y);
+            else if (direcao.Y < -0.000001)
+                t = Math.Min(t, (0.0 - centro.Y) / direcao.Y);
+
+            if (double.IsNaN(t) || double.IsInfinity(t))
+                t = 0.0;
+
+            t = Math.Max(0.0, Math.Min(1.0, t));
+            return centro + direcao * t;
+        }
+
+        private Point CalcularLeaderPointWorld()
+        {
+            if (_texto.PossuiLeaderPointValido)
+                return new Point(_texto.LeaderX + _previewOffsetX, _texto.LeaderY + _previewOffsetY);
+
+            return LocalToWorld(new Point(Math.Max(1.0, LarguraCaixa) + 70.0, Math.Max(1.0, AlturaVisual) + 50.0));
+        }
+
+        private Point CalcularLeaderCotoveloWorld()
+        {
+            if (_texto.LeaderCotoveloManual && _texto.PossuiLeaderCotoveloPointValido)
+                return new Point(_texto.LeaderCotoveloX + _previewOffsetX, _texto.LeaderCotoveloY + _previewOffsetY);
+
+            return CalcularLeaderCotoveloMedioWorld();
+        }
+
+        private Point CalcularLeaderCotoveloMedioWorld()
+        {
+            Point inicio = LeaderInicioWorld;
+            Point fim = LeaderPoint;
+            return new Point((inicio.X + fim.X) / 2.0, (inicio.Y + fim.Y) / 2.0);
+        }
+
+        private PointCollection CalcularLeaderPolylineWorldPoints()
+        {
+            return new PointCollection
+            {
+                LeaderInicioWorld,
+                LeaderCotoveloPoint,
+                LeaderPoint
+            };
+        }
+
+        private PointCollection CalcularLeaderArrowWorldPoints()
+        {
+            Point fim = LeaderPoint;
+            Point inicio = LeaderComCotovelo ? LeaderCotoveloPoint : LeaderInicioWorld;
+            Vector direcao = inicio - fim;
+
+            if (direcao.Length < 0.000001)
+                direcao = new Vector(0.0, -1.0);
+            else
+                direcao.Normalize();
+
+            Vector normal = new(-direcao.Y, direcao.X);
+            Point p1 = fim + direcao * LeaderArrowLength + normal * LeaderArrowHalfWidth;
+            Point p2 = fim + direcao * LeaderArrowLength - normal * LeaderArrowHalfWidth;
+
+            return new PointCollection { fim, p1, p2 };
+        }
+
+        private PointCollection CalcularLeaderOpenArrowWorldPoints()
+        {
+            PointCollection pontos = CalcularLeaderArrowWorldPoints();
+
+            if (pontos.Count < 3)
+                return pontos;
+
+            return new PointCollection { pontos[1], pontos[0], pontos[2] };
+        }
+
+        private Point WorldToLocal(Point world)
+        {
+            double largura = Math.Max(1.0, LarguraCaixa);
+            double altura = Math.Max(1.0, AlturaVisual);
+            Point centroWorld = new(X + largura / 2.0, Y + altura / 2.0);
+            double radians = -Rotacao * Math.PI / 180.0;
+            double cos = Math.Cos(radians);
+            double sin = Math.Sin(radians);
+            double dx = world.X - centroWorld.X;
+            double dy = world.Y - centroWorld.Y;
+            return new Point(largura / 2.0 + dx * cos - dy * sin, altura / 2.0 + dx * sin + dy * cos);
+        }
+
+        private Point LocalToWorld(Point local)
+        {
+            double largura = Math.Max(1.0, LarguraCaixa);
+            double altura = Math.Max(1.0, AlturaVisual);
+            Point centroWorld = new(X + largura / 2.0, Y + altura / 2.0);
+            double radians = Rotacao * Math.PI / 180.0;
+            double cos = Math.Cos(radians);
+            double sin = Math.Sin(radians);
+            double dx = local.X - largura / 2.0;
+            double dy = local.Y - altura / 2.0;
+            return new Point(centroWorld.X + dx * cos - dy * sin, centroWorld.Y + dx * sin + dy * cos);
         }
 
         private static double CalcularAlturaEstimada(string? texto, double larguraCaixa, double alturaTexto, double lineHeight)

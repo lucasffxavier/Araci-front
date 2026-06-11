@@ -131,16 +131,19 @@ namespace Araci.Applications.UseCases.Projeto
             if (!TryGetTexto(tipoId, textoId, out ProjectSheetType tipo, out ProjectSheetTemplateText texto))
                 return false;
 
-            if (texto.LeaderAtivo == leaderAtivo)
+            if (texto.LeaderAtivo == leaderAtivo && (!leaderAtivo || texto.PossuiLeaderPointValido))
                 return false;
 
-            _commands.Execute(new UpdateProjectSheetTypeTextPropertyCommand<bool>(
+            ProjectSheetTemplateTextLeaderState estadoAnterior = ProjectSheetTemplateTextLeaderState.FromText(texto);
+            ProjectSheetTemplateTextLeaderState estadoNovo = CriarEstadoLeader(texto, leaderAtivo, texto.LeaderComCotovelo);
+
+            _commands.Execute(new UpdateProjectSheetTypeTextPropertyCommand<ProjectSheetTemplateTextLeaderState>(
                 _document,
                 tipo,
                 texto.Id,
-                (t, value) => t.LeaderAtivo = value,
-                texto.LeaderAtivo,
-                leaderAtivo));
+                (t, value) => value.Aplicar(t),
+                estadoAnterior,
+                estadoNovo));
 
             return true;
         }
@@ -150,16 +153,19 @@ namespace Araci.Applications.UseCases.Projeto
             if (!TryGetTexto(tipoId, textoId, out ProjectSheetType tipo, out ProjectSheetTemplateText texto))
                 return false;
 
-            if (texto.LeaderComCotovelo == leaderComCotovelo)
+            if (texto.LeaderComCotovelo == leaderComCotovelo && (!leaderComCotovelo || texto.PossuiLeaderCotoveloPointValido))
                 return false;
 
-            _commands.Execute(new UpdateProjectSheetTypeTextPropertyCommand<bool>(
+            ProjectSheetTemplateTextLeaderState estadoAnterior = ProjectSheetTemplateTextLeaderState.FromText(texto);
+            ProjectSheetTemplateTextLeaderState estadoNovo = CriarEstadoLeader(texto, texto.LeaderAtivo, leaderComCotovelo);
+
+            _commands.Execute(new UpdateProjectSheetTypeTextPropertyCommand<ProjectSheetTemplateTextLeaderState>(
                 _document,
                 tipo,
                 texto.Id,
-                (t, value) => t.LeaderComCotovelo = value,
-                texto.LeaderComCotovelo,
-                leaderComCotovelo));
+                (t, value) => value.Aplicar(t),
+                estadoAnterior,
+                estadoNovo));
 
             return true;
         }
@@ -285,8 +291,10 @@ namespace Araci.Applications.UseCases.Projeto
             if (deltaSquared < MinDeltaSquared)
                 return false;
 
+            double deltaX = x - texto.X;
+            double deltaY = y - texto.Y;
             var estadoAnterior = ProjectSheetTemplateTextPositionState.FromText(texto);
-            var estadoNovo = new ProjectSheetTemplateTextPositionState(x, y);
+            var estadoNovo = CriarEstadoPosicao(texto, x, y, deltaX, deltaY);
 
             _commands.Execute(new UpdateProjectSheetTypeTextPropertyCommand<ProjectSheetTemplateTextPositionState>(
                 _document,
@@ -298,6 +306,82 @@ namespace Araci.Applications.UseCases.Projeto
 
             return true;
         }
+
+        private static ProjectSheetTemplateTextPositionState CriarEstadoPosicao(
+            ProjectSheetTemplateText texto,
+            double x,
+            double y,
+            double deltaX,
+            double deltaY)
+        {
+            double leaderX = texto.LeaderX;
+            double leaderY = texto.LeaderY;
+            double leaderCotoveloX = texto.LeaderCotoveloX;
+            double leaderCotoveloY = texto.LeaderCotoveloY;
+
+            if (texto.LeaderAtivo)
+            {
+                if (texto.PossuiLeaderPointValido)
+                {
+                    leaderX += deltaX;
+                    leaderY += deltaY;
+                }
+
+                if (texto.LeaderComCotovelo && texto.LeaderCotoveloManual && texto.PossuiLeaderCotoveloPointValido)
+                {
+                    leaderCotoveloX += deltaX;
+                    leaderCotoveloY += deltaY;
+                }
+            }
+
+            return new ProjectSheetTemplateTextPositionState(
+                x,
+                y,
+                leaderX,
+                leaderY,
+                leaderCotoveloX,
+                leaderCotoveloY,
+                texto.LeaderCotoveloManual,
+                true);
+        }
+
+        private static ProjectSheetTemplateTextLeaderState CriarEstadoLeader(
+            ProjectSheetTemplateText texto,
+            bool leaderAtivo,
+            bool leaderComCotovelo)
+        {
+            double leaderX = texto.LeaderX;
+            double leaderY = texto.LeaderY;
+
+            if (leaderAtivo && !texto.PossuiLeaderPointValido)
+            {
+                leaderX = texto.X + texto.LarguraCaixa + 70.0;
+                leaderY = texto.Y + Math.Max(texto.AlturaTexto * 1.25 + 4.0, texto.AlturaTexto) + 50.0;
+            }
+
+            double leaderCotoveloX = texto.LeaderCotoveloX;
+            double leaderCotoveloY = texto.LeaderCotoveloY;
+            bool leaderCotoveloManual = texto.LeaderCotoveloManual;
+
+            if (leaderAtivo && leaderComCotovelo && !texto.PossuiLeaderCotoveloPointValido)
+            {
+                double inicioX = texto.X + texto.LarguraCaixa / 2.0;
+                double inicioY = texto.Y + Math.Max(texto.AlturaTexto * 1.25 + 4.0, texto.AlturaTexto) / 2.0;
+                leaderCotoveloX = (inicioX + leaderX) / 2.0;
+                leaderCotoveloY = (inicioY + leaderY) / 2.0;
+                leaderCotoveloManual = false;
+            }
+
+            return new ProjectSheetTemplateTextLeaderState(
+                leaderAtivo,
+                leaderX,
+                leaderY,
+                leaderComCotovelo,
+                leaderCotoveloX,
+                leaderCotoveloY,
+                leaderCotoveloManual);
+        }
+
 
         private bool TryGetTexto(Guid tipoId, Guid textoId, out ProjectSheetType tipo, out ProjectSheetTemplateText texto)
         {

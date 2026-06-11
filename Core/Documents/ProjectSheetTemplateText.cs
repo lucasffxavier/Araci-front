@@ -32,7 +32,12 @@ namespace Araci.Core.Documents
         public string AlinhamentoHorizontal { get; set; } = DefaultHorizontalAlignment;
         public double Rotacao { get; set; }
         public bool LeaderAtivo { get; set; }
+        public double LeaderX { get; set; }
+        public double LeaderY { get; set; }
         public bool LeaderComCotovelo { get; set; }
+        public double LeaderCotoveloX { get; set; }
+        public double LeaderCotoveloY { get; set; }
+        public bool LeaderCotoveloManual { get; set; }
         public bool Visible { get; set; } = true;
 
         public string Texto
@@ -57,6 +62,16 @@ namespace Araci.Core.Documents
             !string.IsNullOrWhiteSpace(TipoTextoNome) &&
             !string.IsNullOrWhiteSpace(TipoTextoFamilia) &&
             !string.IsNullOrWhiteSpace(TipoTextoCategoria);
+
+        public bool PossuiLeaderPointValido =>
+            ValorFinito(LeaderX) &&
+            ValorFinito(LeaderY) &&
+            (Math.Abs(LeaderX) > 0.000001 || Math.Abs(LeaderY) > 0.000001);
+
+        public bool PossuiLeaderCotoveloPointValido =>
+            ValorFinito(LeaderCotoveloX) &&
+            ValorFinito(LeaderCotoveloY) &&
+            (Math.Abs(LeaderCotoveloX) > 0.000001 || Math.Abs(LeaderCotoveloY) > 0.000001);
 
         public void DefinirTipoTexto(string? nomeTipo, string? familia, string? categoria)
         {
@@ -91,7 +106,12 @@ namespace Araci.Core.Documents
                 AlinhamentoHorizontal = AlinhamentoHorizontal,
                 Rotacao = Rotacao,
                 LeaderAtivo = LeaderAtivo,
+                LeaderX = LeaderX,
+                LeaderY = LeaderY,
                 LeaderComCotovelo = LeaderComCotovelo,
+                LeaderCotoveloX = LeaderCotoveloX,
+                LeaderCotoveloY = LeaderCotoveloY,
+                LeaderCotoveloManual = LeaderCotoveloManual,
                 Visible = Visible
             };
         }
@@ -106,6 +126,11 @@ namespace Araci.Core.Documents
             return double.IsNaN(valor) || double.IsInfinity(valor) || valor < minimo
                 ? fallback
                 : valor;
+        }
+
+        private static bool ValorFinito(double valor)
+        {
+            return !double.IsNaN(valor) && !double.IsInfinity(valor);
         }
     }
 }
