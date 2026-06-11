@@ -1023,6 +1023,19 @@ namespace Araci.Views
                 return;
             }
 
+            if (viewModel.TryGetSelectedCircleId(out Guid circleId) &&
+                viewModel.TryGetCircle(circleId, out ProjectSheetTemplateCircle? circulo) &&
+                circulo != null)
+            {
+                _context.Editor.ElementoSelecionado = new ProjectSheetTemplateCirclePropertiesViewModel(
+                    viewModel.Tipo,
+                    circulo,
+                    _context.MoverCirculoDoTipoPrancha,
+                    _context.Types,
+                    _context.TypePropertiesDialogs);
+                return;
+            }
+
             _context.Editor.ElementoSelecionado = new ProjectSheetTypePropertiesViewModel(
                 _context.Document,
                 viewModel.Tipo,
