@@ -83,6 +83,7 @@ namespace Araci.ViewModels
         public bool HasSelectedRectangle => _selectedRectangleId.HasValue;
         public bool HasSelectedCircle => _selectedCircleId.HasValue;
         public bool HasSelectedText => _selectedTextId.HasValue;
+        public bool HasTextInlineEditing => Texts.Any(t => t.IsEditingInline);
         public bool HasTemplateSelection => HasSelectedLine || HasSelectedRectangle || HasSelectedCircle || HasSelectedText;
         public bool EndpointHandlesVisible => EndpointHandles.Count > 0;
         public bool RectangleResizeHandlesVisible => RectangleResizeHandles.Count > 0;
@@ -207,6 +208,84 @@ namespace Araci.ViewModels
             return texto != null;
         }
 
+        public bool TryGetSelectedTextViewModel(out ProjectSheetTemplateTextViewModel? text)
+        {
+            text = null;
+
+            if (!_selectedTextId.HasValue)
+                return false;
+
+            text = Texts.FirstOrDefault(t => t.Id == _selectedTextId.Value);
+            return text != null;
+        }
+
+        public bool TryGetEditingText(out ProjectSheetTemplateTextViewModel? text)
+        {
+            text = Texts.FirstOrDefault(t => t.IsEditingInline);
+            return text != null;
+        }
+
+        public bool BeginTextInlineEditing(Guid textId)
+        {
+            ProjectSheetTemplateTextViewModel? text = Texts.FirstOrDefault(t => t.Id == textId);
+
+            if (text == null)
+                return false;
+
+            SelectText(textId);
+
+            foreach (ProjectSheetTemplateTextViewModel item in Texts.Where(t => t.Id != textId && t.IsEditingInline))
+                item.CancelarEdicaoInline();
+
+            text.IniciarEdicaoInline();
+            RefreshTextResizeHandles();
+            OnPropertyChanged(nameof(HasTextInlineEditing));
+            return true;
+        }
+
+        public bool EndTextInlineEditing(Guid textId)
+        {
+            ProjectSheetTemplateTextViewModel? text = Texts.FirstOrDefault(t => t.Id == textId);
+
+            if (text == null || !text.IsEditingInline)
+                return false;
+
+            text.EncerrarEdicaoInline();
+            RefreshTextResizeHandles();
+            OnPropertyChanged(nameof(HasTextInlineEditing));
+            return true;
+        }
+
+        public bool CancelTextInlineEditing(Guid textId)
+        {
+            ProjectSheetTemplateTextViewModel? text = Texts.FirstOrDefault(t => t.Id == textId);
+
+            if (text == null || !text.IsEditingInline)
+                return false;
+
+            text.CancelarEdicaoInline();
+            RefreshTextResizeHandles();
+            OnPropertyChanged(nameof(HasTextInlineEditing));
+            return true;
+        }
+
+        public void CancelAllTextInlineEditing()
+        {
+            bool alterou = false;
+
+            foreach (ProjectSheetTemplateTextViewModel text in Texts.Where(t => t.IsEditingInline))
+            {
+                text.CancelarEdicaoInline();
+                alterou = true;
+            }
+
+            if (!alterou)
+                return;
+
+            RefreshTextResizeHandles();
+            OnPropertyChanged(nameof(HasTextInlineEditing));
+        }
+
         public bool SetTextPreviewOffset(Guid textId, double deltaX, double deltaY)
         {
             ProjectSheetTemplateTextViewModel? text = Texts.FirstOrDefault(t => t.Id == textId);
@@ -323,6 +402,7 @@ namespace Araci.ViewModels
             RefreshCircles();
             RefreshRectangles();
             RefreshLines();
+            OnPropertyChanged(nameof(HasTextInlineEditing));
             OnPropertyChanged(nameof(HasTemplateSelection));
         }
 
@@ -984,6 +1064,7 @@ namespace Araci.ViewModels
             RefreshTextResizeHandles();
             OnPropertyChanged(nameof(SelectedTextId));
             OnPropertyChanged(nameof(HasSelectedText));
+            OnPropertyChanged(nameof(HasTextInlineEditing));
         }
 
         private void AtualizarSelecaoVisual()
@@ -1088,10 +1169,10 @@ namespace Araci.ViewModels
 
             if (_selectedTextId.HasValue)
             {
-                ProjectSheetTemplateTextViewModel? text = Texts.FirstOrDefault(t => t.Id == _selectedTextId.Value && t.IsSelected);
+                ProjectSheetTemplateTextViewModel? text = Texts.FirstOrDefault(t => t.Id == _selectedTextId.Value && t.IsSelected && !t.IsEditingInline);
 
                 if (text != null)
-                    AddTextResizeHandle(text.Id, text.X + text.LarguraCaixa, text.Y + Math.Max(text.AlturaTexto, text.AlturaEstimada) / 2.0);
+                    AddTextResizeHandle(text.Id, text.X + text.LarguraCaixa, text.Y + Math.Max(text.AlturaTexto, text.AlturaVisual) / 2.0);
             }
 
             OnPropertyChanged(nameof(TextResizeHandlesVisible));
@@ -1122,6 +1203,7 @@ namespace Araci.ViewModels
             OnPropertyChanged(nameof(HasSelectedRectangle));
             OnPropertyChanged(nameof(HasSelectedCircle));
             OnPropertyChanged(nameof(HasSelectedText));
+            OnPropertyChanged(nameof(HasTextInlineEditing));
             OnPropertyChanged(nameof(HasTemplateSelection));
             OnPropertyChanged(nameof(RectangleResizeHandlesVisible));
             OnPropertyChanged(nameof(CircleResizeHandlesVisible));

@@ -23,6 +23,8 @@ namespace Araci.ViewModels
         private bool _hasPreviewBoxWidth;
         private double _previewBoxWidth;
         private bool _isSelected;
+        private bool _isEditingInline;
+        private string _conteudoEdicao = string.Empty;
 
         public ProjectSheetTemplateTextViewModel(ProjectSheetTemplateText texto)
             : this(texto, new TypeLibraryService())
@@ -33,6 +35,7 @@ namespace Araci.ViewModels
         {
             _texto = texto ?? throw new ArgumentNullException(nameof(texto));
             _types = types ?? throw new ArgumentNullException(nameof(types));
+            _conteudoEdicao = _texto.Texto;
             AtualizarTipoTexto();
         }
 
@@ -43,6 +46,24 @@ namespace Araci.ViewModels
         public double ModelY => _texto.Y;
         public string Nome => _texto.Nome;
         public string Conteudo => _texto.Texto;
+
+        public string ConteudoEdicao
+        {
+            get => _conteudoEdicao;
+            set
+            {
+                string normalizado = value ?? string.Empty;
+
+                if (string.Equals(_conteudoEdicao, normalizado, StringComparison.Ordinal))
+                    return;
+
+                _conteudoEdicao = normalizado;
+                OnPropertyChanged();
+                OnPropertyChanged(nameof(AlturaEdicao));
+                OnPropertyChanged(nameof(AlturaVisual));
+            }
+        }
+
         public double LarguraCaixa => _hasPreviewBoxWidth ? _previewBoxWidth : _texto.LarguraCaixa;
         public double ModelLarguraCaixa => _texto.LarguraCaixa;
         public double Rotacao => NormalizarRotacao(_texto.Rotacao);
@@ -56,6 +77,7 @@ namespace Araci.ViewModels
         public FontFamily FontFamily => new(string.IsNullOrWhiteSpace(Fonte) ? ProjectSheetTemplateText.DefaultFont : Fonte);
         public bool HasPreviewOffset => Math.Abs(_previewOffsetX) > 0.000001 || Math.Abs(_previewOffsetY) > 0.000001;
         public bool HasPreviewBoxWidth => _hasPreviewBoxWidth;
+        public bool IsNotEditingInline => !IsEditingInline;
         public Brush SelectionBorderBrush => IsSelected ? Brushes.DodgerBlue : Brushes.Transparent;
         public Thickness SelectionBorderThickness => IsSelected ? new Thickness(DefaultSelectionThickness) : new Thickness(0.0);
 
@@ -74,6 +96,23 @@ namespace Araci.ViewModels
             }
         }
 
+        public bool IsEditingInline
+        {
+            get => _isEditingInline;
+            private set
+            {
+                if (_isEditingInline == value)
+                    return;
+
+                _isEditingInline = value;
+                OnPropertyChanged();
+                OnPropertyChanged(nameof(IsNotEditingInline));
+                OnPropertyChanged(nameof(AlturaVisual));
+                OnPropertyChanged(nameof(SelectionBorderBrush));
+                OnPropertyChanged(nameof(SelectionBorderThickness));
+            }
+        }
+
         public TextAlignment TextAlignment => AlinhamentoHorizontal switch
         {
             "Centro" => TextAlignment.Center,
@@ -81,15 +120,24 @@ namespace Araci.ViewModels
             _ => TextAlignment.Left
         };
 
+        public HorizontalAlignment TextBoxHorizontalContentAlignment => AlinhamentoHorizontal switch
+        {
+            "Centro" => HorizontalAlignment.Center,
+            "Direita" => HorizontalAlignment.Right,
+            _ => HorizontalAlignment.Left
+        };
+
         public double LineHeight => Math.Max(AlturaTexto * 1.25, AlturaTexto + 1.0);
         public double AlturaEstimada => CalcularAlturaEstimada(Conteudo, LarguraCaixa, AlturaTexto, LineHeight);
+        public double AlturaEdicao => CalcularAlturaEstimada(ConteudoEdicao, LarguraCaixa, AlturaTexto, LineHeight);
+        public double AlturaVisual => IsEditingInline ? AlturaEdicao : AlturaEstimada;
         public Transform RenderTransform => CriarRenderTransform();
 
         public bool Contains(Point position, double tolerance)
         {
             double margem = Math.Max(0.0, tolerance);
             double largura = Math.Max(ProjectSheetTemplateText.MinBoxWidth, LarguraCaixa);
-            double altura = Math.Max(AlturaTexto, AlturaEstimada);
+            double altura = Math.Max(AlturaTexto, AlturaVisual);
             var bounds = new Rect(X - margem, Y - margem, largura + margem * 2.0, altura + margem * 2.0);
             return bounds.Contains(position);
         }
@@ -135,6 +183,23 @@ namespace Araci.ViewModels
             OnPropertyChanged(nameof(HasPreviewBoxWidth));
         }
 
+        public void IniciarEdicaoInline()
+        {
+            ConteudoEdicao = Conteudo;
+            IsEditingInline = true;
+        }
+
+        public void CancelarEdicaoInline()
+        {
+            ConteudoEdicao = Conteudo;
+            IsEditingInline = false;
+        }
+
+        public void EncerrarEdicaoInline()
+        {
+            IsEditingInline = false;
+        }
+
         public void Refresh()
         {
             AtualizarTipoTexto();
@@ -144,14 +209,23 @@ namespace Araci.ViewModels
             OnPropertyChanged(nameof(ModelY));
             OnPropertyChanged(nameof(Nome));
             OnPropertyChanged(nameof(Conteudo));
+
+            if (!IsEditingInline)
+                _conteudoEdicao = Conteudo;
+
+            OnPropertyChanged(nameof(ConteudoEdicao));
             OnPropertyChanged(nameof(LarguraCaixa));
             OnPropertyChanged(nameof(ModelLarguraCaixa));
             OnPropertyChanged(nameof(HasPreviewBoxWidth));
             OnPropertyChanged(nameof(Rotacao));
             OnPropertyChanged(nameof(Visible));
             OnPropertyChanged(nameof(AlturaEstimada));
+            OnPropertyChanged(nameof(AlturaEdicao));
+            OnPropertyChanged(nameof(AlturaVisual));
             OnPropertyChanged(nameof(RenderTransform));
             OnPropertyChanged(nameof(IsSelected));
+            OnPropertyChanged(nameof(IsEditingInline));
+            OnPropertyChanged(nameof(IsNotEditingInline));
             OnPropertyChanged(nameof(SelectionBorderBrush));
             OnPropertyChanged(nameof(SelectionBorderThickness));
             NotificarVisual();
@@ -186,6 +260,8 @@ namespace Araci.ViewModels
         {
             OnPropertyChanged(nameof(LarguraCaixa));
             OnPropertyChanged(nameof(AlturaEstimada));
+            OnPropertyChanged(nameof(AlturaEdicao));
+            OnPropertyChanged(nameof(AlturaVisual));
             OnPropertyChanged(nameof(RenderTransform));
         }
 
@@ -199,8 +275,11 @@ namespace Araci.ViewModels
             OnPropertyChanged(nameof(ForegroundBrush));
             OnPropertyChanged(nameof(FontFamily));
             OnPropertyChanged(nameof(TextAlignment));
+            OnPropertyChanged(nameof(TextBoxHorizontalContentAlignment));
             OnPropertyChanged(nameof(LineHeight));
             OnPropertyChanged(nameof(AlturaEstimada));
+            OnPropertyChanged(nameof(AlturaEdicao));
+            OnPropertyChanged(nameof(AlturaVisual));
             OnPropertyChanged(nameof(RenderTransform));
         }
 

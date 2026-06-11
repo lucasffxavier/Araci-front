@@ -2,6 +2,7 @@ using System;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
+using System.Windows.Media;
 using System.Windows.Threading;
 using Araci.Core.Documents;
 using Araci.Applications.Editar.Base;
@@ -44,6 +45,7 @@ namespace Araci.Views
         private bool _textoTemplateResizeLastPositionValid;
         private bool _textoTemplateResizeArrastando;
         private double _textoTemplateResizeOriginalX;
+        private bool _textoTemplateInlineCommitEmAndamento;
         private Guid? _circuloTemplateResizeEmArrasteId;
         private Point _circuloTemplateResizeDragStart;
         private Point _circuloTemplateResizeLastPosition;
@@ -108,6 +110,9 @@ namespace Araci.Views
             if (_context == null)
                 return;
 
+            if (OrigemEstaDentroDeEditorInline(e.OriginalSource as DependencyObject))
+                return;
+
             Focus();
             Keyboard.Focus(this);
 
@@ -140,7 +145,7 @@ namespace Araci.Views
                 return;
             }
 
-            if (TentarIniciarInteracaoTemplate(position))
+            if (TentarIniciarInteracaoTemplate(position, e.ClickCount))
             {
                 e.Handled = true;
                 return;
@@ -159,6 +164,9 @@ namespace Araci.Views
                 return;
 
             Point position = ObterPontoLocalFolha(e);
+
+            if (TextoInlineEmEdicaoAtivo())
+                return;
 
             if (AtualizarResizeCirculoTemplate(position, e))
             {
@@ -340,6 +348,15 @@ namespace Araci.Views
         {
             if (_context == null)
                 return;
+
+            if (ProcessarTecladoEdicaoInlineTexto(e))
+                return;
+
+            if (e.Key == Key.Enter && IniciarEdicaoInlineTextoSelecionado())
+            {
+                e.Handled = true;
+                return;
+            }
 
             if (e.Key == Key.Escape && _circuloTemplateResizeEmArrasteId.HasValue)
             {
@@ -987,7 +1004,7 @@ namespace Araci.Views
             _linhaTemplateEndpointOriginalY2 = 0.0;
         }
 
-        private bool TentarIniciarInteracaoTemplate(Point position)
+        private bool TentarIniciarInteracaoTemplate(Point position, int clickCount)
         {
             ProjectSheetTypeViewModel? viewModel = ObterViewModelAtivo();
 
@@ -1002,15 +1019,25 @@ namespace Araci.Views
             if (viewModel.TryHitTextAt(position, TextHitTolerance, out Guid textId))
             {
                 viewModel.SelectText(textId);
-                _textoTemplateEmArrasteId = textId;
-                _textoTemplateDragStart = position;
-                _textoTemplateArrastando = false;
                 LimparEstadoArrasteLinhaTemplate();
                 LimparEstadoArrasteRetanguloTemplate();
                 LimparEstadoArrasteCirculoTemplate();
                 LimparEstadoResizeRetanguloTemplate();
                 LimparEstadoResizeCirculoTemplate();
                 LimparEstadoResizeTextoTemplate();
+
+                if (clickCount >= 2)
+                {
+                    LimparEstadoArrasteTextoTemplate();
+                    IniciarEdicaoInlineTextoTemplate(textId);
+                    AtualizarPainelPropriedadesTemplateSelecionado();
+                    AtualizarHandlesOverlay();
+                    return true;
+                }
+
+                _textoTemplateEmArrasteId = textId;
+                _textoTemplateDragStart = position;
+                _textoTemplateArrastando = false;
                 TemplatePageBorder.CaptureMouse();
                 AtualizarPainelPropriedadesTemplateSelecionado();
                 AtualizarHandlesOverlay();
@@ -1353,6 +1380,213 @@ namespace Araci.Views
         {
             _circuloTemplateEmArrasteId = null;
             _circuloTemplateArrastando = false;
+        }
+
+        private bool IniciarEdicaoInlineTextoSelecionado()
+        {
+            ProjectSheetTypeViewModel? viewModel = ObterViewModelAtivo();
+
+            if (viewModel == null || !viewModel.TryGetSelectedTextId(out Guid textId))
+                return false;
+
+            return IniciarEdicaoInlineTextoTemplate(textId);
+        }
+
+        private bool IniciarEdicaoInlineTextoTemplate(Guid textId)
+        {
+            ProjectSheetTypeViewModel? viewModel = ObterViewModelAtivo();
+
+            if (viewModel == null)
+                return false;
+
+            if (!viewModel.BeginTextInlineEditing(textId))
+                return false;
+
+            LimparEstadoArrasteTextoTemplate();
+            LimparEstadoResizeTextoTemplate();
+            FocarEditorTextoInlineDeferred(textId);
+            AtualizarHandlesOverlay();
+            return true;
+        }
+
+        private bool TextoInlineEmEdicaoAtivo()
+        {
+            ProjectSheetTypeViewModel? viewModel = ObterViewModelAtivo();
+            return viewModel?.HasTextInlineEditing == true;
+        }
+
+        private bool ProcessarTecladoEdicaoInlineTexto(KeyEventArgs e)
+        {
+            ProjectSheetTypeViewModel? viewModel = ObterViewModelAtivo();
+
+            if (viewModel == null || !viewModel.TryGetEditingText(out ProjectSheetTemplateTextViewModel? texto) || texto == null)
+                return false;
+
+            if (e.Key == Key.Escape)
+            {
+                CancelarEdicaoInlineTextoTemplate(texto);
+                e.Handled = true;
+                return true;
+            }
+
+            if (e.Key == Key.Enter && Keyboard.Modifiers != ModifierKeys.Shift)
+            {
+                ConfirmarEdicaoInlineTextoTemplate(texto, devolverFoco: true);
+                e.Handled = true;
+                return true;
+            }
+
+            return true;
+        }
+
+        private void TemplateTextInlineEditor_Loaded(object sender, RoutedEventArgs e)
+        {
+            if (sender is not TextBox textBox || textBox.DataContext is not ProjectSheetTemplateTextViewModel texto || !texto.IsEditingInline)
+                return;
+
+            textBox.Focus();
+            Keyboard.Focus(textBox);
+            textBox.SelectAll();
+        }
+
+        private void TemplateTextInlineEditor_PreviewKeyDown(object sender, KeyEventArgs e)
+        {
+            if (sender is not TextBox textBox || textBox.DataContext is not ProjectSheetTemplateTextViewModel texto)
+                return;
+
+            if (e.Key == Key.Escape)
+            {
+                CancelarEdicaoInlineTextoTemplate(texto);
+                e.Handled = true;
+                return;
+            }
+
+            if (e.Key == Key.Enter && Keyboard.Modifiers != ModifierKeys.Shift)
+            {
+                ConfirmarEdicaoInlineTextoTemplate(texto, devolverFoco: true);
+                e.Handled = true;
+            }
+        }
+
+        private void TemplateTextInlineEditor_LostKeyboardFocus(object sender, KeyboardFocusChangedEventArgs e)
+        {
+            if (sender is not TextBox textBox || textBox.DataContext is not ProjectSheetTemplateTextViewModel texto || !texto.IsEditingInline)
+                return;
+
+            ConfirmarEdicaoInlineTextoTemplate(texto, devolverFoco: false);
+        }
+
+        private bool ConfirmarEdicaoInlineTextoTemplate(ProjectSheetTemplateTextViewModel texto, bool devolverFoco)
+        {
+            if (_textoTemplateInlineCommitEmAndamento)
+                return true;
+
+            ProjectSheetTypeViewModel? viewModel = ObterViewModelAtivo();
+
+            if (_context == null || viewModel == null)
+                return false;
+
+            Guid textId = texto.Id;
+            string novoConteudo = texto.ConteudoEdicao ?? string.Empty;
+            bool alterouConteudo = !string.Equals(texto.Conteudo, novoConteudo, StringComparison.Ordinal);
+
+            _textoTemplateInlineCommitEmAndamento = true;
+
+            try
+            {
+                viewModel.EndTextInlineEditing(textId);
+
+                if (alterouConteudo)
+                    _context.MoverTextoDoTipoPrancha.AlterarConteudo(viewModel.Id, textId, novoConteudo);
+
+                viewModel.SelectText(textId);
+                AtualizarPainelPropriedadesTemplateSelecionado();
+                AtualizarHandlesOverlay();
+
+                if (devolverFoco)
+                {
+                    Focus();
+                    Keyboard.Focus(this);
+                }
+
+                return true;
+            }
+            finally
+            {
+                _textoTemplateInlineCommitEmAndamento = false;
+            }
+        }
+
+        private bool CancelarEdicaoInlineTextoTemplate(ProjectSheetTemplateTextViewModel texto)
+        {
+            ProjectSheetTypeViewModel? viewModel = ObterViewModelAtivo();
+
+            if (viewModel == null)
+                return false;
+
+            Guid textId = texto.Id;
+            bool cancelou = viewModel.CancelTextInlineEditing(textId);
+
+            if (cancelou)
+            {
+                viewModel.SelectText(textId);
+                AtualizarPainelPropriedadesTemplateSelecionado();
+                AtualizarHandlesOverlay();
+                Focus();
+                Keyboard.Focus(this);
+            }
+
+            return cancelou;
+        }
+
+        private void FocarEditorTextoInlineDeferred(Guid textId)
+        {
+            Dispatcher.BeginInvoke(
+                DispatcherPriority.Input,
+                new Action(() =>
+                {
+                    TextBox? editor = EncontrarTextBoxInline(TemplatePageContent, textId);
+
+                    if (editor == null)
+                        return;
+
+                    editor.Focus();
+                    Keyboard.Focus(editor);
+                    editor.SelectAll();
+                }));
+        }
+
+        private static TextBox? EncontrarTextBoxInline(DependencyObject origem, Guid textId)
+        {
+            int count = VisualTreeHelper.GetChildrenCount(origem);
+
+            for (int i = 0; i < count; i++)
+            {
+                DependencyObject child = VisualTreeHelper.GetChild(origem, i);
+
+                if (child is TextBox textBox && textBox.DataContext is ProjectSheetTemplateTextViewModel texto && texto.Id == textId)
+                    return textBox;
+
+                TextBox? result = EncontrarTextBoxInline(child, textId);
+
+                if (result != null)
+                    return result;
+            }
+
+            return null;
+        }
+
+        private static bool OrigemEstaDentroDeEditorInline(DependencyObject? origem)
+        {
+            while (origem != null)
+            {
+                if (origem is TextBox { DataContext: ProjectSheetTemplateTextViewModel texto } && texto.IsEditingInline)
+                    return true;
+
+                origem = VisualTreeHelper.GetParent(origem);
+            }
+
+            return false;
         }
 
         private bool ExcluirTemplateSelecionado()
