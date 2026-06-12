@@ -147,9 +147,10 @@ namespace Araci.ViewModels
 
         private void MostrarExibicaoPlaceholder()
         {
-            _dialogs.ShowInfo(
-                "Exibição",
-                "A configuração de exibição da tabela será implementada em uma etapa futura.");
+            ExibicaoTabelaDialogResult? resultado = _dialogs.ShowExibicaoTabelaDialog(_tabela.Exibicao);
+
+            if (resultado != null)
+                _editarPropriedadesTabela.AlterarExibicaoTabela(_tabela.Id, resultado.Exibicao);
         }
 
         private void OnPropertyChanged([CallerMemberName] string? propertyName = null)

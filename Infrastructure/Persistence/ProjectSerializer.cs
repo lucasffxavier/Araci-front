@@ -482,7 +482,46 @@ namespace Araci.Infrastructure.Persistence
                         NomeExibicao = o.NomeExibicao,
                         Direcao = o.Direcao.ToString()
                     })
-                    .ToList()
+                    .ToList(),
+                Exibicao = CriarProjectTableDisplaySettingsDto(NormalizarProjectTableDisplaySettings(tabela.Exibicao))
+            };
+        }
+
+
+        private static ProjectTableDisplaySettingsDto CriarProjectTableDisplaySettingsDto(ProjectTableDisplaySettings exibicao)
+        {
+            return new ProjectTableDisplaySettingsDto
+            {
+                ExibirTitulo = exibicao.ExibirTitulo,
+                FonteTitulo = exibicao.FonteTitulo,
+                TamanhoFonteTitulo = exibicao.TamanhoFonteTitulo,
+                TituloNegrito = exibicao.TituloNegrito,
+                CorTextoTitulo = exibicao.CorTextoTitulo,
+                CorFundoTitulo = exibicao.CorFundoTitulo,
+                AlturaTitulo = exibicao.AlturaTitulo,
+                AlinhamentoTitulo = exibicao.AlinhamentoTitulo.ToString(),
+                ExibirCabecalho = exibicao.ExibirCabecalho,
+                FonteCabecalho = exibicao.FonteCabecalho,
+                TamanhoFonteCabecalho = exibicao.TamanhoFonteCabecalho,
+                CabecalhoNegrito = exibicao.CabecalhoNegrito,
+                CorTextoCabecalho = exibicao.CorTextoCabecalho,
+                CorFundoCabecalho = exibicao.CorFundoCabecalho,
+                AlturaCabecalho = exibicao.AlturaCabecalho,
+                AlinhamentoCabecalho = exibicao.AlinhamentoCabecalho.ToString(),
+                FonteCorpo = exibicao.FonteCorpo,
+                TamanhoFonteCorpo = exibicao.TamanhoFonteCorpo,
+                CorTextoCorpo = exibicao.CorTextoCorpo,
+                CorFundoCorpo = exibicao.CorFundoCorpo,
+                AlturaLinhaCorpo = exibicao.AlturaLinhaCorpo,
+                AlinhamentoCorpo = exibicao.AlinhamentoCorpo.ToString(),
+                UsarLinhasAlternadas = exibicao.UsarLinhasAlternadas,
+                CorLinhaAlternada = exibicao.CorLinhaAlternada,
+                ExibirLinhasGrade = exibicao.ExibirLinhasGrade,
+                CorGrade = exibicao.CorGrade,
+                EspessuraGrade = exibicao.EspessuraGrade,
+                ExibirContornoExterno = exibicao.ExibirContornoExterno,
+                CorContorno = exibicao.CorContorno,
+                EspessuraContorno = exibicao.EspessuraContorno
             };
         }
 
@@ -708,8 +747,114 @@ namespace Araci.Infrastructure.Persistence
                 FiltroVistaId = NormalizarProjectTableViewFilter(dto.FiltroVistaId, vistasIds),
                 ModoFiltro = ParseEnum(dto.ModoFiltro, ProjectTableFilterLogicalMode.Todas),
                 Filtros = ParseProjectTableFilters(dto.Filtros, campos),
-                Ordenacoes = ParseProjectTableSortings(dto.Ordenacoes, dto.Ordenacao, campos)
+                Ordenacoes = ParseProjectTableSortings(dto.Ordenacoes, dto.Ordenacao, campos),
+                Exibicao = ParseProjectTableDisplaySettings(dto.Exibicao)
             };
+        }
+
+
+        private static ProjectTableDisplaySettings ParseProjectTableDisplaySettings(ProjectTableDisplaySettingsDto? dto)
+        {
+            if (dto == null)
+                return new ProjectTableDisplaySettings();
+
+            return NormalizarProjectTableDisplaySettings(new ProjectTableDisplaySettings
+            {
+                ExibirTitulo = dto.ExibirTitulo ?? true,
+                FonteTitulo = NormalizarFonteTabela(dto.FonteTitulo, ProjectTableDisplaySettings.DefaultFontFamily),
+                TamanhoFonteTitulo = NormalizarIntervalo(dto.TamanhoFonteTitulo, 11.0, ProjectTableDisplaySettings.MinFontSize, ProjectTableDisplaySettings.MaxFontSize),
+                TituloNegrito = dto.TituloNegrito ?? true,
+                CorTextoTitulo = NormalizarCorTabela(dto.CorTextoTitulo, ProjectTableDisplaySettings.DefaultTitleTextColor),
+                CorFundoTitulo = NormalizarCorTabela(dto.CorFundoTitulo, ProjectTableDisplaySettings.DefaultTitleBackgroundColor),
+                AlturaTitulo = NormalizarIntervalo(dto.AlturaTitulo, 32.0, ProjectTableDisplaySettings.MinRowHeight, ProjectTableDisplaySettings.MaxRowHeight),
+                AlinhamentoTitulo = ParseEnum(dto.AlinhamentoTitulo, ProjectTableTextAlignment.Esquerda),
+                ExibirCabecalho = dto.ExibirCabecalho ?? true,
+                FonteCabecalho = NormalizarFonteTabela(dto.FonteCabecalho, ProjectTableDisplaySettings.DefaultFontFamily),
+                TamanhoFonteCabecalho = NormalizarIntervalo(dto.TamanhoFonteCabecalho, 10.0, ProjectTableDisplaySettings.MinFontSize, ProjectTableDisplaySettings.MaxFontSize),
+                CabecalhoNegrito = dto.CabecalhoNegrito ?? true,
+                CorTextoCabecalho = NormalizarCorTabela(dto.CorTextoCabecalho, ProjectTableDisplaySettings.DefaultHeaderTextColor),
+                CorFundoCabecalho = NormalizarCorTabela(dto.CorFundoCabecalho, ProjectTableDisplaySettings.DefaultHeaderBackgroundColor),
+                AlturaCabecalho = NormalizarIntervalo(dto.AlturaCabecalho, 26.0, ProjectTableDisplaySettings.MinRowHeight, ProjectTableDisplaySettings.MaxRowHeight),
+                AlinhamentoCabecalho = ParseEnum(dto.AlinhamentoCabecalho, ProjectTableTextAlignment.Esquerda),
+                FonteCorpo = NormalizarFonteTabela(dto.FonteCorpo, ProjectTableDisplaySettings.DefaultFontFamily),
+                TamanhoFonteCorpo = NormalizarIntervalo(dto.TamanhoFonteCorpo, 10.5, ProjectTableDisplaySettings.MinFontSize, ProjectTableDisplaySettings.MaxFontSize),
+                CorTextoCorpo = NormalizarCorTabela(dto.CorTextoCorpo, ProjectTableDisplaySettings.DefaultBodyTextColor),
+                CorFundoCorpo = NormalizarCorTabela(dto.CorFundoCorpo, ProjectTableDisplaySettings.DefaultBodyBackgroundColor),
+                AlturaLinhaCorpo = NormalizarIntervalo(dto.AlturaLinhaCorpo, 24.0, ProjectTableDisplaySettings.MinRowHeight, ProjectTableDisplaySettings.MaxRowHeight),
+                AlinhamentoCorpo = ParseEnum(dto.AlinhamentoCorpo, ProjectTableTextAlignment.Esquerda),
+                UsarLinhasAlternadas = dto.UsarLinhasAlternadas ?? false,
+                CorLinhaAlternada = NormalizarCorTabela(dto.CorLinhaAlternada, ProjectTableDisplaySettings.DefaultAlternateRowBackgroundColor),
+                ExibirLinhasGrade = dto.ExibirLinhasGrade ?? true,
+                CorGrade = NormalizarCorTabela(dto.CorGrade, ProjectTableDisplaySettings.DefaultGridColor),
+                EspessuraGrade = NormalizarIntervalo(dto.EspessuraGrade, 1.0, ProjectTableDisplaySettings.MinThickness, ProjectTableDisplaySettings.MaxThickness),
+                ExibirContornoExterno = dto.ExibirContornoExterno ?? true,
+                CorContorno = NormalizarCorTabela(dto.CorContorno, ProjectTableDisplaySettings.DefaultOutlineColor),
+                EspessuraContorno = NormalizarIntervalo(dto.EspessuraContorno, 1.0, ProjectTableDisplaySettings.MinThickness, ProjectTableDisplaySettings.MaxThickness)
+            });
+        }
+
+        private static ProjectTableDisplaySettings NormalizarProjectTableDisplaySettings(ProjectTableDisplaySettings? valor)
+        {
+            ProjectTableDisplaySettings origem = valor ?? new ProjectTableDisplaySettings();
+
+            return new ProjectTableDisplaySettings
+            {
+                ExibirTitulo = origem.ExibirTitulo,
+                FonteTitulo = NormalizarFonteTabela(origem.FonteTitulo, ProjectTableDisplaySettings.DefaultFontFamily),
+                TamanhoFonteTitulo = NormalizarIntervalo(origem.TamanhoFonteTitulo, 11.0, ProjectTableDisplaySettings.MinFontSize, ProjectTableDisplaySettings.MaxFontSize),
+                TituloNegrito = origem.TituloNegrito,
+                CorTextoTitulo = NormalizarCorTabela(origem.CorTextoTitulo, ProjectTableDisplaySettings.DefaultTitleTextColor),
+                CorFundoTitulo = NormalizarCorTabela(origem.CorFundoTitulo, ProjectTableDisplaySettings.DefaultTitleBackgroundColor),
+                AlturaTitulo = NormalizarIntervalo(origem.AlturaTitulo, 32.0, ProjectTableDisplaySettings.MinRowHeight, ProjectTableDisplaySettings.MaxRowHeight),
+                AlinhamentoTitulo = Enum.IsDefined(typeof(ProjectTableTextAlignment), origem.AlinhamentoTitulo) ? origem.AlinhamentoTitulo : ProjectTableTextAlignment.Esquerda,
+                ExibirCabecalho = origem.ExibirCabecalho,
+                FonteCabecalho = NormalizarFonteTabela(origem.FonteCabecalho, ProjectTableDisplaySettings.DefaultFontFamily),
+                TamanhoFonteCabecalho = NormalizarIntervalo(origem.TamanhoFonteCabecalho, 10.0, ProjectTableDisplaySettings.MinFontSize, ProjectTableDisplaySettings.MaxFontSize),
+                CabecalhoNegrito = origem.CabecalhoNegrito,
+                CorTextoCabecalho = NormalizarCorTabela(origem.CorTextoCabecalho, ProjectTableDisplaySettings.DefaultHeaderTextColor),
+                CorFundoCabecalho = NormalizarCorTabela(origem.CorFundoCabecalho, ProjectTableDisplaySettings.DefaultHeaderBackgroundColor),
+                AlturaCabecalho = NormalizarIntervalo(origem.AlturaCabecalho, 26.0, ProjectTableDisplaySettings.MinRowHeight, ProjectTableDisplaySettings.MaxRowHeight),
+                AlinhamentoCabecalho = Enum.IsDefined(typeof(ProjectTableTextAlignment), origem.AlinhamentoCabecalho) ? origem.AlinhamentoCabecalho : ProjectTableTextAlignment.Esquerda,
+                FonteCorpo = NormalizarFonteTabela(origem.FonteCorpo, ProjectTableDisplaySettings.DefaultFontFamily),
+                TamanhoFonteCorpo = NormalizarIntervalo(origem.TamanhoFonteCorpo, 10.5, ProjectTableDisplaySettings.MinFontSize, ProjectTableDisplaySettings.MaxFontSize),
+                CorTextoCorpo = NormalizarCorTabela(origem.CorTextoCorpo, ProjectTableDisplaySettings.DefaultBodyTextColor),
+                CorFundoCorpo = NormalizarCorTabela(origem.CorFundoCorpo, ProjectTableDisplaySettings.DefaultBodyBackgroundColor),
+                AlturaLinhaCorpo = NormalizarIntervalo(origem.AlturaLinhaCorpo, 24.0, ProjectTableDisplaySettings.MinRowHeight, ProjectTableDisplaySettings.MaxRowHeight),
+                AlinhamentoCorpo = Enum.IsDefined(typeof(ProjectTableTextAlignment), origem.AlinhamentoCorpo) ? origem.AlinhamentoCorpo : ProjectTableTextAlignment.Esquerda,
+                UsarLinhasAlternadas = origem.UsarLinhasAlternadas,
+                CorLinhaAlternada = NormalizarCorTabela(origem.CorLinhaAlternada, ProjectTableDisplaySettings.DefaultAlternateRowBackgroundColor),
+                ExibirLinhasGrade = origem.ExibirLinhasGrade,
+                CorGrade = NormalizarCorTabela(origem.CorGrade, ProjectTableDisplaySettings.DefaultGridColor),
+                EspessuraGrade = NormalizarIntervalo(origem.EspessuraGrade, 1.0, ProjectTableDisplaySettings.MinThickness, ProjectTableDisplaySettings.MaxThickness),
+                ExibirContornoExterno = origem.ExibirContornoExterno,
+                CorContorno = NormalizarCorTabela(origem.CorContorno, ProjectTableDisplaySettings.DefaultOutlineColor),
+                EspessuraContorno = NormalizarIntervalo(origem.EspessuraContorno, 1.0, ProjectTableDisplaySettings.MinThickness, ProjectTableDisplaySettings.MaxThickness)
+            };
+        }
+
+        private static string NormalizarFonteTabela(string? valor, string fallback)
+        {
+            return string.IsNullOrWhiteSpace(valor) ? fallback : valor.Trim();
+        }
+
+        private static string NormalizarCorTabela(string? valor, string fallback)
+        {
+            string cor = string.IsNullOrWhiteSpace(valor) ? fallback : valor.Trim();
+            return cor.StartsWith("#", StringComparison.Ordinal) ? cor : fallback;
+        }
+
+        private static double NormalizarIntervalo(double? valor, double fallback, double minimo, double maximo)
+        {
+            if (!valor.HasValue || double.IsNaN(valor.Value) || double.IsInfinity(valor.Value))
+                return fallback;
+
+            if (valor.Value < minimo)
+                return minimo;
+
+            if (valor.Value > maximo)
+                return maximo;
+
+            return valor.Value;
         }
 
         private static ProjectSheet? CriarProjectSheet(ProjectSheetDto dto, IEnumerable<Guid> tableIds)

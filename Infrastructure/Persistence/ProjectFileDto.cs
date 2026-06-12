@@ -57,14 +57,13 @@ namespace Araci.Infrastructure.Persistence
         public string Nome { get; set; } = string.Empty;
         public double X { get; set; }
         public double Y { get; set; }
-        public double Largura { get; set; } = 100.0;
-        public double Altura { get; set; } = 50.0;
+        public double Largura { get; set; }
+        public double Altura { get; set; }
         public TypeRefDto? Type { get; set; }
         public string Stroke { get; set; } = "#FF000000";
         public double StrokeThickness { get; set; } = 1.0;
         public bool Visible { get; set; } = true;
     }
-
 
     public sealed class ProjectSheetTemplateCircleDto
     {
@@ -72,7 +71,7 @@ namespace Araci.Infrastructure.Persistence
         public string Nome { get; set; } = string.Empty;
         public double X { get; set; }
         public double Y { get; set; }
-        public double Raio { get; set; } = 50.0;
+        public double Raio { get; set; }
         public TypeRefDto? Type { get; set; }
         public string Stroke { get; set; } = "#FF000000";
         public double StrokeThickness { get; set; } = 1.0;
@@ -85,8 +84,8 @@ namespace Araci.Infrastructure.Persistence
         public string Nome { get; set; } = string.Empty;
         public double X { get; set; }
         public double Y { get; set; }
-        public string Texto { get; set; } = "Texto";
-        public double LarguraCaixa { get; set; } = 200.0;
+        public string Texto { get; set; } = string.Empty;
+        public double LarguraCaixa { get; set; }
         public TypeRefDto? Type { get; set; }
         public string CorTexto { get; set; } = "#FF000000";
         public string Fonte { get; set; } = "Arial";
@@ -128,6 +127,41 @@ namespace Araci.Infrastructure.Persistence
         public List<ProjectTableFilterRuleDto> Filtros { get; set; } = new();
         public ProjectTableSortingDto? Ordenacao { get; set; }
         public List<ProjectTableSortingDto> Ordenacoes { get; set; } = new();
+        public ProjectTableDisplaySettingsDto? Exibicao { get; set; }
+    }
+
+    public sealed class ProjectTableDisplaySettingsDto
+    {
+        public bool? ExibirTitulo { get; set; }
+        public string? FonteTitulo { get; set; }
+        public double? TamanhoFonteTitulo { get; set; }
+        public bool? TituloNegrito { get; set; }
+        public string? CorTextoTitulo { get; set; }
+        public string? CorFundoTitulo { get; set; }
+        public double? AlturaTitulo { get; set; }
+        public string? AlinhamentoTitulo { get; set; }
+        public bool? ExibirCabecalho { get; set; }
+        public string? FonteCabecalho { get; set; }
+        public double? TamanhoFonteCabecalho { get; set; }
+        public bool? CabecalhoNegrito { get; set; }
+        public string? CorTextoCabecalho { get; set; }
+        public string? CorFundoCabecalho { get; set; }
+        public double? AlturaCabecalho { get; set; }
+        public string? AlinhamentoCabecalho { get; set; }
+        public string? FonteCorpo { get; set; }
+        public double? TamanhoFonteCorpo { get; set; }
+        public string? CorTextoCorpo { get; set; }
+        public string? CorFundoCorpo { get; set; }
+        public double? AlturaLinhaCorpo { get; set; }
+        public string? AlinhamentoCorpo { get; set; }
+        public bool? UsarLinhasAlternadas { get; set; }
+        public string? CorLinhaAlternada { get; set; }
+        public bool? ExibirLinhasGrade { get; set; }
+        public string? CorGrade { get; set; }
+        public double? EspessuraGrade { get; set; }
+        public bool? ExibirContornoExterno { get; set; }
+        public string? CorContorno { get; set; }
+        public double? EspessuraContorno { get; set; }
     }
 
     public sealed class ProjectTableFieldSelectionDto

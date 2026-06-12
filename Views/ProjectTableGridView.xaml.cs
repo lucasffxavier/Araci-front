@@ -1,6 +1,8 @@
 using System.ComponentModel;
+using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Data;
+using System.Windows.Media;
 using Araci.ViewModels;
 
 namespace Araci.Views
@@ -47,9 +49,22 @@ namespace Araci.Views
                 {
                     Header = _viewModel.Columns[i].NomeExibicao,
                     Binding = new Binding($"[{i}]") { Mode = BindingMode.OneWay },
-                    IsReadOnly = true
+                    IsReadOnly = true,
+                    ElementStyle = CriarTextoCelulaStyle()
                 });
             }
+        }
+
+        private static Style CriarTextoCelulaStyle()
+        {
+            var style = new Style(typeof(TextBlock));
+            style.Setters.Add(new Setter(TextBlock.TextAlignmentProperty, new Binding("DataContext.BodyTextAlignment")
+            {
+                RelativeSource = new RelativeSource(RelativeSourceMode.FindAncestor, typeof(DataGrid), 1)
+            }));
+            style.Setters.Add(new Setter(TextBlock.VerticalAlignmentProperty, VerticalAlignment.Center));
+            style.Setters.Add(new Setter(TextBlock.TextTrimmingProperty, TextTrimming.CharacterEllipsis));
+            return style;
         }
     }
 }

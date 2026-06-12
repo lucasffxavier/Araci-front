@@ -159,6 +159,30 @@ namespace Araci.Applications.UseCases.Projeto
             return true;
         }
 
+
+        public bool AlterarExibicaoTabela(Guid id, ProjectTableDisplaySettings exibicao)
+        {
+            ProjectTable? tabela = _document.Tabelas.FirstOrDefault(t => t.Id == id);
+
+            if (tabela == null)
+                return false;
+
+            ProjectTableDisplaySettings valorNovo = NormalizarExibicao(exibicao);
+            ProjectTableDisplaySettings valorAnterior = NormalizarExibicao(tabela.Exibicao);
+
+            if (ExibicoesIguais(valorAnterior, valorNovo))
+                return true;
+
+            _commands.Execute(new UpdateProjectTablePropertyCommand<ProjectTableDisplaySettings>(
+                _document,
+                tabela,
+                (t, valor) => t.Exibicao = NormalizarExibicao(valor),
+                valorAnterior,
+                valorNovo));
+
+            return true;
+        }
+
         private static List<ProjectTableElementCategory> NormalizarCategorias(IEnumerable<ProjectTableElementCategory>? categorias)
         {
             return (categorias ?? Enumerable.Empty<ProjectTableElementCategory>())
@@ -332,6 +356,110 @@ namespace Araci.Applications.UseCases.Projeto
             }
 
             return true;
+        }
+
+
+        private static ProjectTableDisplaySettings NormalizarExibicao(ProjectTableDisplaySettings? valor)
+        {
+            ProjectTableDisplaySettings origem = valor ?? new ProjectTableDisplaySettings();
+
+            return new ProjectTableDisplaySettings
+            {
+                ExibirTitulo = origem.ExibirTitulo,
+                FonteTitulo = NormalizarFonte(origem.FonteTitulo, ProjectTableDisplaySettings.DefaultFontFamily),
+                TamanhoFonteTitulo = NormalizarIntervalo(origem.TamanhoFonteTitulo, 11.0, ProjectTableDisplaySettings.MinFontSize, ProjectTableDisplaySettings.MaxFontSize),
+                TituloNegrito = origem.TituloNegrito,
+                CorTextoTitulo = NormalizarCor(origem.CorTextoTitulo, ProjectTableDisplaySettings.DefaultTitleTextColor),
+                CorFundoTitulo = NormalizarCor(origem.CorFundoTitulo, ProjectTableDisplaySettings.DefaultTitleBackgroundColor),
+                AlturaTitulo = NormalizarIntervalo(origem.AlturaTitulo, 32.0, ProjectTableDisplaySettings.MinRowHeight, ProjectTableDisplaySettings.MaxRowHeight),
+                AlinhamentoTitulo = Enum.IsDefined(typeof(ProjectTableTextAlignment), origem.AlinhamentoTitulo) ? origem.AlinhamentoTitulo : ProjectTableTextAlignment.Esquerda,
+                ExibirCabecalho = origem.ExibirCabecalho,
+                FonteCabecalho = NormalizarFonte(origem.FonteCabecalho, ProjectTableDisplaySettings.DefaultFontFamily),
+                TamanhoFonteCabecalho = NormalizarIntervalo(origem.TamanhoFonteCabecalho, 10.0, ProjectTableDisplaySettings.MinFontSize, ProjectTableDisplaySettings.MaxFontSize),
+                CabecalhoNegrito = origem.CabecalhoNegrito,
+                CorTextoCabecalho = NormalizarCor(origem.CorTextoCabecalho, ProjectTableDisplaySettings.DefaultHeaderTextColor),
+                CorFundoCabecalho = NormalizarCor(origem.CorFundoCabecalho, ProjectTableDisplaySettings.DefaultHeaderBackgroundColor),
+                AlturaCabecalho = NormalizarIntervalo(origem.AlturaCabecalho, 26.0, ProjectTableDisplaySettings.MinRowHeight, ProjectTableDisplaySettings.MaxRowHeight),
+                AlinhamentoCabecalho = Enum.IsDefined(typeof(ProjectTableTextAlignment), origem.AlinhamentoCabecalho) ? origem.AlinhamentoCabecalho : ProjectTableTextAlignment.Esquerda,
+                FonteCorpo = NormalizarFonte(origem.FonteCorpo, ProjectTableDisplaySettings.DefaultFontFamily),
+                TamanhoFonteCorpo = NormalizarIntervalo(origem.TamanhoFonteCorpo, 10.5, ProjectTableDisplaySettings.MinFontSize, ProjectTableDisplaySettings.MaxFontSize),
+                CorTextoCorpo = NormalizarCor(origem.CorTextoCorpo, ProjectTableDisplaySettings.DefaultBodyTextColor),
+                CorFundoCorpo = NormalizarCor(origem.CorFundoCorpo, ProjectTableDisplaySettings.DefaultBodyBackgroundColor),
+                AlturaLinhaCorpo = NormalizarIntervalo(origem.AlturaLinhaCorpo, 24.0, ProjectTableDisplaySettings.MinRowHeight, ProjectTableDisplaySettings.MaxRowHeight),
+                AlinhamentoCorpo = Enum.IsDefined(typeof(ProjectTableTextAlignment), origem.AlinhamentoCorpo) ? origem.AlinhamentoCorpo : ProjectTableTextAlignment.Esquerda,
+                UsarLinhasAlternadas = origem.UsarLinhasAlternadas,
+                CorLinhaAlternada = NormalizarCor(origem.CorLinhaAlternada, ProjectTableDisplaySettings.DefaultAlternateRowBackgroundColor),
+                ExibirLinhasGrade = origem.ExibirLinhasGrade,
+                CorGrade = NormalizarCor(origem.CorGrade, ProjectTableDisplaySettings.DefaultGridColor),
+                EspessuraGrade = NormalizarIntervalo(origem.EspessuraGrade, 1.0, ProjectTableDisplaySettings.MinThickness, ProjectTableDisplaySettings.MaxThickness),
+                ExibirContornoExterno = origem.ExibirContornoExterno,
+                CorContorno = NormalizarCor(origem.CorContorno, ProjectTableDisplaySettings.DefaultOutlineColor),
+                EspessuraContorno = NormalizarIntervalo(origem.EspessuraContorno, 1.0, ProjectTableDisplaySettings.MinThickness, ProjectTableDisplaySettings.MaxThickness)
+            };
+        }
+
+        private static bool ExibicoesIguais(ProjectTableDisplaySettings a, ProjectTableDisplaySettings b)
+        {
+            return a.ExibirTitulo == b.ExibirTitulo &&
+                string.Equals(a.FonteTitulo, b.FonteTitulo, StringComparison.Ordinal) &&
+                ValoresIguais(a.TamanhoFonteTitulo, b.TamanhoFonteTitulo) &&
+                a.TituloNegrito == b.TituloNegrito &&
+                string.Equals(a.CorTextoTitulo, b.CorTextoTitulo, StringComparison.OrdinalIgnoreCase) &&
+                string.Equals(a.CorFundoTitulo, b.CorFundoTitulo, StringComparison.OrdinalIgnoreCase) &&
+                ValoresIguais(a.AlturaTitulo, b.AlturaTitulo) &&
+                a.AlinhamentoTitulo == b.AlinhamentoTitulo &&
+                a.ExibirCabecalho == b.ExibirCabecalho &&
+                string.Equals(a.FonteCabecalho, b.FonteCabecalho, StringComparison.Ordinal) &&
+                ValoresIguais(a.TamanhoFonteCabecalho, b.TamanhoFonteCabecalho) &&
+                a.CabecalhoNegrito == b.CabecalhoNegrito &&
+                string.Equals(a.CorTextoCabecalho, b.CorTextoCabecalho, StringComparison.OrdinalIgnoreCase) &&
+                string.Equals(a.CorFundoCabecalho, b.CorFundoCabecalho, StringComparison.OrdinalIgnoreCase) &&
+                ValoresIguais(a.AlturaCabecalho, b.AlturaCabecalho) &&
+                a.AlinhamentoCabecalho == b.AlinhamentoCabecalho &&
+                string.Equals(a.FonteCorpo, b.FonteCorpo, StringComparison.Ordinal) &&
+                ValoresIguais(a.TamanhoFonteCorpo, b.TamanhoFonteCorpo) &&
+                string.Equals(a.CorTextoCorpo, b.CorTextoCorpo, StringComparison.OrdinalIgnoreCase) &&
+                string.Equals(a.CorFundoCorpo, b.CorFundoCorpo, StringComparison.OrdinalIgnoreCase) &&
+                ValoresIguais(a.AlturaLinhaCorpo, b.AlturaLinhaCorpo) &&
+                a.AlinhamentoCorpo == b.AlinhamentoCorpo &&
+                a.UsarLinhasAlternadas == b.UsarLinhasAlternadas &&
+                string.Equals(a.CorLinhaAlternada, b.CorLinhaAlternada, StringComparison.OrdinalIgnoreCase) &&
+                a.ExibirLinhasGrade == b.ExibirLinhasGrade &&
+                string.Equals(a.CorGrade, b.CorGrade, StringComparison.OrdinalIgnoreCase) &&
+                ValoresIguais(a.EspessuraGrade, b.EspessuraGrade) &&
+                a.ExibirContornoExterno == b.ExibirContornoExterno &&
+                string.Equals(a.CorContorno, b.CorContorno, StringComparison.OrdinalIgnoreCase) &&
+                ValoresIguais(a.EspessuraContorno, b.EspessuraContorno);
+        }
+
+        private static bool ValoresIguais(double a, double b)
+        {
+            return Math.Abs(a - b) < 0.000001;
+        }
+
+        private static string NormalizarFonte(string? valor, string fallback)
+        {
+            return string.IsNullOrWhiteSpace(valor) ? fallback : valor.Trim();
+        }
+
+        private static string NormalizarCor(string? valor, string fallback)
+        {
+            string cor = string.IsNullOrWhiteSpace(valor) ? fallback : valor.Trim();
+            return cor.StartsWith("#", StringComparison.Ordinal) ? cor : fallback;
+        }
+
+        private static double NormalizarIntervalo(double valor, double fallback, double minimo, double maximo)
+        {
+            if (double.IsNaN(valor) || double.IsInfinity(valor))
+                return fallback;
+
+            if (valor < minimo)
+                return minimo;
+
+            if (valor > maximo)
+                return maximo;
+
+            return valor;
         }
 
         private static string CriarChaveCampo(ProjectTableElementCategory categoria, string campoId)

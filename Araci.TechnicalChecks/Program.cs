@@ -8777,6 +8777,11 @@ namespace Araci.TechnicalChecks
                 return new OrdenacaoTabelaDialogResult(ordenacoes);
             }
 
+            public ExibicaoTabelaDialogResult? ShowExibicaoTabelaDialog(ProjectTableDisplaySettings exibicao)
+            {
+                return new ExibicaoTabelaDialogResult(exibicao);
+            }
+
             public bool Confirm(string title, string message)
             {
                 ConfirmChamadas++;

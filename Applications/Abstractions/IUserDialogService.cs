@@ -33,6 +33,8 @@ namespace Araci.Applications.Abstractions
             IReadOnlyList<ProjectTableFieldSelection> camposSelecionados,
             IReadOnlyList<ProjectTableSorting> ordenacoes);
 
+        ExibicaoTabelaDialogResult? ShowExibicaoTabelaDialog(ProjectTableDisplaySettings exibicao);
+
         bool Confirm(string title, string message);
 
         void Show(SimulationMessage message);

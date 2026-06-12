@@ -102,6 +102,18 @@ namespace Araci.Services.UI
                 : null;
         }
 
+        public ExibicaoTabelaDialogResult? ShowExibicaoTabelaDialog(ProjectTableDisplaySettings exibicao)
+        {
+            var window = new ExibicaoTabelaWindow(exibicao)
+            {
+                Owner = Application.Current?.MainWindow
+            };
+
+            return window.ShowDialog() == true
+                ? new ExibicaoTabelaDialogResult(window.Exibicao)
+                : null;
+        }
+
         public bool Confirm(string title, string message)
         {
             MessageBoxResult result = MessageBox.Show(

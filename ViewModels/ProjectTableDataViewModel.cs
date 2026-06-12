@@ -4,6 +4,8 @@ using System.Collections.ObjectModel;
 using System.ComponentModel;
 using System.Linq;
 using System.Runtime.CompilerServices;
+using System.Windows;
+using System.Windows.Media;
 using Araci.Applications.Projects.Tables;
 using Araci.Core.Documents;
 
@@ -32,6 +34,20 @@ namespace Araci.ViewModels
 
         public Guid TableId => _table.Id;
         public ObservableCollection<ProjectTableDataRowViewModel> Rows { get; }
+        public ProjectTableDisplaySettings Exibicao => _table.Exibicao ?? new ProjectTableDisplaySettings();
+        public FontFamily HeaderFontFamily => new(Exibicao.FonteCabecalho);
+        public FontFamily BodyFontFamily => new(Exibicao.FonteCorpo);
+        public double HeaderFontSize => Exibicao.TamanhoFonteCabecalho;
+        public double BodyFontSize => Exibicao.TamanhoFonteCorpo;
+        public FontWeight HeaderFontWeight => Exibicao.CabecalhoNegrito ? FontWeights.SemiBold : FontWeights.Normal;
+        public Brush HeaderForegroundBrush => CriarBrush(Exibicao.CorTextoCabecalho, ProjectTableDisplaySettings.DefaultHeaderTextColor);
+        public Brush HeaderBackgroundBrush => CriarBrush(Exibicao.CorFundoCabecalho, ProjectTableDisplaySettings.DefaultHeaderBackgroundColor);
+        public Brush BodyForegroundBrush => CriarBrush(Exibicao.CorTextoCorpo, ProjectTableDisplaySettings.DefaultBodyTextColor);
+        public Brush BodyBackgroundBrush => CriarBrush(Exibicao.CorFundoCorpo, ProjectTableDisplaySettings.DefaultBodyBackgroundColor);
+        public Brush GridBrush => CriarBrush(Exibicao.CorGrade, ProjectTableDisplaySettings.DefaultGridColor);
+        public Thickness GridBorderThickness => Exibicao.ExibirLinhasGrade ? new Thickness(0, 0, Exibicao.EspessuraGrade, Exibicao.EspessuraGrade) : new Thickness(0);
+        public TextAlignment HeaderTextAlignment => ConverterAlinhamento(Exibicao.AlinhamentoCabecalho);
+        public TextAlignment BodyTextAlignment => ConverterAlinhamento(Exibicao.AlinhamentoCorpo);
 
         public string Titulo
         {
@@ -93,6 +109,44 @@ namespace Araci.ViewModels
                     : string.Empty;
 
             OnPropertyChanged(nameof(HasRows));
+            OnPropertyChanged(nameof(Exibicao));
+            OnPropertyChanged(nameof(HeaderFontFamily));
+            OnPropertyChanged(nameof(BodyFontFamily));
+            OnPropertyChanged(nameof(HeaderFontSize));
+            OnPropertyChanged(nameof(BodyFontSize));
+            OnPropertyChanged(nameof(HeaderFontWeight));
+            OnPropertyChanged(nameof(HeaderForegroundBrush));
+            OnPropertyChanged(nameof(HeaderBackgroundBrush));
+            OnPropertyChanged(nameof(BodyForegroundBrush));
+            OnPropertyChanged(nameof(BodyBackgroundBrush));
+            OnPropertyChanged(nameof(GridBrush));
+            OnPropertyChanged(nameof(GridBorderThickness));
+            OnPropertyChanged(nameof(HeaderTextAlignment));
+            OnPropertyChanged(nameof(BodyTextAlignment));
+        }
+
+        private static Brush CriarBrush(string? valor, string fallback)
+        {
+            try
+            {
+                object? convertido = ColorConverter.ConvertFromString(string.IsNullOrWhiteSpace(valor) ? fallback : valor);
+                return convertido is Color cor ? new SolidColorBrush(cor) : new SolidColorBrush(Colors.Black);
+            }
+            catch
+            {
+                object? convertido = ColorConverter.ConvertFromString(fallback);
+                return convertido is Color cor ? new SolidColorBrush(cor) : new SolidColorBrush(Colors.Black);
+            }
+        }
+
+        private static TextAlignment ConverterAlinhamento(ProjectTableTextAlignment alinhamento)
+        {
+            return alinhamento switch
+            {
+                ProjectTableTextAlignment.Centro => TextAlignment.Center,
+                ProjectTableTextAlignment.Direita => TextAlignment.Right,
+                _ => TextAlignment.Left
+            };
         }
 
         public event PropertyChangedEventHandler? PropertyChanged;

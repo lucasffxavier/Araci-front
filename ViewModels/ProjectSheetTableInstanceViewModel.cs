@@ -3,6 +3,8 @@ using System.Collections.Generic;
 using System.ComponentModel;
 using System.Linq;
 using System.Runtime.CompilerServices;
+using System.Windows;
+using System.Windows.Media;
 using Araci.Applications.Projects.Tables;
 using Araci.Core.Documents;
 
@@ -11,10 +13,8 @@ namespace Araci.ViewModels
     public sealed class ProjectSheetTableInstanceViewModel : INotifyPropertyChanged
     {
         private const double MinimumColumnWidth = 44.0;
-        private const double DefaultTitleHeight = 32.0;
-        private const double DefaultHeaderRowHeight = 26.0;
-        private const double DefaultBodyRowHeight = 24.0;
 
+        private readonly ProjectTableDisplaySettings _exibicao;
         private double _x;
         private double _y;
         private double _width;
@@ -26,10 +26,12 @@ namespace Araci.ViewModels
         public ProjectSheetTableInstanceViewModel(
             ProjectSheetTableInstance instance,
             string tableName,
-            ProjectTableDataResult? tableData = null)
+            ProjectTableDataResult? tableData = null,
+            ProjectTableDisplaySettings? exibicao = null)
         {
             ArgumentNullException.ThrowIfNull(instance);
 
+            _exibicao = NormalizarExibicao(exibicao);
             Id = instance.Id;
             TableId = instance.TableId;
             TableName = string.IsNullOrWhiteSpace(tableName) ? "Tabela sem nome" : tableName;
@@ -40,7 +42,7 @@ namespace Araci.ViewModels
             Columns = tableData?.Columns.ToList() ?? new List<ProjectTableDataColumn>();
             RowStartIndex = instance.RowStartIndex;
             RowCount = instance.RowCount;
-            Rows = BuildVisibleRows(tableData, RowStartIndex, RowCount);
+            Rows = BuildVisibleRows(tableData, RowStartIndex, RowCount, _exibicao);
             EmptyDataMessage = tableData == null
                 ? "Tabela nao encontrada"
                 : Columns.Count == 0
@@ -66,13 +68,37 @@ namespace Araci.ViewModels
         public int ColumnCount => Columns.Count;
         public double ColumnWidth => CalcularLarguraColuna(Width, Columns.Count);
         public double TableGridWidth => HasColumns ? ColumnWidth * Columns.Count : Math.Max(0.0, Width);
-        public double TitleHeight => DefaultTitleHeight;
-        public double HeaderRowHeight => DefaultHeaderRowHeight;
-        public double BodyRowHeight => DefaultBodyRowHeight;
+        public bool ExibirTitulo => _exibicao.ExibirTitulo;
+        public bool ExibirCabecalho => _exibicao.ExibirCabecalho;
+        public double TitleHeight => ExibirTitulo ? _exibicao.AlturaTitulo : 0.0;
+        public double HeaderRowHeight => ExibirCabecalho ? _exibicao.AlturaCabecalho : 0.0;
+        public double BodyRowHeight => _exibicao.AlturaLinhaCorpo;
         public double BodyViewportHeight => Math.Max(0.0, Height - TitleHeight);
         public double RowsViewportHeight => Math.Max(0.0, Height - TitleHeight - HeaderRowHeight);
         public double ViewX => X + SheetOriginOffsetX;
         public double ViewY => Y + SheetOriginOffsetY;
+        public FontFamily TitleFontFamily => new(_exibicao.FonteTitulo);
+        public FontFamily HeaderFontFamily => new(_exibicao.FonteCabecalho);
+        public FontFamily BodyFontFamily => new(_exibicao.FonteCorpo);
+        public double TitleFontSize => _exibicao.TamanhoFonteTitulo;
+        public double HeaderFontSize => _exibicao.TamanhoFonteCabecalho;
+        public double BodyFontSize => _exibicao.TamanhoFonteCorpo;
+        public FontWeight TitleFontWeight => _exibicao.TituloNegrito ? FontWeights.SemiBold : FontWeights.Normal;
+        public FontWeight HeaderFontWeight => _exibicao.CabecalhoNegrito ? FontWeights.SemiBold : FontWeights.Normal;
+        public Brush TitleForegroundBrush => CriarBrush(_exibicao.CorTextoTitulo, ProjectTableDisplaySettings.DefaultTitleTextColor);
+        public Brush TitleBackgroundBrush => CriarBrush(_exibicao.CorFundoTitulo, ProjectTableDisplaySettings.DefaultTitleBackgroundColor);
+        public Brush HeaderForegroundBrush => CriarBrush(_exibicao.CorTextoCabecalho, ProjectTableDisplaySettings.DefaultHeaderTextColor);
+        public Brush HeaderBackgroundBrush => CriarBrush(_exibicao.CorFundoCabecalho, ProjectTableDisplaySettings.DefaultHeaderBackgroundColor);
+        public Brush BodyForegroundBrush => CriarBrush(_exibicao.CorTextoCorpo, ProjectTableDisplaySettings.DefaultBodyTextColor);
+        public Brush BodyBackgroundBrush => CriarBrush(_exibicao.CorFundoCorpo, ProjectTableDisplaySettings.DefaultBodyBackgroundColor);
+        public Brush AlternateRowBackgroundBrush => CriarBrush(_exibicao.CorLinhaAlternada, ProjectTableDisplaySettings.DefaultAlternateRowBackgroundColor);
+        public Brush GridBrush => CriarBrush(_exibicao.CorGrade, ProjectTableDisplaySettings.DefaultGridColor);
+        public Brush OutlineBrush => CriarBrush(_exibicao.CorContorno, ProjectTableDisplaySettings.DefaultOutlineColor);
+        public Thickness GridBorderThickness => _exibicao.ExibirLinhasGrade ? new Thickness(0, 0, _exibicao.EspessuraGrade, _exibicao.EspessuraGrade) : new Thickness(0);
+        public Thickness OutlineBorderThickness => _exibicao.ExibirContornoExterno ? new Thickness(_exibicao.EspessuraContorno) : new Thickness(0);
+        public TextAlignment TitleTextAlignment => ConverterAlinhamento(_exibicao.AlinhamentoTitulo);
+        public TextAlignment HeaderTextAlignment => ConverterAlinhamento(_exibicao.AlinhamentoCabecalho);
+        public TextAlignment BodyTextAlignment => ConverterAlinhamento(_exibicao.AlinhamentoCorpo);
 
         public double SheetOriginOffsetX
         {
@@ -194,7 +220,8 @@ namespace Araci.ViewModels
         private static IReadOnlyList<ProjectSheetTableRowViewModel> BuildVisibleRows(
             ProjectTableDataResult? tableData,
             int rowStartIndex,
-            int? rowCount)
+            int? rowCount,
+            ProjectTableDisplaySettings exibicao)
         {
             if (tableData == null || tableData.Columns.Count == 0)
                 return new List<ProjectSheetTableRowViewModel>();
@@ -206,7 +233,7 @@ namespace Araci.ViewModels
                 rows = rows.Take(rowCount.Value);
 
             return rows
-                .Select(row => new ProjectSheetTableRowViewModel(row))
+                .Select((row, index) => new ProjectSheetTableRowViewModel(row, index, exibicao))
                 .ToList();
         }
 
@@ -221,6 +248,35 @@ namespace Araci.ViewModels
             return widthPerColumn < MinimumColumnWidth
                 ? MinimumColumnWidth
                 : widthPerColumn;
+        }
+
+        private static ProjectTableDisplaySettings NormalizarExibicao(ProjectTableDisplaySettings? valor)
+        {
+            return valor?.CriarCopia() ?? new ProjectTableDisplaySettings();
+        }
+
+        private static Brush CriarBrush(string? valor, string fallback)
+        {
+            try
+            {
+                object? convertido = ColorConverter.ConvertFromString(string.IsNullOrWhiteSpace(valor) ? fallback : valor);
+                return convertido is Color cor ? new SolidColorBrush(cor) : new SolidColorBrush(Colors.Black);
+            }
+            catch
+            {
+                object? convertido = ColorConverter.ConvertFromString(fallback);
+                return convertido is Color cor ? new SolidColorBrush(cor) : new SolidColorBrush(Colors.Black);
+            }
+        }
+
+        private static TextAlignment ConverterAlinhamento(ProjectTableTextAlignment alinhamento)
+        {
+            return alinhamento switch
+            {
+                ProjectTableTextAlignment.Centro => TextAlignment.Center,
+                ProjectTableTextAlignment.Direita => TextAlignment.Right,
+                _ => TextAlignment.Left
+            };
         }
 
         private static double NormalizePosition(double value)
@@ -251,16 +307,34 @@ namespace Araci.ViewModels
 
     public sealed class ProjectSheetTableRowViewModel
     {
-        public ProjectSheetTableRowViewModel(ProjectTableDataRow row)
+        public ProjectSheetTableRowViewModel(ProjectTableDataRow row, int visualIndex, ProjectTableDisplaySettings exibicao)
         {
             ElementoId = row.ElementoId;
             Cells = row.Cells
                 .Select(cell => new ProjectSheetTableCellViewModel(cell.DisplayValue))
                 .ToList();
+            BackgroundBrush = exibicao.UsarLinhasAlternadas && visualIndex % 2 == 1
+                ? CriarBrush(exibicao.CorLinhaAlternada, ProjectTableDisplaySettings.DefaultAlternateRowBackgroundColor)
+                : CriarBrush(exibicao.CorFundoCorpo, ProjectTableDisplaySettings.DefaultBodyBackgroundColor);
         }
 
         public Guid ElementoId { get; }
         public IReadOnlyList<ProjectSheetTableCellViewModel> Cells { get; }
+        public Brush BackgroundBrush { get; }
+
+        private static Brush CriarBrush(string? valor, string fallback)
+        {
+            try
+            {
+                object? convertido = ColorConverter.ConvertFromString(string.IsNullOrWhiteSpace(valor) ? fallback : valor);
+                return convertido is Color cor ? new SolidColorBrush(cor) : new SolidColorBrush(Colors.White);
+            }
+            catch
+            {
+                object? convertido = ColorConverter.ConvertFromString(fallback);
+                return convertido is Color cor ? new SolidColorBrush(cor) : new SolidColorBrush(Colors.White);
+            }
+        }
     }
 
     public sealed class ProjectSheetTableCellViewModel
