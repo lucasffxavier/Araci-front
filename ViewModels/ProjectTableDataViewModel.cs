@@ -50,7 +50,10 @@ namespace Araci.ViewModels
         public Brush BodyForegroundBrush => CriarBrush(Exibicao.CorTextoCorpo, ProjectTableDisplaySettings.DefaultBodyTextColor);
         public Brush BodyBackgroundBrush => CriarBrush(Exibicao.CorFundoCorpo, ProjectTableDisplaySettings.DefaultBodyBackgroundColor);
         public Brush GridBrush => CriarBrush(Exibicao.CorGrade, ProjectTableDisplaySettings.DefaultGridColor);
+        public Brush OutlineBrush => CriarBrush(Exibicao.CorContorno, ProjectTableDisplaySettings.DefaultOutlineColor);
         public Thickness GridBorderThickness => Exibicao.ExibirLinhasGrade ? new Thickness(0, 0, Exibicao.EspessuraGrade, Exibicao.EspessuraGrade) : new Thickness(0);
+        public Thickness GridSeparatorBorderThickness => Exibicao.ExibirLinhasGrade ? new Thickness(0, 0, 0, Exibicao.EspessuraGrade) : new Thickness(0);
+        public Thickness OutlineBorderThickness => Exibicao.ExibirContornoExterno ? new Thickness(Exibicao.EspessuraContorno) : new Thickness(0);
         public TextAlignment TitleTextAlignment => ConverterAlinhamento(Exibicao.AlinhamentoTitulo);
         public TextAlignment HeaderTextAlignment => ConverterAlinhamento(Exibicao.AlinhamentoCabecalho);
         public TextAlignment BodyTextAlignment => ConverterAlinhamento(Exibicao.AlinhamentoCorpo);
@@ -131,7 +134,10 @@ namespace Araci.ViewModels
             OnPropertyChanged(nameof(BodyForegroundBrush));
             OnPropertyChanged(nameof(BodyBackgroundBrush));
             OnPropertyChanged(nameof(GridBrush));
+            OnPropertyChanged(nameof(OutlineBrush));
             OnPropertyChanged(nameof(GridBorderThickness));
+            OnPropertyChanged(nameof(GridSeparatorBorderThickness));
+            OnPropertyChanged(nameof(OutlineBorderThickness));
             OnPropertyChanged(nameof(TitleTextAlignment));
             OnPropertyChanged(nameof(HeaderTextAlignment));
             OnPropertyChanged(nameof(BodyTextAlignment));
