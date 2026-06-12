@@ -58,6 +58,7 @@ namespace Araci.Properties
                 .Cast<ProjectTableTextAlignment>()
                 .ToList();
 
+            AlinhamentoTituloComboBox.ItemsSource = alinhamentos;
             AlinhamentoCabecalhoComboBox.ItemsSource = alinhamentos;
             AlinhamentoCorpoComboBox.ItemsSource = alinhamentos;
         }
@@ -71,6 +72,7 @@ namespace Araci.Properties
             CorTextoTituloTextBox.Text = valor.CorTextoTitulo;
             CorFundoTituloTextBox.Text = valor.CorFundoTitulo;
             AlturaTituloTextBox.Text = Format(valor.AlturaTitulo);
+            AlinhamentoTituloComboBox.SelectedItem = valor.AlinhamentoTitulo;
 
             ExibirCabecalhoCheckBox.IsChecked = valor.ExibirCabecalho;
             AplicarFonte(FonteCabecalhoComboBox, valor.FonteCabecalho);
@@ -109,7 +111,7 @@ namespace Araci.Properties
                 CorTextoTitulo = NormalizarTexto(CorTextoTituloTextBox.Text, ProjectTableDisplaySettings.DefaultTitleTextColor),
                 CorFundoTitulo = NormalizarTexto(CorFundoTituloTextBox.Text, ProjectTableDisplaySettings.DefaultTitleBackgroundColor),
                 AlturaTitulo = LerDouble(AlturaTituloTextBox.Text, _original.AlturaTitulo),
-                AlinhamentoTitulo = ProjectTableTextAlignment.Esquerda,
+                AlinhamentoTitulo = AlinhamentoTituloComboBox.SelectedItem is ProjectTableTextAlignment alinhamentoTitulo ? alinhamentoTitulo : _original.AlinhamentoTitulo,
                 ExibirCabecalho = ExibirCabecalhoCheckBox.IsChecked == true,
                 FonteCabecalho = NormalizarTexto(FonteCabecalhoComboBox.Text, ProjectTableDisplaySettings.DefaultFontFamily),
                 TamanhoFonteCabecalho = LerDouble(TamanhoCabecalhoTextBox.Text, _original.TamanhoFonteCabecalho),
