@@ -412,8 +412,7 @@ namespace Araci.Core.Documents
                 return;
 
             tipo.Nome = nome;
-            ItemProjetoRenomeado?.Invoke();
-            PropriedadesTipoPranchaAlteradas?.Invoke(tipo);
+            NotificarTipoPranchaAlterado(tipo, notificarItemProjeto: true);
         }
 
         public void AtualizarPropriedadesTipoPrancha(ProjectSheetType tipo)
@@ -421,8 +420,7 @@ namespace Araci.Core.Documents
             if (tipo == null || !TiposPrancha.Contains(tipo))
                 return;
 
-            PropriedadesTipoPranchaAlteradas?.Invoke(tipo);
-            ItemProjetoRenomeado?.Invoke();
+            NotificarTipoPranchaAlterado(tipo, notificarItemProjeto: true);
         }
 
         public bool TipoPranchaEstaEmUso(Guid tipoId)
@@ -554,12 +552,51 @@ namespace Araci.Core.Documents
         {
             Guid tipoId = ObterTipoPranchaIdValidoOuPadrao(prancha);
             ProjectSheetType tipo = TiposPrancha.FirstOrDefault(t => t.Id == tipoId) ?? GarantirTipoPranchaPadrao();
+            SincronizarPranchaComTipo(prancha, tipo);
+        }
+
+        private void NotificarTipoPranchaAlterado(ProjectSheetType tipo, bool notificarItemProjeto)
+        {
+            List<ProjectSheet> pranchasAfetadas = SincronizarPranchasAssociadasAoTipo(tipo);
+            PropriedadesTipoPranchaAlteradas?.Invoke(tipo);
+
+            foreach (ProjectSheet prancha in pranchasAfetadas)
+                PropriedadesPranchaAlteradas?.Invoke(prancha);
+
+            if (notificarItemProjeto)
+                ItemProjetoRenomeado?.Invoke();
+        }
+
+        private List<ProjectSheet> SincronizarPranchasAssociadasAoTipo(ProjectSheetType tipo)
+        {
+            var pranchasAfetadas = new List<ProjectSheet>();
+
+            foreach (ProjectSheet prancha in Pranchas.Where(p => p != null && p.SheetTypeId == tipo.Id))
+            {
+                if (SincronizarPranchaComTipo(prancha, tipo))
+                    pranchasAfetadas.Add(prancha);
+            }
+
+            return pranchasAfetadas;
+        }
+
+        private static bool SincronizarPranchaComTipo(ProjectSheet prancha, ProjectSheetType tipo)
+        {
+            bool alterou = prancha.SheetTypeId != tipo.Id ||
+                prancha.FormatoFolha != tipo.FormatoFolha ||
+                prancha.OrientacaoFolha != tipo.OrientacaoFolha ||
+                !ProjectSheet.DimensoesEquivalentes(
+                    prancha.LarguraFolha,
+                    prancha.AlturaFolha,
+                    tipo.LarguraFolha,
+                    tipo.AlturaFolha);
 
             prancha.SheetTypeId = tipo.Id;
             prancha.FormatoFolha = tipo.FormatoFolha;
             prancha.OrientacaoFolha = tipo.OrientacaoFolha;
             prancha.LarguraFolha = tipo.LarguraFolha;
             prancha.AlturaFolha = tipo.AlturaFolha;
+            return alterou;
         }
 
         private Guid ObterTipoPranchaIdValidoOuPadrao(ProjectSheet prancha)

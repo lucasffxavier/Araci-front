@@ -157,6 +157,7 @@ namespace Araci.ViewModels
                 return;
 
             OnTipoPranchaChanged();
+            OnCompatibilidadeFolhaChanged();
         }
 
         private void OnTipoPranchaChanged()
