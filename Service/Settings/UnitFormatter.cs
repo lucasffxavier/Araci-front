@@ -136,6 +136,79 @@ namespace Araci.Services.Settings
             return si / GetFactorToSi(to);
         }
 
+
+        public static string FormatSheetMillimeters(double value)
+        {
+            double normalized = double.IsNaN(value) || double.IsInfinity(value) ? 0.0 : value;
+            return $"{normalized.ToString("N2", CultureInfo.CurrentCulture)} mm";
+        }
+
+        public static bool TryParseSheetMillimeters(string? value, out double result)
+        {
+            result = 0.0;
+
+            if (string.IsNullOrWhiteSpace(value))
+                return false;
+
+            string text = value.Trim();
+            double multiplier = 1.0;
+
+            if (text.EndsWith("mm", StringComparison.OrdinalIgnoreCase))
+            {
+                text = text[..^2].Trim();
+            }
+            else if (text.EndsWith("milímetros", StringComparison.OrdinalIgnoreCase))
+            {
+                text = text[..^10].Trim();
+            }
+            else if (text.EndsWith("milimetros", StringComparison.OrdinalIgnoreCase))
+            {
+                text = text[..^10].Trim();
+            }
+            else if (text.EndsWith("m", StringComparison.OrdinalIgnoreCase))
+            {
+                text = text[..^1].Trim();
+                multiplier = 1000.0;
+            }
+
+            return TryParseDouble(text, out double parsed)
+                ? SetResult(parsed * multiplier, out result)
+                : false;
+        }
+
+        public static string StripSheetMillimeters(string? value)
+        {
+            if (string.IsNullOrWhiteSpace(value))
+                return string.Empty;
+
+            string text = value.Trim();
+
+            if (text.EndsWith("mm", StringComparison.OrdinalIgnoreCase))
+                return text[..^2].Trim();
+
+            if (text.EndsWith("milímetros", StringComparison.OrdinalIgnoreCase))
+                return text[..^10].Trim();
+
+            if (text.EndsWith("milimetros", StringComparison.OrdinalIgnoreCase))
+                return text[..^10].Trim();
+
+            return text;
+        }
+
+        private static bool TryParseDouble(string value, out double result)
+        {
+            if (double.TryParse(value, NumberStyles.Float | NumberStyles.AllowThousands, CultureInfo.CurrentCulture, out result))
+                return true;
+
+            return double.TryParse(value, NumberStyles.Float | NumberStyles.AllowThousands, CultureInfo.InvariantCulture, out result);
+        }
+
+        private static bool SetResult(double value, out double result)
+        {
+            result = value;
+            return !double.IsNaN(value) && !double.IsInfinity(value);
+        }
+
         private static double GetFactorToSi(UnitKind unit)
         {
             return unit switch
@@ -160,4 +233,3 @@ namespace Araci.Services.Settings
         }
     }
 }
-

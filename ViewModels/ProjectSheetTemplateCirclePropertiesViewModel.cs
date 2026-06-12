@@ -11,6 +11,7 @@ using Araci.Core.Documents;
 using Araci.Models.Tipos;
 using Araci.Properties;
 using Araci.Services.Catalog;
+using Araci.Services.Settings;
 using Araci.Services.UI;
 
 namespace Araci.ViewModels
@@ -79,6 +80,24 @@ namespace Araci.ViewModels
             set
             {
                 if (_editarCirculo.AlterarRaio(_tipo.Id, _circulo.Id, value))
+                    OnGeometryPropertiesChanged();
+            }
+        }
+
+        public string RaioTexto
+        {
+            get => UnitFormatter.FormatSheetMillimeters(_circulo.Raio);
+            set
+            {
+                if (!UnitFormatter.TryParseSheetMillimeters(value, out double raio))
+                {
+                    OnPropertyChanged();
+                    return;
+                }
+
+                if (_editarCirculo.AlterarRaio(_tipo.Id, _circulo.Id, raio))
+                    OnGeometryPropertiesChanged();
+                else
                     OnPropertyChanged();
             }
         }
@@ -114,7 +133,7 @@ namespace Araci.ViewModels
             OnPropertyChanged(nameof(TipoLinha));
             OnPropertyChanged(nameof(PodeAbrirPropriedadesTipo));
             OnPropertyChanged(nameof(Nome));
-            OnPropertyChanged(nameof(Raio));
+            OnGeometryPropertiesChanged();
             OnStylePropertiesChanged();
             OnPropertyChanged(nameof(AindaExiste));
             _abrirPropriedadesTipoCommand?.RaiseCanExecuteChanged();
@@ -184,6 +203,12 @@ namespace Araci.ViewModels
             {
                 Refresh();
             }
+        }
+
+        private void OnGeometryPropertiesChanged()
+        {
+            OnPropertyChanged(nameof(Raio));
+            OnPropertyChanged(nameof(RaioTexto));
         }
 
         private void OnStylePropertiesChanged()

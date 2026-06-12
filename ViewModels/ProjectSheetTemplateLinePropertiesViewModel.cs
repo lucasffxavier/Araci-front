@@ -84,7 +84,7 @@ namespace Araci.ViewModels
             }
         }
 
-        public string ComprimentoTexto => UnitFormatter.Format(Comprimento, UnitKind.LengthMeter, UnitKind.LengthMeter);
+        public string ComprimentoTexto => UnitFormatter.FormatSheetMillimeters(Comprimento);
 
         public string CorLinha
         {

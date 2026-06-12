@@ -4,6 +4,7 @@ using System.ComponentModel;
 using System.Runtime.CompilerServices;
 using Araci.Applications.UseCases.Projeto;
 using Araci.Core.Documents;
+using Araci.Services.Settings;
 
 namespace Araci.ViewModels
 {
@@ -102,6 +103,42 @@ namespace Araci.ViewModels
             }
         }
 
+        public string LarguraFolhaTexto
+        {
+            get => UnitFormatter.FormatSheetMillimeters(_tipo.LarguraFolha);
+            set
+            {
+                if (!UnitFormatter.TryParseSheetMillimeters(value, out double largura))
+                {
+                    OnPropertyChanged();
+                    return;
+                }
+
+                if (_editarPropriedadesTipoPrancha.AlterarLargura(_tipo.Id, largura))
+                    OnPagePropertiesChanged();
+                else
+                    OnPropertyChanged();
+            }
+        }
+
+        public string AlturaFolhaTexto
+        {
+            get => UnitFormatter.FormatSheetMillimeters(_tipo.AlturaFolha);
+            set
+            {
+                if (!UnitFormatter.TryParseSheetMillimeters(value, out double altura))
+                {
+                    OnPropertyChanged();
+                    return;
+                }
+
+                if (_editarPropriedadesTipoPrancha.AlterarAltura(_tipo.Id, altura))
+                    OnPagePropertiesChanged();
+                else
+                    OnPropertyChanged();
+            }
+        }
+
         public event PropertyChangedEventHandler? PropertyChanged;
 
         private void OnItemProjetoRenomeado()
@@ -123,6 +160,8 @@ namespace Araci.ViewModels
             OnPropertyChanged(nameof(OrientacaoFolha));
             OnPropertyChanged(nameof(LarguraFolha));
             OnPropertyChanged(nameof(AlturaFolha));
+            OnPropertyChanged(nameof(LarguraFolhaTexto));
+            OnPropertyChanged(nameof(AlturaFolhaTexto));
         }
 
         private void OnPropertyChanged([CallerMemberName] string? propertyName = null)

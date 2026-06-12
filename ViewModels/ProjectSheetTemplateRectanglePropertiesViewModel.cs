@@ -11,6 +11,7 @@ using Araci.Core.Documents;
 using Araci.Models.Tipos;
 using Araci.Properties;
 using Araci.Services.Catalog;
+using Araci.Services.Settings;
 using Araci.Services.UI;
 
 namespace Araci.ViewModels
@@ -79,7 +80,7 @@ namespace Araci.ViewModels
             set
             {
                 if (_editarRetangulo.AlterarLargura(_tipo.Id, _retangulo.Id, value))
-                    OnPropertyChanged();
+                    OnGeometryPropertiesChanged();
             }
         }
 
@@ -89,6 +90,42 @@ namespace Araci.ViewModels
             set
             {
                 if (_editarRetangulo.AlterarAltura(_tipo.Id, _retangulo.Id, value))
+                    OnGeometryPropertiesChanged();
+            }
+        }
+
+        public string LarguraTexto
+        {
+            get => UnitFormatter.FormatSheetMillimeters(_retangulo.Largura);
+            set
+            {
+                if (!UnitFormatter.TryParseSheetMillimeters(value, out double largura))
+                {
+                    OnPropertyChanged();
+                    return;
+                }
+
+                if (_editarRetangulo.AlterarLargura(_tipo.Id, _retangulo.Id, largura))
+                    OnGeometryPropertiesChanged();
+                else
+                    OnPropertyChanged();
+            }
+        }
+
+        public string AlturaTexto
+        {
+            get => UnitFormatter.FormatSheetMillimeters(_retangulo.Altura);
+            set
+            {
+                if (!UnitFormatter.TryParseSheetMillimeters(value, out double altura))
+                {
+                    OnPropertyChanged();
+                    return;
+                }
+
+                if (_editarRetangulo.AlterarAltura(_tipo.Id, _retangulo.Id, altura))
+                    OnGeometryPropertiesChanged();
+                else
                     OnPropertyChanged();
             }
         }
@@ -124,8 +161,7 @@ namespace Araci.ViewModels
             OnPropertyChanged(nameof(TipoLinha));
             OnPropertyChanged(nameof(PodeAbrirPropriedadesTipo));
             OnPropertyChanged(nameof(Nome));
-            OnPropertyChanged(nameof(Largura));
-            OnPropertyChanged(nameof(Altura));
+            OnGeometryPropertiesChanged();
             OnStylePropertiesChanged();
             OnPropertyChanged(nameof(AindaExiste));
             _abrirPropriedadesTipoCommand?.RaiseCanExecuteChanged();
@@ -195,6 +231,14 @@ namespace Araci.ViewModels
             {
                 Refresh();
             }
+        }
+
+        private void OnGeometryPropertiesChanged()
+        {
+            OnPropertyChanged(nameof(Largura));
+            OnPropertyChanged(nameof(Altura));
+            OnPropertyChanged(nameof(LarguraTexto));
+            OnPropertyChanged(nameof(AlturaTexto));
         }
 
         private void OnStylePropertiesChanged()
