@@ -49,6 +49,9 @@ namespace Araci.ViewModels
         public Brush HeaderBackgroundBrush => CriarBrush(Exibicao.CorFundoCabecalho, ProjectTableDisplaySettings.DefaultHeaderBackgroundColor);
         public Brush BodyForegroundBrush => CriarBrush(Exibicao.CorTextoCorpo, ProjectTableDisplaySettings.DefaultBodyTextColor);
         public Brush BodyBackgroundBrush => CriarBrush(Exibicao.CorFundoCorpo, ProjectTableDisplaySettings.DefaultBodyBackgroundColor);
+        public Brush AlternateRowBackgroundBrush => Exibicao.UsarLinhasAlternadas
+            ? CriarBrush(Exibicao.CorLinhaAlternada, ProjectTableDisplaySettings.DefaultAlternateRowBackgroundColor)
+            : BodyBackgroundBrush;
         public Brush GridBrush => CriarBrush(Exibicao.CorGrade, ProjectTableDisplaySettings.DefaultGridColor);
         public Brush OutlineBrush => CriarBrush(Exibicao.CorContorno, ProjectTableDisplaySettings.DefaultOutlineColor);
         public Thickness GridBorderThickness => Exibicao.ExibirLinhasGrade ? new Thickness(0, 0, Exibicao.EspessuraGrade, Exibicao.EspessuraGrade) : new Thickness(0);
@@ -133,6 +136,7 @@ namespace Araci.ViewModels
             OnPropertyChanged(nameof(HeaderBackgroundBrush));
             OnPropertyChanged(nameof(BodyForegroundBrush));
             OnPropertyChanged(nameof(BodyBackgroundBrush));
+            OnPropertyChanged(nameof(AlternateRowBackgroundBrush));
             OnPropertyChanged(nameof(GridBrush));
             OnPropertyChanged(nameof(OutlineBrush));
             OnPropertyChanged(nameof(GridBorderThickness));
