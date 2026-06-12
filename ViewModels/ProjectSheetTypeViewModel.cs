@@ -82,7 +82,7 @@ namespace Araci.ViewModels
         public double SheetOriginOffsetY => WorkspaceMargin;
         public double WorkspaceWidth => SheetWidth + WorkspaceMargin * 2;
         public double WorkspaceHeight => SheetHeight + WorkspaceMargin * 2;
-        public string Titulo => $"Tipo de Prancha - {Nome}";
+        public string Titulo => Nome;
         public string Descricao => $"{FormatoFolha} {OrientacaoFolha} - {LarguraFolha:0.#} x {AlturaFolha:0.#} {ProjectSheet.UnitLabel}";
         public ObservableCollection<ProjectSheetTemplateLineViewModel> Lines { get; }
         public ObservableCollection<ProjectSheetTemplateRectangleViewModel> Rectangles { get; }

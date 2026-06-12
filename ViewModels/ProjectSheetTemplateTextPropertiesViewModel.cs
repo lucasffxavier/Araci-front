@@ -95,10 +95,10 @@ namespace Araci.ViewModels
 
         public string LarguraCaixaTexto
         {
-            get => FormatarComprimento(LarguraCaixa);
+            get => FormatarComprimentoFolha(LarguraCaixa);
             set
             {
-                if (TentarConverterComprimento(value, out double largura))
+                if (TentarConverterComprimentoFolha(value, out double largura))
                     LarguraCaixa = largura;
             }
         }
@@ -227,20 +227,21 @@ namespace Araci.ViewModels
             OnPropertyChanged(nameof(RotacaoTexto));
         }
 
-        private static string FormatarComprimento(double valor)
+        private static string FormatarComprimentoFolha(double valor)
         {
-            return PropertiesViewModel.FormatarValor(valor, UnitKind.LengthMeter, UnitKind.LengthMeter);
+            return UnitFormatter.FormatSheetMillimeters(valor);
         }
 
-        private static bool TentarConverterComprimento(string valor, out double convertido)
+        private static bool TentarConverterComprimentoFolha(string valor, out double convertido)
         {
+            if (UnitFormatter.TryParseSheetMillimeters(valor, out double valorConvertido))
+            {
+                convertido = valorConvertido;
+                return true;
+            }
+
             convertido = 0.0;
-
-            if (!PropertiesViewModel.TentarConverterValor(valor, typeof(double), UnitKind.LengthMeter, UnitKind.LengthMeter, out object? resultado) || resultado is not double valorConvertido)
-                return false;
-
-            convertido = valorConvertido;
-            return true;
+            return false;
         }
 
         private static double NormalizarRotacao(double valor)
