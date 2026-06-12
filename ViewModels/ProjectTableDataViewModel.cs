@@ -41,6 +41,9 @@ namespace Araci.ViewModels
         public double TitleFontSize => Exibicao.TamanhoFonteTitulo;
         public double HeaderFontSize => Exibicao.TamanhoFonteCabecalho;
         public double BodyFontSize => Exibicao.TamanhoFonteCorpo;
+        public double TitleHeight => NormalizarAltura(Exibicao.AlturaTitulo, 32.0);
+        public double HeaderRowHeight => NormalizarAltura(Exibicao.AlturaCabecalho, 26.0);
+        public double BodyRowHeight => NormalizarAltura(Exibicao.AlturaLinhaCorpo, 24.0);
         public FontWeight TitleFontWeight => Exibicao.TituloNegrito ? FontWeights.SemiBold : FontWeights.Normal;
         public FontWeight HeaderFontWeight => Exibicao.CabecalhoNegrito ? FontWeights.SemiBold : FontWeights.Normal;
         public Brush TitleForegroundBrush => CriarBrush(Exibicao.CorTextoTitulo, ProjectTableDisplaySettings.DefaultTitleTextColor);
@@ -128,6 +131,9 @@ namespace Araci.ViewModels
             OnPropertyChanged(nameof(TitleFontSize));
             OnPropertyChanged(nameof(HeaderFontSize));
             OnPropertyChanged(nameof(BodyFontSize));
+            OnPropertyChanged(nameof(TitleHeight));
+            OnPropertyChanged(nameof(HeaderRowHeight));
+            OnPropertyChanged(nameof(BodyRowHeight));
             OnPropertyChanged(nameof(TitleFontWeight));
             OnPropertyChanged(nameof(HeaderFontWeight));
             OnPropertyChanged(nameof(TitleForegroundBrush));
@@ -169,6 +175,19 @@ namespace Araci.ViewModels
                 ProjectTableTextAlignment.Direita => TextAlignment.Right,
                 _ => TextAlignment.Left
             };
+        }
+
+        private static double NormalizarAltura(double valor, double fallback)
+        {
+            double altura = double.IsNaN(valor) || double.IsInfinity(valor) ? fallback : valor;
+
+            if (altura < ProjectTableDisplaySettings.MinRowHeight)
+                return ProjectTableDisplaySettings.MinRowHeight;
+
+            if (altura > ProjectTableDisplaySettings.MaxRowHeight)
+                return ProjectTableDisplaySettings.MaxRowHeight;
+
+            return altura;
         }
 
         public event PropertyChangedEventHandler? PropertyChanged;
