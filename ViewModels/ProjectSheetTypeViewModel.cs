@@ -1162,6 +1162,7 @@ namespace Araci.ViewModels
                 return false;
 
             rectangle.SetPreviewOffset(deltaX, deltaY);
+            RefreshRectangleResizeHandles();
             return true;
         }
 

@@ -10,7 +10,7 @@ namespace Araci.ViewModels
 {
     public sealed class ProjectSheetTableInstanceViewModel : INotifyPropertyChanged
     {
-        private const double DefaultColumnWidth = 112.0;
+        private const double MinimumColumnWidth = 44.0;
         private const double DefaultTitleHeight = 32.0;
         private const double DefaultHeaderRowHeight = 26.0;
         private const double DefaultBodyRowHeight = 24.0;
@@ -63,10 +63,14 @@ namespace Araci.ViewModels
         public bool CanSplit => HasRenderableTable && Rows.Count > 1 && RowStartIndex == 0 && !RowCount.HasValue;
         public bool HasEmptyDataMessage => !string.IsNullOrWhiteSpace(EmptyDataMessage);
         public string EmptyDataMessage { get; }
-        public double ColumnWidth => DefaultColumnWidth;
+        public int ColumnCount => Columns.Count;
+        public double ColumnWidth => CalcularLarguraColuna(Width, Columns.Count);
+        public double TableGridWidth => HasColumns ? ColumnWidth * Columns.Count : Math.Max(0.0, Width);
         public double TitleHeight => DefaultTitleHeight;
         public double HeaderRowHeight => DefaultHeaderRowHeight;
         public double BodyRowHeight => DefaultBodyRowHeight;
+        public double BodyViewportHeight => Math.Max(0.0, Height - TitleHeight);
+        public double RowsViewportHeight => Math.Max(0.0, Height - TitleHeight - HeaderRowHeight);
         public double ViewX => X + SheetOriginOffsetX;
         public double ViewY => Y + SheetOriginOffsetY;
 
@@ -136,6 +140,8 @@ namespace Araci.ViewModels
 
                 _width = value;
                 OnPropertyChanged();
+                OnPropertyChanged(nameof(ColumnWidth));
+                OnPropertyChanged(nameof(TableGridWidth));
             }
         }
 
@@ -149,6 +155,8 @@ namespace Araci.ViewModels
 
                 _height = value;
                 OnPropertyChanged();
+                OnPropertyChanged(nameof(BodyViewportHeight));
+                OnPropertyChanged(nameof(RowsViewportHeight));
             }
         }
 
@@ -200,6 +208,19 @@ namespace Araci.ViewModels
             return rows
                 .Select(row => new ProjectSheetTableRowViewModel(row))
                 .ToList();
+        }
+
+        private static double CalcularLarguraColuna(double width, int columnCount)
+        {
+            if (columnCount <= 0)
+                return NormalizeDimension(width, ProjectSheetTableInstance.MinWidth);
+
+            double safeWidth = NormalizeDimension(width, ProjectSheetTableInstance.MinWidth);
+            double widthPerColumn = safeWidth / columnCount;
+
+            return widthPerColumn < MinimumColumnWidth
+                ? MinimumColumnWidth
+                : widthPerColumn;
         }
 
         private static double NormalizePosition(double value)
