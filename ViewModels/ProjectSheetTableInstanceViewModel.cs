@@ -94,10 +94,13 @@ namespace Araci.ViewModels
         public Brush HeaderBackgroundBrush => CriarBrush(_exibicao.CorFundoCabecalho, ProjectTableDisplaySettings.DefaultHeaderBackgroundColor);
         public Brush BodyForegroundBrush => CriarBrush(_exibicao.CorTextoCorpo, ProjectTableDisplaySettings.DefaultBodyTextColor);
         public Brush BodyBackgroundBrush => CriarBrush(_exibicao.CorFundoCorpo, ProjectTableDisplaySettings.DefaultBodyBackgroundColor);
-        public Brush AlternateRowBackgroundBrush => CriarBrush(_exibicao.CorLinhaAlternada, ProjectTableDisplaySettings.DefaultAlternateRowBackgroundColor);
+        public Brush AlternateRowBackgroundBrush => _exibicao.UsarLinhasAlternadas
+            ? CriarBrush(_exibicao.CorLinhaAlternada, ProjectTableDisplaySettings.DefaultAlternateRowBackgroundColor)
+            : BodyBackgroundBrush;
         public Brush GridBrush => CriarBrush(_exibicao.CorGrade, ProjectTableDisplaySettings.DefaultGridColor);
         public Brush OutlineBrush => CriarBrush(_exibicao.CorContorno, ProjectTableDisplaySettings.DefaultOutlineColor);
         public Thickness GridBorderThickness => _exibicao.ExibirLinhasGrade ? new Thickness(0, 0, _exibicao.EspessuraGrade, _exibicao.EspessuraGrade) : new Thickness(0);
+        public Thickness GridSeparatorBorderThickness => _exibicao.ExibirLinhasGrade ? new Thickness(0, 0, 0, _exibicao.EspessuraGrade) : new Thickness(0);
         public Thickness OutlineBorderThickness => _exibicao.ExibirContornoExterno ? new Thickness(_exibicao.EspessuraContorno) : new Thickness(0);
         public TextAlignment TitleTextAlignment => ConverterAlinhamento(_exibicao.AlinhamentoTitulo);
         public TextAlignment HeaderTextAlignment => ConverterAlinhamento(_exibicao.AlinhamentoCabecalho);
