@@ -72,8 +72,8 @@ namespace Araci.ViewModels
         public bool HasEmptyMessage => !string.IsNullOrWhiteSpace(EmptyMessage);
         public Guid? SelectedInstanceId => _selectedInstanceId;
         public bool HasSelectedInstance => _selectedInstanceId.HasValue;
-        public double SheetWidth => _sheet.LarguraFolha;
-        public double SheetHeight => _sheet.AlturaFolha;
+        public double SheetWidth => ResolverTipoPrancha()?.LarguraFolha ?? _sheet.LarguraFolha;
+        public double SheetHeight => ResolverTipoPrancha()?.AlturaFolha ?? _sheet.AlturaFolha;
         public double SheetOriginOffsetX => WorkspaceMargin;
         public double SheetOriginOffsetY => WorkspaceMargin;
         public double MinimumWorkspaceWidth => SheetWidth + WorkspaceMargin * 2;
@@ -192,7 +192,6 @@ namespace Araci.ViewModels
             OnPropertyChanged(nameof(HasSheetTypeTemplate));
             OnSelectionChanged();
         }
-
 
         private void RefreshSheetTemplate()
         {
@@ -461,12 +460,12 @@ namespace Araci.ViewModels
             OnPropertyChanged(nameof(HasSelectedInstance));
         }
 
-
         private void OnPropriedadesTipoPranchaAlteradas(ProjectSheetType tipo)
         {
             if (!_sheet.SheetTypeId.HasValue || tipo.Id != _sheet.SheetTypeId.Value)
                 return;
 
+            NotificarGeometriaPrancha();
             Refresh();
         }
 
@@ -475,11 +474,16 @@ namespace Araci.ViewModels
             if (prancha.Id != SheetId)
                 return;
 
+            NotificarGeometriaPrancha();
+            Refresh();
+        }
+
+        private void NotificarGeometriaPrancha()
+        {
             OnPropertyChanged(nameof(SheetWidth));
             OnPropertyChanged(nameof(SheetHeight));
             OnPropertyChanged(nameof(MinimumWorkspaceWidth));
             OnPropertyChanged(nameof(MinimumWorkspaceHeight));
-            Refresh();
         }
 
         private void OnPropertyChanged([CallerMemberName] string? propertyName = null)

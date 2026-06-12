@@ -22,6 +22,23 @@ namespace Araci.Applications.UseCases.Projeto
             return Alterar(id, p => p.Numero, (p, valor) => p.Numero = NormalizarTexto(valor), NormalizarTexto(numero));
         }
 
+        public bool AlterarTipoPrancha(Guid id, Guid tipoPranchaId)
+        {
+            ProjectSheet? prancha = ObterPrancha(id);
+
+            if (prancha == null)
+                return false;
+
+            if (!_document.TiposPrancha.Any(t => t.Id == tipoPranchaId))
+                return false;
+
+            return Alterar(
+                id,
+                p => p.SheetTypeId,
+                (p, valor) => p.SheetTypeId = valor,
+                (Guid?)tipoPranchaId);
+        }
+
         public bool AlterarFormato(Guid id, ProjectSheetFormat formato)
         {
             ProjectSheet? prancha = ObterPrancha(id);

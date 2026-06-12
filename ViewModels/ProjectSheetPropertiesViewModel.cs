@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.ComponentModel;
+using System.Linq;
 using System.Runtime.CompilerServices;
 using Araci.Applications.UseCases.Projeto;
 using Araci.Core.Documents;
@@ -26,9 +27,12 @@ namespace Araci.ViewModels
             _editarPropriedadesPrancha = editarPropriedadesPrancha ?? throw new ArgumentNullException(nameof(editarPropriedadesPrancha));
             _document.ItemProjetoRenomeado += OnItemProjetoRenomeado;
             _document.PropriedadesPranchaAlteradas += OnPropriedadesPranchaAlteradas;
+            _document.PropriedadesTipoPranchaAlteradas += OnPropriedadesTipoPranchaAlteradas;
         }
 
         public string Titulo => "Prancha";
+        public IReadOnlyList<ProjectSheetType> TiposPrancha => _document.TiposPrancha;
+        public bool PossuiTiposPrancha => _document.TiposPrancha.Count > 0;
 
         public IReadOnlyList<ProjectSheetFormat> Formatos { get; } =
             new[]
@@ -71,13 +75,26 @@ namespace Araci.ViewModels
             }
         }
 
+        public ProjectSheetType? TipoPrancha
+        {
+            get => ResolverTipoPrancha();
+            set
+            {
+                if (value == null)
+                    return;
+
+                if (_editarPropriedadesPrancha.AlterarTipoPrancha(_prancha.Id, value.Id))
+                    OnTipoPranchaChanged();
+            }
+        }
+
         public ProjectSheetFormat FormatoFolha
         {
             get => _prancha.FormatoFolha;
             set
             {
                 if (_editarPropriedadesPrancha.AlterarFormato(_prancha.Id, value))
-                    OnPagePropertiesChanged();
+                    OnCompatibilidadeFolhaChanged();
             }
         }
 
@@ -87,7 +104,7 @@ namespace Araci.ViewModels
             set
             {
                 if (_editarPropriedadesPrancha.AlterarOrientacao(_prancha.Id, value))
-                    OnPagePropertiesChanged();
+                    OnCompatibilidadeFolhaChanged();
             }
         }
 
@@ -97,7 +114,7 @@ namespace Araci.ViewModels
             set
             {
                 if (_editarPropriedadesPrancha.AlterarLargura(_prancha.Id, value))
-                    OnPagePropertiesChanged();
+                    OnCompatibilidadeFolhaChanged();
             }
         }
 
@@ -107,15 +124,24 @@ namespace Araci.ViewModels
             set
             {
                 if (_editarPropriedadesPrancha.AlterarAltura(_prancha.Id, value))
-                    OnPagePropertiesChanged();
+                    OnCompatibilidadeFolhaChanged();
             }
         }
 
         public event PropertyChangedEventHandler? PropertyChanged;
 
+        private ProjectSheetType? ResolverTipoPrancha()
+        {
+            if (!_prancha.SheetTypeId.HasValue)
+                return null;
+
+            return _document.TiposPrancha.FirstOrDefault(t => t.Id == _prancha.SheetTypeId.Value);
+        }
+
         private void OnItemProjetoRenomeado()
         {
             OnPropertyChanged(nameof(Nome));
+            OnTiposPranchaChanged();
         }
 
         private void OnPropriedadesPranchaAlteradas(ProjectSheet prancha)
@@ -124,10 +150,31 @@ namespace Araci.ViewModels
                 return;
 
             OnPropertyChanged(nameof(Numero));
-            OnPagePropertiesChanged();
+            OnTipoPranchaChanged();
+            OnCompatibilidadeFolhaChanged();
         }
 
-        private void OnPagePropertiesChanged()
+        private void OnPropriedadesTipoPranchaAlteradas(ProjectSheetType tipo)
+        {
+            if (!_prancha.SheetTypeId.HasValue || tipo.Id != _prancha.SheetTypeId.Value)
+                return;
+
+            OnTipoPranchaChanged();
+        }
+
+        private void OnTipoPranchaChanged()
+        {
+            OnPropertyChanged(nameof(TipoPrancha));
+            OnTiposPranchaChanged();
+        }
+
+        private void OnTiposPranchaChanged()
+        {
+            OnPropertyChanged(nameof(TiposPrancha));
+            OnPropertyChanged(nameof(PossuiTiposPrancha));
+        }
+
+        private void OnCompatibilidadeFolhaChanged()
         {
             OnPropertyChanged(nameof(FormatoFolha));
             OnPropertyChanged(nameof(OrientacaoFolha));
