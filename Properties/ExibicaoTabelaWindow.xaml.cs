@@ -2,6 +2,7 @@ using System;
 using System.Globalization;
 using System.Linq;
 using System.Windows;
+using System.Windows.Controls;
 using Araci.Core.Documents;
 
 namespace Araci.Properties
@@ -9,6 +10,22 @@ namespace Araci.Properties
     public partial class ExibicaoTabelaWindow : Window
     {
         private readonly ProjectTableDisplaySettings _original;
+
+        private static readonly string[] FontesPrincipais =
+        {
+            "Arial",
+            "Calibri",
+            "Segoe UI",
+            "Times New Roman",
+            "Verdana",
+            "Tahoma",
+            "Consolas",
+            "Courier New",
+            "Georgia",
+            "Cambria",
+            "Trebuchet MS",
+            "Lucida Console"
+        };
 
         public ExibicaoTabelaWindow(ProjectTableDisplaySettings exibicao)
         {
@@ -33,6 +50,10 @@ namespace Araci.Properties
 
         private void ConfigurarCombos()
         {
+            FonteTituloComboBox.ItemsSource = FontesPrincipais;
+            FonteCabecalhoComboBox.ItemsSource = FontesPrincipais;
+            FonteCorpoComboBox.ItemsSource = FontesPrincipais;
+
             var alinhamentos = Enum.GetValues(typeof(ProjectTableTextAlignment))
                 .Cast<ProjectTableTextAlignment>()
                 .ToList();
@@ -44,7 +65,7 @@ namespace Araci.Properties
         private void AplicarValores(ProjectTableDisplaySettings valor)
         {
             ExibirTituloCheckBox.IsChecked = valor.ExibirTitulo;
-            FonteTituloTextBox.Text = valor.FonteTitulo;
+            AplicarFonte(FonteTituloComboBox, valor.FonteTitulo);
             TamanhoTituloTextBox.Text = Format(valor.TamanhoFonteTitulo);
             TituloNegritoCheckBox.IsChecked = valor.TituloNegrito;
             CorTextoTituloTextBox.Text = valor.CorTextoTitulo;
@@ -52,7 +73,7 @@ namespace Araci.Properties
             AlturaTituloTextBox.Text = Format(valor.AlturaTitulo);
 
             ExibirCabecalhoCheckBox.IsChecked = valor.ExibirCabecalho;
-            FonteCabecalhoTextBox.Text = valor.FonteCabecalho;
+            AplicarFonte(FonteCabecalhoComboBox, valor.FonteCabecalho);
             TamanhoCabecalhoTextBox.Text = Format(valor.TamanhoFonteCabecalho);
             CabecalhoNegritoCheckBox.IsChecked = valor.CabecalhoNegrito;
             CorTextoCabecalhoTextBox.Text = valor.CorTextoCabecalho;
@@ -60,7 +81,7 @@ namespace Araci.Properties
             AlturaCabecalhoTextBox.Text = Format(valor.AlturaCabecalho);
             AlinhamentoCabecalhoComboBox.SelectedItem = valor.AlinhamentoCabecalho;
 
-            FonteCorpoTextBox.Text = valor.FonteCorpo;
+            AplicarFonte(FonteCorpoComboBox, valor.FonteCorpo);
             TamanhoCorpoTextBox.Text = Format(valor.TamanhoFonteCorpo);
             CorTextoCorpoTextBox.Text = valor.CorTextoCorpo;
             CorFundoCorpoTextBox.Text = valor.CorFundoCorpo;
@@ -82,7 +103,7 @@ namespace Araci.Properties
             return new ProjectTableDisplaySettings
             {
                 ExibirTitulo = ExibirTituloCheckBox.IsChecked == true,
-                FonteTitulo = NormalizarTexto(FonteTituloTextBox.Text, ProjectTableDisplaySettings.DefaultFontFamily),
+                FonteTitulo = NormalizarTexto(FonteTituloComboBox.Text, ProjectTableDisplaySettings.DefaultFontFamily),
                 TamanhoFonteTitulo = LerDouble(TamanhoTituloTextBox.Text, _original.TamanhoFonteTitulo),
                 TituloNegrito = TituloNegritoCheckBox.IsChecked == true,
                 CorTextoTitulo = NormalizarTexto(CorTextoTituloTextBox.Text, ProjectTableDisplaySettings.DefaultTitleTextColor),
@@ -90,14 +111,14 @@ namespace Araci.Properties
                 AlturaTitulo = LerDouble(AlturaTituloTextBox.Text, _original.AlturaTitulo),
                 AlinhamentoTitulo = ProjectTableTextAlignment.Esquerda,
                 ExibirCabecalho = ExibirCabecalhoCheckBox.IsChecked == true,
-                FonteCabecalho = NormalizarTexto(FonteCabecalhoTextBox.Text, ProjectTableDisplaySettings.DefaultFontFamily),
+                FonteCabecalho = NormalizarTexto(FonteCabecalhoComboBox.Text, ProjectTableDisplaySettings.DefaultFontFamily),
                 TamanhoFonteCabecalho = LerDouble(TamanhoCabecalhoTextBox.Text, _original.TamanhoFonteCabecalho),
                 CabecalhoNegrito = CabecalhoNegritoCheckBox.IsChecked == true,
                 CorTextoCabecalho = NormalizarTexto(CorTextoCabecalhoTextBox.Text, ProjectTableDisplaySettings.DefaultHeaderTextColor),
                 CorFundoCabecalho = NormalizarTexto(CorFundoCabecalhoTextBox.Text, ProjectTableDisplaySettings.DefaultHeaderBackgroundColor),
                 AlturaCabecalho = LerDouble(AlturaCabecalhoTextBox.Text, _original.AlturaCabecalho),
                 AlinhamentoCabecalho = AlinhamentoCabecalhoComboBox.SelectedItem is ProjectTableTextAlignment alinhamentoCabecalho ? alinhamentoCabecalho : ProjectTableTextAlignment.Esquerda,
-                FonteCorpo = NormalizarTexto(FonteCorpoTextBox.Text, ProjectTableDisplaySettings.DefaultFontFamily),
+                FonteCorpo = NormalizarTexto(FonteCorpoComboBox.Text, ProjectTableDisplaySettings.DefaultFontFamily),
                 TamanhoFonteCorpo = LerDouble(TamanhoCorpoTextBox.Text, _original.TamanhoFonteCorpo),
                 CorTextoCorpo = NormalizarTexto(CorTextoCorpoTextBox.Text, ProjectTableDisplaySettings.DefaultBodyTextColor),
                 CorFundoCorpo = NormalizarTexto(CorFundoCorpoTextBox.Text, ProjectTableDisplaySettings.DefaultBodyBackgroundColor),
@@ -112,6 +133,13 @@ namespace Araci.Properties
                 CorContorno = NormalizarTexto(CorContornoTextBox.Text, ProjectTableDisplaySettings.DefaultOutlineColor),
                 EspessuraContorno = LerDouble(EspessuraContornoTextBox.Text, _original.EspessuraContorno)
             };
+        }
+
+        private static void AplicarFonte(ComboBox comboBox, string? valor)
+        {
+            string fonte = NormalizarTexto(valor, ProjectTableDisplaySettings.DefaultFontFamily);
+            comboBox.Text = fonte;
+            comboBox.SelectedItem = FontesPrincipais.Contains(fonte) ? fonte : null;
         }
 
         private static double LerDouble(string? texto, double fallback)
