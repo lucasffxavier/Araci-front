@@ -35,17 +35,23 @@ namespace Araci.ViewModels
         public Guid TableId => _table.Id;
         public ObservableCollection<ProjectTableDataRowViewModel> Rows { get; }
         public ProjectTableDisplaySettings Exibicao => _table.Exibicao ?? new ProjectTableDisplaySettings();
+        public FontFamily TitleFontFamily => new(Exibicao.FonteTitulo);
         public FontFamily HeaderFontFamily => new(Exibicao.FonteCabecalho);
         public FontFamily BodyFontFamily => new(Exibicao.FonteCorpo);
+        public double TitleFontSize => Exibicao.TamanhoFonteTitulo;
         public double HeaderFontSize => Exibicao.TamanhoFonteCabecalho;
         public double BodyFontSize => Exibicao.TamanhoFonteCorpo;
+        public FontWeight TitleFontWeight => Exibicao.TituloNegrito ? FontWeights.SemiBold : FontWeights.Normal;
         public FontWeight HeaderFontWeight => Exibicao.CabecalhoNegrito ? FontWeights.SemiBold : FontWeights.Normal;
+        public Brush TitleForegroundBrush => CriarBrush(Exibicao.CorTextoTitulo, ProjectTableDisplaySettings.DefaultTitleTextColor);
+        public Brush TitleBackgroundBrush => CriarBrush(Exibicao.CorFundoTitulo, ProjectTableDisplaySettings.DefaultTitleBackgroundColor);
         public Brush HeaderForegroundBrush => CriarBrush(Exibicao.CorTextoCabecalho, ProjectTableDisplaySettings.DefaultHeaderTextColor);
         public Brush HeaderBackgroundBrush => CriarBrush(Exibicao.CorFundoCabecalho, ProjectTableDisplaySettings.DefaultHeaderBackgroundColor);
         public Brush BodyForegroundBrush => CriarBrush(Exibicao.CorTextoCorpo, ProjectTableDisplaySettings.DefaultBodyTextColor);
         public Brush BodyBackgroundBrush => CriarBrush(Exibicao.CorFundoCorpo, ProjectTableDisplaySettings.DefaultBodyBackgroundColor);
         public Brush GridBrush => CriarBrush(Exibicao.CorGrade, ProjectTableDisplaySettings.DefaultGridColor);
         public Thickness GridBorderThickness => Exibicao.ExibirLinhasGrade ? new Thickness(0, 0, Exibicao.EspessuraGrade, Exibicao.EspessuraGrade) : new Thickness(0);
+        public TextAlignment TitleTextAlignment => ConverterAlinhamento(Exibicao.AlinhamentoTitulo);
         public TextAlignment HeaderTextAlignment => ConverterAlinhamento(Exibicao.AlinhamentoCabecalho);
         public TextAlignment BodyTextAlignment => ConverterAlinhamento(Exibicao.AlinhamentoCorpo);
 
@@ -110,17 +116,23 @@ namespace Araci.ViewModels
 
             OnPropertyChanged(nameof(HasRows));
             OnPropertyChanged(nameof(Exibicao));
+            OnPropertyChanged(nameof(TitleFontFamily));
             OnPropertyChanged(nameof(HeaderFontFamily));
             OnPropertyChanged(nameof(BodyFontFamily));
+            OnPropertyChanged(nameof(TitleFontSize));
             OnPropertyChanged(nameof(HeaderFontSize));
             OnPropertyChanged(nameof(BodyFontSize));
+            OnPropertyChanged(nameof(TitleFontWeight));
             OnPropertyChanged(nameof(HeaderFontWeight));
+            OnPropertyChanged(nameof(TitleForegroundBrush));
+            OnPropertyChanged(nameof(TitleBackgroundBrush));
             OnPropertyChanged(nameof(HeaderForegroundBrush));
             OnPropertyChanged(nameof(HeaderBackgroundBrush));
             OnPropertyChanged(nameof(BodyForegroundBrush));
             OnPropertyChanged(nameof(BodyBackgroundBrush));
             OnPropertyChanged(nameof(GridBrush));
             OnPropertyChanged(nameof(GridBorderThickness));
+            OnPropertyChanged(nameof(TitleTextAlignment));
             OnPropertyChanged(nameof(HeaderTextAlignment));
             OnPropertyChanged(nameof(BodyTextAlignment));
         }
