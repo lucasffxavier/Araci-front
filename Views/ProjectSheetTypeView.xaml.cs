@@ -42,11 +42,15 @@ namespace Araci.Views
         private Point _textoTemplateDragStart;
         private bool _textoTemplateArrastando;
         private Guid? _textoTemplateResizeEmArrasteId;
+        private ProjectSheetTemplateTextResizeHandleKind? _textoTemplateResizeHandleEmArraste;
         private Point _textoTemplateResizeDragStart;
         private Point _textoTemplateResizeLastPosition;
         private bool _textoTemplateResizeLastPositionValid;
         private bool _textoTemplateResizeArrastando;
         private double _textoTemplateResizeOriginalX;
+        private double _textoTemplateResizeOriginalY;
+        private double _textoTemplateResizeOriginalLargura;
+        private double _textoTemplateResizeOriginalRotacao;
         private Guid? _textoTemplateLeaderEmArrasteId;
         private ProjectSheetTemplateTextLeaderHandleKind? _textoTemplateLeaderHandleEmArraste;
         private Point _textoTemplateLeaderDragStart;
@@ -987,20 +991,24 @@ namespace Araci.Views
             if (!string.Equals(ferramentaAtual.Nome, "Selecionar", StringComparison.OrdinalIgnoreCase) || ferramentaAtual.IsBusy)
                 return false;
 
-            if (!viewModel.TryHitSelectedTextResizeHandle(position, TextResizeHandleHitTolerance, out Guid textId))
+            if (!viewModel.TryHitSelectedTextResizeHandle(position, TextResizeHandleHitTolerance, out Guid textId, out ProjectSheetTemplateTextResizeHandleKind kind))
                 return false;
 
             if (!viewModel.TryGetTextGeometry(
                     textId,
                     out _textoTemplateResizeOriginalX,
-                    out _,
-                    out _,
+                    out _textoTemplateResizeOriginalY,
+                    out _textoTemplateResizeOriginalLargura,
                     out _))
             {
                 return false;
             }
 
+            if (!viewModel.TryGetTextRotationGeometry(textId, out _, out _textoTemplateResizeOriginalRotacao))
+                return false;
+
             _textoTemplateResizeEmArrasteId = textId;
+            _textoTemplateResizeHandleEmArraste = kind;
             _textoTemplateResizeDragStart = position;
             _textoTemplateResizeLastPosition = position;
             _textoTemplateResizeLastPositionValid = PontoValido(position);
@@ -1034,8 +1042,22 @@ namespace Araci.Views
             if (!PontoValido(position))
                 return true;
 
-            double larguraCaixa = CalcularLarguraTextoTemplate(_textoTemplateResizeOriginalX, position);
-            bool previewAplicado = viewModel.SetTextPreviewBoxWidth(_textoTemplateResizeEmArrasteId.Value, larguraCaixa);
+            if (!_textoTemplateResizeHandleEmArraste.HasValue)
+                return true;
+
+            Rect geometry = CalcularGeometriaCaixaTextoTemplate(
+                _textoTemplateResizeOriginalX,
+                _textoTemplateResizeOriginalY,
+                _textoTemplateResizeOriginalLargura,
+                _textoTemplateResizeOriginalRotacao,
+                _textoTemplateResizeHandleEmArraste.Value,
+                _textoTemplateResizeDragStart,
+                position);
+            bool previewAplicado = viewModel.SetTextPreviewBoxGeometry(
+                _textoTemplateResizeEmArrasteId.Value,
+                geometry.X,
+                geometry.Y,
+                geometry.Width);
 
             if (!previewAplicado)
                 return true;
@@ -1059,19 +1081,24 @@ namespace Araci.Views
             Point finalPosition = _textoTemplateResizeLastPosition;
             bool finalPositionValid = _textoTemplateResizeLastPositionValid && PontoValido(finalPosition);
             double originalX = _textoTemplateResizeOriginalX;
+            double originalY = _textoTemplateResizeOriginalY;
+            double originalLargura = _textoTemplateResizeOriginalLargura;
+            double originalRotacao = _textoTemplateResizeOriginalRotacao;
+            ProjectSheetTemplateTextResizeHandleKind? kind = _textoTemplateResizeHandleEmArraste;
+            Point dragStart = _textoTemplateResizeDragStart;
 
-            viewModel.ClearTextPreviewBoxWidth(textId);
+            viewModel.ClearTextPreviewBoxGeometry(textId);
             LimparEstadoResizeTextoTemplate();
             LimparEstadoEdicaoLeaderTextoTemplate();
 
-            if (!arrastou || !finalPositionValid)
+            if (!arrastou || !finalPositionValid || !kind.HasValue)
             {
                 AtualizarHandlesOverlay();
                 return true;
             }
 
-            double larguraCaixa = CalcularLarguraTextoTemplate(originalX, finalPosition);
-            bool alterou = _context.MoverTextoDoTipoPrancha.AlterarLarguraCaixa(viewModel.Id, textId, larguraCaixa);
+            Rect geometry = CalcularGeometriaCaixaTextoTemplate(originalX, originalY, originalLargura, originalRotacao, kind.Value, dragStart, finalPosition);
+            bool alterou = _context.MoverTextoDoTipoPrancha.AlterarCaixa(viewModel.Id, textId, geometry.X, geometry.Y, geometry.Width);
 
             if (alterou)
                 viewModel.SelectText(textId);
@@ -1086,7 +1113,7 @@ namespace Araci.Views
             ProjectSheetTypeViewModel? viewModel = ObterViewModelAtivo();
 
             if (viewModel != null && _textoTemplateResizeEmArrasteId.HasValue)
-                viewModel.ClearTextPreviewBoxWidth(_textoTemplateResizeEmArrasteId.Value);
+                viewModel.ClearTextPreviewBoxGeometry(_textoTemplateResizeEmArrasteId.Value);
 
             LimparEstadoResizeTextoTemplate();
             LimparEstadoEdicaoLeaderTextoTemplate();
@@ -1096,11 +1123,15 @@ namespace Araci.Views
         private void LimparEstadoResizeTextoTemplate()
         {
             _textoTemplateResizeEmArrasteId = null;
+            _textoTemplateResizeHandleEmArraste = null;
             _textoTemplateResizeDragStart = default;
             _textoTemplateResizeLastPosition = default;
             _textoTemplateResizeLastPositionValid = false;
             _textoTemplateResizeArrastando = false;
             _textoTemplateResizeOriginalX = 0.0;
+            _textoTemplateResizeOriginalY = 0.0;
+            _textoTemplateResizeOriginalLargura = 0.0;
+            _textoTemplateResizeOriginalRotacao = 0.0;
         }
 
         private bool TentarIniciarResizeRetanguloTemplate(Point position)
@@ -2448,9 +2479,47 @@ namespace Araci.Views
             return normalizada >= 360.0 ? 0.0 : normalizada;
         }
 
-        private static double CalcularLarguraTextoTemplate(double originalX, Point position)
+        private static Rect CalcularGeometriaCaixaTextoTemplate(
+            double originalX,
+            double originalY,
+            double larguraOriginal,
+            double rotacao,
+            ProjectSheetTemplateTextResizeHandleKind kind,
+            Point dragStart,
+            Point position)
         {
-            return Math.Max(ProjectSheetTemplateText.MinBoxWidth, position.X - originalX);
+            if (!ValorFinito(originalX) || !ValorFinito(originalY) || !ValorPositivo(larguraOriginal) || !PontoValido(dragStart) || !PontoValido(position))
+                return new Rect(originalX, originalY, ProjectSheetTemplateText.MinBoxWidth, 0.0);
+
+            double radians = NormalizarRotacaoTextoTemplate(rotacao) * Math.PI / 180.0;
+            Vector eixoLocalX = new(Math.Cos(radians), Math.Sin(radians));
+            Vector delta = position - dragStart;
+            double deltaLocalX = delta.X * eixoLocalX.X + delta.Y * eixoLocalX.Y;
+
+            if (kind == ProjectSheetTemplateTextResizeHandleKind.Right)
+            {
+                double larguraDireita = Math.Max(ProjectSheetTemplateText.MinBoxWidth, larguraOriginal + deltaLocalX);
+                return new Rect(originalX, originalY, larguraDireita, 0.0);
+            }
+
+            double larguraEsquerda = Math.Max(ProjectSheetTemplateText.MinBoxWidth, larguraOriginal - deltaLocalX);
+            double deslocamentoLocal = larguraOriginal - larguraEsquerda;
+            double novoX = originalX + eixoLocalX.X * deslocamentoLocal;
+            double novoY = originalY + eixoLocalX.Y * deslocamentoLocal;
+            return new Rect(novoX, novoY, larguraEsquerda, 0.0);
+        }
+
+        private static double CalcularLarguraTextoTemplate(double larguraOriginal, double rotacao, Point dragStart, Point position)
+        {
+            if (!ValorPositivo(larguraOriginal) || !PontoValido(dragStart) || !PontoValido(position))
+                return ProjectSheetTemplateText.MinBoxWidth;
+
+            double radians = NormalizarRotacaoTextoTemplate(rotacao) * Math.PI / 180.0;
+            double eixoX = Math.Cos(radians);
+            double eixoY = Math.Sin(radians);
+            Vector delta = position - dragStart;
+            double deltaLocalX = delta.X * eixoX + delta.Y * eixoY;
+            return Math.Max(ProjectSheetTemplateText.MinBoxWidth, larguraOriginal + deltaLocalX);
         }
 
         private static double CalcularRaioCirculoTemplate(double centerX, double centerY, Point position)

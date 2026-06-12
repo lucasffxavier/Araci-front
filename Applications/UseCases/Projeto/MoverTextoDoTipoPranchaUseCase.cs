@@ -103,6 +103,37 @@ namespace Araci.Applications.UseCases.Projeto
             return true;
         }
 
+
+
+        public bool AlterarCaixa(Guid tipoId, Guid textoId, double x, double y, double larguraCaixa)
+        {
+            if (!ValorFinito(x) || !ValorFinito(y) || !LarguraValida(larguraCaixa))
+                return false;
+
+            if (!TryGetTexto(tipoId, textoId, out ProjectSheetType tipo, out ProjectSheetTemplateText texto))
+                return false;
+
+            if (Math.Abs(texto.X - x) < 0.000001 &&
+                Math.Abs(texto.Y - y) < 0.000001 &&
+                Math.Abs(texto.LarguraCaixa - larguraCaixa) < 0.000001)
+            {
+                return false;
+            }
+
+            ProjectSheetTemplateTextBoxState estadoAnterior = ProjectSheetTemplateTextBoxState.FromText(texto);
+            ProjectSheetTemplateTextBoxState estadoNovo = new(x, y, larguraCaixa);
+
+            _commands.Execute(new UpdateProjectSheetTypeTextPropertyCommand<ProjectSheetTemplateTextBoxState>(
+                _document,
+                tipo,
+                texto.Id,
+                (t, value) => value.Aplicar(t),
+                estadoAnterior,
+                estadoNovo));
+
+            return true;
+        }
+
         public bool AlterarRotacao(Guid tipoId, Guid textoId, double rotacao)
         {
             double rotacaoNormalizada = NormalizarRotacao(rotacao);
@@ -413,6 +444,34 @@ namespace Araci.Applications.UseCases.Projeto
                 leaderCotoveloY,
                 texto.LeaderCotoveloManual,
                 true);
+        }
+
+
+
+        private readonly struct ProjectSheetTemplateTextBoxState
+        {
+            public ProjectSheetTemplateTextBoxState(double x, double y, double larguraCaixa)
+            {
+                X = x;
+                Y = y;
+                LarguraCaixa = larguraCaixa;
+            }
+
+            public double X { get; }
+            public double Y { get; }
+            public double LarguraCaixa { get; }
+
+            public static ProjectSheetTemplateTextBoxState FromText(ProjectSheetTemplateText texto)
+            {
+                return new ProjectSheetTemplateTextBoxState(texto.X, texto.Y, texto.LarguraCaixa);
+            }
+
+            public void Aplicar(ProjectSheetTemplateText texto)
+            {
+                texto.X = X;
+                texto.Y = Y;
+                texto.LarguraCaixa = LarguraCaixa;
+            }
         }
 
         private static ProjectSheetTemplateTextLeaderState CriarEstadoLeader(

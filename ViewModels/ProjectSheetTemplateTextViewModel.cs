@@ -20,6 +20,9 @@ namespace Araci.ViewModels
         private TipoTextoAnotativo? _tipoTexto;
         private double _previewOffsetX;
         private double _previewOffsetY;
+        private bool _hasPreviewBoxPosition;
+        private double _previewBoxX;
+        private double _previewBoxY;
         private bool _hasPreviewBoxWidth;
         private double _previewBoxWidth;
         private bool _hasPreviewRotation;
@@ -46,8 +49,8 @@ namespace Araci.ViewModels
         }
 
         public Guid Id => _texto.Id;
-        public double X => _texto.X + _previewOffsetX;
-        public double Y => _texto.Y + _previewOffsetY;
+        public double X => _hasPreviewBoxPosition ? _previewBoxX : _texto.X + _previewOffsetX;
+        public double Y => _hasPreviewBoxPosition ? _previewBoxY : _texto.Y + _previewOffsetY;
         public double ModelX => _texto.X;
         public double ModelY => _texto.Y;
         public string Nome => _texto.Nome;
@@ -107,6 +110,7 @@ namespace Araci.ViewModels
         public PointCollection LeaderArrowWorldPoints => CalcularLeaderArrowWorldPoints();
         public PointCollection LeaderOpenArrowWorldPoints => CalcularLeaderOpenArrowWorldPoints();
         public bool HasPreviewOffset => Math.Abs(_previewOffsetX) > 0.000001 || Math.Abs(_previewOffsetY) > 0.000001;
+        public bool HasPreviewBoxPosition => _hasPreviewBoxPosition;
         public bool HasPreviewBoxWidth => _hasPreviewBoxWidth;
         public bool HasPreviewRotation => _hasPreviewRotation;
         public bool HasPreviewLeaderPoint => _hasPreviewLeaderPoint;
@@ -222,6 +226,34 @@ namespace Araci.ViewModels
             OnPropertyChanged(nameof(HasPreviewBoxWidth));
         }
 
+        public void SetPreviewBoxGeometry(double x, double y, double larguraCaixa)
+        {
+            double novoX = ValorFinito(x) ? x : _texto.X;
+            double novoY = ValorFinito(y) ? y : _texto.Y;
+
+            _hasPreviewBoxPosition = true;
+            _previewBoxX = novoX;
+            _previewBoxY = novoY;
+            SetPreviewBoxWidth(larguraCaixa);
+            NotificarPosicao();
+            OnPropertyChanged(nameof(HasPreviewBoxPosition));
+        }
+
+        public void ClearPreviewBoxGeometry()
+        {
+            bool tinhaPreviewPosicao = _hasPreviewBoxPosition;
+            _hasPreviewBoxPosition = false;
+            _previewBoxX = 0.0;
+            _previewBoxY = 0.0;
+            ClearPreviewBoxWidth();
+
+            if (tinhaPreviewPosicao)
+            {
+                NotificarPosicao();
+                OnPropertyChanged(nameof(HasPreviewBoxPosition));
+            }
+        }
+
         public bool SetPreviewRotation(double rotacao)
         {
             double rotacaoNormalizada = NormalizarRotacao(rotacao);
@@ -332,6 +364,7 @@ namespace Araci.ViewModels
             OnPropertyChanged(nameof(ConteudoEdicao));
             OnPropertyChanged(nameof(LarguraCaixa));
             OnPropertyChanged(nameof(ModelLarguraCaixa));
+            OnPropertyChanged(nameof(HasPreviewBoxPosition));
             OnPropertyChanged(nameof(HasPreviewBoxWidth));
             OnPropertyChanged(nameof(HasPreviewRotation));
             OnPropertyChanged(nameof(HasPreviewLeaderPoint));
