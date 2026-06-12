@@ -73,8 +73,11 @@ namespace Araci.ViewModels
         public double TitleHeight => ExibirTitulo ? _exibicao.AlturaTitulo : 0.0;
         public double HeaderRowHeight => ExibirCabecalho ? _exibicao.AlturaCabecalho : 0.0;
         public double BodyRowHeight => _exibicao.AlturaLinhaCorpo;
-        public double BodyViewportHeight => Math.Max(0.0, Height - TitleHeight);
-        public double RowsViewportHeight => Math.Max(0.0, Height - TitleHeight - HeaderRowHeight);
+        public double RowsContentHeight => HasRows ? BodyRowHeight * Rows.Count : 0.0;
+        public double TableContentHeight => HasRenderableTable ? TitleHeight + HeaderRowHeight + RowsContentHeight : Height;
+        public double RenderedHeight => HasRenderableTable ? Math.Max(ProjectSheetTableInstance.MinHeight, Math.Min(Height, TableContentHeight)) : Height;
+        public double BodyViewportHeight => Math.Max(0.0, RenderedHeight - TitleHeight);
+        public double RowsViewportHeight => Math.Max(0.0, RenderedHeight - TitleHeight - HeaderRowHeight);
         public double ViewX => X + SheetOriginOffsetX;
         public double ViewY => Y + SheetOriginOffsetY;
         public FontFamily TitleFontFamily => new(_exibicao.FonteTitulo);
@@ -181,6 +184,8 @@ namespace Araci.ViewModels
 
                 _height = value;
                 OnPropertyChanged();
+                OnPropertyChanged(nameof(TableContentHeight));
+                OnPropertyChanged(nameof(RenderedHeight));
                 OnPropertyChanged(nameof(BodyViewportHeight));
                 OnPropertyChanged(nameof(RowsViewportHeight));
             }
