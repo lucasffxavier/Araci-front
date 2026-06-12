@@ -138,9 +138,12 @@ namespace Araci.ViewModels
 
         public bool Contains(Point position, double tolerance)
         {
+            double margem = Math.Max(0.0, tolerance);
             Rect bounds = new Rect(X, Y, Math.Max(0.0, Largura), Math.Max(0.0, Altura));
+            Rect hitBounds = bounds;
+            hitBounds.Inflate(margem, margem);
 
-            if (!bounds.Contains(position))
+            if (!hitBounds.Contains(position))
                 return false;
 
             Point topLeft = new(bounds.Left, bounds.Top);
@@ -154,7 +157,7 @@ namespace Araci.ViewModels
             menor = Math.Min(menor, DistanciaPontoSegmento(position, bottomRight, bottomLeft));
             menor = Math.Min(menor, DistanciaPontoSegmento(position, bottomLeft, topLeft));
 
-            return menor <= Math.Max(0.0, tolerance);
+            return menor <= margem;
         }
 
         public event PropertyChangedEventHandler? PropertyChanged;

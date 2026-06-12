@@ -79,7 +79,7 @@ namespace Araci.Applications.Anotar.InserirLinha
 
             if (!_pontoInicial.HasValue)
             {
-                ObterPontoDeCriacao(position, viewModel, aplicarSnap: true);
+                ObterPontoDeCriacao(position, viewModel, aplicarSnap: !inputState.IsShiftPressed);
                 return;
             }
 
