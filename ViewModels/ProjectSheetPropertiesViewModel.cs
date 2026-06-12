@@ -132,10 +132,7 @@ namespace Araci.ViewModels
 
         private ProjectSheetType? ResolverTipoPrancha()
         {
-            if (!_prancha.SheetTypeId.HasValue)
-                return null;
-
-            return _document.TiposPrancha.FirstOrDefault(t => t.Id == _prancha.SheetTypeId.Value);
+            return _document.ObterTipoPranchaDaPrancha(_prancha);
         }
 
         private void OnItemProjetoRenomeado()

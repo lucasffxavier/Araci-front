@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Linq;
@@ -108,7 +109,11 @@ namespace Araci.Core.Documents
             {
                 Nome = $"Prancha {indice}",
                 Numero = $"A{indice:000}",
-                SheetTypeId = tipoPadrao.Id
+                SheetTypeId = tipoPadrao.Id,
+                FormatoFolha = tipoPadrao.FormatoFolha,
+                OrientacaoFolha = tipoPadrao.OrientacaoFolha,
+                LarguraFolha = tipoPadrao.LarguraFolha,
+                AlturaFolha = tipoPadrao.AlturaFolha
             };
         }
 
@@ -179,15 +184,20 @@ namespace Araci.Core.Documents
 
         public ProjectSheet CriarDuplicataPrancha(ProjectSheet origem)
         {
+            Guid tipoId = origem == null
+                ? GarantirTipoPranchaPadrao().Id
+                : ObterTipoPranchaIdValidoOuPadrao(origem);
+            ProjectSheetType tipo = TiposPrancha.FirstOrDefault(t => t.Id == tipoId) ?? GarantirTipoPranchaPadrao();
+
             return new ProjectSheet
             {
                 Nome = CriarNomeUnico(origem?.Nome ?? "Prancha", Pranchas.Select(p => p.Nome)),
                 Numero = CriarNumeroPranchaUnico(),
-                SheetTypeId = ObterTipoPranchaIdValidoOuPadrao(origem?.SheetTypeId),
-                FormatoFolha = origem?.FormatoFolha ?? ProjectSheetFormat.A1,
-                OrientacaoFolha = origem?.OrientacaoFolha ?? ProjectSheetOrientation.Paisagem,
-                LarguraFolha = origem?.LarguraFolha ?? ProjectSheet.DefaultWidth,
-                AlturaFolha = origem?.AlturaFolha ?? ProjectSheet.DefaultHeight,
+                SheetTypeId = tipo.Id,
+                FormatoFolha = tipo.FormatoFolha,
+                OrientacaoFolha = tipo.OrientacaoFolha,
+                LarguraFolha = tipo.LarguraFolha,
+                AlturaFolha = tipo.AlturaFolha,
                 Tabelas = origem?.Tabelas
                     .Where(i => i != null)
                     .Select(i => i.CriarCopia(gerarNovoId: true))
@@ -207,7 +217,19 @@ namespace Araci.Core.Documents
                 Linhas = origem?.Linhas
                     .Where(l => l != null)
                     .Select(l => l.CriarCopia(gerarNovoId: true))
-                    .ToList() ?? new List<ProjectSheetTemplateLine>()
+                    .ToList() ?? new List<ProjectSheetTemplateLine>(),
+                Retangulos = origem?.Retangulos
+                    .Where(r => r != null)
+                    .Select(r => r.CriarCopia(gerarNovoId: true))
+                    .ToList() ?? new List<ProjectSheetTemplateRectangle>(),
+                Circulos = origem?.Circulos
+                    .Where(c => c != null)
+                    .Select(c => c.CriarCopia(gerarNovoId: true))
+                    .ToList() ?? new List<ProjectSheetTemplateCircle>(),
+                Textos = origem?.Textos
+                    .Where(t => t != null)
+                    .Select(t => t.CriarCopia(gerarNovoId: true))
+                    .ToList() ?? new List<ProjectSheetTemplateText>()
             };
         }
 
@@ -326,6 +348,9 @@ namespace Araci.Core.Documents
 
             int indiceSeguro = indice < 0 || indice > TiposPrancha.Count ? TiposPrancha.Count : indice;
             TiposPrancha.Insert(indiceSeguro, tipo);
+
+            foreach (ProjectSheet prancha in Pranchas.Where(p => p != null))
+                GarantirAssociacaoTipoPrancha(prancha);
         }
 
         public void RenomearVista(ProjectView vista, string nome)
@@ -376,6 +401,7 @@ namespace Araci.Core.Documents
             if (prancha == null || !Pranchas.Contains(prancha))
                 return;
 
+            GarantirAssociacaoTipoPrancha(prancha);
             PropriedadesPranchaAlteradas?.Invoke(prancha);
             ItemProjetoRenomeado?.Invoke();
         }
@@ -402,6 +428,23 @@ namespace Araci.Core.Documents
         public bool TipoPranchaEstaEmUso(Guid tipoId)
         {
             return tipoId != Guid.Empty && Pranchas.Any(p => p.SheetTypeId == tipoId);
+        }
+
+        public ProjectSheetType ObterTipoPranchaDaPrancha(ProjectSheet? prancha)
+        {
+            if (prancha == null)
+                return GarantirTipoPranchaPadrao();
+
+            GarantirAssociacaoTipoPrancha(prancha);
+            return TiposPrancha.FirstOrDefault(t => t.Id == prancha.SheetTypeId) ?? GarantirTipoPranchaPadrao();
+        }
+
+        public void GarantirIntegridadePranchasETiposPrancha()
+        {
+            GarantirTipoPranchaPadrao();
+
+            foreach (ProjectSheet prancha in Pranchas.Where(p => p != null))
+                GarantirAssociacaoTipoPrancha(prancha);
         }
 
         public void SubstituirVistas(IEnumerable<ProjectView> vistas)
@@ -453,7 +496,7 @@ namespace Araci.Core.Documents
 
             GarantirTipoPranchaPadrao();
 
-            foreach (ProjectSheet prancha in Pranchas)
+            foreach (ProjectSheet prancha in Pranchas.Where(p => p != null))
                 GarantirAssociacaoTipoPrancha(prancha);
         }
 
@@ -509,7 +552,26 @@ namespace Araci.Core.Documents
 
         private void GarantirAssociacaoTipoPrancha(ProjectSheet prancha)
         {
-            prancha.SheetTypeId = ObterTipoPranchaIdValidoOuPadrao(prancha.SheetTypeId);
+            Guid tipoId = ObterTipoPranchaIdValidoOuPadrao(prancha);
+            ProjectSheetType tipo = TiposPrancha.FirstOrDefault(t => t.Id == tipoId) ?? GarantirTipoPranchaPadrao();
+
+            prancha.SheetTypeId = tipo.Id;
+            prancha.FormatoFolha = tipo.FormatoFolha;
+            prancha.OrientacaoFolha = tipo.OrientacaoFolha;
+            prancha.LarguraFolha = tipo.LarguraFolha;
+            prancha.AlturaFolha = tipo.AlturaFolha;
+        }
+
+        private Guid ObterTipoPranchaIdValidoOuPadrao(ProjectSheet prancha)
+        {
+            if (prancha.SheetTypeId.HasValue &&
+                prancha.SheetTypeId.Value != Guid.Empty &&
+                TiposPrancha.Any(t => t.Id == prancha.SheetTypeId.Value))
+            {
+                return prancha.SheetTypeId.Value;
+            }
+
+            return ResolverTipoPranchaCompatibilidade(prancha).Id;
         }
 
         private Guid ObterTipoPranchaIdValidoOuPadrao(Guid? tipoId)
@@ -518,6 +580,66 @@ namespace Araci.Core.Documents
                 return tipoId.Value;
 
             return GarantirTipoPranchaPadrao().Id;
+        }
+
+        private ProjectSheetType ResolverTipoPranchaCompatibilidade(ProjectSheet prancha)
+        {
+            ProjectSheetType? equivalente = TiposPrancha.FirstOrDefault(t => TipoPranchaEquivalente(t, prancha));
+
+            if (equivalente != null)
+                return equivalente;
+
+            if (!PossuiDimensoesPranchaValidas(prancha))
+                return GarantirTipoPranchaPadrao();
+
+            ProjectSheetType migrado = CriarTipoPranchaMigrado(prancha);
+            TiposPrancha.Add(migrado);
+            return migrado;
+        }
+
+        private ProjectSheetType CriarTipoPranchaMigrado(ProjectSheet prancha)
+        {
+            string nomeBase = prancha.FormatoFolha == ProjectSheetFormat.Personalizado
+                ? "Tipo de prancha legado"
+                : $"{prancha.FormatoFolha} {prancha.OrientacaoFolha} - Migrado";
+
+            return new ProjectSheetType
+            {
+                Nome = CriarNomeUnicoIgnoreCase(nomeBase, TiposPrancha.Select(t => t.Nome)),
+                FormatoFolha = prancha.FormatoFolha,
+                OrientacaoFolha = prancha.OrientacaoFolha,
+                LarguraFolha = prancha.LarguraFolha,
+                AlturaFolha = prancha.AlturaFolha
+            };
+        }
+
+        private static bool TipoPranchaEquivalente(ProjectSheetType tipo, ProjectSheet prancha)
+        {
+            if (tipo == null || prancha == null)
+                return false;
+
+            if (tipo.FormatoFolha != prancha.FormatoFolha)
+                return false;
+
+            if (tipo.OrientacaoFolha != prancha.OrientacaoFolha)
+                return false;
+
+            return ProjectSheet.DimensoesEquivalentes(
+                tipo.LarguraFolha,
+                tipo.AlturaFolha,
+                prancha.LarguraFolha,
+                prancha.AlturaFolha);
+        }
+
+        private static bool PossuiDimensoesPranchaValidas(ProjectSheet prancha)
+        {
+            return prancha != null &&
+                !double.IsNaN(prancha.LarguraFolha) &&
+                !double.IsInfinity(prancha.LarguraFolha) &&
+                !double.IsNaN(prancha.AlturaFolha) &&
+                !double.IsInfinity(prancha.AlturaFolha) &&
+                prancha.LarguraFolha >= ProjectSheet.MinDimension &&
+                prancha.AlturaFolha >= ProjectSheet.MinDimension;
         }
 
         private void CriarVistaPadrao()

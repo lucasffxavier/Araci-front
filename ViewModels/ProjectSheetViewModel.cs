@@ -72,8 +72,8 @@ namespace Araci.ViewModels
         public bool HasEmptyMessage => !string.IsNullOrWhiteSpace(EmptyMessage);
         public Guid? SelectedInstanceId => _selectedInstanceId;
         public bool HasSelectedInstance => _selectedInstanceId.HasValue;
-        public double SheetWidth => ResolverTipoPrancha()?.LarguraFolha ?? _sheet.LarguraFolha;
-        public double SheetHeight => ResolverTipoPrancha()?.AlturaFolha ?? _sheet.AlturaFolha;
+        public double SheetWidth => ResolverTipoPrancha().LarguraFolha;
+        public double SheetHeight => ResolverTipoPrancha().AlturaFolha;
         public double SheetOriginOffsetX => WorkspaceMargin;
         public double SheetOriginOffsetY => WorkspaceMargin;
         public double MinimumWorkspaceWidth => SheetWidth + WorkspaceMargin * 2;
@@ -200,13 +200,7 @@ namespace Araci.ViewModels
             TemplateCircles.Clear();
             TemplateTexts.Clear();
 
-            ProjectSheetType? tipo = ResolverTipoPrancha();
-
-            if (tipo == null)
-            {
-                NotificarTemplate();
-                return;
-            }
+            ProjectSheetType tipo = ResolverTipoPrancha();
 
             foreach (ProjectSheetTemplateCircle circulo in tipo.Circulos.Where(c => c != null && c.Visible))
                 TemplateCircles.Add(new ProjectSheetTemplateCircleViewModel(circulo, _types));
@@ -223,12 +217,9 @@ namespace Araci.ViewModels
             NotificarTemplate();
         }
 
-        private ProjectSheetType? ResolverTipoPrancha()
+        private ProjectSheetType ResolverTipoPrancha()
         {
-            if (!_sheet.SheetTypeId.HasValue)
-                return null;
-
-            return _document.TiposPrancha.FirstOrDefault(t => t.Id == _sheet.SheetTypeId.Value);
+            return _document.ObterTipoPranchaDaPrancha(_sheet);
         }
 
         private void NotificarTemplate()
