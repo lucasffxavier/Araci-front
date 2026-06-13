@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.ComponentModel;
+using System.Globalization;
 using System.Linq;
 using System.Runtime.CompilerServices;
 using System.Windows;
@@ -13,8 +14,16 @@ namespace Araci.ViewModels
     public sealed class ProjectSheetTableInstanceViewModel : INotifyPropertyChanged
     {
         private const double MinimumColumnWidth = 44.0;
+        private const double HorizontalTextPadding = 14.0;
+        private const double ColumnSafetyPadding = 8.0;
+        private const double Epsilon = 0.000001;
 
         private readonly ProjectTableDisplaySettings _exibicao;
+        private readonly IReadOnlyList<ProjectTableDataColumn> _sourceColumns;
+        private readonly IReadOnlyList<ProjectTableDataRow> _visibleDataRows;
+        private IReadOnlyList<ProjectSheetTableColumnViewModel> _renderColumns = new List<ProjectSheetTableColumnViewModel>();
+        private IReadOnlyList<ProjectSheetTableRowViewModel> _rows = new List<ProjectSheetTableRowViewModel>();
+        private double _minimumTableWidth;
         private double _x;
         private double _y;
         private double _width;
@@ -37,12 +46,14 @@ namespace Araci.ViewModels
             TableName = string.IsNullOrWhiteSpace(tableName) ? "Tabela sem nome" : tableName;
             _x = NormalizePosition(instance.X);
             _y = NormalizePosition(instance.Y);
-            _width = NormalizeDimension(instance.Width, ProjectSheetTableInstance.MinWidth);
             _height = NormalizeDimension(instance.Height, ProjectSheetTableInstance.MinHeight);
-            Columns = tableData?.Columns.ToList() ?? new List<ProjectTableDataColumn>();
+            _sourceColumns = tableData?.Columns.ToList() ?? new List<ProjectTableDataColumn>();
             RowStartIndex = instance.RowStartIndex;
             RowCount = instance.RowCount;
-            Rows = BuildVisibleRows(tableData, RowStartIndex, RowCount, _exibicao);
+            _visibleDataRows = BuildVisibleDataRows(tableData, RowStartIndex, RowCount);
+            _minimumTableWidth = CalcularLarguraMinimaTabela(_sourceColumns, _visibleDataRows, _exibicao);
+            _width = NormalizeDimension(instance.Width, MinimumTableWidth);
+            RebuildTableLayout(false);
             EmptyDataMessage = tableData == null
                 ? "Tabela nao encontrada"
                 : Columns.Count == 0
@@ -55,8 +66,9 @@ namespace Araci.ViewModels
         public Guid Id { get; }
         public Guid TableId { get; }
         public string TableName { get; }
-        public IReadOnlyList<ProjectTableDataColumn> Columns { get; }
-        public IReadOnlyList<ProjectSheetTableRowViewModel> Rows { get; }
+        public IReadOnlyList<ProjectTableDataColumn> Columns => _sourceColumns;
+        public IReadOnlyList<ProjectSheetTableColumnViewModel> RenderColumns => _renderColumns;
+        public IReadOnlyList<ProjectSheetTableRowViewModel> Rows => _rows;
         public int RowStartIndex { get; }
         public int? RowCount { get; }
         public bool HasColumns => Columns.Count > 0;
@@ -66,8 +78,9 @@ namespace Araci.ViewModels
         public bool HasEmptyDataMessage => !string.IsNullOrWhiteSpace(EmptyDataMessage);
         public string EmptyDataMessage { get; }
         public int ColumnCount => Columns.Count;
-        public double ColumnWidth => CalcularLarguraColuna(Width, Columns.Count);
-        public double TableGridWidth => HasColumns ? ColumnWidth * Columns.Count : Math.Max(0.0, Width);
+        public double MinimumTableWidth => HasColumns ? Math.Max(ProjectSheetTableInstance.MinWidth, _minimumTableWidth) : ProjectSheetTableInstance.MinWidth;
+        public double ColumnWidth => ColumnCount <= 0 ? Math.Max(0.0, Width) : TableGridWidth / ColumnCount;
+        public double TableGridWidth => HasColumns ? RenderColumns.Sum(c => c.Width) : Math.Max(0.0, Width);
         public bool ExibirTitulo => _exibicao.ExibirTitulo;
         public bool ExibirCabecalho => _exibicao.ExibirCabecalho;
         public double TitleHeight => ExibirTitulo ? _exibicao.AlturaTitulo : 0.0;
@@ -111,7 +124,7 @@ namespace Araci.ViewModels
             get => _sheetOriginOffsetX;
             private set
             {
-                if (Math.Abs(_sheetOriginOffsetX - value) < 0.000001)
+                if (Math.Abs(_sheetOriginOffsetX - value) < Epsilon)
                     return;
 
                 _sheetOriginOffsetX = value;
@@ -125,7 +138,7 @@ namespace Araci.ViewModels
             get => _sheetOriginOffsetY;
             private set
             {
-                if (Math.Abs(_sheetOriginOffsetY - value) < 0.000001)
+                if (Math.Abs(_sheetOriginOffsetY - value) < Epsilon)
                     return;
 
                 _sheetOriginOffsetY = value;
@@ -139,7 +152,7 @@ namespace Araci.ViewModels
             get => _x;
             private set
             {
-                if (Math.Abs(_x - value) < 0.000001)
+                if (Math.Abs(_x - value) < Epsilon)
                     return;
 
                 _x = value;
@@ -153,7 +166,7 @@ namespace Araci.ViewModels
             get => _y;
             private set
             {
-                if (Math.Abs(_y - value) < 0.000001)
+                if (Math.Abs(_y - value) < Epsilon)
                     return;
 
                 _y = value;
@@ -167,10 +180,13 @@ namespace Araci.ViewModels
             get => _width;
             private set
             {
-                if (Math.Abs(_width - value) < 0.000001)
+                double normalized = NormalizeDimension(value, MinimumTableWidth);
+
+                if (Math.Abs(_width - normalized) < Epsilon)
                     return;
 
-                _width = value;
+                _width = normalized;
+                RebuildTableLayout(true);
                 OnPropertyChanged();
                 OnPropertyChanged(nameof(ColumnWidth));
                 OnPropertyChanged(nameof(TableGridWidth));
@@ -182,7 +198,7 @@ namespace Araci.ViewModels
             get => _height;
             private set
             {
-                if (Math.Abs(_height - value) < 0.000001)
+                if (Math.Abs(_height - value) < Epsilon)
                     return;
 
                 _height = value;
@@ -221,18 +237,37 @@ namespace Araci.ViewModels
 
         public void SetPreviewSize(double width, double height)
         {
-            Width = NormalizeDimension(width, ProjectSheetTableInstance.MinWidth);
+            Width = NormalizeDimension(width, MinimumTableWidth);
             Height = NormalizeDimension(height, ProjectSheetTableInstance.MinHeight);
         }
 
-        private static IReadOnlyList<ProjectSheetTableRowViewModel> BuildVisibleRows(
+        private void RebuildTableLayout(bool notify)
+        {
+            _renderColumns = BuildRenderColumns(_sourceColumns, _visibleDataRows, _exibicao, Width);
+            _rows = BuildVisibleRows(_visibleDataRows, _renderColumns, _exibicao);
+
+            if (!notify)
+                return;
+
+            OnPropertyChanged(nameof(RenderColumns));
+            OnPropertyChanged(nameof(Rows));
+            OnPropertyChanged(nameof(HasRows));
+            OnPropertyChanged(nameof(HasRenderableTable));
+            OnPropertyChanged(nameof(CanSplit));
+            OnPropertyChanged(nameof(RowsContentHeight));
+            OnPropertyChanged(nameof(TableContentHeight));
+            OnPropertyChanged(nameof(RenderedHeight));
+            OnPropertyChanged(nameof(BodyViewportHeight));
+            OnPropertyChanged(nameof(RowsViewportHeight));
+        }
+
+        private static IReadOnlyList<ProjectTableDataRow> BuildVisibleDataRows(
             ProjectTableDataResult? tableData,
             int rowStartIndex,
-            int? rowCount,
-            ProjectTableDisplaySettings exibicao)
+            int? rowCount)
         {
             if (tableData == null || tableData.Columns.Count == 0)
-                return new List<ProjectSheetTableRowViewModel>();
+                return new List<ProjectTableDataRow>();
 
             int startIndex = rowStartIndex < 0 ? 0 : rowStartIndex;
             IEnumerable<ProjectTableDataRow> rows = tableData.Rows.Skip(startIndex);
@@ -240,22 +275,141 @@ namespace Araci.ViewModels
             if (rowCount.HasValue)
                 rows = rows.Take(rowCount.Value);
 
-            return rows
-                .Select((row, index) => new ProjectSheetTableRowViewModel(row, index, exibicao))
+            return rows.ToList();
+        }
+
+        private static IReadOnlyList<ProjectSheetTableColumnViewModel> BuildRenderColumns(
+            IReadOnlyList<ProjectTableDataColumn> columns,
+            IReadOnlyList<ProjectTableDataRow> rows,
+            ProjectTableDisplaySettings exibicao,
+            double width)
+        {
+            if (columns.Count == 0)
+                return new List<ProjectSheetTableColumnViewModel>();
+
+            double[] minWidths = columns
+                .Select((column, index) => CalcularLarguraMinimaColuna(column, index, rows, exibicao))
+                .ToArray();
+
+            double minTotal = minWidths.Sum();
+            double safeWidth = NormalizeDimension(width, minTotal);
+            double extraPerColumn = safeWidth > minTotal
+                ? (safeWidth - minTotal) / columns.Count
+                : 0.0;
+
+            return columns
+                .Select((column, index) => new ProjectSheetTableColumnViewModel(
+                    column,
+                    minWidths[index] + extraPerColumn))
                 .ToList();
         }
 
-        private static double CalcularLarguraColuna(double width, int columnCount)
+        private static IReadOnlyList<ProjectSheetTableRowViewModel> BuildVisibleRows(
+            IReadOnlyList<ProjectTableDataRow> rows,
+            IReadOnlyList<ProjectSheetTableColumnViewModel> columns,
+            ProjectTableDisplaySettings exibicao)
         {
-            if (columnCount <= 0)
-                return NormalizeDimension(width, ProjectSheetTableInstance.MinWidth);
+            return rows
+                .Select((row, index) => new ProjectSheetTableRowViewModel(row, index, exibicao, columns))
+                .ToList();
+        }
 
-            double safeWidth = NormalizeDimension(width, ProjectSheetTableInstance.MinWidth);
-            double widthPerColumn = safeWidth / columnCount;
+        private static double CalcularLarguraMinimaTabela(
+            IReadOnlyList<ProjectTableDataColumn> columns,
+            IReadOnlyList<ProjectTableDataRow> rows,
+            ProjectTableDisplaySettings exibicao)
+        {
+            if (columns.Count == 0)
+                return ProjectSheetTableInstance.MinWidth;
 
-            return widthPerColumn < MinimumColumnWidth
-                ? MinimumColumnWidth
-                : widthPerColumn;
+            double total = columns
+                .Select((column, index) => CalcularLarguraMinimaColuna(column, index, rows, exibicao))
+                .Sum();
+
+            return Math.Max(ProjectSheetTableInstance.MinWidth, total);
+        }
+
+        private static double CalcularLarguraMinimaColuna(
+            ProjectTableDataColumn column,
+            int columnIndex,
+            IReadOnlyList<ProjectTableDataRow> rows,
+            ProjectTableDisplaySettings exibicao)
+        {
+            double headerWidth = MedirMaiorPalavra(
+                column.NomeExibicao,
+                new FontFamily(exibicao.FonteCabecalho),
+                exibicao.TamanhoFonteCabecalho,
+                exibicao.CabecalhoNegrito ? FontWeights.SemiBold : FontWeights.Normal);
+
+            double bodyWidth = 0.0;
+
+            foreach (ProjectTableDataRow row in rows)
+            {
+                if (columnIndex < 0 || columnIndex >= row.Cells.Count)
+                    continue;
+
+                bodyWidth = Math.Max(
+                    bodyWidth,
+                    MedirMaiorPalavra(
+                        row.Cells[columnIndex].DisplayValue,
+                        new FontFamily(exibicao.FonteCorpo),
+                        exibicao.TamanhoFonteCorpo,
+                        FontWeights.Normal));
+            }
+
+            double textWidth = Math.Max(headerWidth, bodyWidth);
+            return Math.Max(MinimumColumnWidth, textWidth + HorizontalTextPadding + ColumnSafetyPadding);
+        }
+
+        private static double MedirMaiorPalavra(
+            string? texto,
+            FontFamily fontFamily,
+            double fontSize,
+            FontWeight fontWeight)
+        {
+            double maior = 0.0;
+
+            foreach (string palavra in ExtrairPalavras(texto))
+                maior = Math.Max(maior, MedirTexto(palavra, fontFamily, fontSize, fontWeight));
+
+            return maior;
+        }
+
+        private static IEnumerable<string> ExtrairPalavras(string? texto)
+        {
+            if (string.IsNullOrWhiteSpace(texto))
+                return Enumerable.Empty<string>();
+
+            return texto
+                .Split(new[] { ' ', '\t', '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries)
+                .Select(p => p.Trim())
+                .Where(p => !string.IsNullOrWhiteSpace(p));
+        }
+
+        private static double MedirTexto(
+            string texto,
+            FontFamily fontFamily,
+            double fontSize,
+            FontWeight fontWeight)
+        {
+            try
+            {
+                var typeface = new Typeface(fontFamily, FontStyles.Normal, fontWeight, FontStretches.Normal);
+                var formattedText = new FormattedText(
+                    texto,
+                    CultureInfo.CurrentCulture,
+                    FlowDirection.LeftToRight,
+                    typeface,
+                    fontSize,
+                    Brushes.Black,
+                    1.0);
+
+                return formattedText.WidthIncludingTrailingWhitespace;
+            }
+            catch
+            {
+                return texto.Length * Math.Max(1.0, fontSize) * 0.65;
+            }
         }
 
         private static ProjectTableDisplaySettings NormalizarExibicao(ProjectTableDisplaySettings? valor)
@@ -313,13 +467,39 @@ namespace Araci.ViewModels
         }
     }
 
+    public sealed class ProjectSheetTableColumnViewModel
+    {
+        public ProjectSheetTableColumnViewModel(ProjectTableDataColumn column, double width)
+        {
+            Categoria = column.Categoria;
+            CampoId = column.CampoId;
+            NomeExibicao = column.NomeExibicao;
+            Ordem = column.Ordem;
+            Width = width;
+        }
+
+        public ProjectTableElementCategory Categoria { get; }
+        public string CampoId { get; }
+        public string NomeExibicao { get; }
+        public int Ordem { get; }
+        public double Width { get; }
+    }
+
     public sealed class ProjectSheetTableRowViewModel
     {
-        public ProjectSheetTableRowViewModel(ProjectTableDataRow row, int visualIndex, ProjectTableDisplaySettings exibicao)
+        private const double MinimumCellWidth = 44.0;
+
+        public ProjectSheetTableRowViewModel(
+            ProjectTableDataRow row,
+            int visualIndex,
+            ProjectTableDisplaySettings exibicao,
+            IReadOnlyList<ProjectSheetTableColumnViewModel> columns)
         {
             ElementoId = row.ElementoId;
             Cells = row.Cells
-                .Select(cell => new ProjectSheetTableCellViewModel(cell.DisplayValue))
+                .Select((cell, index) => new ProjectSheetTableCellViewModel(
+                    cell.DisplayValue,
+                    index >= 0 && index < columns.Count ? columns[index].Width : MinimumCellWidth))
                 .ToList();
             BackgroundBrush = exibicao.UsarLinhasAlternadas && visualIndex % 2 == 1
                 ? CriarBrush(exibicao.CorLinhaAlternada, ProjectTableDisplaySettings.DefaultAlternateRowBackgroundColor)
@@ -347,11 +527,13 @@ namespace Araci.ViewModels
 
     public sealed class ProjectSheetTableCellViewModel
     {
-        public ProjectSheetTableCellViewModel(string displayValue)
+        public ProjectSheetTableCellViewModel(string displayValue, double width)
         {
             DisplayValue = displayValue ?? string.Empty;
+            Width = width;
         }
 
         public string DisplayValue { get; }
+        public double Width { get; }
     }
 }
