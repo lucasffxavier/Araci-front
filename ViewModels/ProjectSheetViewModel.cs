@@ -46,13 +46,17 @@ namespace Araci.ViewModels
             _removerTabelaDaPrancha = removerTabelaDaPrancha;
             _dividirTabelaNaPrancha = dividirTabelaNaPrancha;
             TableInstances = new ObservableCollection<ProjectSheetTableInstanceViewModel>();
+            ViewInstances = new ObservableCollection<ProjectSheetViewInstanceViewModel>();
             _document.PropriedadesPranchaAlteradas += OnPropriedadesPranchaAlteradas;
+            _document.PropriedadesVistaAlteradas += OnPropriedadesVistaAlteradas;
+            _document.ItemProjetoRenomeado += OnItemProjetoRenomeado;
             Refresh();
         }
 
         public Guid SheetId => _sheet.Id;
         public ObservableCollection<ProjectSheetTableInstanceViewModel> TableInstances { get; }
-        public bool HasInstances => TableInstances.Count > 0;
+        public ObservableCollection<ProjectSheetViewInstanceViewModel> ViewInstances { get; }
+        public bool HasInstances => TableInstances.Count > 0 || ViewInstances.Count > 0;
         public bool HasEmptyMessage => !string.IsNullOrWhiteSpace(EmptyMessage);
         public Guid? SelectedInstanceId => _selectedInstanceId;
         public bool HasSelectedInstance => _selectedInstanceId.HasValue;
@@ -146,8 +150,17 @@ namespace Araci.ViewModels
                 : $"{_sheet.Numero} - {_sheet.Nome}";
 
             TableInstances.Clear();
+            ViewInstances.Clear();
             NormalizeInstances();
             RecalculateWorkspaceFromDocument();
+
+            foreach (ProjectSheetViewInstance instance in _sheet.Vistas.Where(i => i != null))
+            {
+                ProjectView? view = _document.Vistas.FirstOrDefault(v => v.Id == instance.ViewId);
+                var instanceViewModel = new ProjectSheetViewInstanceViewModel(instance, view);
+                instanceViewModel.SetSheetOriginOffset(SheetOriginOffsetX, SheetOriginOffsetY);
+                ViewInstances.Add(instanceViewModel);
+            }
 
             foreach (ProjectSheetTableInstance instance in _sheet.Tabelas.Where(i => i != null))
             {
@@ -171,8 +184,9 @@ namespace Araci.ViewModels
             if (selectedBeforeRefresh.HasValue && !TableInstances.Any(i => i.Id == selectedBeforeRefresh.Value))
                 _selectedInstanceId = null;
 
-            EmptyMessage = HasInstances ? string.Empty : "Nenhuma tabela inserida na prancha";
+            EmptyMessage = HasInstances ? string.Empty : "Nenhuma tabela ou vista inserida na prancha";
             OnPropertyChanged(nameof(HasInstances));
+            OnPropertyChanged(nameof(ViewInstances));
             OnSelectionChanged();
         }
 
@@ -323,11 +337,21 @@ namespace Araci.ViewModels
         {
             foreach (ProjectSheetTableInstance instance in _sheet.Tabelas.Where(i => i != null))
                 NormalizeInstance(instance);
+
+            foreach (ProjectSheetViewInstance instance in _sheet.Vistas.Where(i => i != null))
+                NormalizeInstance(instance);
         }
 
         private void RecalculateWorkspaceFromDocument()
         {
-            RecalculateWorkspace(_sheet.Tabelas.Where(i => i != null).Select(i => new WorkspaceBoundsItem(i.X, i.Y, i.Width, i.Height)));
+            IEnumerable<WorkspaceBoundsItem> tableItems = _sheet.Tabelas
+                .Where(i => i != null)
+                .Select(i => new WorkspaceBoundsItem(i.X, i.Y, i.Width, i.Height));
+            IEnumerable<WorkspaceBoundsItem> viewItems = _sheet.Vistas
+                .Where(i => i != null)
+                .Select(i => new WorkspaceBoundsItem(i.X, i.Y, i.Width, i.Height));
+
+            RecalculateWorkspace(tableItems.Concat(viewItems));
         }
 
         private void RecalculateWorkspace(IEnumerable<WorkspaceBoundsItem> items)
@@ -355,6 +379,9 @@ namespace Araci.ViewModels
         {
             foreach (ProjectSheetTableInstanceViewModel instance in TableInstances)
                 instance.SetSheetOriginOffset(SheetOriginOffsetX, SheetOriginOffsetY);
+
+            foreach (ProjectSheetViewInstanceViewModel instance in ViewInstances)
+                instance.SetSheetOriginOffset(SheetOriginOffsetX, SheetOriginOffsetY);
         }
 
         private static void NormalizeInstance(ProjectSheetTableInstance instance)
@@ -365,6 +392,14 @@ namespace Araci.ViewModels
             instance.Height = RedimensionarTabelaNaPranchaUseCase.NormalizeDimension(instance.Height, ProjectSheetTableInstance.MinHeight);
             instance.RowStartIndex = instance.RowStartIndex;
             instance.RowCount = instance.RowCount;
+        }
+
+        private static void NormalizeInstance(ProjectSheetViewInstance instance)
+        {
+            instance.X = InserirVistaNaPranchaUseCase.NormalizePosition(instance.X);
+            instance.Y = InserirVistaNaPranchaUseCase.NormalizePosition(instance.Y);
+            instance.Width = InserirVistaNaPranchaUseCase.NormalizeDimension(instance.Width, ProjectSheetViewInstance.MinWidth);
+            instance.Height = InserirVistaNaPranchaUseCase.NormalizeDimension(instance.Height, ProjectSheetViewInstance.MinHeight);
         }
 
         private static double NormalizeWorkspaceDimension(double value, double fallback)
@@ -405,6 +440,19 @@ namespace Araci.ViewModels
             OnPropertyChanged(nameof(SheetHeight));
             OnPropertyChanged(nameof(MinimumWorkspaceWidth));
             OnPropertyChanged(nameof(MinimumWorkspaceHeight));
+            Refresh();
+        }
+
+        private void OnPropriedadesVistaAlteradas(ProjectView vista)
+        {
+            if (!_sheet.Vistas.Any(i => i.ViewId == vista.Id))
+                return;
+
+            Refresh();
+        }
+
+        private void OnItemProjetoRenomeado()
+        {
             Refresh();
         }
 

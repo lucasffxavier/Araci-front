@@ -57,6 +57,27 @@ namespace Araci.Services.UI
                 : null;
         }
 
+
+        public InserirVistaPranchaDialogResult? ShowInserirVistaPranchaDialog(
+            IReadOnlyList<ProjectItemDialogOption> pranchas,
+            IReadOnlyList<ProjectViewDialogOption> vistas)
+        {
+            var window = new InserirVistaPranchaWindow(pranchas, vistas)
+            {
+                Owner = Application.Current?.MainWindow
+            };
+
+            if (window.ShowDialog() != true)
+                return null;
+
+            ProjectItemDialogOption? prancha = window.PranchaSelecionada;
+            ProjectViewDialogOption? vista = window.VistaSelecionada;
+
+            return prancha != null && vista?.Id.HasValue == true
+                ? new InserirVistaPranchaDialogResult(prancha.Id, vista.Id.Value)
+                : null;
+        }
+
         public ElementosTabelaDialogResult? ShowElementosTabelaDialog(
             IReadOnlyList<ProjectTableElementCategory> categorias,
             IReadOnlyList<ProjectTableFieldSelection> camposSelecionados)

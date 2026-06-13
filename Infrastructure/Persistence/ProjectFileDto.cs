@@ -206,6 +206,7 @@ namespace Araci.Infrastructure.Persistence
         public double? LarguraFolha { get; set; }
         public double? AlturaFolha { get; set; }
         public List<ProjectSheetTableInstanceDto> Tabelas { get; set; } = new();
+        public List<ProjectSheetViewInstanceDto> Vistas { get; set; } = new();
     }
 
     public sealed class ProjectSheetTableInstanceDto
@@ -218,6 +219,16 @@ namespace Araci.Infrastructure.Persistence
         public double Height { get; set; }
         public int RowStartIndex { get; set; }
         public int? RowCount { get; set; }
+    }
+
+    public sealed class ProjectSheetViewInstanceDto
+    {
+        public Guid Id { get; set; }
+        public Guid ViewId { get; set; }
+        public double X { get; set; }
+        public double Y { get; set; }
+        public double Width { get; set; }
+        public double Height { get; set; }
     }
 
     public sealed class ProjectMetadataDto

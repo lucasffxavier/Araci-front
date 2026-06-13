@@ -76,7 +76,7 @@ namespace Araci.Infrastructure.Persistence
                     .Select(CriarProjectSheetTypeDto)
                     .ToList(),
                 Sheets = document.Pranchas
-                    .Select(p => CriarProjectSheetDto(p, document.Tabelas.Select(t => t.Id)))
+                    .Select(p => CriarProjectSheetDto(p, document.Tabelas.Select(t => t.Id), document.Vistas.Select(v => v.Id)))
                     .ToList(),
                 Elements = document.Elementos
                     .Select(CriarElementoDto)
@@ -185,15 +185,21 @@ namespace Araci.Infrastructure.Persistence
 
         public IReadOnlyList<ProjectSheet> CreateProjectSheets(ProjectFileDto dto)
         {
-            return CreateProjectSheets(dto, dto.Tables.Select(t => t.Id));
+            return CreateProjectSheets(dto, dto.Tables.Select(t => t.Id), dto.Views.Select(v => v.Id));
         }
 
         public IReadOnlyList<ProjectSheet> CreateProjectSheets(ProjectFileDto dto, IEnumerable<Guid> tableIds)
         {
             ArgumentNullException.ThrowIfNull(dto);
+            return CreateProjectSheets(dto, tableIds, dto.Views.Select(v => v.Id));
+        }
+
+        public IReadOnlyList<ProjectSheet> CreateProjectSheets(ProjectFileDto dto, IEnumerable<Guid> tableIds, IEnumerable<Guid> viewIds)
+        {
+            ArgumentNullException.ThrowIfNull(dto);
 
             return dto.Sheets
-                .Select(s => CriarProjectSheet(s, tableIds))
+                .Select(s => CriarProjectSheet(s, tableIds, viewIds))
                 .Where(s => s != null)
                 .Cast<ProjectSheet>()
                 .ToList();
@@ -529,9 +535,10 @@ namespace Araci.Infrastructure.Persistence
             };
         }
 
-        private static ProjectSheetDto CriarProjectSheetDto(ProjectSheet prancha, IEnumerable<Guid> tableIds)
+        private static ProjectSheetDto CriarProjectSheetDto(ProjectSheet prancha, IEnumerable<Guid> tableIds, IEnumerable<Guid> viewIds)
         {
             HashSet<Guid> tabelasValidas = tableIds.ToHashSet();
+            HashSet<Guid> vistasValidas = viewIds.ToHashSet();
 
             return new ProjectSheetDto
             {
@@ -555,6 +562,18 @@ namespace Araci.Infrastructure.Persistence
                         Height = i.Height,
                         RowStartIndex = i.RowStartIndex,
                         RowCount = i.RowCount
+                    })
+                    .ToList(),
+                Vistas = (prancha.Vistas ?? new List<ProjectSheetViewInstance>())
+                    .Where(i => i != null && i.IsValid && vistasValidas.Contains(i.ViewId))
+                    .Select(i => new ProjectSheetViewInstanceDto
+                    {
+                        Id = i.Id,
+                        ViewId = i.ViewId,
+                        X = i.X,
+                        Y = i.Y,
+                        Width = i.Width,
+                        Height = i.Height
                     })
                     .ToList()
             };
@@ -865,7 +884,7 @@ namespace Araci.Infrastructure.Persistence
             return valor.Value;
         }
 
-        private static ProjectSheet? CriarProjectSheet(ProjectSheetDto dto, IEnumerable<Guid> tableIds)
+        private static ProjectSheet? CriarProjectSheet(ProjectSheetDto dto, IEnumerable<Guid> tableIds, IEnumerable<Guid> viewIds)
         {
             if (string.IsNullOrWhiteSpace(dto.Nome))
                 return null;
@@ -874,8 +893,11 @@ namespace Araci.Infrastructure.Persistence
             ProjectSheetOrientation orientacao = ParseEnum(dto.OrientacaoFolha, ProjectSheetOrientation.Paisagem);
             SheetDimensionMigration dimensoes = ResolverDimensoesFolha(formato, orientacao, dto.LarguraFolha, dto.AlturaFolha);
             HashSet<Guid> tabelasValidas = tableIds.ToHashSet();
+            HashSet<Guid> vistasValidas = viewIds.ToHashSet();
             List<ProjectSheetTableInstance> tabelas = ParseProjectSheetTableInstances(dto.Tabelas, tabelasValidas);
+            List<ProjectSheetViewInstance> vistas = ParseProjectSheetViewInstances(dto.Vistas, vistasValidas);
             AplicarEscalaTabelaPrancha(tabelas, dimensoes);
+            AplicarEscalaVistaPrancha(vistas, dimensoes);
 
             return new ProjectSheet
             {
@@ -887,7 +909,8 @@ namespace Araci.Infrastructure.Persistence
                 OrientacaoFolha = orientacao,
                 LarguraFolha = dimensoes.Largura,
                 AlturaFolha = dimensoes.Altura,
-                Tabelas = tabelas
+                Tabelas = tabelas,
+                Vistas = vistas
             };
         }
 
@@ -1142,6 +1165,28 @@ namespace Araci.Infrastructure.Persistence
                     Height = v.Height,
                     RowStartIndex = v.RowStartIndex,
                     RowCount = v.RowCount
+                })
+                .Where(i => i.IsValid)
+                .ToList();
+        }
+
+        private static List<ProjectSheetViewInstance> ParseProjectSheetViewInstances(
+            IEnumerable<ProjectSheetViewInstanceDto>? valores,
+            IReadOnlySet<Guid> viewIds)
+        {
+            if (valores == null)
+                return new List<ProjectSheetViewInstance>();
+
+            return valores
+                .Where(v => v.ViewId != Guid.Empty && viewIds.Contains(v.ViewId))
+                .Select(v => new ProjectSheetViewInstance
+                {
+                    Id = v.Id == Guid.Empty ? Guid.NewGuid() : v.Id,
+                    ViewId = v.ViewId,
+                    X = v.X,
+                    Y = v.Y,
+                    Width = v.Width,
+                    Height = v.Height
                 })
                 .Where(i => i.IsValid)
                 .ToList();
@@ -1460,6 +1505,22 @@ namespace Araci.Infrastructure.Persistence
                 tabela.Y = EscalarY(tabela.Y, dimensoes);
                 tabela.Width = EscalarLargura(tabela.Width, dimensoes);
                 tabela.Height = EscalarAltura(tabela.Height, dimensoes);
+            }
+        }
+
+        private static void AplicarEscalaVistaPrancha(
+            IEnumerable<ProjectSheetViewInstance> vistas,
+            SheetDimensionMigration dimensoes)
+        {
+            if (!dimensoes.RequerEscala)
+                return;
+
+            foreach (ProjectSheetViewInstance vista in vistas.Where(v => v != null))
+            {
+                vista.X = EscalarX(vista.X, dimensoes);
+                vista.Y = EscalarY(vista.Y, dimensoes);
+                vista.Width = EscalarLargura(vista.Width, dimensoes);
+                vista.Height = EscalarAltura(vista.Height, dimensoes);
             }
         }
 

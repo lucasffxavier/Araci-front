@@ -54,6 +54,7 @@ namespace Araci.Core.Documents
         }
 
         public List<ProjectSheetTableInstance> Tabelas { get; set; } = new();
+        public List<ProjectSheetViewInstance> Vistas { get; set; } = new();
 
         public void AplicarFormato(ProjectSheetFormat formato, ProjectSheetOrientation orientacao)
         {

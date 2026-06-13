@@ -127,6 +127,7 @@ namespace Araci.Services
             MoverCirculoDoTipoPrancha = new MoverCirculoDoTipoPranchaUseCase(Document, Commands);
             ExportarTabela = new ExportarTabelaUseCase(Document, Dialogs, new ProjectTableDataBuilder(), new ProjectTableCsvExportService());
             InserirTabelaNaPrancha = new InserirTabelaNaPranchaUseCase(Document, Commands);
+            InserirVistaNaPrancha = new InserirVistaNaPranchaUseCase(Document, Commands);
             MoverTabelaNaPrancha = new MoverTabelaNaPranchaUseCase(Document, Commands);
             RedimensionarTabelaNaPrancha = new RedimensionarTabelaNaPranchaUseCase(Document, Commands);
             RemoverTabelaDaPrancha = new RemoverTabelaDaPranchaUseCase(Document, Commands);
@@ -265,6 +266,7 @@ namespace Araci.Services
         public MoverCirculoDoTipoPranchaUseCase MoverCirculoDoTipoPrancha { get; }
         public ExportarTabelaUseCase ExportarTabela { get; }
         public InserirTabelaNaPranchaUseCase InserirTabelaNaPrancha { get; }
+        public InserirVistaNaPranchaUseCase InserirVistaNaPrancha { get; }
         public MoverTabelaNaPranchaUseCase MoverTabelaNaPrancha { get; }
         public RedimensionarTabelaNaPranchaUseCase RedimensionarTabelaNaPrancha { get; }
         public RemoverTabelaDaPranchaUseCase RemoverTabelaDaPrancha { get; }
