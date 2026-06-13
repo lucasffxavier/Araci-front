@@ -430,6 +430,10 @@ namespace Araci.Infrastructure.Persistence
                 Disciplina = vista.Disciplina.ToString(),
                 RecortarVista = vista.RecortarVista,
                 RegiaoRecorteVisivel = vista.RegiaoRecorteVisivel,
+                RecorteX = vista.RecorteX,
+                RecorteY = vista.RecorteY,
+                RecorteLargura = vista.RecorteLargura,
+                RecorteAltura = vista.RecorteAltura,
                 CameraX = vista.CameraX,
                 CameraY = vista.CameraY,
                 Zoom = vista.Zoom
@@ -723,6 +727,10 @@ namespace Araci.Infrastructure.Persistence
                 Disciplina = ParseEnum(dto.Disciplina, ProjectViewDiscipline.Eletrica),
                 RecortarVista = dto.RecortarVista,
                 RegiaoRecorteVisivel = dto.RegiaoRecorteVisivel ?? true,
+                RecorteX = NormalizarCoordenadaRecorte(dto.RecorteX, ProjectView.DefaultRecorteX),
+                RecorteY = NormalizarCoordenadaRecorte(dto.RecorteY, ProjectView.DefaultRecorteY),
+                RecorteLargura = NormalizarDimensaoRecorte(dto.RecorteLargura, ProjectView.DefaultRecorteLargura),
+                RecorteAltura = NormalizarDimensaoRecorte(dto.RecorteAltura, ProjectView.DefaultRecorteAltura),
                 CameraX = NormalizarCoordenadaCamera(dto.CameraX),
                 CameraY = NormalizarCoordenadaCamera(dto.CameraY),
                 Zoom = NormalizarZoomVista(dto.Zoom)
@@ -1333,6 +1341,22 @@ namespace Araci.Infrastructure.Persistence
         private static double NormalizarCoordenadaCamera(double valor)
         {
             return double.IsNaN(valor) || double.IsInfinity(valor) ? 0.0 : valor;
+        }
+
+        private static double NormalizarCoordenadaRecorte(double? valor, double fallback)
+        {
+            if (!valor.HasValue || double.IsNaN(valor.Value) || double.IsInfinity(valor.Value))
+                return fallback;
+
+            return valor.Value;
+        }
+
+        private static double NormalizarDimensaoRecorte(double? valor, double fallback)
+        {
+            if (!valor.HasValue || double.IsNaN(valor.Value) || double.IsInfinity(valor.Value))
+                return fallback;
+
+            return Math.Max(ProjectView.MinRecorteDimension, valor.Value);
         }
 
         private static double NormalizarZoomVista(double valor)

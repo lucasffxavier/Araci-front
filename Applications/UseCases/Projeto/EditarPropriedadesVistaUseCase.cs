@@ -38,6 +38,30 @@ namespace Araci.Applications.UseCases.Projeto
             return Alterar(id, v => v.RegiaoRecorteVisivel, (v, valor) => v.RegiaoRecorteVisivel = valor, regiaoRecorteVisivel);
         }
 
+        public bool AlterarRecorteX(Guid id, double recorteX)
+        {
+            double normalizado = NormalizarCoordenada(recorteX, ProjectView.DefaultRecorteX);
+            return Alterar(id, v => v.RecorteX, (v, valor) => v.RecorteX = valor, normalizado);
+        }
+
+        public bool AlterarRecorteY(Guid id, double recorteY)
+        {
+            double normalizado = NormalizarCoordenada(recorteY, ProjectView.DefaultRecorteY);
+            return Alterar(id, v => v.RecorteY, (v, valor) => v.RecorteY = valor, normalizado);
+        }
+
+        public bool AlterarRecorteLargura(Guid id, double recorteLargura)
+        {
+            double normalizado = NormalizarDimensaoRecorte(recorteLargura, ProjectView.DefaultRecorteLargura);
+            return Alterar(id, v => v.RecorteLargura, (v, valor) => v.RecorteLargura = valor, normalizado);
+        }
+
+        public bool AlterarRecorteAltura(Guid id, double recorteAltura)
+        {
+            double normalizado = NormalizarDimensaoRecorte(recorteAltura, ProjectView.DefaultRecorteAltura);
+            return Alterar(id, v => v.RecorteAltura, (v, valor) => v.RecorteAltura = valor, normalizado);
+        }
+
         private bool Alterar<T>(
             Guid id,
             Func<ProjectView, T> obter,
@@ -67,6 +91,19 @@ namespace Araci.Applications.UseCases.Projeto
         private static string NormalizarTexto(string valor, string fallback)
         {
             return string.IsNullOrWhiteSpace(valor) ? fallback : valor.Trim();
+        }
+
+        private static double NormalizarCoordenada(double valor, double fallback)
+        {
+            return double.IsNaN(valor) || double.IsInfinity(valor) ? fallback : valor;
+        }
+
+        private static double NormalizarDimensaoRecorte(double valor, double fallback)
+        {
+            if (double.IsNaN(valor) || double.IsInfinity(valor))
+                return fallback;
+
+            return Math.Max(ProjectView.MinRecorteDimension, valor);
         }
     }
 }
