@@ -9,6 +9,8 @@ namespace Araci.Views
 {
     public partial class ProjectTableGridView : UserControl
     {
+        private const double TableCellHorizontalPadding = 7.0;
+
         private ProjectTableDataViewModel? _viewModel;
 
         public ProjectTableGridView()
@@ -66,7 +68,9 @@ namespace Araci.Views
             {
                 RelativeSource = new RelativeSource(RelativeSourceMode.FindAncestor, typeof(DataGrid), 1)
             }));
+            style.Setters.Add(new Setter(TextBlock.HorizontalAlignmentProperty, HorizontalAlignment.Stretch));
             style.Setters.Add(new Setter(TextBlock.VerticalAlignmentProperty, VerticalAlignment.Center));
+            style.Setters.Add(new Setter(TextBlock.MarginProperty, new Thickness(TableCellHorizontalPadding, 0, TableCellHorizontalPadding, 0)));
             style.Setters.Add(new Setter(TextBlock.TextTrimmingProperty, TextTrimming.CharacterEllipsis));
             return style;
         }
