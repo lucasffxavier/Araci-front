@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.ComponentModel;
+using System.Globalization;
 using System.Runtime.CompilerServices;
 using Araci.Applications.UseCases.Projeto;
 using Araci.Core.Documents;
@@ -18,17 +19,20 @@ namespace Araci.ViewModels
             AraciDocument document,
             ProjectView vista,
             RenomearItemProjetoUseCase renomearItemProjeto,
-            EditarPropriedadesVistaUseCase editarPropriedadesVista)
+            EditarPropriedadesVistaUseCase editarPropriedadesVista,
+            bool exibirParametrosRecorte = false)
         {
             _document = document ?? throw new ArgumentNullException(nameof(document));
             _vista = vista ?? throw new ArgumentNullException(nameof(vista));
             _renomearItemProjeto = renomearItemProjeto ?? throw new ArgumentNullException(nameof(renomearItemProjeto));
             _editarPropriedadesVista = editarPropriedadesVista ?? throw new ArgumentNullException(nameof(editarPropriedadesVista));
+            ExibirParametrosRecorte = exibirParametrosRecorte;
             _document.ItemProjetoRenomeado += OnItemProjetoRenomeado;
             _document.PropriedadesVistaAlteradas += OnPropriedadesVistaAlteradas;
         }
 
-        public string Titulo => "Vista";
+        public string Titulo => ExibirParametrosRecorte ? "Região de recorte" : "Vista";
+        public bool ExibirParametrosRecorte { get; }
 
         public IReadOnlyList<ProjectViewDiscipline> Disciplinas { get; } =
             new[]
@@ -47,7 +51,6 @@ namespace Araci.ViewModels
             set
             {
                 string anterior = _vista.Nome;
-
                 bool renomeado = _renomearItemProjeto.RenomearVista(_vista.Id, value);
 
                 if (!renomeado || anterior != _vista.Nome)
@@ -95,6 +98,70 @@ namespace Araci.ViewModels
             }
         }
 
+        public string RecorteXTexto
+        {
+            get => FormatarNumero(_vista.RecorteX);
+            set
+            {
+                if (!TentarConverterNumero(value, out double valor))
+                {
+                    OnPropertyChanged();
+                    return;
+                }
+
+                if (_editarPropriedadesVista.AlterarRecorteX(_vista.Id, valor))
+                    OnPropertyChanged();
+            }
+        }
+
+        public string RecorteYTexto
+        {
+            get => FormatarNumero(_vista.RecorteY);
+            set
+            {
+                if (!TentarConverterNumero(value, out double valor))
+                {
+                    OnPropertyChanged();
+                    return;
+                }
+
+                if (_editarPropriedadesVista.AlterarRecorteY(_vista.Id, valor))
+                    OnPropertyChanged();
+            }
+        }
+
+        public string RecorteLarguraTexto
+        {
+            get => FormatarNumero(_vista.RecorteLargura);
+            set
+            {
+                if (!TentarConverterNumero(value, out double valor))
+                {
+                    OnPropertyChanged();
+                    return;
+                }
+
+                if (_editarPropriedadesVista.AlterarRecorteLargura(_vista.Id, valor))
+                    OnPropertyChanged();
+            }
+        }
+
+        public string RecorteAlturaTexto
+        {
+            get => FormatarNumero(_vista.RecorteAltura);
+            set
+            {
+                if (!TentarConverterNumero(value, out double valor))
+                {
+                    OnPropertyChanged();
+                    return;
+                }
+
+                if (_editarPropriedadesVista.AlterarRecorteAltura(_vista.Id, valor))
+                    OnPropertyChanged();
+            }
+        }
+
         public event PropertyChangedEventHandler? PropertyChanged;
 
         private void OnItemProjetoRenomeado()
@@ -107,10 +174,28 @@ namespace Araci.ViewModels
             if (vista.Id != _vista.Id)
                 return;
 
+            OnPropertyChanged(nameof(Titulo));
             OnPropertyChanged(nameof(Escala));
             OnPropertyChanged(nameof(Disciplina));
             OnPropertyChanged(nameof(RecortarVista));
             OnPropertyChanged(nameof(RegiaoRecorteVisivel));
+            OnPropertyChanged(nameof(RecorteXTexto));
+            OnPropertyChanged(nameof(RecorteYTexto));
+            OnPropertyChanged(nameof(RecorteLarguraTexto));
+            OnPropertyChanged(nameof(RecorteAlturaTexto));
+        }
+
+        private static string FormatarNumero(double valor)
+        {
+            return valor.ToString("0.###", CultureInfo.CurrentCulture);
+        }
+
+        private static bool TentarConverterNumero(string? texto, out double valor)
+        {
+            if (double.TryParse(texto, NumberStyles.Float, CultureInfo.CurrentCulture, out valor))
+                return true;
+
+            return double.TryParse(texto, NumberStyles.Float, CultureInfo.InvariantCulture, out valor);
         }
 
         private void OnPropertyChanged([CallerMemberName] string? propertyName = null)

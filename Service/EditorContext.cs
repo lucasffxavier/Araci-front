@@ -207,6 +207,24 @@ namespace Araci.Services
             AtualizarPropriedadesSelecionadas.Executar();
         }
 
+        public void SelecionarRegiaoRecorteVistaAtivaNasPropriedades()
+        {
+            ProjectView? vista = Document.VistaAtiva;
+
+            if (vista == null)
+                return;
+
+            Selection.Limpar();
+            Hover.Clear();
+            Editor.SuperficieAtiva = EditorSurfaceKind.Diagram;
+            Editor.ElementoSelecionado = new ProjectViewPropertiesViewModel(
+                Document,
+                vista,
+                RenomearItemProjeto,
+                EditarPropriedadesVista,
+                exibirParametrosRecorte: true);
+        }
+
         public EditorState Editor { get; } = new EditorState();
         public ProjectSheetTypeViewModel? ProjectSheetTypeViewModelAtivo { get; set; }
         public EditorSettings Settings { get; } = new EditorSettings();

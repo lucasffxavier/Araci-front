@@ -43,6 +43,8 @@ namespace Araci.ViewModels
             ArgumentNullException.ThrowIfNull(alignmentGuides);
             AlignmentGuides = alignmentGuides.Linhas;
             _documentSceneSync = documentSceneSync ?? throw new ArgumentNullException(nameof(documentSceneSync));
+            Document.VistaAtivaAlterada += OnVistaAtivaAlterada;
+            Document.PropriedadesVistaAlteradas += OnPropriedadesVistaAlteradas;
         }
 
         public AraciDocument Document { get; }
@@ -79,6 +81,31 @@ namespace Araci.ViewModels
         public double TerminalMessageFontSize => 12 * _inverseZoom;
         public Thickness TerminalMessagePadding => new(7 * _inverseZoom, 4 * _inverseZoom, 7 * _inverseZoom, 4 * _inverseZoom);
         public CornerRadius TerminalMessageCornerRadius => new(5 * _inverseZoom);
+        public bool RecorteVistaVisivel => Document.VistaAtiva?.RegiaoRecorteVisivel == true;
+        public double RecorteVistaX => Document.VistaAtiva?.RecorteX ?? 0.0;
+        public double RecorteVistaY => Document.VistaAtiva?.RecorteY ?? 0.0;
+        public double RecorteVistaLargura => Math.Max(ProjectView.MinRecorteDimension, Document.VistaAtiva?.RecorteLargura ?? ProjectView.DefaultRecorteLargura);
+        public double RecorteVistaAltura => Math.Max(ProjectView.MinRecorteDimension, Document.VistaAtiva?.RecorteAltura ?? ProjectView.DefaultRecorteAltura);
+        public double RecorteVistaStrokeThickness => 1.5 * _inverseZoom;
+        public double RecorteVistaHandleVisualSize => 10 * _inverseZoom;
+        public double RecorteVistaHandleVisualNegativeHalfOffset => -5 * _inverseZoom;
+        public double RecorteVistaHandleStrokeThickness => 1.5 * _inverseZoom;
+        public double RecorteVistaTopLeftHandleX => RecorteVistaX;
+        public double RecorteVistaTopLeftHandleY => RecorteVistaY;
+        public double RecorteVistaTopHandleX => RecorteVistaX + RecorteVistaLargura / 2;
+        public double RecorteVistaTopHandleY => RecorteVistaY;
+        public double RecorteVistaTopRightHandleX => RecorteVistaX + RecorteVistaLargura;
+        public double RecorteVistaTopRightHandleY => RecorteVistaY;
+        public double RecorteVistaRightHandleX => RecorteVistaX + RecorteVistaLargura;
+        public double RecorteVistaRightHandleY => RecorteVistaY + RecorteVistaAltura / 2;
+        public double RecorteVistaBottomRightHandleX => RecorteVistaX + RecorteVistaLargura;
+        public double RecorteVistaBottomRightHandleY => RecorteVistaY + RecorteVistaAltura;
+        public double RecorteVistaBottomHandleX => RecorteVistaX + RecorteVistaLargura / 2;
+        public double RecorteVistaBottomHandleY => RecorteVistaY + RecorteVistaAltura;
+        public double RecorteVistaBottomLeftHandleX => RecorteVistaX;
+        public double RecorteVistaBottomLeftHandleY => RecorteVistaY + RecorteVistaAltura;
+        public double RecorteVistaLeftHandleX => RecorteVistaX;
+        public double RecorteVistaLeftHandleY => RecorteVistaY + RecorteVistaAltura / 2;
 
         public void AtualizarZoomVisual(double zoom)
         {
@@ -111,6 +138,50 @@ namespace Araci.ViewModels
             OnPropertyChanged(nameof(TerminalMessageFontSize));
             OnPropertyChanged(nameof(TerminalMessagePadding));
             OnPropertyChanged(nameof(TerminalMessageCornerRadius));
+            OnPropertyChanged(nameof(RecorteVistaStrokeThickness));
+            OnPropertyChanged(nameof(RecorteVistaHandleVisualSize));
+            OnPropertyChanged(nameof(RecorteVistaHandleVisualNegativeHalfOffset));
+            OnPropertyChanged(nameof(RecorteVistaHandleStrokeThickness));
+        }
+
+        private void OnVistaAtivaAlterada()
+        {
+            NotificarRecorteVistaAlterado();
+        }
+
+        private void OnPropriedadesVistaAlteradas(ProjectView vista)
+        {
+            if (Document.VistaAtivaId.HasValue && Document.VistaAtivaId.Value == vista.Id)
+                NotificarRecorteVistaAlterado();
+        }
+
+        private void NotificarRecorteVistaAlterado()
+        {
+            OnPropertyChanged(nameof(RecorteVistaVisivel));
+            OnPropertyChanged(nameof(RecorteVistaX));
+            OnPropertyChanged(nameof(RecorteVistaY));
+            OnPropertyChanged(nameof(RecorteVistaLargura));
+            OnPropertyChanged(nameof(RecorteVistaAltura));
+            OnPropertyChanged(nameof(RecorteVistaStrokeThickness));
+            OnPropertyChanged(nameof(RecorteVistaHandleVisualSize));
+            OnPropertyChanged(nameof(RecorteVistaHandleVisualNegativeHalfOffset));
+            OnPropertyChanged(nameof(RecorteVistaHandleStrokeThickness));
+            OnPropertyChanged(nameof(RecorteVistaTopLeftHandleX));
+            OnPropertyChanged(nameof(RecorteVistaTopLeftHandleY));
+            OnPropertyChanged(nameof(RecorteVistaTopHandleX));
+            OnPropertyChanged(nameof(RecorteVistaTopHandleY));
+            OnPropertyChanged(nameof(RecorteVistaTopRightHandleX));
+            OnPropertyChanged(nameof(RecorteVistaTopRightHandleY));
+            OnPropertyChanged(nameof(RecorteVistaRightHandleX));
+            OnPropertyChanged(nameof(RecorteVistaRightHandleY));
+            OnPropertyChanged(nameof(RecorteVistaBottomRightHandleX));
+            OnPropertyChanged(nameof(RecorteVistaBottomRightHandleY));
+            OnPropertyChanged(nameof(RecorteVistaBottomHandleX));
+            OnPropertyChanged(nameof(RecorteVistaBottomHandleY));
+            OnPropertyChanged(nameof(RecorteVistaBottomLeftHandleX));
+            OnPropertyChanged(nameof(RecorteVistaBottomLeftHandleY));
+            OnPropertyChanged(nameof(RecorteVistaLeftHandleX));
+            OnPropertyChanged(nameof(RecorteVistaLeftHandleY));
         }
 
         public void RegistrarViewModel(ElementoViewModel vm)

@@ -8,6 +8,8 @@ using System.Windows.Media;
 using Araci.Applications.Editar.Base;
 using Araci.Applications.UseCases.Editar;
 using Araci.Core.Commands;
+using Araci.Core.Documents;
+using Araci.Core.Transactions;
 using Araci.Models;
 using Araci.Services;
 using Araci.ViewModels;
@@ -33,6 +35,14 @@ namespace Araci.Views
         private double _textoWidthResizeYInicial;
         private double _textoWidthResizeLarguraInicial;
         private double _textoWidthResizeDeltaAcumulado;
+        private ProjectView? _recorteVistaResizeAtivo;
+        private ProjectView? _recorteVistaMoveAtivo;
+        private ViewCropResizeHandle _recorteVistaResizeHandle = ViewCropResizeHandle.None;
+        private double _recorteVistaXInicial;
+        private double _recorteVistaYInicial;
+        private double _recorteVistaLarguraInicial;
+        private double _recorteVistaAlturaInicial;
+        private Point _recorteVistaMouseInicial;
 
         public ViewportView()
         {
@@ -52,6 +62,9 @@ namespace Araci.Views
         private bool IsTextoWidthResizing => _textoWidthResizeAtivo != null;
         private bool IsTextoRotating => _textoRotationAtivo != null;
         private bool IsTextoLeaderEditing => _textoLeaderEditAtivo != null || _textoLeaderCotoveloEditAtivo != null;
+        private bool IsRecorteVistaResizing => _recorteVistaResizeAtivo != null;
+        private bool IsRecorteVistaMoving => _recorteVistaMoveAtivo != null;
+        private bool IsRecorteVistaEditing => IsRecorteVistaResizing || IsRecorteVistaMoving;
 
         private void ConfigurarCamera()
         {
@@ -60,6 +73,7 @@ namespace Araci.Views
 
             WorldLayer.RenderTransform = _cameraTransform;
             LeaderLayer.RenderTransform = _cameraTransform;
+            ViewCropLayer.RenderTransform = _cameraTransform;
             AlignmentGuideLayer.RenderTransform = _cameraTransform;
             SelectionLayer.RenderTransform = _cameraTransform;
             CableVertexHandleLayer.RenderTransform = _cameraTransform;
@@ -125,6 +139,9 @@ namespace Araci.Views
             if (_context == null)
                 return;
 
+            if (OrigemEstaDentroDeRecorteVistaHandle(e.OriginalSource as DependencyObject))
+                return;
+
             if (OrigemEstaDentroDeTextoWidthHandle(e.OriginalSource as DependencyObject))
                 return;
 
@@ -149,6 +166,9 @@ namespace Araci.Views
         private void OnPreviewMouseLeftButtonDown(object sender, MouseButtonEventArgs e)
         {
             if (_context == null)
+                return;
+
+            if (OrigemEstaDentroDeRecorteVistaHandle(e.OriginalSource as DependencyObject))
                 return;
 
             if (OrigemEstaDentroDeTextoWidthHandle(e.OriginalSource as DependencyObject))
@@ -210,6 +230,18 @@ namespace Araci.Views
             if (_context == null)
                 return;
 
+            if (IsRecorteVistaMoving)
+            {
+                Cursor = Cursors.SizeAll;
+                return;
+            }
+
+            if (IsRecorteVistaResizing)
+            {
+                Cursor = ObterCursorRecorteVista(_recorteVistaResizeHandle);
+                return;
+            }
+
             if (IsTextoWidthResizing)
             {
                 Cursor = Cursors.SizeWE;
@@ -245,7 +277,7 @@ namespace Araci.Views
 
         private void OnPreviewMouseLeftButtonUp(object sender, MouseButtonEventArgs e)
         {
-            if (IsTextoWidthResizing || IsTextoRotating || IsTextoLeaderEditing)
+            if (IsRecorteVistaEditing || IsTextoWidthResizing || IsTextoRotating || IsTextoLeaderEditing)
                 return;
 
             if (_context?.Navigation.TryEndSpaceLeftPan(e) == true)
@@ -345,7 +377,7 @@ namespace Araci.Views
 
         private void OnMouseLeave(object sender, MouseEventArgs e)
         {
-            if (ExisteEdicaoInlineAtiva() || IsTextoWidthResizing || IsTextoRotating || IsTextoLeaderEditing)
+            if (ExisteEdicaoInlineAtiva() || IsRecorteVistaEditing || IsTextoWidthResizing || IsTextoRotating || IsTextoLeaderEditing)
                 return;
 
             _context?.Hover.Clear();
@@ -359,6 +391,7 @@ namespace Araci.Views
         private void OnUnloaded(object sender, RoutedEventArgs e)
         {
             ConfirmarEdicaoInlineAtiva();
+            CancelarEdicaoRecorteVista();
             CancelarResizeLarguraTexto();
             CancelarRotacaoTexto();
             CancelarEdicaoLeaderTexto();
@@ -375,6 +408,18 @@ namespace Araci.Views
 
         private void AtualizarCursorInteracao(Point worldPosition)
         {
+            if (IsRecorteVistaMoving)
+            {
+                Cursor = Cursors.SizeAll;
+                return;
+            }
+
+            if (IsRecorteVistaResizing)
+            {
+                Cursor = ObterCursorRecorteVista(_recorteVistaResizeHandle);
+                return;
+            }
+
             if (IsTextoWidthResizing)
             {
                 Cursor = Cursors.SizeWE;
@@ -526,6 +571,297 @@ namespace Araci.Views
                 if (!_cancelInlineTextInProgress && !_commitInlineTextInProgress && texto.IsEditingInline)
                     ConfirmarEdicaoInlineTexto(texto);
             }));
+        }
+
+
+        private void OnRecorteVistaAreaMouseLeftButtonDown(object sender, MouseButtonEventArgs e)
+        {
+            if (_context == null)
+                return;
+
+            if (ExisteEdicaoInlineAtiva())
+                ConfirmarEdicaoInlineAtiva();
+
+            _context.SelecionarRegiaoRecorteVistaAtivaNasPropriedades();
+            Focus();
+            Keyboard.Focus(this);
+        }
+
+        private void OnRecorteVistaMoveDragStarted(object sender, DragStartedEventArgs e)
+        {
+            if (_context?.Document.VistaAtiva == null)
+                return;
+
+            if (ExisteEdicaoInlineAtiva())
+                ConfirmarEdicaoInlineAtiva();
+
+            _context.SelecionarRegiaoRecorteVistaAtivaNasPropriedades();
+            _recorteVistaMoveAtivo = _context.Document.VistaAtiva;
+            CapturarEstadoInicialRecorteVista(_recorteVistaMoveAtivo);
+            Cursor = Cursors.SizeAll;
+            e.Handled = true;
+        }
+
+        private void OnRecorteVistaMoveDragDelta(object sender, DragDeltaEventArgs e)
+        {
+            if (_recorteVistaMoveAtivo == null || _context == null)
+                return;
+
+            Point mouseAtual = ObterPosicaoMouseMundoAtual();
+            double deltaX = mouseAtual.X - _recorteVistaMouseInicial.X;
+            double deltaY = mouseAtual.Y - _recorteVistaMouseInicial.Y;
+
+            AplicarRecorteVista(
+                _recorteVistaMoveAtivo,
+                _recorteVistaXInicial + deltaX,
+                _recorteVistaYInicial + deltaY,
+                _recorteVistaLarguraInicial,
+                _recorteVistaAlturaInicial);
+
+            _context.Document.AtualizarPropriedadesVista(_recorteVistaMoveAtivo);
+            Cursor = Cursors.SizeAll;
+            e.Handled = true;
+        }
+
+        private void OnRecorteVistaMoveDragCompleted(object sender, DragCompletedEventArgs e)
+        {
+            if (_recorteVistaMoveAtivo == null || _context == null)
+                return;
+
+            ProjectView vista = _recorteVistaMoveAtivo;
+            _recorteVistaMoveAtivo = null;
+            AtualizarCursorNavegacao();
+            CommitarEdicaoRecorteVista(vista);
+            e.Handled = true;
+        }
+
+        private void OnRecorteVistaResizeHandleDragStarted(object sender, DragStartedEventArgs e)
+        {
+            if (sender is not Thumb thumb || _context?.Document.VistaAtiva == null)
+                return;
+
+            _recorteVistaResizeHandle = ObterRecorteVistaResizeHandle(thumb);
+
+            if (_recorteVistaResizeHandle == ViewCropResizeHandle.None)
+                return;
+
+            if (ExisteEdicaoInlineAtiva())
+                ConfirmarEdicaoInlineAtiva();
+
+            _context.SelecionarRegiaoRecorteVistaAtivaNasPropriedades();
+            _recorteVistaResizeAtivo = _context.Document.VistaAtiva;
+            CapturarEstadoInicialRecorteVista(_recorteVistaResizeAtivo);
+            Cursor = ObterCursorRecorteVista(_recorteVistaResizeHandle);
+            e.Handled = true;
+        }
+
+        private void OnRecorteVistaResizeHandleDragDelta(object sender, DragDeltaEventArgs e)
+        {
+            if (_recorteVistaResizeAtivo == null || _context == null)
+                return;
+
+            Point mouseAtual = ObterPosicaoMouseMundoAtual();
+            double deltaX = mouseAtual.X - _recorteVistaMouseInicial.X;
+            double deltaY = mouseAtual.Y - _recorteVistaMouseInicial.Y;
+
+            AplicarResizeRecorteVista(
+                _recorteVistaResizeAtivo,
+                _recorteVistaResizeHandle,
+                _recorteVistaXInicial,
+                _recorteVistaYInicial,
+                _recorteVistaLarguraInicial,
+                _recorteVistaAlturaInicial,
+                deltaX,
+                deltaY);
+
+            _context.Document.AtualizarPropriedadesVista(_recorteVistaResizeAtivo);
+            Cursor = ObterCursorRecorteVista(_recorteVistaResizeHandle);
+            e.Handled = true;
+        }
+
+        private void OnRecorteVistaResizeHandleDragCompleted(object sender, DragCompletedEventArgs e)
+        {
+            if (_recorteVistaResizeAtivo == null || _context == null)
+                return;
+
+            ProjectView vista = _recorteVistaResizeAtivo;
+            _recorteVistaResizeAtivo = null;
+            _recorteVistaResizeHandle = ViewCropResizeHandle.None;
+            AtualizarCursorNavegacao();
+            CommitarEdicaoRecorteVista(vista);
+            e.Handled = true;
+        }
+
+        private void CancelarEdicaoRecorteVista()
+        {
+            ProjectView? vista = _recorteVistaMoveAtivo ?? _recorteVistaResizeAtivo;
+
+            if (vista == null)
+                return;
+
+            AplicarRecorteVista(
+                vista,
+                _recorteVistaXInicial,
+                _recorteVistaYInicial,
+                _recorteVistaLarguraInicial,
+                _recorteVistaAlturaInicial);
+
+            _context?.Document.AtualizarPropriedadesVista(vista);
+            _recorteVistaMoveAtivo = null;
+            _recorteVistaResizeAtivo = null;
+            _recorteVistaResizeHandle = ViewCropResizeHandle.None;
+        }
+
+        private void CapturarEstadoInicialRecorteVista(ProjectView vista)
+        {
+            _recorteVistaXInicial = vista.RecorteX;
+            _recorteVistaYInicial = vista.RecorteY;
+            _recorteVistaLarguraInicial = Math.Max(ProjectView.MinRecorteDimension, vista.RecorteLargura);
+            _recorteVistaAlturaInicial = Math.Max(ProjectView.MinRecorteDimension, vista.RecorteAltura);
+            _recorteVistaMouseInicial = ObterPosicaoMouseMundoAtual();
+        }
+
+        private Point ObterPosicaoMouseMundoAtual()
+        {
+            Point screen = Mouse.GetPosition(this);
+            return _context?.Viewport?.ScreenToWorld(screen) ?? screen;
+        }
+
+        private void CommitarEdicaoRecorteVista(ProjectView vista)
+        {
+            if (_context == null)
+                return;
+
+            double xAntes = _recorteVistaXInicial;
+            double yAntes = _recorteVistaYInicial;
+            double larguraAntes = _recorteVistaLarguraInicial;
+            double alturaAntes = _recorteVistaAlturaInicial;
+            double xDepois = vista.RecorteX;
+            double yDepois = vista.RecorteY;
+            double larguraDepois = vista.RecorteLargura;
+            double alturaDepois = vista.RecorteAltura;
+
+            if (!RecorteVistaAlterado(xAntes, yAntes, larguraAntes, alturaAntes, xDepois, yDepois, larguraDepois, alturaDepois))
+            {
+                AplicarRecorteVista(vista, xAntes, yAntes, larguraAntes, alturaAntes);
+                _context.Document.AtualizarPropriedadesVista(vista);
+                return;
+            }
+
+            AplicarRecorteVista(vista, xAntes, yAntes, larguraAntes, alturaAntes);
+            _context.Document.AtualizarPropriedadesVista(vista);
+
+            using var transaction = _context.BeginTransaction();
+            AdicionarComandoRecorteVista(transaction, _context.Document, vista, xAntes, xDepois, (v, valor) => v.RecorteX = valor);
+            AdicionarComandoRecorteVista(transaction, _context.Document, vista, yAntes, yDepois, (v, valor) => v.RecorteY = valor);
+            AdicionarComandoRecorteVista(transaction, _context.Document, vista, larguraAntes, larguraDepois, (v, valor) => v.RecorteLargura = valor);
+            AdicionarComandoRecorteVista(transaction, _context.Document, vista, alturaAntes, alturaDepois, (v, valor) => v.RecorteAltura = valor);
+            transaction.Commit();
+        }
+
+        private static void AdicionarComandoRecorteVista(
+            TransactionScope transaction,
+            AraciDocument document,
+            ProjectView vista,
+            double valorAnterior,
+            double valorNovo,
+            Action<ProjectView, double> aplicar)
+        {
+            if (Math.Abs(valorAnterior - valorNovo) < 0.000001)
+                return;
+
+            transaction.Add(new UpdateProjectViewPropertyCommand<double>(
+                document,
+                vista,
+                aplicar,
+                valorAnterior,
+                valorNovo));
+        }
+
+        private static void AplicarResizeRecorteVista(
+            ProjectView vista,
+            ViewCropResizeHandle handle,
+            double xInicial,
+            double yInicial,
+            double larguraInicial,
+            double alturaInicial,
+            double deltaX,
+            double deltaY)
+        {
+            double esquerda = xInicial;
+            double topo = yInicial;
+            double direita = xInicial + larguraInicial;
+            double inferior = yInicial + alturaInicial;
+            bool alterarEsquerda = handle is ViewCropResizeHandle.TopLeft or ViewCropResizeHandle.Left or ViewCropResizeHandle.BottomLeft;
+            bool alterarDireita = handle is ViewCropResizeHandle.TopRight or ViewCropResizeHandle.Right or ViewCropResizeHandle.BottomRight;
+            bool alterarTopo = handle is ViewCropResizeHandle.TopLeft or ViewCropResizeHandle.Top or ViewCropResizeHandle.TopRight;
+            bool alterarInferior = handle is ViewCropResizeHandle.BottomLeft or ViewCropResizeHandle.Bottom or ViewCropResizeHandle.BottomRight;
+
+            if (alterarEsquerda)
+                esquerda = Math.Min(esquerda + deltaX, direita - ProjectView.MinRecorteDimension);
+
+            if (alterarDireita)
+                direita = Math.Max(direita + deltaX, esquerda + ProjectView.MinRecorteDimension);
+
+            if (alterarTopo)
+                topo = Math.Min(topo + deltaY, inferior - ProjectView.MinRecorteDimension);
+
+            if (alterarInferior)
+                inferior = Math.Max(inferior + deltaY, topo + ProjectView.MinRecorteDimension);
+
+            AplicarRecorteVista(vista, esquerda, topo, direita - esquerda, inferior - topo);
+        }
+
+        private static void AplicarRecorteVista(ProjectView vista, double x, double y, double largura, double altura)
+        {
+            vista.RecorteX = x;
+            vista.RecorteY = y;
+            vista.RecorteLargura = Math.Max(ProjectView.MinRecorteDimension, largura);
+            vista.RecorteAltura = Math.Max(ProjectView.MinRecorteDimension, altura);
+        }
+
+        private static bool RecorteVistaAlterado(
+            double xAntes,
+            double yAntes,
+            double larguraAntes,
+            double alturaAntes,
+            double xDepois,
+            double yDepois,
+            double larguraDepois,
+            double alturaDepois)
+        {
+            return Math.Abs(xAntes - xDepois) > 0.000001 ||
+                Math.Abs(yAntes - yDepois) > 0.000001 ||
+                Math.Abs(larguraAntes - larguraDepois) > 0.000001 ||
+                Math.Abs(alturaAntes - alturaDepois) > 0.000001;
+        }
+
+        private static ViewCropResizeHandle ObterRecorteVistaResizeHandle(Thumb thumb)
+        {
+            return thumb.Tag?.ToString() switch
+            {
+                "ViewCropTopLeft" => ViewCropResizeHandle.TopLeft,
+                "ViewCropTop" => ViewCropResizeHandle.Top,
+                "ViewCropTopRight" => ViewCropResizeHandle.TopRight,
+                "ViewCropRight" => ViewCropResizeHandle.Right,
+                "ViewCropBottomRight" => ViewCropResizeHandle.BottomRight,
+                "ViewCropBottom" => ViewCropResizeHandle.Bottom,
+                "ViewCropBottomLeft" => ViewCropResizeHandle.BottomLeft,
+                "ViewCropLeft" => ViewCropResizeHandle.Left,
+                _ => ViewCropResizeHandle.None
+            };
+        }
+
+        private static Cursor ObterCursorRecorteVista(ViewCropResizeHandle handle)
+        {
+            return handle switch
+            {
+                ViewCropResizeHandle.TopLeft or ViewCropResizeHandle.BottomRight => Cursors.SizeNWSE,
+                ViewCropResizeHandle.TopRight or ViewCropResizeHandle.BottomLeft => Cursors.SizeNESW,
+                ViewCropResizeHandle.Top or ViewCropResizeHandle.Bottom => Cursors.SizeNS,
+                ViewCropResizeHandle.Left or ViewCropResizeHandle.Right => Cursors.SizeWE,
+                _ => Cursors.Arrow
+            };
         }
 
 
@@ -1049,6 +1385,20 @@ namespace Araci.Views
             return false;
         }
 
+        private static bool OrigemEstaDentroDeRecorteVistaHandle(DependencyObject? origem)
+        {
+            while (origem != null)
+            {
+                if (origem is Thumb thumb && thumb.Tag?.ToString()?.StartsWith("ViewCrop", StringComparison.OrdinalIgnoreCase) == true)
+                    return true;
+
+                origem = VisualTreeHelper.GetParent(origem);
+            }
+
+            return false;
+        }
+
+
         private static bool OrigemEstaDentroDeTextoWidthHandle(DependencyObject? origem)
         {
             while (origem != null)
@@ -1093,6 +1443,19 @@ namespace Araci.Views
             }
 
             return null;
+        }
+
+        private enum ViewCropResizeHandle
+        {
+            None,
+            TopLeft,
+            Top,
+            TopRight,
+            Right,
+            BottomRight,
+            Bottom,
+            BottomLeft,
+            Left
         }
 
         private enum TextoWidthResizeSide
