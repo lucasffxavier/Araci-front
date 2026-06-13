@@ -26,13 +26,12 @@ namespace Araci.ViewModels
             _vista = vista ?? throw new ArgumentNullException(nameof(vista));
             _renomearItemProjeto = renomearItemProjeto ?? throw new ArgumentNullException(nameof(renomearItemProjeto));
             _editarPropriedadesVista = editarPropriedadesVista ?? throw new ArgumentNullException(nameof(editarPropriedadesVista));
-            ExibirParametrosRecorte = exibirParametrosRecorte;
+            _ = exibirParametrosRecorte;
             _document.ItemProjetoRenomeado += OnItemProjetoRenomeado;
             _document.PropriedadesVistaAlteradas += OnPropriedadesVistaAlteradas;
         }
 
-        public string Titulo => ExibirParametrosRecorte ? "Região de recorte" : "Vista";
-        public bool ExibirParametrosRecorte { get; }
+        public string Titulo => "Vista";
 
         public IReadOnlyList<ProjectViewDiscipline> Disciplinas { get; } =
             new[]
@@ -98,39 +97,52 @@ namespace Araci.ViewModels
             }
         }
 
-        public string RecorteXTexto
-        {
-            get => FormatarNumero(_vista.RecorteX);
-            set
-            {
-                if (!TentarConverterNumero(value, out double valor))
-                {
-                    OnPropertyChanged();
-                    return;
-                }
+        public event PropertyChangedEventHandler? PropertyChanged;
 
-                if (_editarPropriedadesVista.AlterarRecorteX(_vista.Id, valor))
-                    OnPropertyChanged();
-            }
+        private void OnItemProjetoRenomeado()
+        {
+            OnPropertyChanged(nameof(Nome));
         }
 
-        public string RecorteYTexto
+        private void OnPropriedadesVistaAlteradas(ProjectView vista)
         {
-            get => FormatarNumero(_vista.RecorteY);
-            set
-            {
-                if (!TentarConverterNumero(value, out double valor))
-                {
-                    OnPropertyChanged();
-                    return;
-                }
+            if (vista.Id != _vista.Id)
+                return;
 
-                if (_editarPropriedadesVista.AlterarRecorteY(_vista.Id, valor))
-                    OnPropertyChanged();
-            }
+            OnPropertyChanged(nameof(Escala));
+            OnPropertyChanged(nameof(Disciplina));
+            OnPropertyChanged(nameof(RecortarVista));
+            OnPropertyChanged(nameof(RegiaoRecorteVisivel));
         }
 
-        public string RecorteLarguraTexto
+        private void OnPropertyChanged([CallerMemberName] string? propertyName = null)
+        {
+            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
+        }
+    }
+
+    public sealed class ProjectViewCropRegionPropertiesViewModel : INotifyPropertyChanged
+    {
+        private readonly AraciDocument _document;
+        private readonly ProjectView _vista;
+        private readonly EditarPropriedadesVistaUseCase _editarPropriedadesVista;
+
+        public ProjectViewCropRegionPropertiesViewModel(
+            AraciDocument document,
+            ProjectView vista,
+            EditarPropriedadesVistaUseCase editarPropriedadesVista)
+        {
+            _document = document ?? throw new ArgumentNullException(nameof(document));
+            _vista = vista ?? throw new ArgumentNullException(nameof(vista));
+            _editarPropriedadesVista = editarPropriedadesVista ?? throw new ArgumentNullException(nameof(editarPropriedadesVista));
+            _document.ItemProjetoRenomeado += OnItemProjetoRenomeado;
+            _document.PropriedadesVistaAlteradas += OnPropriedadesVistaAlteradas;
+        }
+
+        public string Titulo => "Região de recorte";
+        public string VistaNome => _vista.Nome;
+
+        public string LarguraTexto
         {
             get => FormatarNumero(_vista.RecorteLargura);
             set
@@ -146,7 +158,7 @@ namespace Araci.ViewModels
             }
         }
 
-        public string RecorteAlturaTexto
+        public string AlturaTexto
         {
             get => FormatarNumero(_vista.RecorteAltura);
             set
@@ -162,11 +174,31 @@ namespace Araci.ViewModels
             }
         }
 
+        public bool RecortarVista
+        {
+            get => _vista.RecortarVista;
+            set
+            {
+                if (_editarPropriedadesVista.AlterarRecortarVista(_vista.Id, value))
+                    OnPropertyChanged();
+            }
+        }
+
+        public bool RegiaoRecorteVisivel
+        {
+            get => _vista.RegiaoRecorteVisivel;
+            set
+            {
+                if (_editarPropriedadesVista.AlterarRegiaoRecorteVisivel(_vista.Id, value))
+                    OnPropertyChanged();
+            }
+        }
+
         public event PropertyChangedEventHandler? PropertyChanged;
 
         private void OnItemProjetoRenomeado()
         {
-            OnPropertyChanged(nameof(Nome));
+            OnPropertyChanged(nameof(VistaNome));
         }
 
         private void OnPropriedadesVistaAlteradas(ProjectView vista)
@@ -174,15 +206,11 @@ namespace Araci.ViewModels
             if (vista.Id != _vista.Id)
                 return;
 
-            OnPropertyChanged(nameof(Titulo));
-            OnPropertyChanged(nameof(Escala));
-            OnPropertyChanged(nameof(Disciplina));
+            OnPropertyChanged(nameof(VistaNome));
+            OnPropertyChanged(nameof(LarguraTexto));
+            OnPropertyChanged(nameof(AlturaTexto));
             OnPropertyChanged(nameof(RecortarVista));
             OnPropertyChanged(nameof(RegiaoRecorteVisivel));
-            OnPropertyChanged(nameof(RecorteXTexto));
-            OnPropertyChanged(nameof(RecorteYTexto));
-            OnPropertyChanged(nameof(RecorteLarguraTexto));
-            OnPropertyChanged(nameof(RecorteAlturaTexto));
         }
 
         private static string FormatarNumero(double valor)

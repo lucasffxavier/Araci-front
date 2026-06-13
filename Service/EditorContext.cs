@@ -217,12 +217,10 @@ namespace Araci.Services
             Selection.Limpar();
             Hover.Clear();
             Editor.SuperficieAtiva = EditorSurfaceKind.Diagram;
-            Editor.ElementoSelecionado = new ProjectViewPropertiesViewModel(
+            Editor.ElementoSelecionado = new ProjectViewCropRegionPropertiesViewModel(
                 Document,
                 vista,
-                RenomearItemProjeto,
-                EditarPropriedadesVista,
-                exibirParametrosRecorte: true);
+                EditarPropriedadesVista);
         }
 
         public EditorState Editor { get; } = new EditorState();
