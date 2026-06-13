@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.ComponentModel;
+using System.Globalization;
 using System.Linq;
 using System.Runtime.CompilerServices;
 using System.Windows;
@@ -13,11 +14,16 @@ namespace Araci.ViewModels
 {
     public sealed class ProjectTableDataViewModel : INotifyPropertyChanged
     {
+        private const double MinimumColumnWidth = 44.0;
+        private const double HeaderHorizontalPadding = 14.0;
+        private const double BodyHorizontalPadding = 14.0;
+
         private readonly AraciDocument _document;
         private readonly ProjectTable _table;
         private readonly ProjectTableDataBuilder _builder;
         private string _titulo = string.Empty;
         private IReadOnlyList<ProjectTableDataColumn> _columns = new List<ProjectTableDataColumn>();
+        private IReadOnlyList<double> _columnMinimumWidths = new List<double>();
         private string _emptyMessage = string.Empty;
 
         public ProjectTableDataViewModel(
@@ -88,6 +94,16 @@ namespace Araci.ViewModels
             }
         }
 
+        public IReadOnlyList<double> ColumnMinimumWidths
+        {
+            get => _columnMinimumWidths;
+            private set
+            {
+                _columnMinimumWidths = value ?? new List<double>();
+                OnPropertyChanged();
+            }
+        }
+
         public bool HasColumns => Columns.Count > 0;
         public bool HasRows => Rows.Count > 0;
         public bool HasEmptyMessage => !string.IsNullOrWhiteSpace(EmptyMessage);
@@ -106,11 +122,19 @@ namespace Araci.ViewModels
             }
         }
 
+        public double ObterLarguraMinimaColuna(int index)
+        {
+            return index >= 0 && index < ColumnMinimumWidths.Count
+                ? ColumnMinimumWidths[index]
+                : MinimumColumnWidth;
+        }
+
         public void Refresh()
         {
             Titulo = _table.Nome;
             ProjectTableDataResult result = _builder.Build(_document, _table);
             Columns = result.Columns.ToList();
+            ColumnMinimumWidths = CalcularLargurasMinimas(result.Columns, result.Rows, Exibicao);
 
             Rows.Clear();
 
@@ -153,6 +177,97 @@ namespace Araci.ViewModels
             OnPropertyChanged(nameof(BodyTextAlignment));
         }
 
+        private static IReadOnlyList<double> CalcularLargurasMinimas(
+            IReadOnlyList<ProjectTableDataColumn> columns,
+            IReadOnlyList<ProjectTableDataRow> rows,
+            ProjectTableDisplaySettings exibicao)
+        {
+            var resultado = new List<double>();
+
+            if (columns.Count == 0)
+                return resultado;
+
+            Typeface headerTypeface = CriarTypeface(exibicao.FonteCabecalho, exibicao.CabecalhoNegrito ? FontWeights.SemiBold : FontWeights.Normal);
+            Typeface bodyTypeface = CriarTypeface(exibicao.FonteCorpo, FontWeights.Normal);
+            double headerFontSize = NormalizarTamanhoFonte(exibicao.TamanhoFonteCabecalho, 10.0);
+            double bodyFontSize = NormalizarTamanhoFonte(exibicao.TamanhoFonteCorpo, 10.5);
+
+            for (int columnIndex = 0; columnIndex < columns.Count; columnIndex++)
+            {
+                double maiorLargura = MedirMaiorPalavra(columns[columnIndex].NomeExibicao, headerTypeface, headerFontSize) + HeaderHorizontalPadding;
+
+                foreach (ProjectTableDataRow row in rows)
+                {
+                    if (columnIndex < 0 || columnIndex >= row.Cells.Count)
+                        continue;
+
+                    double larguraCelula = MedirMaiorPalavra(row.Cells[columnIndex].DisplayValue, bodyTypeface, bodyFontSize) + BodyHorizontalPadding;
+
+                    if (larguraCelula > maiorLargura)
+                        maiorLargura = larguraCelula;
+                }
+
+                resultado.Add(Math.Ceiling(Math.Max(MinimumColumnWidth, maiorLargura)));
+            }
+
+            return resultado;
+        }
+
+        private static Typeface CriarTypeface(string? fonte, FontWeight peso)
+        {
+            string nomeFonte = string.IsNullOrWhiteSpace(fonte)
+                ? ProjectTableDisplaySettings.DefaultFontFamily
+                : fonte.Trim();
+
+            return new Typeface(new FontFamily(nomeFonte), FontStyles.Normal, peso, FontStretches.Normal);
+        }
+
+        private static double MedirMaiorPalavra(string? texto, Typeface typeface, double fontSize)
+        {
+            double maior = 0.0;
+
+            foreach (string palavra in ObterPalavras(texto))
+            {
+                double largura = MedirTexto(palavra, typeface, fontSize);
+
+                if (largura > maior)
+                    maior = largura;
+            }
+
+            return maior;
+        }
+
+        private static IEnumerable<string> ObterPalavras(string? texto)
+        {
+            if (string.IsNullOrWhiteSpace(texto))
+                yield break;
+
+            foreach (string palavra in texto.Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries))
+            {
+                string normalizada = palavra.Trim();
+
+                if (!string.IsNullOrWhiteSpace(normalizada))
+                    yield return normalizada;
+            }
+        }
+
+        private static double MedirTexto(string texto, Typeface typeface, double fontSize)
+        {
+            if (string.IsNullOrWhiteSpace(texto))
+                return 0.0;
+
+            var formatted = new FormattedText(
+                texto,
+                CultureInfo.CurrentUICulture,
+                FlowDirection.LeftToRight,
+                typeface,
+                fontSize,
+                Brushes.Black,
+                1.0);
+
+            return formatted.WidthIncludingTrailingWhitespace;
+        }
+
         private static Brush CriarBrush(string? valor, string fallback)
         {
             try
@@ -188,6 +303,19 @@ namespace Araci.ViewModels
                 return ProjectTableDisplaySettings.MaxRowHeight;
 
             return altura;
+        }
+
+        private static double NormalizarTamanhoFonte(double valor, double fallback)
+        {
+            double tamanho = double.IsNaN(valor) || double.IsInfinity(valor) ? fallback : valor;
+
+            if (tamanho < ProjectTableDisplaySettings.MinFontSize)
+                return ProjectTableDisplaySettings.MinFontSize;
+
+            if (tamanho > ProjectTableDisplaySettings.MaxFontSize)
+                return ProjectTableDisplaySettings.MaxFontSize;
+
+            return tamanho;
         }
 
         public event PropertyChangedEventHandler? PropertyChanged;

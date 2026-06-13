@@ -32,7 +32,9 @@ namespace Araci.Views
 
         private void OnViewModelPropertyChanged(object? sender, PropertyChangedEventArgs e)
         {
-            if (string.IsNullOrEmpty(e.PropertyName) || e.PropertyName == nameof(ProjectTableDataViewModel.Columns))
+            if (string.IsNullOrEmpty(e.PropertyName) ||
+                e.PropertyName == nameof(ProjectTableDataViewModel.Columns) ||
+                e.PropertyName == nameof(ProjectTableDataViewModel.ColumnMinimumWidths))
                 AtualizarColunas();
         }
 
@@ -50,6 +52,8 @@ namespace Araci.Views
                     Header = _viewModel.Columns[i].NomeExibicao,
                     Binding = new Binding($"[{i}]") { Mode = BindingMode.OneWay },
                     IsReadOnly = true,
+                    MinWidth = _viewModel.ObterLarguraMinimaColuna(i),
+                    Width = DataGridLength.SizeToCells,
                     ElementStyle = CriarTextoCelulaStyle()
                 });
             }
