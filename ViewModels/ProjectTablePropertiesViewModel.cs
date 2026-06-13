@@ -17,7 +17,6 @@ namespace Araci.ViewModels
         private readonly ProjectTable _tabela;
         private readonly RenomearItemProjetoUseCase _renomearItemProjeto;
         private readonly EditarPropriedadesTabelaUseCase _editarPropriedadesTabela;
-        private readonly ExportarTabelaUseCase _exportarTabela;
         private readonly IUserDialogService _dialogs;
 
         public ProjectTablePropertiesViewModel(
@@ -32,12 +31,11 @@ namespace Araci.ViewModels
             _tabela = tabela ?? throw new ArgumentNullException(nameof(tabela));
             _renomearItemProjeto = renomearItemProjeto ?? throw new ArgumentNullException(nameof(renomearItemProjeto));
             _editarPropriedadesTabela = editarPropriedadesTabela ?? throw new ArgumentNullException(nameof(editarPropriedadesTabela));
-            _exportarTabela = exportarTabela ?? throw new ArgumentNullException(nameof(exportarTabela));
+            ArgumentNullException.ThrowIfNull(exportarTabela);
             _dialogs = dialogs ?? throw new ArgumentNullException(nameof(dialogs));
             _document.ItemProjetoRenomeado += OnItemProjetoRenomeado;
             _document.PropriedadesTabelaAlteradas += OnPropriedadesTabelaAlteradas;
 
-            ExportarCsvCommand = new RelayCommand(ExportarCsv);
             ElementosTabelaCommand = new RelayCommand(MostrarElementosTabelaPlaceholder);
             FiltrosCommand = new RelayCommand(MostrarFiltrosPlaceholder);
             OrdenacaoCommand = new RelayCommand(MostrarOrdenacaoPlaceholder);
@@ -57,7 +55,6 @@ namespace Araci.ViewModels
                 ProjectViewDiscipline.Subestacao
             };
 
-        public ICommand ExportarCsvCommand { get; }
         public ICommand ElementosTabelaCommand { get; }
         public ICommand FiltrosCommand { get; }
         public ICommand OrdenacaoCommand { get; }
@@ -99,11 +96,6 @@ namespace Araci.ViewModels
                 return;
 
             OnPropertyChanged(nameof(Disciplina));
-        }
-
-        private void ExportarCsv()
-        {
-            _exportarTabela.Executar(_tabela);
         }
 
         private void MostrarElementosTabelaPlaceholder()
