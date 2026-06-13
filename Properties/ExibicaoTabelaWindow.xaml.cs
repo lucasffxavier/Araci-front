@@ -3,6 +3,7 @@ using System.Globalization;
 using System.Linq;
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Media;
 using Araci.Core.Documents;
 
 namespace Araci.Properties
@@ -33,6 +34,7 @@ namespace Araci.Properties
             _original = exibicao?.CriarCopia() ?? new ProjectTableDisplaySettings();
             ConfigurarCombos();
             AplicarValores(_original);
+            AtualizarTodosBotoesCor();
         }
 
         public ProjectTableDisplaySettings Exibicao { get; private set; } = new();
@@ -46,6 +48,56 @@ namespace Araci.Properties
         private void CancelButton_Click(object sender, RoutedEventArgs e)
         {
             DialogResult = false;
+        }
+
+        private void ColorTextBox_TextChanged(object sender, TextChangedEventArgs e)
+        {
+            AtualizarTodosBotoesCor();
+        }
+
+        private void CorTextoTituloButton_Click(object sender, RoutedEventArgs e)
+        {
+            AbrirSeletorCor(CorTextoTituloTextBox);
+        }
+
+        private void CorFundoTituloButton_Click(object sender, RoutedEventArgs e)
+        {
+            AbrirSeletorCor(CorFundoTituloTextBox);
+        }
+
+        private void CorTextoCabecalhoButton_Click(object sender, RoutedEventArgs e)
+        {
+            AbrirSeletorCor(CorTextoCabecalhoTextBox);
+        }
+
+        private void CorFundoCabecalhoButton_Click(object sender, RoutedEventArgs e)
+        {
+            AbrirSeletorCor(CorFundoCabecalhoTextBox);
+        }
+
+        private void CorTextoCorpoButton_Click(object sender, RoutedEventArgs e)
+        {
+            AbrirSeletorCor(CorTextoCorpoTextBox);
+        }
+
+        private void CorFundoCorpoButton_Click(object sender, RoutedEventArgs e)
+        {
+            AbrirSeletorCor(CorFundoCorpoTextBox);
+        }
+
+        private void CorLinhaAlternadaButton_Click(object sender, RoutedEventArgs e)
+        {
+            AbrirSeletorCor(CorLinhaAlternadaTextBox);
+        }
+
+        private void CorGradeButton_Click(object sender, RoutedEventArgs e)
+        {
+            AbrirSeletorCor(CorGradeTextBox);
+        }
+
+        private void CorContornoButton_Click(object sender, RoutedEventArgs e)
+        {
+            AbrirSeletorCor(CorContornoTextBox);
         }
 
         private void ConfigurarCombos()
@@ -108,33 +160,84 @@ namespace Araci.Properties
                 FonteTitulo = NormalizarTexto(FonteTituloComboBox.Text, ProjectTableDisplaySettings.DefaultFontFamily),
                 TamanhoFonteTitulo = LerDouble(TamanhoTituloTextBox.Text, _original.TamanhoFonteTitulo),
                 TituloNegrito = TituloNegritoCheckBox.IsChecked == true,
-                CorTextoTitulo = NormalizarTexto(CorTextoTituloTextBox.Text, ProjectTableDisplaySettings.DefaultTitleTextColor),
-                CorFundoTitulo = NormalizarTexto(CorFundoTituloTextBox.Text, ProjectTableDisplaySettings.DefaultTitleBackgroundColor),
+                CorTextoTitulo = NormalizarCor(CorTextoTituloTextBox.Text, ProjectTableDisplaySettings.DefaultTitleTextColor),
+                CorFundoTitulo = NormalizarCor(CorFundoTituloTextBox.Text, ProjectTableDisplaySettings.DefaultTitleBackgroundColor),
                 AlturaTitulo = LerDouble(AlturaTituloTextBox.Text, _original.AlturaTitulo),
                 AlinhamentoTitulo = AlinhamentoTituloComboBox.SelectedItem is ProjectTableTextAlignment alinhamentoTitulo ? alinhamentoTitulo : _original.AlinhamentoTitulo,
                 ExibirCabecalho = ExibirCabecalhoCheckBox.IsChecked == true,
                 FonteCabecalho = NormalizarTexto(FonteCabecalhoComboBox.Text, ProjectTableDisplaySettings.DefaultFontFamily),
                 TamanhoFonteCabecalho = LerDouble(TamanhoCabecalhoTextBox.Text, _original.TamanhoFonteCabecalho),
                 CabecalhoNegrito = CabecalhoNegritoCheckBox.IsChecked == true,
-                CorTextoCabecalho = NormalizarTexto(CorTextoCabecalhoTextBox.Text, ProjectTableDisplaySettings.DefaultHeaderTextColor),
-                CorFundoCabecalho = NormalizarTexto(CorFundoCabecalhoTextBox.Text, ProjectTableDisplaySettings.DefaultHeaderBackgroundColor),
+                CorTextoCabecalho = NormalizarCor(CorTextoCabecalhoTextBox.Text, ProjectTableDisplaySettings.DefaultHeaderTextColor),
+                CorFundoCabecalho = NormalizarCor(CorFundoCabecalhoTextBox.Text, ProjectTableDisplaySettings.DefaultHeaderBackgroundColor),
                 AlturaCabecalho = LerDouble(AlturaCabecalhoTextBox.Text, _original.AlturaCabecalho),
                 AlinhamentoCabecalho = AlinhamentoCabecalhoComboBox.SelectedItem is ProjectTableTextAlignment alinhamentoCabecalho ? alinhamentoCabecalho : ProjectTableTextAlignment.Esquerda,
                 FonteCorpo = NormalizarTexto(FonteCorpoComboBox.Text, ProjectTableDisplaySettings.DefaultFontFamily),
                 TamanhoFonteCorpo = LerDouble(TamanhoCorpoTextBox.Text, _original.TamanhoFonteCorpo),
-                CorTextoCorpo = NormalizarTexto(CorTextoCorpoTextBox.Text, ProjectTableDisplaySettings.DefaultBodyTextColor),
-                CorFundoCorpo = NormalizarTexto(CorFundoCorpoTextBox.Text, ProjectTableDisplaySettings.DefaultBodyBackgroundColor),
+                CorTextoCorpo = NormalizarCor(CorTextoCorpoTextBox.Text, ProjectTableDisplaySettings.DefaultBodyTextColor),
+                CorFundoCorpo = NormalizarCor(CorFundoCorpoTextBox.Text, ProjectTableDisplaySettings.DefaultBodyBackgroundColor),
                 AlturaLinhaCorpo = LerDouble(AlturaLinhaCorpoTextBox.Text, _original.AlturaLinhaCorpo),
                 AlinhamentoCorpo = AlinhamentoCorpoComboBox.SelectedItem is ProjectTableTextAlignment alinhamentoCorpo ? alinhamentoCorpo : ProjectTableTextAlignment.Esquerda,
                 UsarLinhasAlternadas = LinhasAlternadasCheckBox.IsChecked == true,
-                CorLinhaAlternada = NormalizarTexto(CorLinhaAlternadaTextBox.Text, ProjectTableDisplaySettings.DefaultAlternateRowBackgroundColor),
+                CorLinhaAlternada = NormalizarCor(CorLinhaAlternadaTextBox.Text, ProjectTableDisplaySettings.DefaultAlternateRowBackgroundColor),
                 ExibirLinhasGrade = ExibirGradeCheckBox.IsChecked == true,
-                CorGrade = NormalizarTexto(CorGradeTextBox.Text, ProjectTableDisplaySettings.DefaultGridColor),
+                CorGrade = NormalizarCor(CorGradeTextBox.Text, ProjectTableDisplaySettings.DefaultGridColor),
                 EspessuraGrade = LerDouble(EspessuraGradeTextBox.Text, _original.EspessuraGrade),
                 ExibirContornoExterno = ExibirContornoCheckBox.IsChecked == true,
-                CorContorno = NormalizarTexto(CorContornoTextBox.Text, ProjectTableDisplaySettings.DefaultOutlineColor),
+                CorContorno = NormalizarCor(CorContornoTextBox.Text, ProjectTableDisplaySettings.DefaultOutlineColor),
                 EspessuraContorno = LerDouble(EspessuraContornoTextBox.Text, _original.EspessuraContorno)
             };
+        }
+
+        private void AbrirSeletorCor(TextBox textBox)
+        {
+            var window = new ColorPickerWindow(textBox.Text)
+            {
+                Owner = this
+            };
+
+            if (window.ShowDialog() != true)
+                return;
+
+            textBox.Text = window.SelectedColorHex;
+            AtualizarTodosBotoesCor();
+        }
+
+        private void AtualizarTodosBotoesCor()
+        {
+            AtualizarBotaoCor(CorTextoTituloTextBox, CorTextoTituloButton, ProjectTableDisplaySettings.DefaultTitleTextColor);
+            AtualizarBotaoCor(CorFundoTituloTextBox, CorFundoTituloButton, ProjectTableDisplaySettings.DefaultTitleBackgroundColor);
+            AtualizarBotaoCor(CorTextoCabecalhoTextBox, CorTextoCabecalhoButton, ProjectTableDisplaySettings.DefaultHeaderTextColor);
+            AtualizarBotaoCor(CorFundoCabecalhoTextBox, CorFundoCabecalhoButton, ProjectTableDisplaySettings.DefaultHeaderBackgroundColor);
+            AtualizarBotaoCor(CorTextoCorpoTextBox, CorTextoCorpoButton, ProjectTableDisplaySettings.DefaultBodyTextColor);
+            AtualizarBotaoCor(CorFundoCorpoTextBox, CorFundoCorpoButton, ProjectTableDisplaySettings.DefaultBodyBackgroundColor);
+            AtualizarBotaoCor(CorLinhaAlternadaTextBox, CorLinhaAlternadaButton, ProjectTableDisplaySettings.DefaultAlternateRowBackgroundColor);
+            AtualizarBotaoCor(CorGradeTextBox, CorGradeButton, ProjectTableDisplaySettings.DefaultGridColor);
+            AtualizarBotaoCor(CorContornoTextBox, CorContornoButton, ProjectTableDisplaySettings.DefaultOutlineColor);
+        }
+
+        private static void AtualizarBotaoCor(TextBox textBox, Button button, string fallback)
+        {
+            string color = ColorPickerWindow.TryNormalizeColor(textBox.Text, out string normalized)
+                ? normalized
+                : fallback;
+
+            button.Background = CriarBrush(color);
+            button.BorderBrush = Brushes.DimGray;
+            button.Content = string.Empty;
+            button.ToolTip = color;
+        }
+
+        private static SolidColorBrush CriarBrush(string color)
+        {
+            if (!ColorPickerWindow.TryNormalizeColor(color, out string normalized))
+                normalized = "#FF000000";
+
+            byte a = byte.Parse(normalized.Substring(1, 2), NumberStyles.HexNumber, CultureInfo.InvariantCulture);
+            byte r = byte.Parse(normalized.Substring(3, 2), NumberStyles.HexNumber, CultureInfo.InvariantCulture);
+            byte g = byte.Parse(normalized.Substring(5, 2), NumberStyles.HexNumber, CultureInfo.InvariantCulture);
+            byte b = byte.Parse(normalized.Substring(7, 2), NumberStyles.HexNumber, CultureInfo.InvariantCulture);
+            return new SolidColorBrush(Color.FromArgb(a, r, g, b));
         }
 
         private static void AplicarFonte(ComboBox comboBox, string? valor)
@@ -153,6 +256,13 @@ namespace Araci.Properties
                 return valor;
 
             return fallback;
+        }
+
+        private static string NormalizarCor(string? valor, string fallback)
+        {
+            return ColorPickerWindow.TryNormalizeColor(valor, out string normalized)
+                ? normalized
+                : fallback;
         }
 
         private static string NormalizarTexto(string? valor, string fallback)
